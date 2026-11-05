@@ -1,0 +1,13 @@
+{
+  "desktop": {
+    "mode": "offscreen worker",
+    "counts": "3 / 1",
+    "frame": "31.9 ms",
+    "overflow": false,
+    "webgl": true
+  },
+  "mobileOverflow": false,
+  "fallbackMode": "main thread fallback",
+  "pageErrors": [],
+  "note": "Chromium headless SwiftShader smoke test; not native WebView/GPU performance acceptance."
+}

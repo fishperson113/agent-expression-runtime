@@ -1,0 +1,652 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Agent Expression Runtime wire protocol v1",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "epoch": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "ttlMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5000
+        },
+        "kind": {
+          "const": "program"
+        },
+        "track": {
+          "const": "body"
+        },
+        "policy": {
+          "enum": ["append", "replace"]
+        },
+        "body": {
+          "$ref": "#/$defs/node"
+        }
+      },
+      "required": ["v", "epoch", "seq", "kind", "track", "policy", "body"],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "epoch": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "ttlMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5000
+        },
+        "kind": {
+          "const": "state"
+        },
+        "body": {
+          "type": "object",
+          "properties": {
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "pointSize": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 8
+            },
+            "dispersion": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "durationMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "easing": {
+              "enum": ["linear", "smoothstep"]
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "anyOf": [
+            {
+              "required": ["brightness"]
+            },
+            {
+              "required": ["pointSize"]
+            },
+            {
+              "required": ["dispersion"]
+            }
+          ]
+        }
+      },
+      "required": ["v", "epoch", "seq", "kind", "body"],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "epoch": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "ttlMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5000
+        },
+        "kind": {
+          "const": "define"
+        },
+        "body": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "revision": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "params": {
+              "type": "object",
+              "maxProperties": 8,
+              "propertyNames": {
+                "pattern": "^[a-zA-Z][\\w]{0,63}$"
+              },
+              "additionalProperties": {
+                "enum": ["number", "string"]
+              }
+            },
+            "body": {
+              "$ref": "#/$defs/template"
+            }
+          },
+          "required": ["name", "revision", "params", "body"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["v", "epoch", "seq", "kind", "body"],
+      "additionalProperties": false
+    }
+  ],
+  "$defs": {
+    "param": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "param"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      },
+      "required": ["type", "name"],
+      "additionalProperties": false
+    },
+    "node": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "morph"
+            },
+            "target": {
+              "enum": ["sphere", "ring", "wave", "cloud"]
+            },
+            "durationMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "easing": {
+              "enum": ["linear", "smoothstep"]
+            }
+          },
+          "required": ["type", "target", "durationMs"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "flow"
+            },
+            "field": {
+              "enum": ["orbit", "turbulence", "pulse"]
+            },
+            "strength": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "durationMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "easing": {
+              "enum": ["linear", "smoothstep"]
+            }
+          },
+          "required": ["type", "field", "strength", "durationMs"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "style"
+            },
+            "color": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$"
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "pointSize": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 8
+            },
+            "dispersion": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "durationMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "easing": {
+              "enum": ["linear", "smoothstep"]
+            }
+          },
+          "required": ["type", "durationMs"],
+          "additionalProperties": false,
+          "anyOf": [
+            {
+              "required": ["color"]
+            },
+            {
+              "required": ["brightness"]
+            },
+            {
+              "required": ["pointSize"]
+            },
+            {
+              "required": ["dispersion"]
+            }
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "wait"
+            },
+            "durationMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            }
+          },
+          "required": ["type", "durationMs"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "sequence"
+            },
+            "children": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 128,
+              "items": {
+                "$ref": "#/$defs/node"
+              }
+            }
+          },
+          "required": ["type", "children"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "parallel"
+            },
+            "children": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 128,
+              "items": {
+                "$ref": "#/$defs/node"
+              }
+            }
+          },
+          "required": ["type", "children"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "call"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "revision": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "args": {
+              "type": "object",
+              "maxProperties": 8,
+              "additionalProperties": {
+                "type": ["string", "number"]
+              }
+            }
+          },
+          "required": ["type", "name", "revision", "args"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "template": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "morph"
+            },
+            "target": {
+              "anyOf": [
+                {
+                  "enum": ["sphere", "ring", "wave", "cloud"]
+                },
+                {
+                  "$ref": "#/$defs/param"
+                }
+              ]
+            },
+            "durationMs": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000
+                },
+                {
+                  "$ref": "#/$defs/param"
+                }
+              ]
+            },
+            "easing": {
+              "anyOf": [
+                {
+                  "enum": ["linear", "smoothstep"]
+                },
+                {
+                  "$ref": "#/$defs/param"
+                }
+              ]
+            }
+          },
+          "required": ["type", "target", "durationMs"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "flow"
+            },
+            "field": {
+              "anyOf": [
+                {
+                  "enum": ["orbit", "turbulence", "pulse"]
+                },
+                {
+                  "$ref": "#/$defs/param"
+                }
+              ]
+            },
+            "strength": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                {
+                  "$ref": "#/$defs/param"
+                }
+              ]
+            },
+            "durationMs": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000
+                },
+                {
+                  "$ref": "#/$defs/param"
+                }
+              ]
+            },
+            "easing": {
+              "anyOf": [
+                {
+                  "enum": ["linear", "smoothstep"]
+                },
+                {
+                  "$ref": "#/$defs/param"
+                }
+              ]
+            }
+          },
+          "required": ["type", "field", "strength", "durationMs"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "style"
+            },
+            "color": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^#[0-9a-fA-F]{6}$"
+                },
+                {
+                  "$ref": "#/$defs/param"
+                }
+              ]
+            },
+            "brightness": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                {
+                  "$ref": "#/$defs/param"
+                }
+              ]
+            },
+            "pointSize": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 8
+                },
+                {
+                  "$ref": "#/$defs/param"
+                }
+              ]
+            },
+            "dispersion": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                {
+                  "$ref": "#/$defs/param"
+                }
+              ]
+            },
+            "durationMs": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000
+                },
+                {
+                  "$ref": "#/$defs/param"
+                }
+              ]
+            },
+            "easing": {
+              "anyOf": [
+                {
+                  "enum": ["linear", "smoothstep"]
+                },
+                {
+                  "$ref": "#/$defs/param"
+                }
+              ]
+            }
+          },
+          "required": ["type", "durationMs"],
+          "additionalProperties": false,
+          "anyOf": [
+            {
+              "required": ["color"]
+            },
+            {
+              "required": ["brightness"]
+            },
+            {
+              "required": ["pointSize"]
+            },
+            {
+              "required": ["dispersion"]
+            }
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "wait"
+            },
+            "durationMs": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000
+                },
+                {
+                  "$ref": "#/$defs/param"
+                }
+              ]
+            }
+          },
+          "required": ["type", "durationMs"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "sequence"
+            },
+            "children": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 128,
+              "items": {
+                "$ref": "#/$defs/template"
+              }
+            }
+          },
+          "required": ["type", "children"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "parallel"
+            },
+            "children": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 128,
+              "items": {
+                "$ref": "#/$defs/template"
+              }
+            }
+          },
+          "required": ["type", "children"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "call"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "revision": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "args": {
+              "type": "object",
+              "maxProperties": 8,
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": ["string", "number"]
+                  },
+                  {
+                    "$ref": "#/$defs/param"
+                  }
+                ]
+              }
+            }
+          },
+          "required": ["type", "name", "revision", "args"],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}
