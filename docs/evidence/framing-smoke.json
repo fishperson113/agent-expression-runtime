@@ -1,0 +1,23 @@
+{
+  "target": {
+    "rise": 1,
+    "advance": 1,
+    "grow": 2,
+    "spread": 2
+  },
+  "viewports": [
+    {
+      "name": "desktop",
+      "width": 1280,
+      "height": 900,
+      "admission": "accepted"
+    },
+    {
+      "name": "portrait",
+      "width": 375,
+      "height": 812,
+      "admission": "accepted"
+    }
+  ],
+  "pageErrors": []
+}
