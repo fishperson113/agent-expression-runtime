@@ -1,0 +1,88 @@
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { resolve, dirname } from 'node:path';
+import { mkdirSync, readFileSync, existsSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { setTimeout as delay } from 'node:timers/promises';
+import { herdrCall, selectAgent, graphicsMode } from '../integrations/herdr.mjs';
+import { openControl } from '../integrations/terminal-ipc.mjs';
+import { displaySize, drawFrame } from '../integrations/pane-display.mjs';
+
+const root = fileURLToPath(new URL('../', import.meta.url));
+async function bundler() {
+  try { return await import('esbuild'); }
+  catch (error) {
+    if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error;
+    const script = process.env.npm_execpath ?? resolve(dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js');
+    await new Promise((resolve, reject) => {
+      const child = existsSync(script) ? spawn(process.execPath, [script, 'ci'], { cwd: root, stdio: 'inherit', windowsHide: true })
+        : spawn('npm', ['ci'], { cwd: root, stdio: 'inherit', windowsHide: true });
+      child.once('error', reject); child.once('exit', code => code === 0 ? resolve() : reject(Error('Fisch dependency installation failed.')));
+    });
+    return import('esbuild');
+  }
+}
+export async function terminalEngine() {
+  const { build } = await bundler();
+  mkdirSync(resolve(root, '.runtime'), { recursive: true });
+  const outfile = resolve(root, '.runtime/terminal.mjs');
+  await build({ entryPoints: [resolve(root, 'src/terminal/runtime.ts')], outfile,
+    bundle: true, format: 'esm', platform: 'node', target: 'node22', packages: 'external' });
+  const { TerminalEngine } = await import(pathToFileURL(outfile).href + '?build=' + Date.now());
+  return new TerminalEngine();
+}
+export function capabilities() {
+  return { capabilities: JSON.parse(readFileSync(resolve(root, 'src/contracts/capabilities.json'), 'utf8')),
+    schema: JSON.parse(readFileSync(resolve(root, 'src/contracts/protocol.schema.json'), 'utf8')),
+    instructions: readFileSync(resolve(root, 'integrations/instructions-v1.md'), 'utf8') };
+}
+async function notifyAgent(call, agent) {
+  try {
+    await call('agent.prompt', { target: agent.pane_id, text:
+      'Fisch is now attached to this EXISTING agent session in a neighboring Herdr pane. Use `fisch status` to acknowledge, `fisch capabilities` for the AST contract, `fisch express \'{"type":"morph","target":"sphere","durationMs":900}\'` for a body expression, and `fisch cancel` to reset. Keep working on the user request. Do not launch another agent or browser.' });
+    return true;
+  } catch (error) { if (error.code === 'agent_blocked') return false; throw error; }
+}
+export async function runPaneSession({ agentPane, call = herdrCall, notify = true, output = process.stdout, signal } = {}) {
+  let { snapshot } = await call('session.snapshot');
+  const { own, agent } = selectAgent(snapshot, process.env.HERDR_PANE_ID, agentPane);
+  let mode = await graphicsMode(call);
+  const engine = await terminalEngine();
+  const abort = new AbortController(), stop = () => abort.abort();
+  let commands = 0, frames = 0, notified = !notify;
+  const control = await openControl(agent.pane_id, message => {
+    if (message.method === 'express') { commands++; return engine.express(message.args); }
+    if (message.method === 'cancel') return engine.cancel();
+    if (message.method === 'stop') { stop(); return { status: 'stopped' }; }
+    if (message.method === 'status') return { status: 'attached', agent: agent.agent, agentPane: agent.pane_id,
+      rendererPane: own.pane_id, renderer: mode, frames, expressions: commands, shape: engine.state.shape };
+    throw Error('unknown_method');
+  });
+  process.once('SIGINT', stop); process.once('SIGTERM', stop); signal?.addEventListener('abort', stop, { once: true });
+  if (signal?.aborted) stop();
+  const wasRaw = process.stdin.isRaw ?? false;
+  const key = chunk => { if (chunk.includes(113) || chunk.includes(3)) stop(); };
+  if (process.stdin.isTTY) { process.stdin.setRawMode(true); process.stdin.resume(); process.stdin.on('data', key); }
+  output.write('\x1b[?1049h\x1b[?25l\x1b[2J');
+  try {
+    while (!abort.signal.aborted) {
+      if (frames % 10 === 0) {
+        snapshot = (await call('session.snapshot')).snapshot;
+        if (!snapshot.panes.some(pane => pane.pane_id === own.pane_id) ||
+            !snapshot.agents.some(peer => peer.pane_id === agent.pane_id && peer.agent === agent.agent)) break;
+        if (mode === 'braille' && frames > 0) mode = await graphicsMode(call);
+        if (!notified) notified = await notifyAgent(call, agent);
+      }
+      const size = displaySize(snapshot, own.pane_id), pixels = engine.frame(size.width, size.height);
+      await drawFrame({ pixels, size, mode, paneId: own.pane_id, call, output,
+        title: `Fisch · ${agent.agent} ${agent.pane_id} · ${commands ? 'receiving expressions' : 'waiting for first expression'}` });
+      frames++; await delay(100);
+    }
+    return 0;
+  } finally {
+    stop(); process.removeListener('SIGINT', stop); process.removeListener('SIGTERM', stop);
+    signal?.removeEventListener('abort', stop); process.stdin.off('data', key);
+    if (process.stdin.isTTY) { process.stdin.setRawMode(wasRaw); process.stdin.pause(); }
+    if (mode === 'pixels') await call('pane.graphics.clear', { pane_id: own.pane_id }).catch(() => {});
+    await control.close(); engine.dispose(); output.write('\x1b[0m\x1b[?25h\x1b[?1049l');
+  }
+}

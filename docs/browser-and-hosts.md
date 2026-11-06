@@ -1,31 +1,21 @@
-# Browser display and Codex in one command
+# Pane runtime and browser reference
 
-Link this checkout once with `npm link`. In a free Herdr/terminal pane, run:
-
-```powershell
-fisch run
-```
-
-The Node launcher installs missing npm dependencies, validates/builds the frontend, incrementally builds the Rust gateway, opens a dedicated browser window and automatically pairs its renderer. It then starts a fresh Codex CLI session in that same terminal pane with the existing `aer` MCP adapter already configured. The other pane and existing conversation stay available.
-
-There is no clipboard step, token input, manual environment setup or edit to `~/.codex/config.toml`. The first Codex prompt loads `aer://instructions/v1` and requests a short sphere expression. Model replies remain in the terminal; the browser displays the particle body. The browser's conversation form is a separate scripted demo.
-
-Commands: `fisch run` starts a connected session; `fisch build` builds without a model; `fisch test` runs automated checks; `fisch evaluate` opens the blind observer workflow; `fisch doctor` checks prerequisites; `fisch --help` lists commands.
+The normal entry point is `fisch run` in a free Herdr pane next to an existing Codex or Claude. It runs the expression engine and particle renderer in Node and attaches through Herdr discovery and a private local socket. It does not launch a browser or another agent. See [the pane guide](multiplexer.md).
 
 ## Requirements
 
-Windows, Linux or macOS; Node.js 22.12+ (or 24), npm, Rust stable, platform Tauri build prerequisites, an installed Microsoft Edge or Google Chrome, and Codex CLI already signed in. Windows needs Microsoft C++ Build Tools; Linux needs GTK/WebKit development packages; macOS needs Xcode command line tools. PowerShell is not required by `fisch run`. The launcher also supports a locally installed Playwright Chromium as a fallback, or a browser executable selected with `CHROME_PATH`. It does not install system toolchains, download browsers, change Codex authentication or configure paid services.
+Node.js 22.12+ (or 24), npm and Herdr with its local socket API enabled. The agent must already be running and capable of shell commands. Missing checkout dependencies are installed with `npm ci`. Link the checkout once using `npm link` to expose the `fisch` command.
 
-## Session lifetime
+The launcher uses platform-native sockets and has no PowerShell dependency. Windows live attachment has been exercised with Codex. Claude discovery is covered by automated tests; live Claude attachment remains unverified. The new pane path still needs a live Linux/macOS multiplexer check; earlier Linux build validation covers the reference engine.
 
-Exit Codex or close the particle window to stop the session. The launcher closes its browser and stops its gateway/frontend and child host processes. Ctrl+C also requests shutdown. A forced termination of the launcher or OS crash cannot guarantee cleanup.
+## Display and lifecycle
 
-Each run selects available loopback ports and creates a new random credential. The credential travels through child-process environments and the browser's in-memory password input, which is cleared after pairing. It is not put in URLs, shell arguments, clipboard, configuration files or launcher logs. Browser refresh is paired again automatically using the launcher-held credential; the MCP host recreates its session and restores acknowledged macros on the next command. Closing the window ends the launcher session.
+Inline RGB requires Herdr graphics support and cell dimensions. If experimental graphics are disabled, Fisch enables `experimental.kitty_graphics` in the existing Herdr configuration and reloads it without restarting agents. If pixels remain unavailable, colored Braille particles stay inside the pane. This is a lower fidelity display, not evidence that subtle effort differences are perceptible.
 
-Codex runs with `--no-daemon` so this invocation receives its own inherited environment rather than sharing a daemon started without the credential. MCP options apply only to this invocation; the launcher does not weaken sandbox or approval settings. The new session is independent of the chat already open in another Herdr pane.
+Each agent pane has a separate private control endpoint. Fisch refuses a second body attached to that same pane. Agent notification is retried if Herdr reports the agent blocked. q, Ctrl+C or `fisch stop` stops the body; the original chat remains. A vanished agent ends the body. A new run starts a fresh macro registry. No model credentials enter the engine.
 
-The first model-selected expression still depends on Codex login, model availability and host/tool approval settings. The launcher verifies renderer readiness before starting Codex; this does not certify a model response or physical display timing. See [admission semantics](admission.md).
+## Development and evaluation
 
-## Development and protocol reference
+`npm run dev` and `npm run tauri -- dev` remain browser/desktop developer entry points. `fisch evaluate` opens the separate browser reference evaluation workflow and retains its Rust and browser prerequisites. `fisch build` builds the reference frontend; `fisch test` runs automated checks. These commands are independent of pane attachment.
 
-`npm run dev` and `npm run tauri -- dev` remain developer entry points. For custom agent hosts, see [the HTTP/MCP protocol](integration.md). These are implementation references, not additional setup steps for `fisch run`.
+For custom HTTP/MCP hosts, see [the protocol reference](integration.md). That adapter remains available but is not required by `fisch run`.

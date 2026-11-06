@@ -1,18 +1,20 @@
 # Fisch
 
-A provider-independent, Windows-first Tauri + TypeScript runtime: a particle body controlled by a bounded, declarative JSON AST. External agents connect through authenticated local HTTP/SSE or the MCP adapter. The engine itself requires no model account, model SDK or API key; the one-command launcher uses your signed-in Codex CLI.
+A provider-independent, Windows-first Tauri + TypeScript runtime: a particle body controlled by a bounded, declarative JSON AST. External agents connect through authenticated local HTTP/SSE or the MCP adapter. The engine itself requires no model account, model SDK or API key; the pane launcher attaches to your existing Codex or Claude session.
 
 ![Browser sandbox](docs/evidence/browser-desktop.png)
 
-## Browser / multiplexer quick start
+## Herdr quick start
 
-Link the checkout once with `npm link`. Then, in a free Herdr/terminal pane, run:
+Link the checkout once with `npm link`. Keep Codex or Claude running in one Herdr pane. In the neighboring free pane, run:
 
-```powershell
+```sh
 fisch run
 ```
 
-This builds the runtime, opens and pairs the browser body, and starts a fresh Codex session in that pane with MCP already connected. No clipboard token, environment commands or manual Codex configuration. Exit Codex or close the body window to stop. Requires Node 22.12+, Rust with the platform Tauri build prerequisites, Edge/Chrome and a signed-in Codex CLI. The Node launcher supports Windows, Linux and macOS. Use `fisch doctor` for prerequisite checks, `fisch build` to build, `fisch test` for automated validation, and `fisch evaluate` for blind effort comparisons. See [the one-command guide](docs/browser-and-hosts.md).
+Fisch displays its particle body inside that pane, discovers the existing agent in the same workspace, and sends it attachment instructions. It opens no browser and starts no new agent. Requires Node 22.12+ and Herdr. Missing npm dependencies are installed automatically.
+
+The installed Herdr client currently uses colored Braille particles; inline RGB is selected when Herdr supplies its graphics API and cell dimensions. This terminal rendering has lower visual fidelity than the browser reference renderer. See [pane workflow and controls](docs/multiplexer.md).
 
 ## Development entry points
 
@@ -29,7 +31,7 @@ Open the printed local URL. Start a scripted turn, cancel it, submit a JSON prog
 npm run tauri -- dev
 ```
 
-The desktop app starts a loopback-only gateway and shows pairing details on demand. Follow [external agent integration](docs/integration.md) for the HTTP/MCP protocol. The body works without the conversation demo. The runtime itself never calls a model; `fisch run` launches your signed-in Codex CLI as the external agent. The browser conversation demo remains scripted. No paid services are configured by the launcher.
+The desktop app starts a loopback-only gateway and shows pairing details on demand. Follow [external agent integration](docs/integration.md) for the HTTP/MCP protocol. The body works without the conversation demo. The runtime itself never calls a model; `fisch run` attaches to the existing agent through a private local socket. The browser conversation demo remains scripted. No paid services are configured by the launcher.
 
 ## Validate
 
@@ -59,7 +61,7 @@ Browser smoke test: start `npm run dev`, install Chromium with `npx playwright i
 
 This is an initial POC implementation, **not a claim that M1–M3 or performance acceptance are complete**. See [validation](docs/validation.md), [architecture and known limits](docs/architecture.md), and [benchmark procedure](docs/benchmark.md).
 
-First real agent-host selection/demo, token overhead measurement, native visual checks, 20-minute memory soak and target-machine performance acceptance remain open. Direct model API mode is optional and unimplemented. Headless browser tests cannot certify Windows WebView/GPU behavior. The source SRS attachments are deliberately excluded from the public repository.
+Claude live attachment, token overhead measurement, native pixel visual checks, 20-minute memory soak and target-machine performance acceptance remain open. Direct model API mode is optional and unimplemented. Headless browser tests cannot certify Windows WebView/GPU behavior. The source SRS attachments are deliberately excluded from the public repository.
 
 Product-code license remains undecided. This public repository is a source preview, not a completed OSS licensing release. Dependency licenses and the original generated icon remain separate; no license was silently inherited from another repository.
 
