@@ -1,58 +1,29 @@
-# Browser display, terminal control
+# Browser display and Codex in one command
 
-The simple POC path uses a browser for WebGL and any terminal multiplexer for the gateway and agent. It does not render 3D inside the terminal pane and does not depend on Herdr. The Rust gateway can run without a Tauri window; it still binds loopback and requires pairing authentication.
-
-## Quick Windows run
-
-From the repository root, run `npm ci`, then:
+From the repository root in a free Herdr terminal pane, run:
 
 ```powershell
-pwsh -File scripts/start-browser.ps1 -CopyToken
+npm start
 ```
 
-The launcher builds the current gateway, generates an ephemeral credential, starts the gateway hidden and starts Vite in the foreground. Open the printed browser URL. Enter the printed gateway URL, paste the clipboard token into the password field and click **Connect browser renderer**. The input is cleared after connection. No token is printed or written to the runtime info file; that file contains only the loopback address. Ctrl+C stops the launcher gateway. Use `-Port 5180` if needed; the Origin allowlist follows that exact port.
+The Windows launcher installs missing npm dependencies, validates/builds the frontend, incrementally builds the Rust gateway, opens a dedicated browser window and automatically pairs its renderer. It then starts a fresh Codex CLI session in that same terminal pane with the existing `aer` MCP adapter already configured. The other pane and existing conversation stay available.
 
-Only one renderer/controller is supported. Connecting a new renderer releases the prior session. A local scripted demo cannot take over an active external controller; release it explicitly first. Disabling Expressions cancels body work without revoking the host session. Browser refresh creates a fresh compiler session, so the host must reconnect and redefine macros.
+There is no clipboard step, token input, manual environment setup or edit to `~/.codex/config.toml`. The first Codex prompt loads `aer://instructions/v1` and requests a short sphere expression. Model replies remain in the terminal; the browser displays the particle body. The browser's conversation form is a separate scripted demo.
 
-## Control from another pane
+## Requirements
 
-Set `AER_BASE_URL` to the gateway URL and `AER_PAIRING_TOKEN` to the same ephemeral credential in the agent host's process environment. Separately created multiplexer panes do not automatically inherit variables set later in another pane. In a PowerShell host pane you can assign `$env:AER_PAIRING_TOKEN = Get-Clipboard` after the launcher copied it, without printing or placing the value in a command literal. Do not save the token in shell profiles, committed files or model instructions.
+Windows, PowerShell 7 (`pwsh`), Node.js 22.12+ (or 24), npm, Rust stable, Microsoft C++ Build Tools, an installed Microsoft Edge or Google Chrome, and Codex CLI already signed in. The launcher also supports a locally installed Playwright Chromium as a fallback. It does not install system toolchains, download browsers, change Codex authentication or configure paid services.
 
-```sh
-node integrations/cli.mjs capabilities
-node integrations/cli.mjs smoke
-```
+## Session lifetime
 
-The smoke command acquires a controller, submits, cancels and releases it. It fails rather than stealing an active controller. The browser displays the body; the pane displays text receipts. To test the complete automated path with Chromium installed:
+Exit Codex or close the particle window to stop the session. The launcher closes its browser and stops its gateway/frontend and child host processes. Ctrl+C also requests shutdown. A forced termination of the launcher or OS crash cannot guarantee cleanup.
 
-```sh
-cargo build --locked --manifest-path src-tauri/Cargo.toml
-node scripts/browser-bridge-smoke.mjs
-```
+Each run selects available loopback ports and creates a new random credential. The credential travels through child-process environments and the browser's in-memory password input, which is cleared after pairing. It is not put in URLs, shell arguments, clipboard, configuration files or launcher logs. Closing the browser requires a new `npm start`; manual browser refresh requires pairing again, so restart the session instead.
 
-`CHROME_PATH` can select an existing Chromium. This test starts its own gateway/Vite/browser processes, uses a temporary in-memory credential and writes only non-secret results to `docs/evidence/browser-bridge-smoke.json`.
+Codex runs with `--no-daemon` so this invocation receives its own inherited environment rather than sharing a daemon started without the credential. MCP options apply only to this invocation; the launcher does not weaken sandbox or approval settings. The new session is independent of the chat already open in another Herdr pane.
 
-## Codex
+The first model-selected expression still depends on Codex login, model availability and host/tool approval settings. The launcher verifies renderer readiness before starting Codex; this does not certify a model response or physical display timing. See [admission semantics](admission.md).
 
-The installed `codex mcp add --help` supports local stdio commands. For manual registration, use `codex mcp add aer -- node "ABSOLUTE_REPO_PATH/integrations/mcp-server.mjs"`, then configure only environment-variable **names**, not credential values:
+## Development and protocol reference
 
-```toml
-[mcp_servers.aer]
-command = "node"
-args = ["ABSOLUTE_REPO_PATH/integrations/mcp-server.mjs"]
-env_vars = ["AER_BASE_URL", "AER_PAIRING_TOKEN"]
-```
-
-Merge this into the appropriate Codex configuration rather than duplicating an existing server table. Start the host from a process that has those ephemeral environment variables. Review/trust the server through the host's normal controls. See [official Codex MCP documentation](https://developers.openai.com/codex/mcp). Registration/configuration was not performed by this work.
-
-## Claude Code
-
-The installed CLI supports `--mcp-config`. Set `AER_REPO_DIR`, `AER_BASE_URL` and `AER_PAIRING_TOKEN` in the launching process, then use the example that contains environment references rather than literal secrets:
-
-```sh
-claude --mcp-config integrations/claude-mcp.example.json
-```
-
-Check `/mcp` in that host, approve the local server if requested and load `aer://instructions/v1` into agent context. The example uses documented environment expansion in MCP configuration. See [official Claude Code MCP documentation](https://code.claude.com/docs/en/mcp). This verifies configuration syntax and the fake-host protocol, not a real model/host behavioral benchmark. No Claude configuration or credential has been installed.
-
-For either host, request a short `express` program and continue the normal answer independently. ACK means admission, `pending` means unconfirmed, and animation completion is separate feedback. Standard sequential tool-calling may pause text; this runtime cannot remove that host limitation. No evaluator is included.
+`npm run dev` and `npm run tauri -- dev` remain developer entry points. For custom agent hosts, see [the HTTP/MCP protocol](integration.md). These are implementation references, not additional setup steps for `npm start`.

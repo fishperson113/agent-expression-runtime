@@ -1,14 +1,20 @@
 # Agent Expression Runtime
 
-A provider-independent, Windows-first Tauri + TypeScript runtime: a particle body controlled by a bounded, declarative JSON AST. External agents connect through authenticated local HTTP/SSE or the MCP adapter. No model account, model SDK or API key is required.
+A provider-independent, Windows-first Tauri + TypeScript runtime: a particle body controlled by a bounded, declarative JSON AST. External agents connect through authenticated local HTTP/SSE or the MCP adapter. The engine itself requires no model account, model SDK or API key; the one-command launcher uses your signed-in Codex CLI.
 
 ![Browser sandbox](docs/evidence/browser-desktop.png)
 
 ## Browser / multiplexer quick start
 
-See [browser and Codex/Claude guide](docs/browser-and-hosts.md). Run `pwsh -File scripts/start-browser.ps1 -CopyToken` from a terminal pane; WebGL is displayed in the browser window. The working tree includes a breaking primitive update and receipt `pending` semantics documented in [admission](docs/admission.md).
+In a free Herdr/PowerShell pane at the repository root, run:
 
-## Run
+```powershell
+npm start
+```
+
+This builds the runtime, opens and pairs the browser body, and starts a fresh Codex session in that pane with MCP already connected. No clipboard token, environment commands or manual Codex configuration. Exit Codex or close the body window to stop. Requires Windows, PowerShell 7, Node 22.12+, Rust/C++ Build Tools, Edge/Chrome and a signed-in Codex CLI. See [the one-command guide](docs/browser-and-hosts.md).
+
+## Development entry points
 
 Requires Node.js 22.12+ (or 24), npm, and for desktop Rust stable, Microsoft C++ Build Tools and WebView2.
 
@@ -23,7 +29,7 @@ Open the printed local URL. Start a scripted turn, cancel it, submit a JSON prog
 npm run tauri -- dev
 ```
 
-The desktop app starts a loopback-only gateway and shows pairing details on demand. Follow [external agent integration](docs/integration.md) for HTTP, the TypeScript helper and MCP stdio adapter. The body works without the conversation demo. Browser mode and the optional conversation demo use scripted adapters. **No mode calls a model.** No paid services are configured.
+The desktop app starts a loopback-only gateway and shows pairing details on demand. Follow [external agent integration](docs/integration.md) for the HTTP/MCP protocol. The body works without the conversation demo. The runtime itself never calls a model; `npm start` launches your signed-in Codex CLI as the external agent. The browser conversation demo remains scripted. No paid services are configured by the launcher.
 
 ## Validate
 

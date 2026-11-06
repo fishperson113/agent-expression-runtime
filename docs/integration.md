@@ -4,6 +4,8 @@ This is the primary integration mode introduced by SRS v0.3. The desktop runtime
 
 ## Pair a host
 
+For the supported Windows Codex workflow, run **`npm start`** from the repository root. It starts and pairs the browser renderer and opens Codex with the MCP adapter configured for that invocation. Follow [the one-command guide](browser-and-hosts.md). The protocol examples below are for developers integrating their own hosts; they are not required launcher steps.
+
 Run the Tauri desktop application. The external-agent panel shows its ephemeral `http://127.0.0.1:<port>` address. Click **Show pairing details** and copy the token into your host's environment as `AER_PAIRING_TOKEN`, with the address in `AER_BASE_URL`. The credential is generated on every app launch, kept in memory, never written into a model prompt, URL, replay or application log. Click again to hide it. **Release controller** closes the active session; restarting the app rotates the token.
 
 The server binds IPv4 loopback only. Requests require `Authorization: Bearer <token>`. Origin headers are denied unless explicitly listed in `AER_ALLOWED_ORIGINS` (comma-separated exact origins). There is no wildcard CORS. CORS preflight is supported only for the configured exact Origin, allowed methods and headers; OPTIONS never carries the bearer token. Host headers must be loopback. Remote exposure is unsupported.
