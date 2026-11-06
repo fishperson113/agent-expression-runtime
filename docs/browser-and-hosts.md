@@ -6,19 +6,19 @@ From the repository root in a free Herdr terminal pane, run:
 npm start
 ```
 
-The Windows launcher installs missing npm dependencies, validates/builds the frontend, incrementally builds the Rust gateway, opens a dedicated browser window and automatically pairs its renderer. It then starts a fresh Codex CLI session in that same terminal pane with the existing `aer` MCP adapter already configured. The other pane and existing conversation stay available.
+The Node launcher installs missing npm dependencies, validates/builds the frontend, incrementally builds the Rust gateway, opens a dedicated browser window and automatically pairs its renderer. It then starts a fresh Codex CLI session in that same terminal pane with the existing `aer` MCP adapter already configured. The other pane and existing conversation stay available.
 
 There is no clipboard step, token input, manual environment setup or edit to `~/.codex/config.toml`. The first Codex prompt loads `aer://instructions/v1` and requests a short sphere expression. Model replies remain in the terminal; the browser displays the particle body. The browser's conversation form is a separate scripted demo.
 
 ## Requirements
 
-Windows, PowerShell 7 (`pwsh`), Node.js 22.12+ (or 24), npm, Rust stable, Microsoft C++ Build Tools, an installed Microsoft Edge or Google Chrome, and Codex CLI already signed in. The launcher also supports a locally installed Playwright Chromium as a fallback. It does not install system toolchains, download browsers, change Codex authentication or configure paid services.
+Windows, Linux or macOS; Node.js 22.12+ (or 24), npm, Rust stable, platform Tauri build prerequisites, an installed Microsoft Edge or Google Chrome, and Codex CLI already signed in. Windows needs Microsoft C++ Build Tools; Linux needs GTK/WebKit development packages; macOS needs Xcode command line tools. PowerShell is not required by `npm start`. The launcher also supports a locally installed Playwright Chromium as a fallback, or a browser executable selected with `CHROME_PATH`. It does not install system toolchains, download browsers, change Codex authentication or configure paid services.
 
 ## Session lifetime
 
 Exit Codex or close the particle window to stop the session. The launcher closes its browser and stops its gateway/frontend and child host processes. Ctrl+C also requests shutdown. A forced termination of the launcher or OS crash cannot guarantee cleanup.
 
-Each run selects available loopback ports and creates a new random credential. The credential travels through child-process environments and the browser's in-memory password input, which is cleared after pairing. It is not put in URLs, shell arguments, clipboard, configuration files or launcher logs. Closing the browser requires a new `npm start`; manual browser refresh requires pairing again, so restart the session instead.
+Each run selects available loopback ports and creates a new random credential. The credential travels through child-process environments and the browser's in-memory password input, which is cleared after pairing. It is not put in URLs, shell arguments, clipboard, configuration files or launcher logs. Browser refresh is paired again automatically using the launcher-held credential; the MCP host recreates its session and restores acknowledged macros on the next command. Closing the window ends the launcher session.
 
 Codex runs with `--no-daemon` so this invocation receives its own inherited environment rather than sharing a daemon started without the credential. MCP options apply only to this invocation; the launcher does not weaken sandbox or approval settings. The new session is independent of the chat already open in another Herdr pane.
 

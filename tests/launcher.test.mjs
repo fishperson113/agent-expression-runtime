@@ -1,7 +1,8 @@
 import { expect, it } from 'vitest';
 import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { runSession, stopChild } from '../scripts/start-session.mjs';
+import { runSession, stopChild, codexArguments, gatewayExecutable } from '../scripts/start-session.mjs';
 
 function mcpClient(base, token) {
   const child = spawn(process.execPath, ['integrations/mcp-server.mjs'], {
@@ -28,25 +29,29 @@ function mcpClient(base, token) {
   return { child, call };
 }
 
-it.skipIf(process.platform !== 'win32')('passes transient MCP settings to Codex without storing credentials', async () => {
-  const child = spawn('pwsh', ['-NoProfile', '-Command',
-    'function codex { ConvertTo-Json -Compress -InputObject @($args); $global:LASTEXITCODE = 0 }; & ./scripts/start-browser.ps1 -Agent',
-  ], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
-  let output = '', errors = '';
-  child.stdout.on('data', chunk => output += chunk);
-  child.stderr.on('data', chunk => errors += chunk);
-  const code = await new Promise((resolve, reject) => { child.once('exit', resolve); child.once('error', reject); });
-  expect(errors).toBe('');
-  expect(code).toBe(0);
-  const args = JSON.parse(output);
+async function admitted(call, args) {
+  const arguments_ = { ...args, requestId: randomUUID() };
+  let reply;
+  await expect.poll(async () => {
+    reply = await call('tools/call', { name: 'express', arguments: arguments_ });
+    return JSON.parse(reply.content[0].text).status;
+  }, { timeout: 1500, interval: 100 }).toBe('accepted');
+  return reply;
+}
+
+it('passes transient MCP settings to Codex without storing credentials', () => {
+  const args = codexArguments();
   expect(args).toContain('--no-daemon');
   expect(args).toContain('mcp_servers.aer.env_vars=["AER_BASE_URL","AER_PAIRING_TOKEN"]');
   const adapter = JSON.parse(args.find(arg => arg.startsWith('mcp_servers.aer.args=')).split('=').slice(1).join('='));
   expect(adapter).toHaveLength(1);
   expect(existsSync(adapter[0])).toBe(true);
+  expect(gatewayExecutable('win32')).toMatch(/runtime\.exe$/);
+  expect(gatewayExecutable('linux')).toMatch(/runtime$/);
+  expect(gatewayExecutable('darwin')).toMatch(/runtime$/);
 });
 
-const native = process.platform === 'win32' && existsSync('src-tauri/target/debug/agent-expression-runtime.exe');
+const native = existsSync(gatewayExecutable());
 it.skipIf(!native)('auto-pairs the real browser and admits an MCP expression, then cleans up', async () => {
   let base, origin, gateway;
   const result = await runSession({ headless: true, runHost: async context => {
@@ -59,12 +64,14 @@ it.skipIf(!native)('auto-pairs the real browser and admits an MCP expression, th
       expect(initialized.serverInfo.name).toBe('agent-expression-runtime');
       const resource = await mcp.call('resources/read', { uri: 'aer://instructions/v1' });
       expect(resource.contents[0].text).toContain('morph');
-      const reply = await mcp.call('tools/call', {
-        name: 'express', arguments: { body: { type: 'morph', target: 'wall', durationMs: 100 } },
-      });
-      expect(JSON.parse(reply.content[0].text).status).toBe('accepted');
+      await admitted(mcp.call, { body: { type: 'morph', target: 'wall', durationMs: 100 } });
       await context.page.waitForFunction(() => document.querySelector('#shape')?.textContent.includes('wall'));
       expect((await mcp.call('tools/call', { name: 'cancel_expression', arguments: {} })).isError).not.toBe(true);
+      await admitted(mcp.call, { kind: 'define', body: { name: 'afterRefresh', revision: 1,
+        params: {}, body: { type: 'wait', durationMs: 10 } } });
+      await context.page.reload();
+      await context.page.waitForFunction(() => document.querySelector('#gateway-status')?.textContent.includes('Listening'));
+      await admitted(mcp.call, { body: { type: 'call', name: 'afterRefresh', revision: 1, args: {} } });
       return 0;
     } finally { await stopChild(mcp.child); }
   } });

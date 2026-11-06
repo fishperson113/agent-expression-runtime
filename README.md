@@ -12,7 +12,7 @@ In a free Herdr/PowerShell pane at the repository root, run:
 npm start
 ```
 
-This builds the runtime, opens and pairs the browser body, and starts a fresh Codex session in that pane with MCP already connected. No clipboard token, environment commands or manual Codex configuration. Exit Codex or close the body window to stop. Requires Windows, PowerShell 7, Node 22.12+, Rust/C++ Build Tools, Edge/Chrome and a signed-in Codex CLI. See [the one-command guide](docs/browser-and-hosts.md).
+This builds the runtime, opens and pairs the browser body, and starts a fresh Codex session in that pane with MCP already connected. No clipboard token, environment commands or manual Codex configuration. Exit Codex or close the body window to stop. Requires Node 22.12+, Rust with the platform Tauri build prerequisites, Edge/Chrome and a signed-in Codex CLI. The Node launcher supports Windows, Linux and macOS. See [the one-command guide](docs/browser-and-hosts.md).
 
 ## Development entry points
 
