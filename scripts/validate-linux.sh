@@ -12,11 +12,11 @@ uname -a
 node --version
 cargo --version
 npm ci
-npm run build
-npm run check:architecture
-cargo build --locked --manifest-path src-tauri/Cargo.toml
-cargo test --locked --manifest-path src-tauri/Cargo.toml
-npm test
+npm link
+fisch --help
+fisch --version
+fisch build
+fisch test
 export AER_GATEWAY_EXE=/work/src-tauri/target/debug/agent-expression-runtime
 node scripts/browser-bridge-smoke.mjs
 node --input-type=module <<'JS'
@@ -26,6 +26,8 @@ writeFileSync('docs/evidence/linux-validation.json', JSON.stringify({
   platform: process.platform, arch: process.arch, node: process.version,
   kernel: execFileSync('uname', ['-r'], { encoding: 'utf8' }).trim(),
   cargo: execFileSync('cargo', ['--version'], { encoding: 'utf8' }).trim(),
+  fisch: execFileSync('fisch', ['--version'], { encoding: 'utf8' }).trim(),
+  cliBuild: 'passed', cliTest: 'passed',
   frontendBuild: 'passed', architecture: 'passed', nativeBuild: 'passed',
   rustTests: 'passed', javascriptTests: 'passed', browserBridge: 'passed',
   timestamp: new Date().toISOString(),

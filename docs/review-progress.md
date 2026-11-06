@@ -26,6 +26,8 @@ This ledger records review findings and validation evidence. Publication status 
 
 ## Primitive contract
 
+Fisch is the product and CLI name. `fisch run` opens a paired body and a fresh Codex session; `build`, `test`, `doctor`, `evaluate`, `--help` and `--version` provide the corresponding workflows. Windows and Debian Linux on WSL2 passed 83 JavaScript tests and 11 Rust tests via `fisch test`; the Linux browser/gateway/MCP smoke also passed. See [Linux validation](linux-validation.md) for the recorded environment and exported ELF artifact. This does not establish human effort recognition, native desktop visual acceptance or macOS execution.
+
 The MCP adapter now restores up to 32 acknowledged immutable macro definitions after session recreation and retries only definitively rejected commands. An unknown macro after a compiler reset triggers bounded registry restoration; caller request IDs are renewed only after a definitive rejection. Uncertain definitions stay out of the restoration journal. `express` advertises the full shared program/state/definition schemas, and initialization includes the instruction bundle. Lease-expiry, refresh, compiler-reset, uncertain-definition and schema regressions cover the adapter; a live browser smoke also covers macro restoration across controller revocation.
 
 Compiler errors retain their AST `path` through the Worker host, browser/Tauri completion, Rust receipt and MCP tool error. The same path is retained in deduplicated receipts. Worker-host, Rust HTTP/dedup and MCP regressions check a nested node error such as `$.body.children[1].durationMs`.

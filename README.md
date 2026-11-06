@@ -16,7 +16,7 @@ This builds the runtime, opens and pairs the browser body, and starts a fresh Co
 
 ## Development entry points
 
-Requires Node.js 22.12+ (or 24), npm, and for desktop Rust stable, Microsoft C++ Build Tools and WebView2.
+Requires Node.js 22.12+ (or 24), npm, Rust stable and the platform Tauri prerequisites. Windows desktop builds need Microsoft C++ Build Tools and WebView2; Linux builds need GTK/WebKit development packages.
 
 ```sh
 npm ci

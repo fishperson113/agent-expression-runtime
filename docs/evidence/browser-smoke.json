@@ -2,7 +2,7 @@
   "desktop": {
     "mode": "offscreen worker",
     "counts": "3 / 1",
-    "frame": "45.4 ms",
+    "frame": "27.3 ms",
     "overflow": false,
     "webgl": true
   },
