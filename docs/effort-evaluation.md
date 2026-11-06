@@ -1,6 +1,6 @@
 # Effort perception remains an empirical question
 
-Run `npm run evaluate` to open an automatically paired body and a blind A/B evaluator in the terminal. It needs the runtime prerequisites and a browser, but no Codex login or model call. Watch both clips and answer `a`, `b` or `u` (unsure). `q` saves partial results and stops.
+Run `fisch evaluate` to open an automatically paired body and a blind A/B evaluator in the terminal. It needs the runtime prerequisites and a browser, but no Codex login or model call. Watch both clips and answer `a`, `b` or `u` (unsure). `q` saves partial results and stops.
 
 The evaluator counterbalances and shuffles 20 comparisons per axis using a recorded seed. Each pair changes only the effort value, keeps the same 1200ms duration and resets posture, shape, dispersion and flow between clips. Reduced motion is disabled during evaluation. Flow asks which clip looks freer; time asks which begins moving sooner. Time currently changes the speed curve, not total duration. Flow currently adds up to 0.03 world units of jitter per axis; this is not presumed perceptually sufficient.
 

@@ -100,8 +100,13 @@ async function playClip(api, session, page, trial, clip, signal) {
   await delay(1500, undefined, { signal });
 }
 
+export async function runEvaluation() {
+  await prepareSession({ withCodex: false });
+  return runSession({ runHost: evaluator });
+}
+
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  prepareSession({ withCodex: false }).then(() => runSession({ runHost: evaluator })).then(code => {
+  runEvaluation().then(code => {
     process.exitCode = code;
   }).catch(() => { console.error('Evaluation stopped. Check the runtime and saved partial results.'); process.exitCode = 1; });
 }

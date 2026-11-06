@@ -1,18 +1,20 @@
 # Browser display and Codex in one command
 
-From the repository root in a free Herdr terminal pane, run:
+Link this checkout once with `npm link`. In a free Herdr/terminal pane, run:
 
 ```powershell
-npm start
+fisch run
 ```
 
 The Node launcher installs missing npm dependencies, validates/builds the frontend, incrementally builds the Rust gateway, opens a dedicated browser window and automatically pairs its renderer. It then starts a fresh Codex CLI session in that same terminal pane with the existing `aer` MCP adapter already configured. The other pane and existing conversation stay available.
 
 There is no clipboard step, token input, manual environment setup or edit to `~/.codex/config.toml`. The first Codex prompt loads `aer://instructions/v1` and requests a short sphere expression. Model replies remain in the terminal; the browser displays the particle body. The browser's conversation form is a separate scripted demo.
 
+Commands: `fisch run` starts a connected session; `fisch build` builds without a model; `fisch test` runs automated checks; `fisch evaluate` opens the blind observer workflow; `fisch doctor` checks prerequisites; `fisch --help` lists commands.
+
 ## Requirements
 
-Windows, Linux or macOS; Node.js 22.12+ (or 24), npm, Rust stable, platform Tauri build prerequisites, an installed Microsoft Edge or Google Chrome, and Codex CLI already signed in. Windows needs Microsoft C++ Build Tools; Linux needs GTK/WebKit development packages; macOS needs Xcode command line tools. PowerShell is not required by `npm start`. The launcher also supports a locally installed Playwright Chromium as a fallback, or a browser executable selected with `CHROME_PATH`. It does not install system toolchains, download browsers, change Codex authentication or configure paid services.
+Windows, Linux or macOS; Node.js 22.12+ (or 24), npm, Rust stable, platform Tauri build prerequisites, an installed Microsoft Edge or Google Chrome, and Codex CLI already signed in. Windows needs Microsoft C++ Build Tools; Linux needs GTK/WebKit development packages; macOS needs Xcode command line tools. PowerShell is not required by `fisch run`. The launcher also supports a locally installed Playwright Chromium as a fallback, or a browser executable selected with `CHROME_PATH`. It does not install system toolchains, download browsers, change Codex authentication or configure paid services.
 
 ## Session lifetime
 
@@ -26,4 +28,4 @@ The first model-selected expression still depends on Codex login, model availabi
 
 ## Development and protocol reference
 
-`npm run dev` and `npm run tauri -- dev` remain developer entry points. For custom agent hosts, see [the HTTP/MCP protocol](integration.md). These are implementation references, not additional setup steps for `npm start`.
+`npm run dev` and `npm run tauri -- dev` remain developer entry points. For custom agent hosts, see [the HTTP/MCP protocol](integration.md). These are implementation references, not additional setup steps for `fisch run`.

@@ -30,12 +30,44 @@ export async function codexCommand() {
   throw Error('Install Codex CLI with npm install -g @openai/codex, then run codex login.');
 }
 
+export async function inspectEnvironment() {
+  const [major, minor] = process.versions.node.split('.').map(Number);
+  const checks = [{ name: 'Node', ok: major > 22 || (major === 22 && minor >= 12), detail: process.version }];
+  for (const name of ['Rust', 'Codex']) {
+    try {
+      const host = name === 'Rust' ? { command: 'cargo', args: [] } : await codexCommand();
+      const { stdout } = await promisify(execFile)(host.command, [...host.args, '--version'], { windowsHide: true });
+      checks.push({ name, ok: true, detail: stdout.trim() });
+    } catch { checks.push({ name, ok: false, detail: name === 'Rust' ? 'Install Rust and platform Tauri prerequisites.' : 'Install Codex CLI and run codex login.' }); }
+  }
+  const browsers = [process.env.CHROME_PATH, '/usr/bin/chromium', '/usr/bin/google-chrome',
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+    resolve(process.env['ProgramFiles(x86)'] ?? '/', 'Microsoft/Edge/Application/msedge.exe'),
+    resolve(process.env.ProgramFiles ?? '/', 'Google/Chrome/Application/chrome.exe')];
+  try {
+    const { chromium } = await import('@playwright/test');
+    browsers.push(chromium.executablePath());
+  } catch { /* fisch run installs missing local npm dependencies. */ }
+  const browser = browsers.find(path => path && existsSync(path));
+  checks.push({ name: 'Browser', ok: !!browser, detail: browser ?? 'Install Edge/Chrome or set CHROME_PATH.' });
+  const installed = existsSync(resolve(root, 'node_modules/vite/package.json'));
+  checks.push({ name: 'Dependencies', ok: installed, optional: true,
+    detail: installed ? 'Installed' : 'fisch run will install them.' });
+  return checks;
+}
+
 function runChecked(command, args) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, { cwd: root, stdio: 'inherit', windowsHide: true });
     child.once('error', () => reject(Error('Could not start ' + command + '. Check system prerequisites.')));
     child.once('exit', code => code === 0 ? resolve() : reject(Error(command + ' failed. See the output above.')));
   });
+}
+
+function npmCommand() {
+  const script = process.env.npm_execpath ?? resolve(dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js');
+  return existsSync(script) ? { command: process.execPath, args: [script] } : { command: 'npm', args: [] };
 }
 
 export async function prepareSession({ withCodex = true } = {}) {
@@ -46,12 +78,19 @@ export async function prepareSession({ withCodex = true } = {}) {
     await runChecked(host.command, [...host.args, '--version']);
   }
   await runChecked('cargo', ['--version']);
-  const npmCli = process.env.npm_execpath ?? resolve(dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js');
-  const npm = existsSync(npmCli) ? { command: process.execPath, args: [npmCli] } : { command: 'npm', args: [] };
+  const npm = npmCommand();
   if (!existsSync(resolve(root, 'node_modules/vite/package.json')) || !existsSync(resolve(root, 'node_modules/@playwright/test/package.json')))
     await runChecked(npm.command, [...npm.args, 'ci']);
   await runChecked(npm.command, [...npm.args, 'run', 'build']);
   await runChecked('cargo', ['build', '--locked', '--manifest-path', 'src-tauri/Cargo.toml']);
+}
+
+export async function testSession() {
+  await prepareSession({ withCodex: false });
+  const npm = npmCommand();
+  await runChecked(npm.command, [...npm.args, 'test']);
+  await runChecked(npm.command, [...npm.args, 'run', 'check:architecture']);
+  await runChecked('cargo', ['test', '--locked', '--manifest-path', 'src-tauri/Cargo.toml']);
 }
 
 function startGateway(origin, token) {

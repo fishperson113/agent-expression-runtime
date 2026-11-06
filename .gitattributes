@@ -1,4 +1,2 @@
-* text=auto eol=lf
-*.png binary
-*.ico binary
-*.icns binary
+bin/* text eol=lf
+*.sh text eol=lf

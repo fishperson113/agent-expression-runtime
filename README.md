@@ -1,4 +1,4 @@
-# Agent Expression Runtime
+# Fisch
 
 A provider-independent, Windows-first Tauri + TypeScript runtime: a particle body controlled by a bounded, declarative JSON AST. External agents connect through authenticated local HTTP/SSE or the MCP adapter. The engine itself requires no model account, model SDK or API key; the one-command launcher uses your signed-in Codex CLI.
 
@@ -6,13 +6,13 @@ A provider-independent, Windows-first Tauri + TypeScript runtime: a particle bod
 
 ## Browser / multiplexer quick start
 
-In a free Herdr/PowerShell pane at the repository root, run:
+Link the checkout once with `npm link`. Then, in a free Herdr/terminal pane, run:
 
 ```powershell
-npm start
+fisch run
 ```
 
-This builds the runtime, opens and pairs the browser body, and starts a fresh Codex session in that pane with MCP already connected. No clipboard token, environment commands or manual Codex configuration. Exit Codex or close the body window to stop. Requires Node 22.12+, Rust with the platform Tauri build prerequisites, Edge/Chrome and a signed-in Codex CLI. The Node launcher supports Windows, Linux and macOS. See [the one-command guide](docs/browser-and-hosts.md).
+This builds the runtime, opens and pairs the browser body, and starts a fresh Codex session in that pane with MCP already connected. No clipboard token, environment commands or manual Codex configuration. Exit Codex or close the body window to stop. Requires Node 22.12+, Rust with the platform Tauri build prerequisites, Edge/Chrome and a signed-in Codex CLI. The Node launcher supports Windows, Linux and macOS. Use `fisch doctor` for prerequisite checks, `fisch build` to build, `fisch test` for automated validation, and `fisch evaluate` for blind effort comparisons. See [the one-command guide](docs/browser-and-hosts.md).
 
 ## Development entry points
 
@@ -29,7 +29,7 @@ Open the printed local URL. Start a scripted turn, cancel it, submit a JSON prog
 npm run tauri -- dev
 ```
 
-The desktop app starts a loopback-only gateway and shows pairing details on demand. Follow [external agent integration](docs/integration.md) for the HTTP/MCP protocol. The body works without the conversation demo. The runtime itself never calls a model; `npm start` launches your signed-in Codex CLI as the external agent. The browser conversation demo remains scripted. No paid services are configured by the launcher.
+The desktop app starts a loopback-only gateway and shows pairing details on demand. Follow [external agent integration](docs/integration.md) for the HTTP/MCP protocol. The body works without the conversation demo. The runtime itself never calls a model; `fisch run` launches your signed-in Codex CLI as the external agent. The browser conversation demo remains scripted. No paid services are configured by the launcher.
 
 ## Validate
 
