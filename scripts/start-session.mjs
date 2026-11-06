@@ -38,11 +38,13 @@ function runChecked(command, args) {
   });
 }
 
-async function prepare() {
+export async function prepareSession({ withCodex = true } = {}) {
   const [major, minor] = process.versions.node.split('.').map(Number);
   if (major < 22 || (major === 22 && minor < 12)) throw Error('Install Node.js 22.12 or newer.');
-  const host = await codexCommand();
-  await runChecked(host.command, [...host.args, '--version']);
+  if (withCodex) {
+    const host = await codexCommand();
+    await runChecked(host.command, [...host.args, '--version']);
+  }
   await runChecked('cargo', ['--version']);
   const npmCli = process.env.npm_execpath ?? resolve(dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js');
   const npm = existsSync(npmCli) ? { command: process.execPath, args: [npmCli] } : { command: 'npm', args: [] };
@@ -186,7 +188,7 @@ export async function runSession({ headless = false, runHost = codexHost } = {})
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  prepare().then(() => runSession()).then(code => { process.exitCode = code; }).catch(error => {
+  prepareSession().then(() => runSession()).then(code => { process.exitCode = code; }).catch(error => {
     console.error('Session failed: ' + (error.message.startsWith('Install ') || error.message.includes('failed.') || error.message.startsWith('Could not start ') ? error.message : 'Check Edge/Chrome, Codex login and the gateway build, then run npm start again.'));
     process.exitCode = 1;
   });

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node scripts/start-session.mjs",
+    "evaluate": "node scripts/evaluate-effort.mjs",
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
