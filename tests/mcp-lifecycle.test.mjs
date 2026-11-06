@@ -112,3 +112,13 @@ it('returns the exact failing AST path to the agent', async () => {
     expect(JSON.parse(reply.content[0].text)).toMatchObject({ code: 'range', path: '$.body.children[1].durationMs' });
   });
 });
+it('rejects reusing an ID with a different definition without corrupting the macro journal', async () => {
+  await harness(async (state, call) => {
+    expect((await express(call, { ...define, requestId: 'fixed' })).isError).not.toBe(true);
+    const wrong = await express(call, { kind: 'define', requestId: 'fixed', body: { ...define.body, name: 'wrong' } });
+    expect(JSON.parse(wrong.content[0].text).code).toBe('request_id_reused');
+    state.session = undefined;
+    expect((await express(call, macro)).isError).not.toBe(true);
+    expect(state.commands.filter(command => command.kind === 'define').map(command => command.body.name)).toEqual(['vui', 'vui']);
+  });
+});

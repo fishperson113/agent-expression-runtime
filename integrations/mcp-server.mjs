@@ -23,7 +23,7 @@ if (
 }
 const instructions = readFileSync(new URL('./instructions-v1.md', import.meta.url), 'utf8');
 let session, connecting;
-const definitions = new Map(), pendingDefinitions = new Map();
+const definitions = new Map(), pendingDefinitions = new Map(), commands = new Map();
 const protocol = JSON.parse(readFileSync(new URL('../src/contracts/protocol.schema.json', import.meta.url), 'utf8'));
 const lifecycleErrors = ['session', 'session_closed', 'stale_epoch', 'http_404'];
 async function request(path, body,method=body===undefined?'GET':'POST') {
@@ -88,6 +88,10 @@ function remember(args, result) {
   else pendingDefinitions.delete(args.requestId);
 }
 async function send(args) {
+  const payload = JSON.stringify(args), previous = commands.get(args.requestId);
+  if (previous && previous !== payload) throw Error('request_id_reused');
+  commands.set(args.requestId, payload);
+  while (commands.size > 256) commands.delete(commands.keys().next().value);
   const result = await request(`/v1/sessions/${session.id}/expressions`, { ...args, epoch: session.epoch });
   remember(args, result);
   return result;
@@ -115,7 +119,7 @@ async function restore() {
 async function connect() {
   if (session) return;
   connecting ??= (async () => {
-    pendingDefinitions.clear();
+    pendingDefinitions.clear(); commands.clear();
     session = await request('/v1/sessions', {});
     try { await restore(); }
     catch (error) {
