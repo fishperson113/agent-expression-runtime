@@ -1,6 +1,6 @@
 # Review remediation ledger
 
-All changes are local and unpushed. This ledger covers the 19 supplied review findings, not full SRS performance acceptance.
+This ledger records review findings and validation evidence. Publication status belongs to Git history and remotes, not this document. It does not establish full SRS performance acceptance.
 
 | Review | Change | Evidence |
 |---|---|---|
@@ -25,6 +25,8 @@ All changes are local and unpushed. This ledger covers the 19 supplied review fi
 | 19 Missing cross-layer tests | Live Rust gateway + browser Workers + renderer + HTTP + MCP + CLI exercise lifecycle and delayed ACK | `scripts/browser-bridge-smoke.mjs` and JSON evidence |
 
 ## Primitive contract
+
+Follow-up corrections: upright wall/cloud/pyramid preserve each sphere particle's latitude; pyramid taper remains upright. Camera distance adapts to portrait aspect ratios and a uniform body fit keeps transformed particle centers within 88% of the view. Perspective point-size gain is bounded to 0.75–1.25. This containment can reduce extreme grow/translation combinations; raw target parameters are not a promise of unbounded screen displacement. `shapeQuality` programs blend back to their baseline over 250ms, and cancellation/session epoch changes restore neutral posture. Scheduler weights and renderer buffer order follow the shared manifest. Geometry/projection and scheduler regressions cover these properties; perceptual evaluation remains separate.
 
 Removed `ring` with no compatibility alias. `wall` is an upright thin plane. Shapes are sphere (ball-like), wall, pin, screw, pyramid, plus wave/cloud. This is a breaking POC vocabulary change. There is one particle body, not multiple composited objects.
 

@@ -122,3 +122,21 @@ it('free-flow effort releases to a bound baseline after the motion ends', () => 
   s.tick();
   expect(Number(s.state.effortFlow)).toBeCloseTo(0);
 });
+it.each(['cancel', 'close', 'complete'])('restores neutral posture after %s', reason => {
+  let now = 0;
+  const scheduler = new Scheduler({ now: () => now }, { apply() {}, dispose() {} }, { count() {} });
+  scheduler.cancel('e');
+  scheduler.admit(new Compiler().compile({
+    v: 1, epoch: 'e', seq: 1, kind: 'program', track: 'body', policy: 'replace',
+    body: { type: 'shapeQuality', rise: 1, advance: 1, spread: 2, grow: 2, path: 'arc', durationMs: 100 },
+  }, 0));
+  now = 50;
+  scheduler.tick();
+  expect(Number(scheduler.state.rise)).toBeGreaterThan(0);
+  if (reason === 'complete') { now = 100; scheduler.tick(); }
+  else scheduler.cancel(reason === 'close' ? 'next-session' : 'next-epoch');
+  now += 250;
+  scheduler.tick();
+  for (const [key, value] of Object.entries({ rise: 0, advance: 0, spread: 1, grow: 1, arcOffset: 0 }))
+    expect(scheduler.state[key as keyof typeof scheduler.state]).toBeCloseTo(value);
+});

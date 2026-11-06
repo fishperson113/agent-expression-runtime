@@ -1,12 +1,13 @@
 import type { BodyState, Clock, DiagnosticsSink, RendererSink } from '../ports';
 import type { Compiled, ProgramIR, StateIR, Op } from './ir';
 import type { Property, Value } from '../ast/types';
+import { capability } from '../../primitives/registry';
 export const initialState = (): BodyState => ({
   shape: 'sphere',
-  shapeWeights: [1, 0, 0, 0, 0, 0, 0],
+  shapeWeights: capability.shapes.map(name => Number(name === 'sphere')),
   flow: 'orbit',
   flowStrength: 0.15,
-  flowWeights: [1, 0, 0],
+  flowWeights: capability.fields.map(name => Number(name === 'orbit')),
   color: '#79e6d3',
   brightness: 0.65,
   pointSize: 2,
@@ -31,6 +32,7 @@ type Active = {
   completed: Set<Op>;
   applied: boolean;
 };
+const restPosture = { rise: 0, advance: 0, spread: 1, grow: 1, arcOffset: 0 };
 type Blend = { from: number; to: number; start: number; duration: number; easing: string };
 export class Scheduler {
   epoch = 'idle';
@@ -38,7 +40,7 @@ export class Scheduler {
   private lastSeq = -1;
   private active?: Active;
   private queue: ProgramIR[] = [];
-  private baseline = { brightness: 0.65, pointSize: 2, dispersion: 0.12, effortFlow: 0 };
+  private baseline = { brightness: 0.65, pointSize: 2, dispersion: 0.12, effortFlow: 0, ...restPosture };
   private blends = new Map<Property, Blend>();
   private owned = new Set<Property>();
   private admissions: number[] = [];
@@ -70,6 +72,7 @@ export class Scheduler {
     this.stateFeedback = [];
     this.admissions = [];
     this.owned.clear();
+    Object.assign(this.baseline, restPosture);
     for (const [p, to] of Object.entries(this.baseline))
       this.blend(p as Property, to, 250, 'smoothstep');
   }
@@ -155,99 +158,82 @@ export class Scheduler {
     }
     this.owned.clear();
   }
-  tick() {
-    const now = this.clock.now();
-    // At most nine programs can be visited after restore; no unbounded catch-up.
+  private effortPosition(a: Active, op: Op, t: number) {
+    if (!op.effort?.weight || !['rise', 'advance', 'spread', 'grow'].includes(op.property)) return;
+    const value = Number(this.state[op.property]) + Math.sin(Math.PI * t) * op.effort.weight *
+      0.4 * (Number(op.value) - Number(a.origins.get(op)!));
+    const position = ['rise', 'advance'].includes(op.property);
+    this.state[op.property] = Math.max(position ? -1 : 0.25, Math.min(position ? 1 : 2, value));
+  }
+  private sampleColor(a: Active, op: Op, t: number) {
+    const aColor = parseInt(String(a.origins.get(op)).slice(1), 16);
+    const bColor = parseInt(String(op.value).slice(1), 16);
+    const srgb = (v: number) => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    let color = 0;
+    for (const shift of [16, 8, 0]) {
+      const from = ((aColor >> shift) & 255) / 255, to = ((bColor >> shift) & 255) / 255;
+      const value = srgb(from) + (srgb(to) - srgb(from)) * t;
+      const encoded = value <= 0.0031308 ? value * 12.92 : 1.055 * value ** (1 / 2.4) - 0.055;
+      color |= Math.round(encoded * 255) << shift;
+    }
+    this.state.color = '#' + color.toString(16).padStart(6, '0');
+  }
+  private sampleWeights(a: Active, op: Op, t: number) {
+    if (op.property === 'shape') {
+      const target = capability.shapes.indexOf(String(op.value));
+      this.state.shapeWeights = a.weights.get(op)!.map((w, i) => w + ((i === target ? 1 : 0) - w) * t);
+      this.state.shape = op.value;
+    }
+    if (op.property === 'flow') {
+      const target = capability.fields.indexOf(String(op.value));
+      this.state.flowWeights = a.flowWeights.get(op)!.map((w, i) => w + ((i === target ? 1 : 0) - w) * t);
+      this.state.flow = op.value;
+      this.state.flowStrength = a.strengths.get(op)! + (op.strength! - a.strengths.get(op)!) * t;
+    }
+  }
+  private sampleOp(a: Active, op: Op, elapsed: number, writing: Set<Property>) {
+    if (elapsed < op.at || a.completed.has(op)) return;
+    if (!a.origins.has(op)) {
+      a.origins.set(op, this.state[op.property]);
+      a.strengths.set(op, this.state.flowStrength);
+      a.weights.set(op, [...this.state.shapeWeights]);
+      a.flowWeights.set(op, [...this.state.flowWeights]);
+      this.blends.delete(op.property);
+    }
+    let t = ease(op.duration === 0 ? 1 : Math.min(1, (elapsed - op.at) / op.duration), op.easing);
+    if (op.effort?.time !== undefined) t = Math.pow(t, Math.pow(2, (0.5 - op.effort.time) * 2));
+    if (op.effort?.weight && !['rise', 'advance', 'spread', 'grow'].includes(op.property))
+      t = Math.max(0, Math.min(1, t + Math.sin(Math.PI * t) * op.effort.weight * 0.4));
+    this.state[op.property] = mix(a.origins.get(op)!, op.value, t);
+    if (op.arcAmplitude !== undefined)
+      this.state[op.property] = Number(a.origins.get(op)!) * (1 - t) + Math.sin(Math.PI * t) * op.arcAmplitude;
+    this.effortPosition(a, op, t);
+    this.sampleWeights(a, op, t);
+    if (op.property === 'color') this.sampleColor(a, op, t);
+    if (elapsed < op.at + op.duration) writing.add(op.property);
+    else {
+      a.completed.add(op);
+      if (op.property in this.baseline && !this.owned.has(op.property))
+        this.blend(op.property, this.baseline[op.property as keyof typeof this.baseline], 250, 'smoothstep');
+    }
+  }
+  private nextProgram(now: number) {
+    while (this.queue.length) {
+      const next = this.queue.shift()!;
+      if (now - next.receivedAt > next.ttlMs) {
+        this.diagnostics.count('expired');
+        this.feedback?.('cancelled', next);
+      } else { this.start(next, now); break; }
+    }
+  }
+  private advance(now: number) {
     for (let attempts = 0; attempts < 9; attempts++) {
       const a = this.active;
       if (!a) break;
-      if (a.ir.epoch !== this.epoch) {
-        this.active = undefined;
-        break;
-      }
-      const elapsed = now - a.start;
-      const writing = new Set<Property>();
-      if (!a.applied) {
-        a.applied = true;
-        this.feedback?.('applied', a.ir);
-      }
-      for (const op of a.ir.ops) {
-        if (elapsed < op.at || a.completed.has(op)) continue;
-        if (!a.origins.has(op)) {
-          a.origins.set(op, this.state[op.property]);
-          a.strengths.set(op, this.state.flowStrength);
-          a.weights.set(op, [...this.state.shapeWeights]);
-          a.flowWeights.set(op, [...this.state.flowWeights]);
-          this.blends.delete(op.property);
-        }
-        let t = ease(
-          op.duration === 0 ? 1 : Math.min(1, (elapsed - op.at) / op.duration),
-          op.easing,
-        );
-        if (op.effort?.time !== undefined) t = Math.pow(t, Math.pow(2, (0.5 - op.effort.time) * 2));
-        if (op.effort?.weight && !['rise', 'advance', 'spread', 'grow'].includes(op.property))
-          t = Math.max(0, Math.min(1, t + Math.sin(Math.PI * t) * op.effort.weight * 0.4));
-        this.state[op.property] = mix(a.origins.get(op)!, op.value, t);
-        if (op.arcAmplitude !== undefined)
-          this.state[op.property] =
-            Number(a.origins.get(op)!) * (1 - t) + Math.sin(Math.PI * t) * op.arcAmplitude;
-        if (op.effort?.weight && ['rise', 'advance', 'spread', 'grow'].includes(op.property)) {
-          const value =
-            Number(this.state[op.property]) +
-            Math.sin(Math.PI * t) *
-              op.effort.weight *
-              0.4 *
-              (Number(op.value) - Number(a.origins.get(op)!));
-          this.state[op.property] = Math.max(
-            ['rise', 'advance'].includes(op.property) ? -1 : 0.25,
-            Math.min(['rise', 'advance'].includes(op.property) ? 1 : 2, value),
-          );
-        }
-        if (op.property === 'shape') {
-          const target = ['sphere', 'wall', 'wave', 'cloud', 'pin', 'screw', 'pyramid'].indexOf(
-            String(op.value),
-          );
-          this.state.shapeWeights = a.weights
-            .get(op)!
-            .map((w, i) => w + ((i === target ? 1 : 0) - w) * t);
-          this.state.shape = op.value;
-        }
-        if (op.property === 'flow') {
-          this.state.flow = op.value;
-          const target = ['orbit', 'turbulence', 'pulse'].indexOf(String(op.value));
-          this.state.flowWeights = a.flowWeights
-            .get(op)!
-            .map((w, i) => w + ((i === target ? 1 : 0) - w) * t);
-        }
-        if (op.property === 'color') {
-          const aColor = parseInt(String(a.origins.get(op)).slice(1), 16),
-            bColor = parseInt(String(op.value).slice(1), 16);
-          let c = 0;
-          for (const shift of [16, 8, 0]) {
-            const from = ((aColor >> shift) & 255) / 255,
-              to = ((bColor >> shift) & 255) / 255;
-            const srgb = (v: number) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
-            const v = srgb(from) + (srgb(to) - srgb(from)) * t;
-            const encoded = v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055;
-            c |= Math.round(encoded * 255) << shift;
-          }
-          this.state.color = '#' + c.toString(16).padStart(6, '0');
-        }
-        if (op.property === 'flow')
-          this.state.flowStrength =
-            a.strengths.get(op)! + (op.strength! - a.strengths.get(op)!) * t;
-        if (elapsed < op.at + op.duration) writing.add(op.property);
-        else {
-          a.completed.add(op);
-          if (op.property in this.baseline && !this.owned.has(op.property))
-            this.blend(
-              op.property,
-              this.baseline[op.property as keyof typeof this.baseline],
-              250,
-              'smoothstep',
-            );
-        }
-      }
+      if (a.ir.epoch !== this.epoch) { this.active = undefined; break; }
+      const elapsed = now - a.start, writing = new Set<Property>();
+      if (!a.applied) { a.applied = true; this.feedback?.('applied', a.ir); }
+      for (const op of a.ir.ops) this.sampleOp(a, op, elapsed, writing);
       for (const p of this.owned)
         if (!writing.has(p) && p in this.baseline)
           this.blend(p, this.baseline[p as keyof typeof this.baseline], 250, 'smoothstep');
@@ -256,42 +242,33 @@ export class Scheduler {
       this.release();
       this.feedback?.('completed', a.ir);
       this.active = undefined;
-      while (this.queue.length) {
-        const next = this.queue.shift()!;
-        if (now - next.receivedAt > next.ttlMs) {
-          this.diagnostics.count('expired');
-          this.feedback?.('cancelled', next);
-          continue;
-        }
-        this.start(next, now);
-        break;
-      }
+      this.nextProgram(now);
     }
+  }
+  private sampleBaseline(now: number) {
     for (const [p, b] of this.blends) {
       const t = ease(b.duration === 0 ? 1 : Math.min(1, (now - b.start) / b.duration), b.easing);
       this.state[p] = b.from + (b.to - b.from) * t;
       if (t >= 1) this.blends.delete(p);
     }
-    this.stateFeedback = this.stateFeedback.filter((f) => {
+    this.stateFeedback = this.stateFeedback.filter(f => {
       const properties = Object.entries(f.ir.patch);
-      const visible = properties.some(([p]) => !this.owned.has(p as Property));
-      if (!f.applied && visible) {
+      if (!f.applied && properties.some(([p]) => !this.owned.has(p as Property))) {
         f.applied = true;
         this.feedback?.('applied', f.ir);
       }
-      if (
-        properties.every(
-          ([p, value]) =>
-            !this.owned.has(p as Property) &&
-            !this.blends.has(p as Property) &&
-            Math.abs(Number(this.state[p as Property]) - value!) < 1e-8,
-        )
-      ) {
+      if (properties.every(([p, value]) => !this.owned.has(p as Property) &&
+          !this.blends.has(p as Property) && Math.abs(Number(this.state[p as Property]) - value!) < 1e-8)) {
         this.feedback?.('completed', f.ir);
         return false;
       }
       return true;
     });
+  }
+  tick() {
+    const now = this.clock.now();
+    this.advance(now);
+    this.sampleBaseline(now);
     this.sink.apply({ ...this.state, shapeWeights: [...this.state.shapeWeights] }, now);
   }
   dispose() {

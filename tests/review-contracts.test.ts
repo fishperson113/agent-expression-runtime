@@ -1,6 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import { Compiler } from '../src/core/compiler/compiler';
-import { shapeBuffers } from '../src/adapters/three-renderer';
+import { shapeBuffers, fitCamera, frameBody } from '../src/adapters/three-renderer';
+import { PerspectiveCamera, Vector3 } from 'three';
 import { capability } from '../src/primitives/registry';
 it('every advertised shape has a finite deterministic particle buffer', () => {
   const first = shapeBuffers(100, 42),
@@ -52,4 +53,39 @@ it('cache hits bypass lowering and cached IR is isolated from caller mutation', 
 it('the configured seed reaches IR and changes procedural targets deterministically', () => {
   expect((new Compiler(123).compile(program('wall'), 0) as any).seed).toBe(123);
   expect(shapeBuffers(10, 123)[0]).not.toEqual(shapeBuffers(10, 124)[0]);
+});
+it('upright shapes preserve sphere particle latitude and shorten the wall morph', () => {
+  const shapes = shapeBuffers(10000), sphere = shapes[capability.shapes.indexOf('sphere')];
+  for (const name of ['wall', 'cloud', 'pyramid']) {
+    const shape = shapes[capability.shapes.indexOf(name)];
+    for (let i = 0; i < sphere.length; i += 3) expect(sphere[i + 1] * shape[i + 1]).toBeGreaterThanOrEqual(0);
+  }
+  const wall = shapes[capability.shapes.indexOf('wall')];
+  let distance = 0;
+  for (let i = 0; i < sphere.length; i += 3)
+    distance += Math.hypot(sphere[i] - wall[i], sphere[i + 1] - wall[i + 1], sphere[i + 2] - wall[i + 2]);
+  expect(distance / 10000).toBeCloseTo(0.922, 2);
+  const pyramid = shapes[capability.shapes.indexOf('pyramid')];
+  for (let i = 0; i < pyramid.length; i += 3)
+    if (pyramid[i + 1] > 0.9) expect(Math.abs(pyramid[i])).toBeLessThan(0.051);
+});
+it.each([16 / 9, 9 / 16, 0.4])('contains every shapeQuality boundary combination at aspect %s', aspect => {
+  const camera = new PerspectiveCamera(42, aspect, 0.1, 100), point = new Vector3();
+  fitCamera(camera, aspect);
+  for (const shape of shapeBuffers(200)) for (const rise of [-1, 1]) for (const advance of [-1, 1])
+    for (const grow of [0.25, 2]) for (const spread of [0.25, 2]) {
+      const positions = shape.slice();
+      for (let i = 0; i < positions.length; i += 3) {
+        positions[i] = positions[i] * grow * spread + 0.25;
+        positions[i + 1] = positions[i + 1] * grow + rise;
+        positions[i + 2] = positions[i + 2] * grow + advance;
+      }
+      frameBody(positions, positions.length / 3, camera);
+      for (let i = 0; i < positions.length; i += 3) {
+        point.fromArray(positions, i).project(camera);
+        expect(Math.abs(point.x)).toBeLessThan(0.881);
+        expect(Math.abs(point.y)).toBeLessThan(0.881);
+        expect(Math.abs(point.z)).toBeLessThan(1);
+      }
+    }
 });
