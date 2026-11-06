@@ -37,7 +37,7 @@ async function harness(work) {
     if (req.headers.authorization !== `Bearer ${token}`) { res.writeHead(401).end('{}'); return; }
     let bytes = ''; for await (const chunk of req) bytes += chunk;
     try { res.end(JSON.stringify(response(state, req, bytes ? JSON.parse(bytes) : {}))); }
-    catch (error) { res.writeHead(422).end(JSON.stringify({ code: error.code ?? error.message })); }
+    catch (error) { res.writeHead(422).end(JSON.stringify({ code: error.code ?? error.message, path: error.path })); }
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const child = spawn(process.execPath, ['integrations/mcp-server.mjs'], {
@@ -101,5 +101,14 @@ it('publishes usable program, state and macro schemas in tools/list', async () =
     expect(validate(define)).toBe(true);
     expect(validate({ body: { type: 'morph', target: 'face', durationMs: 100 } })).toBe(false);
     expect(validate({ body: { type: 'morph' } })).toBe(false);
+  });
+});
+it('returns the exact failing AST path to the agent', async () => {
+  await harness(async (_state, call) => {
+    const reply = await express(call, { body: { type: 'sequence', children: [
+      { type: 'wait', durationMs: 1 }, { type: 'morph', target: 'wall', durationMs: -1 },
+    ] } });
+    expect(reply.isError).toBe(true);
+    expect(JSON.parse(reply.content[0].text)).toMatchObject({ code: 'range', path: '$.body.children[1].durationMs' });
   });
 });

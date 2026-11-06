@@ -55,6 +55,8 @@ pub struct Receipt {
     pub seq: u64,
     pub status: String,
     pub code: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
 }
 #[derive(Clone)]
 pub struct Gateway {
@@ -188,9 +190,12 @@ impl Gateway {
     }
     fn publish(&self, receipt: &Receipt, status: &str, code: Option<&str>) {
         let id = self.event_id.fetch_add(1, Ordering::SeqCst) + 1;
-        let _=self.events.send(json!({"id":id,"session":receipt.session,"epoch":receipt.epoch,"seq":receipt.seq,"expressionId":receipt.id,"status":status,"code":code}));
+        let _=self.events.send(json!({"id":id,"session":receipt.session,"epoch":receipt.epoch,"seq":receipt.seq,"expressionId":receipt.id,"status":status,"code":code,"path":receipt.path}));
     }
     pub fn finish(&self, id: String, status: String, code: Option<String>) {
+        self.finish_diagnostic(id, status, code, None);
+    }
+    pub fn finish_diagnostic(&self, id: String, status: String, code: Option<String>, path: Option<String>) {
         let pending = self.pending.lock().unwrap().remove(&id);
         if let Some(p) = pending {
             let current = self
@@ -211,6 +216,7 @@ impl Gateway {
                 seq: p.seq,
                 status: status.clone(),
                 code: code.clone(),
+                path,
             };
             if let Some(s) = self.session.lock().unwrap().as_mut() {
                 for (_, _, r) in s.dedup.iter_mut() {
@@ -258,6 +264,7 @@ impl Gateway {
                     seq,
                     status: status.clone(),
                     code: None,
+                    path: None,
                 };
                 self.publish(&receipt, &status, None);
             }
@@ -299,6 +306,7 @@ impl Gateway {
                 seq: s.seq,
                 status: "closed".into(),
                 code: None,
+                path: None,
             },
             "closed",
             None,
@@ -318,6 +326,7 @@ impl Gateway {
                 seq: p.seq,
                 status: "cancelled".into(),
                 code: Some("session_closed".into()),
+                path: None,
             });
         }
     }
@@ -549,6 +558,7 @@ async fn expression(
             seq: s.seq,
             status: "pending".into(),
             code: None,
+            path: None,
         };
         pending.insert(
             receipt.id.clone(),
@@ -713,12 +723,13 @@ struct Completion {
     id: String,
     status: String,
     code: Option<String>,
+    path: Option<String>,
 }
 async fn renderer_complete(State(g): State<Gateway>, Json(c): Json<Completion>) -> Response {
     if !["accepted", "rejected", "cancelled"].contains(&c.status.as_str()) {
         return error(StatusCode::BAD_REQUEST, "status");
     }
-    g.finish(c.id, c.status, c.code);
+    g.finish_diagnostic(c.id, c.status, c.code, c.path);
     StatusCode::NO_CONTENT.into_response()
 }
 #[derive(Deserialize)]
@@ -751,8 +762,9 @@ pub fn gateway_complete(
     id: String,
     status: String,
     code: Option<String>,
+    path: Option<String>,
 ) {
-    state.finish(id, status, code);
+    state.finish_diagnostic(id, status, code, path);
 }
 #[tauri::command]
 pub fn gateway_feedback(state: tauri::State<'_, Gateway>, epoch: String, seq: u64, status: String) {

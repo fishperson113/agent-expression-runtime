@@ -73,8 +73,8 @@ export class HttpGatewayConnection {
   async pairing() {
     return { baseUrl: this.baseUrl, token: '[host credential hidden]', protocolVersion: 1 };
   }
-  complete(id: string, status: string, code?: string) {
-    return this.post('/v1/renderer/complete', { id, status, code: code ?? null });
+  complete(id: string, status: string, code?: string, path?: string) {
+    return this.post('/v1/renderer/complete', { id, status, code: code ?? null, path: path ?? null });
   }
   feedback(epoch: string, seq: number, status: string) {
     return this.post('/v1/renderer/feedback', { epoch, seq, status });

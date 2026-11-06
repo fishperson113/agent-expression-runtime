@@ -69,3 +69,18 @@ it('fails immediately after the restart budget is exhausted without filling a de
   expect(errors).toContain('compiler_unavailable');
   expect(errors).not.toContain('compiler_full');
 });
+it('preserves diagnostic paths and request context from the compiler worker', () => {
+  let worker: any;
+  vi.stubGlobal('Worker', class {
+    onmessage?: (event: unknown) => void;
+    constructor() { worker = this; }
+    postMessage() {}
+    terminate() {}
+  });
+  const error = vi.fn(), host = new CompilerHost(() => {}, error);
+  host.submit({}, 0, 'receipt-1');
+  worker.onmessage({ data: { id: 1, error: { code: 'range', path: '$.body.children[1].durationMs' } } });
+  expect(error).toHaveBeenCalledWith('range', 'receipt-1', '$.body.children[1].durationMs');
+  expect(host.depth).toBe(0);
+  host.dispose();
+});

@@ -8,7 +8,7 @@ export class CompilerHost {
   private available = false;
   constructor(
     private result: (ir: Compiled, context?: string) => void,
-    private error: (code: string, context?: string) => void,
+    private error: (code: string, context?: string, path?: string) => void,
     private seed = 42,
   ) {
     this.spawn();
@@ -32,7 +32,7 @@ export class CompilerHost {
       const job = this.pending.get(e.data.id);
       if (!job) return;
       this.pending.delete(e.data.id);
-      if (e.data.error) this.error(e.data.error.code, job.context);
+      if (e.data.error) this.error(e.data.error.code, job.context, e.data.error.path);
       else this.result(e.data.ir, job.context);
     };
     this.worker.onerror = (event) => {

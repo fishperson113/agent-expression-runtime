@@ -143,13 +143,13 @@ const compiler = new CompilerHost(
       capture.push({ at: performance.now() - captureStart, ir });
     $('queue').textContent = `${compiler.depth} / 4`;
   },
-  (code, context) => {
+  (code, context, path) => {
     diagnostic(code);
     if ((code === 'compiler_restarted' || code === 'compiler_unavailable') && externalController)
       void gateway?.revoke();
     if (context) {
       externalJobs.delete(context);
-      void gateway?.complete(context, 'rejected', code);
+      void gateway?.complete(context, 'rejected', code, path);
     }
   },
   bodySeed,

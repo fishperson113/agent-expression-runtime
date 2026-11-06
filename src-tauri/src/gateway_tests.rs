@@ -10,6 +10,32 @@ use std::sync::{
 };
 use tower::ServiceExt;
 #[tokio::test]
+async fn compiler_diagnostic_path_survives_receipt_and_dedup() {
+    let g = Gateway::new();
+    let owner = g.clone();
+    g.subscribe(Arc::new(move |event| {
+        let gateway = owner.clone();
+        if event.kind == "expression" {
+            tokio::spawn(async move {
+                gateway.finish_diagnostic(event.id, "rejected".into(), Some("range".into()),
+                    Some("$.body.children[1].durationMs".into()));
+            });
+        } else { gateway.control_ack(event.epoch); }
+        Ok(())
+    }));
+    let app = g.router();
+    let session = json_response(app.clone().oneshot(request(&g, "/v1/sessions", Some(json!({}))))
+        .await.unwrap()).await;
+    let url = format!("/v1/sessions/{}/expressions", session["id"].as_str().unwrap());
+    for _ in 0..2 {
+        let response = app.clone().oneshot(request(&g, &url, Some(json!({
+            "epoch": session["epoch"], "requestId": "bad-node", "body": {}
+        })))).await.unwrap();
+        assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(json_response(response).await["path"], "$.body.children[1].durationMs");
+    }
+}
+#[tokio::test]
 async fn browser_renderer_connection_is_bounded_and_released_on_disconnect() {
     let (g, _) = connected();
     let app = g.router();

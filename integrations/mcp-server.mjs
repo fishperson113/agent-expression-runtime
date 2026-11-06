@@ -44,7 +44,7 @@ async function request(path, body,method=body===undefined?'GET':'POST') {
   } catch {
     throw Error(response.ok ? 'invalid_gateway_response' : `http_${response.status}`);
   }
-  if (!response.ok) throw Error(result.code ?? 'gateway_rejected');
+  if (!response.ok) throw Object.assign(Error(result.code ?? 'gateway_rejected'), { path: result.path });
   return result;
 }
 const inputSchema = {
@@ -158,7 +158,8 @@ async function toolCall(params) {
     return { content: [{ type: 'text', text: JSON.stringify(result) }] };
   } catch (error) {
     if (lifecycleErrors.includes(error.message)) session = undefined;
-    return { isError: true, content: [{ type: 'text', text: JSON.stringify({ status: 'rejected', code: error.message }) }] };
+    return { isError: true, content: [{ type: 'text', text: JSON.stringify({ status: 'rejected', code: error.message,
+      ...(error.path ? { path: error.path } : {}) }) }] };
   }
 }
 let calls = Promise.resolve();

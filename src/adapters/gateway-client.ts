@@ -17,8 +17,8 @@ export class GatewayConnection {
   pairing() {
     return invoke<{ baseUrl: string; token: string; protocolVersion: number }>('gateway_pairing');
   }
-  complete(id: string, status: string, code?: string) {
-    return invoke('gateway_complete', { id, status, code: code ?? null });
+  complete(id: string, status: string, code?: string, path?: string) {
+    return invoke('gateway_complete', { id, status, code: code ?? null, path: path ?? null });
   }
   feedback(epoch: string, seq: number, status: string) {
     return invoke('gateway_feedback', { epoch, seq, status });
