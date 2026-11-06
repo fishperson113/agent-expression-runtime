@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { BodyState, RendererSink } from '../core/ports';
 import { MotionPhase } from './motion-phase';
 import { capability } from '../primitives/registry';
+import { sampleBody } from './body-geometry';
 function shapePoints(u: number, v: number, w: number): Record<string, number[]> {
   const angle = u * Math.PI * 2, y = 1 - 2 * v, radius = Math.sqrt(1 - y * y);
   return {
@@ -134,43 +135,9 @@ export class ThreeRenderer implements RendererSink {
   }
   apply(state: BodyState, now: number) {
     if (this.lost) return;
-    const t = now / 1000,
-      amp = this.reducedMotion ? 0.08 : 1,
-      strength = state.flowStrength * amp,
-      dispersion = Number(state.dispersion);
-    const fields = Object.fromEntries(capability.fields.map((name, i) => [name, state.flowWeights[i]]));
-    const orbitAngle = this.orbit.advance(now, strength * fields.orbit);
-    for (let i = 0; i < this.count; i++) {
-      const j = i * 3;
-      let x = 0,
-        y = 0,
-        z = 0;
-      for (let k = 0; k < this.shapes.length; k++) {
-        const weight = state.shapeWeights[k];
-        x += this.shapes[k][j] * weight;
-        y += this.shapes[k][j + 1] * weight;
-        z += this.shapes[k][j + 2] * weight;
-      }
-      const phase = i * 0.618;
-      let scale = 1;
-      scale += Math.sin(t * 2) * strength * 0.16 * fields.pulse;
-      x += Math.sin(phase + t) * strength * 0.15 * fields.turbulence;
-      y += Math.cos(phase * 1.3 + t) * strength * 0.15 * fields.turbulence;
-      const a = orbitAngle,
-        c = Math.cos(a),
-        s = Math.sin(a);
-      const jitter = dispersion * 0.12;
-      x += Math.sin(phase + t * 2) * Number(state.effortFlow) * 0.03 * amp;
-      y += Math.cos(phase * 1.7 + t * 2) * Number(state.effortFlow) * 0.03 * amp;
-      const grow = Number(state.grow),
-        spread = Number(state.spread);
-      this.positions[j] =
-        ((x * c - z * s) * scale + Math.sin(phase) * jitter) * grow * spread +
-        Number(state.arcOffset) * amp;
-      this.positions[j + 1] =
-        (y * scale + Math.cos(phase) * jitter) * grow + Number(state.rise) * amp;
-      this.positions[j + 2] = (x * s + z * c) * scale * grow + Number(state.advance) * amp;
-    }
+    const amp = this.reducedMotion ? 0.08 : 1;
+    const angle = this.orbit.advance(now, state.flowStrength * amp * state.flowWeights[capability.fields.indexOf('orbit')]);
+    sampleBody(this.shapes, this.positions, this.count, state, now, angle, this.reducedMotion);
     frameBody(this.positions, this.count, this.camera);
     this.geometry.attributes.position.needsUpdate = true;
     this.material.uniforms.color.value = this.color.set(String(state.color));
