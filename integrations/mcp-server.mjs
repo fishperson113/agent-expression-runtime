@@ -2,6 +2,7 @@
 // Minimal newline-delimited stdio MCP transport. Never logs host credentials.
 import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
+import { setTimeout as delay } from 'node:timers/promises';
 const base = process.env.AER_BASE_URL,
   token = process.env.AER_PAIRING_TOKEN;
 if (!base || !token) {
@@ -22,6 +23,9 @@ if (
 }
 const instructions = readFileSync(new URL('./instructions-v1.md', import.meta.url), 'utf8');
 let session, connecting;
+const definitions = new Map(), pendingDefinitions = new Map();
+const protocol = JSON.parse(readFileSync(new URL('../src/contracts/protocol.schema.json', import.meta.url), 'utf8'));
+const lifecycleErrors = ['session', 'session_closed', 'stale_epoch', 'http_404'];
 async function request(path, body,method=body===undefined?'GET':'POST') {
   const response = await fetch(base + path, {
     method,
@@ -47,11 +51,11 @@ const inputSchema = {
   type: 'object',
   additionalProperties: false,
   required: ['body'],
+  $defs: protocol.$defs,
   properties: {
     body: {
-      type: 'object',
-      description:
-        'Complete valid AST node, state patch, or macro definition; see aer://instructions/v1 and protocol schema.',
+      anyOf: protocol.oneOf.map(envelope => envelope.properties.body),
+      description: 'Program AST by default; use kind=state for baseline patches or kind=define for an immutable macro.',
     },
     kind: { enum: ['program', 'state', 'define'] },
     track: { const: 'body' },
@@ -60,105 +64,122 @@ const inputSchema = {
     requestId: { type: 'string', minLength: 1, maxLength: 128 },
   },
 };
+function tools() {
+  return { tools: [
+    { name: 'express', description: 'Choose a short particle expression. Read aer://instructions/v1. ACK is admission, not completion.', inputSchema },
+    { name: 'cancel_expression', description: 'Cancel body work and reset posture; keep the agent running.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
+  ] };
+}
+function resources(params) {
+  const uri = params?.uri;
+  if (uri === 'aer://instructions/v1') return { contents: [{ uri, mimeType: 'text/markdown', text: instructions }] };
+  if (uri === 'aer://schema/v1') return { contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(protocol) }] };
+  throw Error('unknown_resource');
+}
+function remember(args, result) {
+  if (args.kind !== 'define') return;
+  if (result.status === 'accepted') {
+    const key = `${args.body.name}@${args.body.revision}`;
+    if (!definitions.has(key) && definitions.size >= 32) throw Error('macro_journal_full');
+    definitions.set(key, structuredClone(args));
+    pendingDefinitions.delete(args.requestId);
+  } else if (result.status === 'pending') pendingDefinitions.set(args.requestId, structuredClone(args));
+  else pendingDefinitions.delete(args.requestId);
+}
+async function send(args) {
+  const result = await request(`/v1/sessions/${session.id}/expressions`, { ...args, epoch: session.epoch });
+  remember(args, result);
+  return result;
+}
+async function settlePending() {
+  for (const args of [...pendingDefinitions.values()]) {
+    try { await send(args); }
+    catch (error) { pendingDefinitions.delete(args.requestId); throw error; }
+  }
+}
+async function restore() {
+  for (const definition of definitions.values()) {
+    const args = { ...definition, requestId: randomUUID() };
+    let result;
+    try { result = await send(args); }
+    catch (error) { if (error.message === 'immutable_revision') continue; throw error; }
+    for (let attempt = 0; result.status === 'pending' && attempt < 4; attempt++) {
+      await delay(100);
+      result = await send(args);
+    }
+    if (result.status !== 'accepted') throw Error('macro_restore_pending');
+    await delay(110);
+  }
+}
+async function connect() {
+  if (session) return;
+  connecting ??= (async () => {
+    pendingDefinitions.clear();
+    session = await request('/v1/sessions', {});
+    try { await restore(); }
+    catch (error) {
+      const held = session; session = undefined;
+      await request(`/v1/sessions/${held.id}`, undefined, 'DELETE').catch(() => {});
+      throw error;
+    }
+  })().finally(() => { connecting = undefined; });
+  await connecting;
+}
+async function invoke(params) {
+  if (!['express', 'cancel_expression'].includes(params?.name)) throw Error('unknown_tool');
+  const args = { ...(params.arguments ?? {}) };
+  if (params.name === 'express') {
+    if (Object.keys(args).some(key => !Object.hasOwn(inputSchema.properties, key)) ||
+        !args.body || typeof args.body !== 'object' || Array.isArray(args.body)) throw Error('invalid_arguments');
+    args.requestId ??= randomUUID();
+  }
+  await connect();
+  await settlePending();
+  if (params.name === 'express') return send(args);
+  const result = await request(`/v1/sessions/${session.id}/cancel`, { epoch: session.epoch });
+  session.epoch = result.epoch;
+  pendingDefinitions.clear();
+  return result;
+}
+async function toolCall(params) {
+  try {
+    let result;
+    try { result = await invoke(params); }
+    catch (error) {
+      if (lifecycleErrors.includes(error.message)) {
+        session = undefined; pendingDefinitions.clear();
+        result = await invoke(params);
+      } else if (error.message === 'unknown_macro' && definitions.size) {
+        await restore();
+        result = await invoke({ ...params, arguments: { ...params.arguments, requestId: randomUUID() } });
+      } else throw error;
+    }
+    return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+  } catch (error) {
+    if (lifecycleErrors.includes(error.message)) session = undefined;
+    return { isError: true, content: [{ type: 'text', text: JSON.stringify({ status: 'rejected', code: error.message }) }] };
+  }
+}
+let calls = Promise.resolve();
 async function handle(message) {
   const { method, params } = message;
-  if (method === 'initialize')
-    return {
-      protocolVersion: '2025-06-18',
-      capabilities: { tools: {}, resources: {} },
-      serverInfo: { name: 'agent-expression-runtime', version: '0.1.0' },
-      instructions:
-        'Load aer://instructions/v1 into agent context. Host owns pairing credentials. Tool ACK is admission only; content parallelism depends on your host.',
-    };
+  if (method === 'initialize') return {
+    protocolVersion: '2025-06-18', capabilities: { tools: {}, resources: {} },
+    serverInfo: { name: 'agent-expression-runtime', version: '0.1.0' },
+    instructions: instructions,
+  };
   if (method === 'ping') return {};
-  if (method === 'tools/list')
-    return {
-      tools: [
-        {
-          name: 'express',
-          description:
-            'Choose a short declarative particle-body expression. ACK means admitted, not animation completed. Use sphere/wall/pin/screw/pyramid/wave/cloud; orbit/turbulence/pulse; sequence/parallel/wait/style/shapeQuality. Never send code or per-frame coordinates. Read aer://instructions/v1.',
-          inputSchema,
-        },
-        {
-          name: 'cancel_expression',
-          description:
-            'Cancel only body expressions and obtain a new runtime epoch. Does not cancel your agent run.',
-          inputSchema: { type: 'object', properties: {}, additionalProperties: false },
-        },
-      ],
-    };
-  if (method === 'resources/list')
-    return {
-      resources: [
-        {
-          uri: 'aer://instructions/v1',
-          name: 'Expression instructions v1',
-          mimeType: 'text/markdown',
-        },
-        {
-          uri: 'aer://schema/v1',
-          name: 'Expression protocol schema v1',
-          mimeType: 'application/json',
-        },
-      ],
-    };
-  if (method === 'resources/read') {
-    const uri = params?.uri;
-    if (uri === 'aer://instructions/v1')
-      return { contents: [{ uri, mimeType: 'text/markdown', text: instructions }] };
-    if (uri === 'aer://schema/v1')
-      return {
-        contents: [
-          {
-            uri,
-            mimeType: 'application/json',
-            text: readFileSync(
-              new URL('../src/contracts/protocol.schema.json', import.meta.url),
-              'utf8',
-            ),
-          },
-        ],
-      };
-    throw Error('unknown_resource');
-  }
+  if (method === 'tools/list') return tools();
+  if (method === 'resources/list') return { resources: [
+    { uri: 'aer://instructions/v1', name: 'Expression instructions v1', mimeType: 'text/markdown' },
+    { uri: 'aer://schema/v1', name: 'Expression protocol schema v1', mimeType: 'application/json' },
+  ] };
+  if (method === 'resources/read') return resources(params);
   if (method === 'tools/call') {
-    try {
-      if (!session) {
-        connecting ??= request('/v1/sessions', {}).finally(() => {
-          connecting = undefined;
-        });
-        session = await connecting;
-      }
-      let result;
-      if (params.name === 'express') {
-        const args = params.arguments ?? {};
-        const allowed = Object.keys(inputSchema.properties);
-        if (
-          Object.keys(args).some((k) => !allowed.includes(k)) ||
-          !args.body ||
-          typeof args.body !== 'object'
-        )
-          throw Error('invalid_arguments');
-        result = await request(`/v1/sessions/${session.id}/expressions`, {
-          ...args,
-          epoch: session.epoch,
-          requestId: args.requestId ?? randomUUID(),
-        });
-      } else if (params.name === 'cancel_expression') {
-        result = await request(`/v1/sessions/${session.id}/cancel`, { epoch: session.epoch });
-        session.epoch = result.epoch;
-      } else throw Error('unknown_tool');
-      return { content: [{ type: 'text', text: JSON.stringify(result) }] };
-    } catch (e) {
-      // Definitive lifecycle rejection: reconnect on the next call, never replay an uncertain command.
-      if (['session', 'session_closed', 'stale_epoch', 'http_404'].includes(e.message))
-        session = undefined;
-      return {
-        isError: true,
-        content: [{ type: 'text', text: JSON.stringify({ status: 'rejected', code: e.message }) }],
-      };
-    }
+    const result = calls.then(() => toolCall(params));
+    calls = result.catch(() => {});
+    return result;
   }
   throw Error('method_not_found');
 }
@@ -166,7 +187,9 @@ let inFlight = 0;
 let stopping=false;
 async function releaseOnExit(){
   if(stopping)return;stopping=true;process.stdin.pause();
-  const held=session??await connecting?.catch(()=>undefined);
+  await calls.catch(()=>{});
+  await connecting?.catch(()=>{});
+  const held=session;
   session=undefined;
   if(held)await request(`/v1/sessions/${held.id}`,undefined,'DELETE').catch(()=>{});
   process.exit(0);

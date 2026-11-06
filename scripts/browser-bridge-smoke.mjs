@@ -266,7 +266,7 @@ try {
         waiting.delete(message.id);
       }
     });
-    const call = () =>
+    const call = (arguments_ = { body: { type: 'wait', durationMs: 20 } }) =>
       new Promise((resolve, reject) => {
         const next = ++id,
           timer = setTimeout(() => reject(Error('mcp_timeout')), 4000);
@@ -279,21 +279,23 @@ try {
             jsonrpc: '2.0',
             id: next,
             method: 'tools/call',
-            params: { name: 'express', arguments: { body: { type: 'wait', durationMs: 20 } } },
+            params: { name: 'express', arguments: arguments_ },
           }) + '\n',
         );
       });
     const first = await call(),
       receipt = JSON.parse(first.content[0].text);
     if (receipt.status !== 'accepted') throw Error('mcp_first_admission');
+    const definition = await call({ kind: 'define', body: { name: 'allDay', revision: 1, params: {},
+      body: { type: 'morph', target: 'sphere', durationMs: 100 } } });
+    if (JSON.parse(definition.content[0].text).status !== 'accepted') throw Error('mcp_define_failed');
     await api(`/v1/sessions/${receipt.session}`, undefined, 'DELETE');
-    const stale = await call();
-    if (!stale.isError) throw Error('mcp_stale_session_should_reject');
-    const recovered = await call(),
+    const recovered = await call({ body: { type: 'call', name: 'allDay', revision: 1, args: {} } }),
       fresh = JSON.parse(recovered.content[0].text);
     if (fresh.status !== 'accepted') throw Error('mcp_session_not_recovered');
     await api(`/v1/sessions/${fresh.session}`, undefined, 'DELETE');
     evidence.mcpRecoversAfterRevoke = true;
+    evidence.mcpRestoresAcceptedMacros = true;
   } finally {
     mcp.kill();
   }

@@ -19,7 +19,7 @@
       "check": "admission",
       "status": "accepted",
       "code": null,
-      "elapsedMs": 17,
+      "elapsedMs": 22,
       "animationDurationMs": 1000
     },
     {
@@ -35,5 +35,6 @@
     123
   ],
   "mcpRecoversAfterRevoke": true,
+  "mcpRestoresAcceptedMacros": true,
   "basicBrowserSmoke": true
 }
