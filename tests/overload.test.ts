@@ -28,7 +28,7 @@ it('100 records/sec for 30 simulated seconds bounds queue/cache; content and can
         kind: 'program',
         track: 'body',
         policy: 'append',
-        body: { type: 'morph', target: i % 2 ? 'ring' : 'wave', durationMs: 1000 },
+        body: { type: 'morph', target: i % 2 ? 'wall' : 'wave', durationMs: 1000 },
       },
       now,
     );

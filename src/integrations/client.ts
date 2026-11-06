@@ -44,7 +44,12 @@ export class ExpressionClient {
       redirect: 'error',
       signal: AbortSignal.timeout(2000),
     });
-    const result = await response.json();
+    let result;
+    try {
+      result = await response.json();
+    } catch {
+      throw Error(response.ok ? 'invalid_gateway_response' : `http_${response.status}`);
+    }
     if (!response.ok) throw Error(result.code ?? `http_${response.status}`);
     return result;
   }

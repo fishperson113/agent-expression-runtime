@@ -4,7 +4,7 @@ import { JsonLines } from '../src/adapters/framing';
 import { Scheduler, initialState } from '../src/core/runtime/scheduler';
 import type { BodyState } from '../src/core/ports';
 import type { ProgramIR } from '../src/core/runtime/ir';
-const morph = (target = 'ring', durationMs = 1000) => ({
+const morph = (target = 'wall', durationMs = 1000) => ({
   type: 'morph',
   target,
   durationMs,
@@ -94,7 +94,7 @@ describe('compiler', () => {
         program({
           type: 'parallel',
           children: [
-            { type: 'sequence', children: [morph('ring', 0), morph('wave', 0)] },
+            { type: 'sequence', children: [morph('wall', 0), morph('wave', 0)] },
             { type: 'flow', field: 'orbit', strength: 0.2, durationMs: 100 },
           ],
         }),
@@ -180,7 +180,7 @@ describe('compiler', () => {
         params: { ms: 'number' },
         body: {
           type: 'morph',
-          target: 'ring',
+          target: 'wall',
           durationMs: { type: 'param', name: 'ms' },
           easing: 'linear',
         },
@@ -226,7 +226,7 @@ describe('compiler', () => {
     expect(() => c.compile(program(body), 0)).toThrow('depth_budget');
     expect(() =>
       c.compile(
-        program({ type: 'sequence', children: [morph('ring', 6000), morph('wave', 6000)] }),
+        program({ type: 'sequence', children: [morph('wall', 6000), morph('wave', 6000)] }),
         0,
       ),
     ).toThrow('duration_budget');
@@ -237,12 +237,12 @@ describe('scheduler', () => {
     const r = rig();
     r.s.admit(r.c.compile(program(morph()), 0));
     r.time(500);
-    expect(r.state.shapeWeights).toEqual([0.5, 0.5, 0, 0]);
+    expect(r.state.shapeWeights).toEqual([0.5, 0.5, 0, 0, 0, 0, 0]);
     r.s.admit(r.c.compile(program(morph('wave'), 2), 500));
     r.time(500);
-    expect(r.state.shapeWeights).toEqual([0.5, 0.5, 0, 0]);
+    expect(r.state.shapeWeights).toEqual([0.5, 0.5, 0, 0, 0, 0, 0]);
     r.time(1000);
-    expect(r.state.shapeWeights).toEqual([0.25, 0.25, 0.5, 0]);
+    expect(r.state.shapeWeights).toEqual([0.25, 0.25, 0.5, 0, 0, 0, 0]);
   });
   it('rejects stale epoch/seq and expired records, including late compiler results', () => {
     const r = rig();
@@ -283,13 +283,14 @@ describe('scheduler', () => {
     for (let i = 1; i <= 9; i++)
       expect(
         r.s.admit(
-          r.c.compile(program(morph('ring', 10000), i, { policy: 'append', ttlMs: 5000 }), 0),
+          r.c.compile(program(morph('wall', 10000), i, { policy: 'append', ttlMs: 5000 }), 0),
         ),
       ).toBe('accepted');
     expect(r.s.queueDepth).toBe(8);
     expect(r.s.admit(r.c.compile(program(morph(), 10, { policy: 'append' }), 0))).toBe(
       'queue_full',
     );
+    expect(r.s.admit(r.c.compile(program(morph(), 11), 0))).toBe('accepted');
     r.s.cancel('next');
     expect(r.s.queueDepth).toBe(0);
     expect(r.s.busy).toBe(false);

@@ -22,9 +22,9 @@ if (
 }
 const instructions = readFileSync(new URL('./instructions-v1.md', import.meta.url), 'utf8');
 let session, connecting;
-async function request(path, body) {
+async function request(path, body,method=body===undefined?'GET':'POST') {
   const response = await fetch(base + path, {
-    method: body === undefined ? 'GET' : 'POST',
+    method,
     headers: {
       Authorization: `Bearer ${token}`,
       ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
@@ -33,7 +33,13 @@ async function request(path, body) {
     redirect: 'error',
     signal: AbortSignal.timeout(2000),
   });
-  const result = await response.json();
+  if(response.status===204)return {};
+  let result;
+  try {
+    result = await response.json();
+  } catch {
+    throw Error(response.ok ? 'invalid_gateway_response' : `http_${response.status}`);
+  }
   if (!response.ok) throw Error(result.code ?? 'gateway_rejected');
   return result;
 }
@@ -71,7 +77,7 @@ async function handle(message) {
         {
           name: 'express',
           description:
-            'Choose a short declarative particle-body expression. ACK means admitted, not animation completed. Use sphere/ring/wave/cloud; orbit/turbulence/pulse; sequence/parallel/wait/style. Never send code or per-frame coordinates. Read aer://instructions/v1.',
+            'Choose a short declarative particle-body expression. ACK means admitted, not animation completed. Use sphere/wall/pin/screw/pyramid/wave/cloud; orbit/turbulence/pulse; sequence/parallel/wait/style/shapeQuality. Never send code or per-frame coordinates. Read aer://instructions/v1.',
           inputSchema,
         },
         {
@@ -145,6 +151,9 @@ async function handle(message) {
       } else throw Error('unknown_tool');
       return { content: [{ type: 'text', text: JSON.stringify(result) }] };
     } catch (e) {
+      // Definitive lifecycle rejection: reconnect on the next call, never replay an uncertain command.
+      if (['session', 'session_closed', 'stale_epoch', 'http_404'].includes(e.message))
+        session = undefined;
       return {
         isError: true,
         content: [{ type: 'text', text: JSON.stringify({ status: 'rejected', code: e.message }) }],
@@ -154,6 +163,17 @@ async function handle(message) {
   throw Error('method_not_found');
 }
 let inFlight = 0;
+let stopping=false;
+async function releaseOnExit(){
+  if(stopping)return;stopping=true;process.stdin.pause();
+  const held=session??await connecting?.catch(()=>undefined);
+  session=undefined;
+  if(held)await request(`/v1/sessions/${held.id}`,undefined,'DELETE').catch(()=>{});
+  process.exit(0);
+}
+process.stdin.once('end',()=>void releaseOnExit());
+process.once('SIGINT',()=>void releaseOnExit());
+process.once('SIGTERM',()=>void releaseOnExit());
 function line(line) {
   let m;
   try {

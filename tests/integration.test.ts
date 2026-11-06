@@ -45,7 +45,21 @@ it('HTTP helper and fake MCP host route the same AST into identical core IR with
     }
     res.end('{}');
   });
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  // Some Windows ephemeral ranges include WHATWG-forbidden fetch ports (e.g. 10080).
+  for (let attempt = 0; attempt < 20; attempt++) {
+    try {
+      await new Promise<void>((resolve, reject) => {
+        server.once('error', reject);
+        server.listen(49152 + Math.floor(Math.random() * 16000), '127.0.0.1', () => {
+          server.removeListener('error', reject);
+          resolve();
+        });
+      });
+      break;
+    } catch (error) {
+      if ((error as { code?: string }).code !== 'EADDRINUSE' || attempt === 19) throw error;
+    }
+  }
   const address = server.address() as { port: number };
   const base = `http://127.0.0.1:${address.port}`;
   const child = spawn(process.execPath, ['integrations/mcp-server.mjs'], {
@@ -81,7 +95,7 @@ it('HTTP helper and fake MCP host route the same AST into identical core IR with
     const body = {
       type: 'parallel' as const,
       children: [
-        { type: 'morph' as const, target: 'ring' as const, durationMs: 10000 },
+        { type: 'morph' as const, target: 'wall' as const, durationMs: 10000 },
         { type: 'flow' as const, field: 'orbit' as const, strength: 0.4, durationMs: 10000 },
       ],
     };
@@ -101,7 +115,7 @@ it('HTTP helper and fake MCP host route the same AST into identical core IR with
     expect(outputs[0].ops).toEqual(outputs[1].ops);
     expect(outputs[0].duration).toBe(10000);
     const instructions = await call('resources/read', { uri: 'aer://instructions/v1' });
-    expect(instructions.result.contents[0].text).toContain('version 1.0.0');
+    expect(instructions.result.contents[0].text).toContain('version 1.1.0');
     expect(instructions.result.contents[0].text).not.toContain(token);
   } finally {
     child.kill();

@@ -189,10 +189,52 @@
           "type": "object",
           "properties": {
             "type": {
-              "const": "morph"
+              "const": "shapeQuality"
             },
-            "target": {
-              "enum": ["sphere", "ring", "wave", "cloud"]
+            "rise": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "advance": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "spread": {
+              "type": "number",
+              "minimum": 0.25,
+              "maximum": 2
+            },
+            "grow": {
+              "type": "number",
+              "minimum": 0.25,
+              "maximum": 2
+            },
+            "path": {
+              "enum": ["spoke", "arc"]
+            },
+            "effort": {
+              "type": "object",
+              "properties": {
+                "time": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "weight": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "flow": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [],
+              "additionalProperties": false
             },
             "durationMs": {
               "type": "integer",
@@ -201,6 +243,63 @@
             },
             "easing": {
               "enum": ["linear", "smoothstep"]
+            }
+          },
+          "required": ["type", "durationMs"],
+          "additionalProperties": false,
+          "anyOf": [
+            {
+              "required": ["rise"]
+            },
+            {
+              "required": ["advance"]
+            },
+            {
+              "required": ["spread"]
+            },
+            {
+              "required": ["grow"]
+            }
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "morph"
+            },
+            "target": {
+              "enum": ["sphere", "wall", "wave", "cloud", "pin", "screw", "pyramid"]
+            },
+            "durationMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "easing": {
+              "enum": ["linear", "smoothstep"]
+            },
+            "effort": {
+              "type": "object",
+              "properties": {
+                "time": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "weight": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "flow": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [],
+              "additionalProperties": false
             }
           },
           "required": ["type", "target", "durationMs"],
@@ -227,6 +326,28 @@
             },
             "easing": {
               "enum": ["linear", "smoothstep"]
+            },
+            "effort": {
+              "type": "object",
+              "properties": {
+                "time": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "weight": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "flow": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [],
+              "additionalProperties": false
             }
           },
           "required": ["type", "field", "strength", "durationMs"],
@@ -264,6 +385,28 @@
             },
             "easing": {
               "enum": ["linear", "smoothstep"]
+            },
+            "effort": {
+              "type": "object",
+              "properties": {
+                "time": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "weight": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "flow": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [],
+              "additionalProperties": false
             }
           },
           "required": ["type", "durationMs"],
@@ -369,12 +512,152 @@
           "type": "object",
           "properties": {
             "type": {
+              "const": "shapeQuality"
+            },
+            "rise": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": -1,
+                  "maximum": 1
+                },
+                {
+                  "$ref": "#/$defs/param"
+                }
+              ]
+            },
+            "advance": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": -1,
+                  "maximum": 1
+                },
+                {
+                  "$ref": "#/$defs/param"
+                }
+              ]
+            },
+            "spread": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0.25,
+                  "maximum": 2
+                },
+                {
+                  "$ref": "#/$defs/param"
+                }
+              ]
+            },
+            "grow": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0.25,
+                  "maximum": 2
+                },
+                {
+                  "$ref": "#/$defs/param"
+                }
+              ]
+            },
+            "path": {
+              "enum": ["spoke", "arc"]
+            },
+            "effort": {
+              "type": "object",
+              "properties": {
+                "time": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    {
+                      "$ref": "#/$defs/param"
+                    }
+                  ]
+                },
+                "weight": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    {
+                      "$ref": "#/$defs/param"
+                    }
+                  ]
+                },
+                "flow": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    {
+                      "$ref": "#/$defs/param"
+                    }
+                  ]
+                }
+              },
+              "required": [],
+              "additionalProperties": false
+            },
+            "durationMs": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000
+                },
+                {
+                  "$ref": "#/$defs/param"
+                }
+              ]
+            },
+            "easing": {
+              "anyOf": [
+                {
+                  "enum": ["linear", "smoothstep"]
+                },
+                {
+                  "$ref": "#/$defs/param"
+                }
+              ]
+            }
+          },
+          "required": ["type", "durationMs"],
+          "additionalProperties": false,
+          "anyOf": [
+            {
+              "required": ["rise"]
+            },
+            {
+              "required": ["advance"]
+            },
+            {
+              "required": ["spread"]
+            },
+            {
+              "required": ["grow"]
+            }
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
               "const": "morph"
             },
             "target": {
               "anyOf": [
                 {
-                  "enum": ["sphere", "ring", "wave", "cloud"]
+                  "enum": ["sphere", "wall", "wave", "cloud", "pin", "screw", "pyramid"]
                 },
                 {
                   "$ref": "#/$defs/param"
@@ -402,6 +685,49 @@
                   "$ref": "#/$defs/param"
                 }
               ]
+            },
+            "effort": {
+              "type": "object",
+              "properties": {
+                "time": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    {
+                      "$ref": "#/$defs/param"
+                    }
+                  ]
+                },
+                "weight": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    {
+                      "$ref": "#/$defs/param"
+                    }
+                  ]
+                },
+                "flow": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    {
+                      "$ref": "#/$defs/param"
+                    }
+                  ]
+                }
+              },
+              "required": [],
+              "additionalProperties": false
             }
           },
           "required": ["type", "target", "durationMs"],
@@ -456,6 +782,49 @@
                   "$ref": "#/$defs/param"
                 }
               ]
+            },
+            "effort": {
+              "type": "object",
+              "properties": {
+                "time": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    {
+                      "$ref": "#/$defs/param"
+                    }
+                  ]
+                },
+                "weight": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    {
+                      "$ref": "#/$defs/param"
+                    }
+                  ]
+                },
+                "flow": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    {
+                      "$ref": "#/$defs/param"
+                    }
+                  ]
+                }
+              },
+              "required": [],
+              "additionalProperties": false
             }
           },
           "required": ["type", "field", "strength", "durationMs"],
@@ -535,6 +904,49 @@
                   "$ref": "#/$defs/param"
                 }
               ]
+            },
+            "effort": {
+              "type": "object",
+              "properties": {
+                "time": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    {
+                      "$ref": "#/$defs/param"
+                    }
+                  ]
+                },
+                "weight": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    {
+                      "$ref": "#/$defs/param"
+                    }
+                  ]
+                },
+                "flow": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    {
+                      "$ref": "#/$defs/param"
+                    }
+                  ]
+                }
+              },
+              "required": [],
+              "additionalProperties": false
             }
           },
           "required": ["type", "durationMs"],

@@ -11,7 +11,7 @@ const page = await browser.newPage({
 });
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
-await page.goto('http://127.0.0.1:5173');
+await page.goto(process.env.AER_BROWSER_URL ?? 'http://127.0.0.1:5173');
 await page.waitForFunction(
   () => !document.querySelector('#mode').textContent.includes('Initializing'),
   { timeout: 15000 },
@@ -28,9 +28,9 @@ await page.getByRole('button', { name: 'Apply program' }).click();
 await page.waitForFunction(() =>
   document.querySelector('#feedback').textContent.includes('diagnostic'),
 );
-await page.getByLabel('Program body').fill('{"type":"morph","target":"ring","durationMs":700}');
+await page.getByLabel('Program body').fill('{"type":"morph","target":"wall","durationMs":700}');
 await page.getByRole('button', { name: 'Apply program' }).click();
-await page.waitForFunction(() => document.querySelector('#shape').textContent.includes('ring'));
+await page.waitForFunction(() => document.querySelector('#shape').textContent.includes('wall'));
 await page.waitForTimeout(800);
 mkdirSync('docs/evidence', { recursive: true });
 await page.screenshot({ path: 'docs/evidence/browser-desktop.png', fullPage: true });
@@ -52,7 +52,7 @@ const fallback = await browser.newPage({ viewport: { width: 1280, height: 900 } 
 await fallback.addInitScript(() => {
   Object.defineProperty(window, 'OffscreenCanvas', { value: undefined });
 });
-await fallback.goto('http://127.0.0.1:5173');
+await fallback.goto(process.env.AER_BROWSER_URL ?? 'http://127.0.0.1:5173');
 await fallback.waitForFunction(() =>
   document.querySelector('#mode').textContent.includes('fallback'),
 );

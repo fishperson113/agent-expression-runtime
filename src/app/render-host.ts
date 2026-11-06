@@ -14,6 +14,7 @@ export class RenderHost {
   private epoch = 'idle';
   private ready = false;
   private stopped = false;
+  private fallbackStarted = false;
   private timeout?: ReturnType<typeof setTimeout>;
   private resize: ResizeObserver;
   mode = 'starting';
@@ -24,6 +25,7 @@ export class RenderHost {
     private error: (code: string) => void,
     private stats: (value: { frameP95: number; queue: number; particles: number }) => void,
     private feedback?: (event: { epoch: string; seq: number; status: string }) => void,
+    private seed = 42,
   ) {
     this.resize = new ResizeObserver(() => this.size());
     this.resize.observe(canvas);
@@ -50,13 +52,20 @@ export class RenderHost {
           this.worker = new Worker(new URL('../workers/render.worker.ts', import.meta.url), {
             type: 'module',
           });
-          this.worker.onmessage = (e) => this.message(e.data);
-          this.worker.onerror = () => this.fallback('render_worker_crash');
+          const owner = this.worker;
+          this.worker.onmessage = (e) => {
+            if (this.worker === owner) this.message(e.data);
+          };
+          this.worker.onerror = (event) => {
+            event.preventDefault();
+            if (this.worker === owner) this.fallback('render_worker_crash');
+          };
           const box = this.canvas.getBoundingClientRect(),
             offscreen = this.canvas.transferControlToOffscreen();
           this.worker.postMessage(
             {
               type: 'init',
+              seed: this.seed,
               canvas: offscreen,
               width: box.width,
               height: box.height,
@@ -97,13 +106,14 @@ export class RenderHost {
     if (m.type === 'init_failed') this.fallback('render_init_failed');
   }
   private fallback(reason?: string) {
-    if (this.stopped) return;
+    if (this.stopped || this.fallbackStarted) return;
+    this.fallbackStarted = true;
     if (reason) this.error(reason);
     this.worker?.terminate();
     this.worker = undefined;
     for (const p of this.pending.values()) {
       clearTimeout(p.timer);
-      p.resolve('render_worker_crash');
+      p.resolve('pending');
     }
     this.pending.clear();
     clearTimeout(this.timeout);
@@ -117,7 +127,7 @@ export class RenderHost {
     this.mode = 'main thread fallback';
     this.ready = false;
     try {
-      this.renderer = new ThreeRenderer(this.canvas, this.error);
+      this.renderer = new ThreeRenderer(this.canvas, this.error, this.seed);
       this.renderer.quality(5000);
       this.particles = 5000;
       this.renderer.reducedMotion = this.reduced;
@@ -171,7 +181,7 @@ export class RenderHost {
     this.epoch = epoch;
     for (const p of this.pending.values()) {
       clearTimeout(p.timer);
-      p.resolve('stale_epoch');
+      p.resolve('cancelled');
     }
     this.pending.clear();
     this.worker?.postMessage({ type: 'epoch', epoch });
@@ -190,18 +200,14 @@ export class RenderHost {
       const id = ++this.next;
       return new Promise((resolve) => {
         const timer = setTimeout(() => {
-          this.pending.delete(id);
-          resolve('admission_timeout');
+          this.error('render_ack_delayed');
         }, 500);
         this.pending.set(id, { resolve, timer });
         this.worker!.postMessage({
           type: 'ir',
-          ir,
-          age: 'receivedAt' in ir ? performance.now() - ir.receivedAt : 0,
+          ir: { ...ir, ...(deadlineAt === undefined ? {} : { deadlineAt }) },
+          clockOrigin: performance.timeOrigin,
           id,
-          ...(deadlineAt === undefined
-            ? {}
-            : { deadlineRemaining: deadlineAt - performance.now() }),
         });
       });
     } else
@@ -226,7 +232,7 @@ export class RenderHost {
     cancelAnimationFrame(this.raf);
     for (const p of this.pending.values()) {
       clearTimeout(p.timer);
-      p.resolve('disposed');
+      p.resolve('cancelled');
     }
     this.pending.clear();
     this.worker?.postMessage({ type: 'dispose' });

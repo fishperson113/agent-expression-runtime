@@ -1,4 +1,6 @@
-# Validation record
+# Initial baseline validation record
+
+This page records the original baseline. The current local review changes and live browser/CLI evidence are listed in [review remediation](review-progress.md) and [browser bridge smoke](evidence/browser-bridge-smoke.json).
 
 Date: 2026-11-05. Environment: Windows x64, Node v24.15.0, Rust 1.97.1, Chromium headless with SwiftShader. Native GPU/WebView performance hardware characterization has not been completed.
 

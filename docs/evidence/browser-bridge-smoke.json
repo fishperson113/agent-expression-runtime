@@ -1,0 +1,39 @@
+{
+  "shapeQuality": "accepted",
+  "macro": "accepted",
+  "rejectedDefinitionCanRetry": true,
+  "uiRetainsController": true,
+  "delayedAck": {
+    "initial": "pending",
+    "final": "accepted"
+  },
+  "delayedWorkerDelivery": {
+    "initial": "pending",
+    "final": "rejected",
+    "code": "admission_timeout"
+  },
+  "cancelledFeedback": true,
+  "sessionMacroIsolation": true,
+  "cli": [
+    {
+      "check": "admission",
+      "status": "accepted",
+      "code": null,
+      "elapsedMs": 17,
+      "animationDurationMs": 1000
+    },
+    {
+      "check": "cancel",
+      "status": "cancelled"
+    },
+    {
+      "status": "closed"
+    }
+  ],
+  "pageErrors": [],
+  "seedPropagation": [
+    123
+  ],
+  "mcpRecoversAfterRevoke": true,
+  "basicBrowserSmoke": true
+}

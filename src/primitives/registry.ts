@@ -1,29 +1,12 @@
+import manifest from '../contracts/capabilities.json';
 import type { Property } from '../core/ast/types';
 export const primitives = Object.freeze({
-  morph: { writes: ['shape'] as Property[], cost: 1, targets: ['sphere', 'ring', 'wave', 'cloud'] },
-  flow: { writes: ['flow'] as Property[], cost: 1, fields: ['orbit', 'turbulence', 'pulse'] },
+  shapeQuality: {
+    writes: ['rise', 'advance', 'spread', 'grow', 'arcOffset', 'effortFlow'] as Property[],
+    cost: 1,
+  },
+  morph: { writes: ['shape'] as Property[], cost: 1, targets: manifest.shapes },
+  flow: { writes: ['flow'] as Property[], cost: 1, fields: manifest.fields },
   style: { writes: ['color', 'brightness', 'pointSize', 'dispersion'] as Property[], cost: 1 },
 });
-export const capability = Object.freeze({
-  v: 1,
-  revision: 'poc-1',
-  tracks: ['body'],
-  shapes: primitives.morph.targets,
-  fields: primitives.flow.fields,
-  easing: ['linear', 'smoothstep'],
-  limits: {
-    recordBytes: 32768,
-    depth: 16,
-    inputNodes: 128,
-    expandedNodes: 512,
-    macros: 32,
-    params: 8,
-    durationMs: 10000,
-    queue: 8,
-    inFlight: 4,
-    recordsPerSecond: 10,
-    pointSize: 8,
-    ttlMs: 5000,
-  },
-  particles: [10000, 5000, 2000],
-});
+export const capability = Object.freeze(manifest);

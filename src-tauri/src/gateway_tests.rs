@@ -9,6 +9,136 @@ use std::sync::{
     Arc,
 };
 use tower::ServiceExt;
+#[tokio::test]
+async fn browser_renderer_connection_is_bounded_and_released_on_disconnect() {
+    let (g, _) = connected();
+    let app = g.router();
+    let first = app
+        .clone()
+        .oneshot(request(&g, "/v1/renderer/events", None))
+        .await
+        .unwrap();
+    assert_eq!(first.status(), StatusCode::OK);
+    assert_eq!(
+        app.clone()
+            .oneshot(request(&g, "/v1/renderer/events", None))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::TOO_MANY_REQUESTS
+    );
+    drop(first);
+    assert_eq!(
+        app.oneshot(request(&g, "/v1/renderer/events", None))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::OK
+    );
+}
+#[tokio::test]
+async fn lease_refreshes_on_activity_and_expires_cleanly() {
+    let (g, _) = connected();
+    let app = g.router();
+    let first = json_response(
+        app.clone()
+            .oneshot(request(&g, "/v1/sessions", Some(json!({}))))
+            .await
+            .unwrap(),
+    )
+    .await;
+    g.expire_session_for_test();
+    let path = format!("/v1/sessions/{}/expressions", first["id"].as_str().unwrap());
+    assert_eq!(app.clone().oneshot(request(&g,&path,Some(json!({"epoch":first["epoch"],"requestId":"keepalive","body":{"type":"wait","durationMs":1}})))).await.unwrap().status(),StatusCode::ACCEPTED);
+    assert_eq!(
+        app.clone()
+            .oneshot(request(&g, "/v1/sessions", Some(json!({}))))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::CONFLICT
+    );
+    g.expire_session_for_test();
+    let second = json_response(
+        app.oneshot(request(&g, "/v1/sessions", Some(json!({}))))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert_ne!(first["id"], second["id"]);
+}
+#[tokio::test]
+async fn cors_preflight_allows_only_explicit_origin_methods_and_headers_without_token() {
+    let g = Gateway::new().with_test_origin("http://127.0.0.1:5173");
+    let req = |origin: &str| {
+        Request::builder()
+            .method("OPTIONS")
+            .uri("/v1/sessions")
+            .header("host", "127.0.0.1:1234")
+            .header("origin", origin)
+            .header("access-control-request-method", "POST")
+            .header(
+                "access-control-request-headers",
+                "authorization,content-type",
+            )
+            .body(Body::empty())
+            .unwrap()
+    };
+    let response = g
+        .router()
+        .oneshot(req("http://127.0.0.1:5173"))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+    assert_eq!(
+        response.headers()["access-control-allow-origin"],
+        "http://127.0.0.1:5173"
+    );
+    assert_eq!(
+        g.router()
+            .oneshot(req("https://other.example"))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::FORBIDDEN
+    );
+}
+#[tokio::test]
+async fn capabilities_match_the_shared_typescript_manifest() {
+    let (g, _) = connected();
+    let response = g
+        .router()
+        .oneshot(request(&g, "/v1/capabilities", None))
+        .await
+        .unwrap();
+    let expected: Value =
+        serde_json::from_str(include_str!("../../src/contracts/capabilities.json")).unwrap();
+    assert_eq!(json_response(response).await, expected);
+}
+#[tokio::test]
+async fn revoked_session_closes_sse_and_releases_consumer_permits() {
+    use http_body_util::BodyExt;
+    let (g, _) = connected();
+    for _ in 0..6 {
+        let app = g.router();
+        let session = json_response(
+            app.clone()
+                .oneshot(request(&g, "/v1/sessions", Some(json!({}))))
+                .await
+                .unwrap(),
+        )
+        .await;
+        let path = format!("/v1/sessions/{}/events", session["id"].as_str().unwrap());
+        let response = app.oneshot(request(&g, &path, None)).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let mut body = response.into_body();
+        assert!(body.frame().await.is_some());
+        g.revoke();
+        let closed = body.frame().await.unwrap().unwrap().into_data().unwrap();
+        assert!(String::from_utf8_lossy(&closed).contains("closed"));
+        assert!(body.frame().await.is_none());
+    }
+}
 fn request(g: &Gateway, path: &str, body: Option<Value>) -> Request<Body> {
     let mut b = Request::builder()
         .uri(path)
@@ -101,7 +231,7 @@ async fn dedup_ack_cancel_and_stale_epoch() {
     .await;
     let id = session["id"].as_str().unwrap();
     let path = format!("/v1/sessions/{id}/expressions");
-    let command = json!({"epoch":session["epoch"],"requestId":"one","body":{"type":"morph","target":"ring","durationMs":10000}});
+    let command = json!({"epoch":session["epoch"],"requestId":"one","body":{"type":"morph","target":"wall","durationMs":10000}});
     let start = std::time::Instant::now();
     let response = app
         .clone()
@@ -177,7 +307,9 @@ async fn bounded_mailbox_deadline_and_body_limit() {
         .unwrap();
     assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
     for h in handles {
-        assert_eq!(h.await.unwrap().status(), StatusCode::SERVICE_UNAVAILABLE);
+        let response = h.await.unwrap();
+        assert_eq!(response.status(), StatusCode::ACCEPTED);
+        assert_eq!(json_response(response).await["status"], "pending");
     }
     let response = app
         .oneshot(request(

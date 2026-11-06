@@ -12,7 +12,7 @@ The core is independent of Tauri, DOM, Workers and Three.js. The composition roo
 
 The compiler mailbox has four in-flight jobs. The render mailbox has four acknowledged messages. Renderer queues have eight pending programs; overload is rejected and counted. Rust uses separate 64-message content and four-message expression permits, with frontend acknowledgement. Content may backpressure its own provider but never waits for the expression compiler or renderer. Cancellation has a direct command/message path; every consumer checks epoch again.
 
-Morphs interpolate four procedural shape weight vectors over stable seeded particle IDs. Replacement captures the current weights, preserving continuity. Geometry buffers are allocated once; lowering is outside the frame loop. Color interpolation is linear-light sRGB conversion. Quality selection retains the first stable particle IDs.
+Morphs interpolate seven procedural shape weight vectors over stable seeded particle IDs. Replacement captures the current weights, preserving continuity. Geometry buffers are allocated once; lowering is outside the frame loop. Color interpolation is linear-light sRGB conversion. Quality selection retains the first stable particle IDs.
 
 Default telemetry is numeric counters and error codes only. Prompts stay in the conversation UI; they are not sent to a service in this POC. Replay capture requires a checkbox and retains at most 1,000 normalized records in memory. Export is a deliberate local download.
 

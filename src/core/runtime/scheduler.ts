@@ -3,13 +3,20 @@ import type { Compiled, ProgramIR, StateIR, Op } from './ir';
 import type { Property, Value } from '../ast/types';
 export const initialState = (): BodyState => ({
   shape: 'sphere',
-  shapeWeights: [1, 0, 0, 0],
+  shapeWeights: [1, 0, 0, 0, 0, 0, 0],
   flow: 'orbit',
   flowStrength: 0.15,
+  flowWeights: [1, 0, 0],
   color: '#79e6d3',
   brightness: 0.65,
   pointSize: 2,
   dispersion: 0.12,
+  rise: 0,
+  advance: 0,
+  spread: 1,
+  grow: 1,
+  arcOffset: 0,
+  effortFlow: 0,
 });
 const ease = (t: number, e: string) => (e === 'linear' ? t : t * t * (3 - 2 * t));
 const mix = (a: Value, b: Value, t: number): Value =>
@@ -20,6 +27,7 @@ type Active = {
   origins: Map<Op, Value>;
   strengths: Map<Op, number>;
   weights: Map<Op, number[]>;
+  flowWeights: Map<Op, number[]>;
   completed: Set<Op>;
   applied: boolean;
 };
@@ -30,7 +38,7 @@ export class Scheduler {
   private lastSeq = -1;
   private active?: Active;
   private queue: ProgramIR[] = [];
-  private baseline = { brightness: 0.65, pointSize: 2, dispersion: 0.12 };
+  private baseline = { brightness: 0.65, pointSize: 2, dispersion: 0.12, effortFlow: 0 };
   private blends = new Map<Property, Blend>();
   private owned = new Set<Property>();
   private admissions: number[] = [];
@@ -39,7 +47,10 @@ export class Scheduler {
     private clock: Clock,
     private sink: RendererSink,
     private diagnostics: DiagnosticsSink,
-    private feedback?: (status: 'applied' | 'completed', ir: ProgramIR | StateIR) => void,
+    private feedback?: (
+      status: 'applied' | 'completed' | 'cancelled',
+      ir: ProgramIR | StateIR,
+    ) => void,
   ) {}
   get queueDepth() {
     return this.queue.length;
@@ -49,6 +60,9 @@ export class Scheduler {
   }
   cancel(epoch: string) {
     this.tick();
+    if (this.active) this.feedback?.('cancelled', this.active.ir);
+    for (const ir of this.queue) this.feedback?.('cancelled', ir);
+    for (const f of this.stateFeedback) this.feedback?.('cancelled', f.ir);
     this.epoch = epoch;
     this.lastSeq = -1;
     this.active = undefined;
@@ -67,26 +81,37 @@ export class Scheduler {
     const now = this.clock.now();
     if (ir.epoch !== this.epoch) return reject('stale_epoch');
     if (ir.seq <= this.lastSeq) return reject('stale_seq');
-    if (ir.kind === 'define') {
-      this.lastSeq = ir.seq;
-      return 'defined';
-    }
     if (ir.deadlineAt !== undefined && now > ir.deadlineAt) return reject('admission_timeout');
     if (now - ir.receivedAt > ir.ttlMs) return reject('expired');
     this.admissions = this.admissions.filter((t) => now - t < 1000);
     if (this.admissions.length >= 10) return reject('rate_limited');
-    this.admissions.push(now);
-    if (ir.kind === 'state') {
+    if (ir.kind === 'define') {
+      this.admissions.push(now);
       this.lastSeq = ir.seq;
+      return 'defined';
+    }
+    if (ir.kind === 'state') {
+      this.admissions.push(now);
+      this.lastSeq = ir.seq;
+      this.stateFeedback = this.stateFeedback.filter((f) => {
+        if (Object.keys(ir.patch).some((p) => p in f.ir.patch)) {
+          this.feedback?.('cancelled', f.ir);
+          return false;
+        }
+        return true;
+      });
       this.applyBaseline(ir);
       this.stateFeedback.push({ ir, at: now, applied: false });
       return 'state';
     }
     if (ir.policy === 'append' && this.active && this.queue.length >= 8)
       return reject('queue_full');
+    this.admissions.push(now);
     this.tick();
     this.lastSeq = ir.seq;
     if (ir.policy === 'replace') {
+      if (this.active) this.feedback?.('cancelled', this.active.ir);
+      for (const queued of this.queue) this.feedback?.('cancelled', queued);
       this.active = undefined;
       this.queue = [];
       this.release();
@@ -118,6 +143,7 @@ export class Scheduler {
       origins: new Map(),
       strengths: new Map(),
       weights: new Map(),
+      flowWeights: new Map(),
       completed: new Set(),
       applied: false,
     };
@@ -151,21 +177,48 @@ export class Scheduler {
           a.origins.set(op, this.state[op.property]);
           a.strengths.set(op, this.state.flowStrength);
           a.weights.set(op, [...this.state.shapeWeights]);
+          a.flowWeights.set(op, [...this.state.flowWeights]);
           this.blends.delete(op.property);
         }
-        const t = ease(
+        let t = ease(
           op.duration === 0 ? 1 : Math.min(1, (elapsed - op.at) / op.duration),
           op.easing,
         );
+        if (op.effort?.time !== undefined) t = Math.pow(t, Math.pow(2, (0.5 - op.effort.time) * 2));
+        if (op.effort?.weight && !['rise', 'advance', 'spread', 'grow'].includes(op.property))
+          t = Math.max(0, Math.min(1, t + Math.sin(Math.PI * t) * op.effort.weight * 0.4));
         this.state[op.property] = mix(a.origins.get(op)!, op.value, t);
+        if (op.arcAmplitude !== undefined)
+          this.state[op.property] =
+            Number(a.origins.get(op)!) * (1 - t) + Math.sin(Math.PI * t) * op.arcAmplitude;
+        if (op.effort?.weight && ['rise', 'advance', 'spread', 'grow'].includes(op.property)) {
+          const value =
+            Number(this.state[op.property]) +
+            Math.sin(Math.PI * t) *
+              op.effort.weight *
+              0.4 *
+              (Number(op.value) - Number(a.origins.get(op)!));
+          this.state[op.property] = Math.max(
+            ['rise', 'advance'].includes(op.property) ? -1 : 0.25,
+            Math.min(['rise', 'advance'].includes(op.property) ? 1 : 2, value),
+          );
+        }
         if (op.property === 'shape') {
-          const target = ['sphere', 'ring', 'wave', 'cloud'].indexOf(String(op.value));
+          const target = ['sphere', 'wall', 'wave', 'cloud', 'pin', 'screw', 'pyramid'].indexOf(
+            String(op.value),
+          );
           this.state.shapeWeights = a.weights
             .get(op)!
             .map((w, i) => w + ((i === target ? 1 : 0) - w) * t);
           this.state.shape = op.value;
         }
-        if (op.property === 'flow') this.state.flow = op.value;
+        if (op.property === 'flow') {
+          this.state.flow = op.value;
+          const target = ['orbit', 'turbulence', 'pulse'].indexOf(String(op.value));
+          this.state.flowWeights = a.flowWeights
+            .get(op)!
+            .map((w, i) => w + ((i === target ? 1 : 0) - w) * t);
+        }
         if (op.property === 'color') {
           const aColor = parseInt(String(a.origins.get(op)).slice(1), 16),
             bColor = parseInt(String(op.value).slice(1), 16);
@@ -184,7 +237,16 @@ export class Scheduler {
           this.state.flowStrength =
             a.strengths.get(op)! + (op.strength! - a.strengths.get(op)!) * t;
         if (elapsed < op.at + op.duration) writing.add(op.property);
-        else a.completed.add(op);
+        else {
+          a.completed.add(op);
+          if (op.property in this.baseline && !this.owned.has(op.property))
+            this.blend(
+              op.property,
+              this.baseline[op.property as keyof typeof this.baseline],
+              250,
+              'smoothstep',
+            );
+        }
       }
       for (const p of this.owned)
         if (!writing.has(p) && p in this.baseline)
@@ -198,6 +260,7 @@ export class Scheduler {
         const next = this.queue.shift()!;
         if (now - next.receivedAt > next.ttlMs) {
           this.diagnostics.count('expired');
+          this.feedback?.('cancelled', next);
           continue;
         }
         this.start(next, now);
@@ -210,11 +273,20 @@ export class Scheduler {
       if (t >= 1) this.blends.delete(p);
     }
     this.stateFeedback = this.stateFeedback.filter((f) => {
-      if (!f.applied) {
+      const properties = Object.entries(f.ir.patch);
+      const visible = properties.some(([p]) => !this.owned.has(p as Property));
+      if (!f.applied && visible) {
         f.applied = true;
         this.feedback?.('applied', f.ir);
       }
-      if (now >= f.at + f.ir.duration) {
+      if (
+        properties.every(
+          ([p, value]) =>
+            !this.owned.has(p as Property) &&
+            !this.blends.has(p as Property) &&
+            Math.abs(Number(this.state[p as Property]) - value!) < 1e-8,
+        )
+      ) {
         this.feedback?.('completed', f.ir);
         return false;
       }

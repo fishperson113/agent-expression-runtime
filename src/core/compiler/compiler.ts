@@ -40,14 +40,51 @@ type Macro = {
   body: unknown;
 };
 export class Compiler {
+  constructor(private seed = 42) {}
   private macros = new Map<string, Macro>();
-  private cache = new Map<string, Op[]>();
+  private cache = new Map<string, { ops: Op[]; duration: number }>();
+  private macroRevision = 0;
+  private nextDraft = 0;
+  private drafts = new Map<number, { key: string; macro: Macro }>();
+  discardDefinitions() {
+    this.drafts.clear();
+  }
+  prepareDefinition(raw: unknown, receivedAt: number): Compiled {
+    if (this.drafts.size >= 4) fail('definition_mailbox_full', '$');
+    const candidate = new Compiler(this.seed);
+    candidate.macros = new Map(this.macros);
+    const ir = candidate.compile(raw, receivedAt);
+    if (ir.kind !== 'define') fail('definition_required', '$');
+    const [key, macro] = [...candidate.macros].find(([key]) => !this.macros.has(key))!;
+    if ([...this.drafts.values()].some((d) => d.key === key)) fail('definition_pending', '$.body');
+    if (this.macros.size + this.drafts.size >= 32) fail('macro_budget', '$.body');
+    const draft = ++this.nextDraft;
+    this.drafts.set(draft, { key, macro });
+    return {
+      kind: 'define',
+      epoch: ir.epoch,
+      seq: ir.seq,
+      draft,
+      ttlMs: 'ttlMs' in ir ? ir.ttlMs : 2000,
+      receivedAt,
+    };
+  }
+  settleDefinition(draft: number, accepted: boolean) {
+    const staged = this.drafts.get(draft);
+    this.drafts.delete(draft);
+    if (staged && accepted) {
+      this.macros.set(staged.key, staged.macro);
+      this.macroRevision++;
+    }
+  }
   get sizes() {
     return { macros: this.macros.size, cache: this.cache.size };
   }
   reset() {
+    this.drafts.clear();
     this.macros.clear();
     this.cache.clear();
+    this.macroRevision++;
   }
   compile(raw: unknown, receivedAt: number): Compiled {
     let encoded: string;
@@ -119,7 +156,8 @@ export class Compiler {
       };
       this.lower(probe(b.body), snapshot, [], true);
       this.macros.set(key, structuredClone(macro));
-      return { kind: 'define', epoch: r.epoch, seq: r.seq };
+      this.macroRevision++;
+      return { kind: 'define', epoch: r.epoch, seq: r.seq, ttlMs, receivedAt };
     }
     if (r.kind === 'state') {
       const b = object(r.body, '$.body');
@@ -141,12 +179,11 @@ export class Compiler {
     }
     choice(r.track, ['body'], '$.track');
     choice(r.policy, ['append', 'replace'], '$.policy');
-    const cacheKey = JSON.stringify([r.body, Array.from(snapshot), capability.revision]);
-    const lowered = this.lower(r.body, snapshot, []);
-    let ops = this.cache.get(cacheKey);
-    if (!ops) {
-      ops = lowered.ops;
-      this.cache.set(cacheKey, ops);
+    const cacheKey = JSON.stringify([r.body, this.macroRevision, capability.revision]);
+    let lowered = this.cache.get(cacheKey);
+    if (!lowered) {
+      lowered = this.lower(r.body, snapshot, []);
+      this.cache.set(cacheKey, lowered);
       if (this.cache.size > 64) this.cache.delete(this.cache.keys().next().value!);
     }
     return {
@@ -157,8 +194,8 @@ export class Compiler {
       receivedAt,
       policy: r.policy,
       duration: lowered.duration,
-      ops: structuredClone(ops),
-      seed: 42,
+      ops: structuredClone(lowered.ops),
+      seed: this.seed,
     };
   }
   private substitute(raw: unknown, args: Obj, p: string): unknown {
@@ -197,7 +234,7 @@ export class Compiler {
       const n = object(value, p);
       const type = choice(
         n.type,
-        ['morph', 'flow', 'style', 'wait', 'sequence', 'parallel', 'call'],
+        ['morph', 'flow', 'style', 'shapeQuality', 'wait', 'sequence', 'parallel', 'call'],
         `${p}.type`,
       );
       if (type === 'call') {
@@ -261,10 +298,27 @@ export class Compiler {
             : type === 'style'
               ? ['color', 'brightness', 'pointSize', 'dispersion']
               : [];
-      keys(n, ['type', 'durationMs', ...(type === 'wait' ? [] : ['easing']), ...allowed], p);
+      keys(
+        n,
+        [
+          'type',
+          'durationMs',
+          ...(type === 'wait' ? [] : ['easing', 'effort']),
+          ...allowed,
+          ...(type === 'shapeQuality'
+            ? ['rise', 'advance', 'spread', 'grow', 'path', 'effort']
+            : []),
+        ],
+        p,
+      );
       const duration = num(n.durationMs, p + '.durationMs', 0, 10000, true),
         ease = type === 'wait' ? 'linear' : easing(n.easing, p + '.easing');
       const ops: Op[] = [];
+      const effort = n.effort === undefined ? undefined : object(n.effort, p + '.effort');
+      if (effort) {
+        keys(effort, ['time', 'weight', 'flow'], p + '.effort');
+        for (const key of Object.keys(effort)) num(effort[key], p + '.effort.' + key, 0, 1);
+      }
       const add = (property: Property, value: string | number, strength?: number) =>
         ops.push({
           at,
@@ -272,8 +326,32 @@ export class Compiler {
           easing: ease,
           property,
           value,
+          ...(effort ? { effort } : {}),
           ...(strength === undefined ? {} : { strength }),
         });
+      if (type === 'shapeQuality') {
+        for (const prop of ['rise', 'advance', 'spread', 'grow'] as const)
+          if (n[prop] !== undefined) {
+            add(
+              prop,
+              num(
+                n[prop],
+                p + '.' + prop,
+                prop === 'rise' || prop === 'advance' ? -1 : 0.25,
+                prop === 'rise' || prop === 'advance' ? 1 : 2,
+              ),
+            );
+            ops[ops.length - 1].effort = effort;
+          }
+        if (!ops.length) fail('empty_shape_quality', p);
+        const path = choice(n.path ?? 'spoke', ['spoke', 'arc'], p + '.path');
+        if (path === 'arc') {
+          if (n.rise === undefined && n.advance === undefined) fail('arc_requires_translation', p);
+          add('arcOffset', 0);
+          ops[ops.length - 1].arcAmplitude = 0.25;
+          ops[ops.length - 1].effort = effort;
+        }
+      }
       if (type === 'morph') add('shape', choice(n.target, primitives.morph.targets, p + '.target'));
       if (type === 'flow')
         add(
@@ -292,6 +370,7 @@ export class Compiler {
         }
         if (!ops.length) fail('empty_style', p);
       }
+      if (effort?.flow !== undefined) add('effortFlow', effort.flow);
       return { ops, duration };
     };
     void template;

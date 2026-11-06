@@ -1,5 +1,6 @@
 import { Scheduler } from '../core/runtime/scheduler';
 import { ThreeRenderer } from '../adapters/three-renderer';
+import { convertClockOrigin } from '../adapters/clock-origin';
 let scheduler: Scheduler | undefined,
   renderer: ThreeRenderer | undefined,
   timer: ReturnType<typeof setTimeout> | undefined,
@@ -28,7 +29,7 @@ self.onmessage = (e) => {
   const m = e.data;
   try {
     if (m.type === 'init') {
-      renderer = new ThreeRenderer(m.canvas, (c) => send('error', c));
+      renderer = new ThreeRenderer(m.canvas, (c) => send('error', c), m.seed);
       renderer.resize(m.width, m.height, m.dpr);
       scheduler = new Scheduler(clock, renderer, { count: (c) => send('error', c) }, (status, ir) =>
         send('feedback', { status, epoch: ir.epoch, seq: ir.seq }),
@@ -40,13 +41,8 @@ self.onmessage = (e) => {
     if (m.type === 'epoch') scheduler?.cancel(m.epoch);
     if (m.type === 'ir') {
       const status =
-        scheduler?.admit({
-          ...m.ir,
-          receivedAt: clock.now() - m.age,
-          ...(m.deadlineRemaining !== undefined
-            ? { deadlineAt: clock.now() + m.deadlineRemaining }
-            : {}),
-        }) ?? 'renderer_unavailable';
+        scheduler?.admit(convertClockOrigin(m.ir, m.clockOrigin, performance.timeOrigin)) ??
+        'renderer_unavailable';
       send('ack', { id: m.id, status });
     }
     if (m.type === 'resize') renderer?.resize(m.width, m.height, m.dpr);

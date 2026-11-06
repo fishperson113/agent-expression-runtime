@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "aer": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${AER_REPO_DIR}/integrations/mcp-server.mjs"],
+      "env": { "AER_BASE_URL": "${AER_BASE_URL}", "AER_PAIRING_TOKEN": "${AER_PAIRING_TOKEN}" }
+    }
+  }
+}

@@ -6,6 +6,8 @@ export type Op = {
   property: Property;
   value: Value;
   strength?: number;
+  arcAmplitude?: number;
+  effort?: { time?: number; weight?: number };
 };
 export type ProgramIR = {
   kind: 'program';
@@ -30,5 +32,16 @@ export type StateIR = {
   duration: number;
   easing: Easing;
 };
-export type Compiled = ProgramIR | StateIR | { kind: 'define'; epoch: string; seq: number };
+export type Compiled =
+  | ProgramIR
+  | StateIR
+  | {
+      kind: 'define';
+      epoch: string;
+      seq: number;
+      draft?: number;
+      ttlMs: number;
+      receivedAt: number;
+      deadlineAt?: number;
+    };
 export type CompileInput = { record: Envelope; receivedAt: number };

@@ -1,14 +1,46 @@
-export type Shape = 'sphere' | 'ring' | 'wave' | 'cloud';
+export type Shape = 'sphere' | 'wall' | 'wave' | 'cloud' | 'pin' | 'screw' | 'pyramid';
 export type Field = 'orbit' | 'turbulence' | 'pulse';
 export type Easing = 'linear' | 'smoothstep';
-export type Property = 'shape' | 'flow' | 'color' | 'brightness' | 'pointSize' | 'dispersion';
+export type Property =
+  | 'shape'
+  | 'flow'
+  | 'color'
+  | 'brightness'
+  | 'pointSize'
+  | 'dispersion'
+  | 'rise'
+  | 'advance'
+  | 'spread'
+  | 'grow'
+  | 'arcOffset'
+  | 'effortFlow';
 export type Value = number | string;
 export type Param = { type: 'param'; name: string };
+export type Effort = { time?: number; weight?: number; flow?: number };
 export type Node =
-  | { type: 'morph'; target: Shape; durationMs: number; easing?: Easing }
-  | { type: 'flow'; field: Field; strength: number; durationMs: number; easing?: Easing }
+  | {
+      type: 'shapeQuality';
+      rise?: number;
+      advance?: number;
+      spread?: number;
+      grow?: number;
+      path?: 'spoke' | 'arc';
+      effort?: { time?: number; weight?: number; flow?: number };
+      durationMs: number;
+      easing?: Easing;
+    }
+  | { type: 'morph'; target: Shape; durationMs: number; easing?: Easing; effort?: Effort }
+  | {
+      type: 'flow';
+      field: Field;
+      strength: number;
+      durationMs: number;
+      easing?: Easing;
+      effort?: Effort;
+    }
   | {
       type: 'style';
+      effort?: Effort;
       color?: string;
       brightness?: number;
       pointSize?: number;

@@ -20,15 +20,39 @@ const schema = {
 for (const template of [false, true]) {
   const ref = template ? 'template' : 'node',
     v = (s) => (template ? templatize(s) : s);
-  const duration = { durationMs: v(integer()), easing: v({ enum: ['linear', 'smoothstep'] }) };
+  const duration = {
+    durationMs: v(integer()),
+    easing: v({ enum: ['linear', 'smoothstep'] }),
+    effort: obj({ time: v(number()), weight: v(number()), flow: v(number()) }, []),
+  };
   const leaf = (type, props, required) =>
     obj({ type: constant(type), ...props }, ['type', ...required]);
   schema.$defs[ref] = {
     oneOf: [
-      leaf('morph', { target: v({ enum: ['sphere', 'ring', 'wave', 'cloud'] }), ...duration }, [
-        'target',
-        'durationMs',
-      ]),
+      {
+        ...leaf(
+          'shapeQuality',
+          {
+            rise: v({ type: 'number', minimum: -1, maximum: 1 }),
+            advance: v({ type: 'number', minimum: -1, maximum: 1 }),
+            spread: v({ type: 'number', minimum: 0.25, maximum: 2 }),
+            grow: v({ type: 'number', minimum: 0.25, maximum: 2 }),
+            path: { enum: ['spoke', 'arc'] },
+            effort: obj({ time: v(number()), weight: v(number()), flow: v(number()) }, []),
+            ...duration,
+          },
+          ['durationMs'],
+        ),
+        anyOf: ['rise', 'advance', 'spread', 'grow'].map((p) => ({ required: [p] })),
+      },
+      leaf(
+        'morph',
+        {
+          target: v({ enum: ['sphere', 'wall', 'wave', 'cloud', 'pin', 'screw', 'pyramid'] }),
+          ...duration,
+        },
+        ['target', 'durationMs'],
+      ),
       leaf(
         'flow',
         {

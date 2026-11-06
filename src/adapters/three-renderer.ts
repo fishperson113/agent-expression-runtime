@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import type { BodyState, RendererSink } from '../core/ports';
+import { MotionPhase } from './motion-phase';
 export function shapeBuffers(count: number, seed = 42) {
   let s = seed;
   const random = () => {
     s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
     return s / 4294967296;
   };
-  const shapes = Array.from({ length: 4 }, () => new Float32Array(count * 3));
+  const shapes = Array.from({ length: 7 }, () => new Float32Array(count * 3));
   for (let i = 0; i < count; i++) {
     const u = random(),
       v = random(),
@@ -17,14 +18,15 @@ export function shapeBuffers(count: number, seed = 42) {
       j = i * 3;
     const points = [
       [r * Math.cos(angle), z, r * Math.sin(angle)],
-      [
-        Math.cos(angle) * (0.85 + 0.12 * Math.cos(v * 6.28)),
-        0.12 * Math.sin(v * 6.28),
-        Math.sin(angle) * (0.85 + 0.12 * Math.cos(v * 6.28)),
-      ],
+      [u * 2 - 1, v * 2 - 1, (w - 0.5) * 0.04],
       [u * 2 - 1, Math.sin(u * 8 + v * 4) * 0.22, v * 2 - 1],
       [(u * 2 - 1) * 0.9, (v * 2 - 1) * 0.9, (w * 2 - 1) * 0.9],
     ];
+    points.push(
+      [Math.cos(angle) * 0.06, z, Math.sin(angle) * 0.06],
+      [Math.cos(v * Math.PI * 6) * 0.45, z, Math.sin(v * Math.PI * 6) * 0.45],
+      [(u * 2 - 1) * (1 - v), v * 2 - 1, (w * 2 - 1) * (1 - v)],
+    );
     points.forEach((p, k) => shapes[k].set(p, j));
   }
   return shapes;
@@ -37,16 +39,19 @@ export class ThreeRenderer implements RendererSink {
   private material: THREE.ShaderMaterial;
   private points: THREE.Points;
   private positions = new Float32Array(30000);
-  private shapes = shapeBuffers(10000);
+  private shapes: Float32Array[];
   private color = new THREE.Color();
   private lost = false;
   private restores = 0;
+  private orbit = new MotionPhase();
   count = 10000;
   reducedMotion = false;
   constructor(
     private canvas: HTMLCanvasElement | OffscreenCanvas,
     private fault: (code: string) => void,
+    seed = 42,
   ) {
+    this.shapes = shapeBuffers(10000, seed);
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       alpha: true,
@@ -107,12 +112,13 @@ export class ThreeRenderer implements RendererSink {
       amp = this.reducedMotion ? 0.08 : 1,
       strength = state.flowStrength * amp,
       dispersion = Number(state.dispersion);
+    const orbitAngle = this.orbit.advance(now, strength * state.flowWeights[0]);
     for (let i = 0; i < this.count; i++) {
       const j = i * 3;
       let x = 0,
         y = 0,
         z = 0;
-      for (let k = 0; k < 4; k++) {
+      for (let k = 0; k < this.shapes.length; k++) {
         const weight = state.shapeWeights[k];
         x += this.shapes[k][j] * weight;
         y += this.shapes[k][j + 1] * weight;
@@ -120,18 +126,23 @@ export class ThreeRenderer implements RendererSink {
       }
       const phase = i * 0.618;
       let scale = 1;
-      if (state.flow === 'pulse') scale += Math.sin(t * 2) * strength * 0.16;
-      if (state.flow === 'turbulence') {
-        x += Math.sin(phase + t) * strength * 0.15;
-        y += Math.cos(phase * 1.3 + t) * strength * 0.15;
-      }
-      const a = state.flow === 'orbit' ? t * strength * 0.35 : 0,
+      scale += Math.sin(t * 2) * strength * 0.16 * state.flowWeights[2];
+      x += Math.sin(phase + t) * strength * 0.15 * state.flowWeights[1];
+      y += Math.cos(phase * 1.3 + t) * strength * 0.15 * state.flowWeights[1];
+      const a = orbitAngle,
         c = Math.cos(a),
         s = Math.sin(a);
       const jitter = dispersion * 0.12;
-      this.positions[j] = (x * c - z * s) * scale + Math.sin(phase) * jitter;
-      this.positions[j + 1] = y * scale + Math.cos(phase) * jitter;
-      this.positions[j + 2] = (x * s + z * c) * scale;
+      x += Math.sin(phase + t * 2) * Number(state.effortFlow) * 0.03 * amp;
+      y += Math.cos(phase * 1.7 + t * 2) * Number(state.effortFlow) * 0.03 * amp;
+      const grow = Number(state.grow),
+        spread = Number(state.spread);
+      this.positions[j] =
+        ((x * c - z * s) * scale + Math.sin(phase) * jitter) * grow * spread +
+        Number(state.arcOffset) * amp;
+      this.positions[j + 1] =
+        (y * scale + Math.cos(phase) * jitter) * grow + Number(state.rise) * amp;
+      this.positions[j + 2] = (x * s + z * c) * scale * grow + Number(state.advance) * amp;
     }
     this.geometry.attributes.position.needsUpdate = true;
     this.material.uniforms.color.value = this.color.set(String(state.color));

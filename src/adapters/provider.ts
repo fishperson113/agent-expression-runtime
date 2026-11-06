@@ -23,7 +23,7 @@ export class FakeAgent implements AgentStreamAdapter {
     let index = 0,
       seq = 0;
     const words =
-      'This is a scripted stream, not a model response. Content keeps arriving while the expression compiler works independently. The body can move from a sphere into a ring, then a wave and a cloud using a small declarative program. Cancel this turn at any time, or try a program in the inspector.'.split(
+      'This is a scripted stream, not a model response. Content keeps arriving while the expression compiler works independently. The body can move from a sphere into a wall, then a wave and a cloud using a small declarative program. Cancel this turn at any time, or try a program in the inspector.'.split(
         ' ',
       );
     const timer = setInterval(() => {
@@ -34,7 +34,7 @@ export class FakeAgent implements AgentStreamAdapter {
       }
       content(words[index++] + ' ');
       if (index === 1 || index % 14 === 0) {
-        const shapes = ['sphere', 'ring', 'wave', 'cloud'] as const;
+        const shapes = ['sphere', 'wall', 'wave', 'cloud'] as const;
         expression({
           v: 1,
           epoch,

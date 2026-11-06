@@ -103,7 +103,7 @@ fn start_demo(
                         .lock()
                         .unwrap()
                         .insert((epoch.clone(), seq, true), permit);
-                    let target = ["sphere", "ring", "wave", "cloud"][((seq - 1) % 4) as usize];
+                    let target = ["sphere", "wall", "wave", "cloud"][((seq - 1) % 4) as usize];
                     let record = json!({"v":1,"epoch":epoch,"seq":seq,"kind":"program","track":"body","policy":"replace","body":{"type":"parallel","children":[{"type":"morph","target":target,"durationMs":900},{"type":"flow","field":"orbit","strength":0.35,"durationMs":1600}]}});
                     if on_expression
                         .send(Event {
@@ -133,6 +133,30 @@ fn start_demo(
     Ok(())
 }
 fn main() {
+    if std::env::args().any(|arg| arg == "--browser-gateway") {
+        let token = std::env::var("AER_PAIRING_TOKEN")
+            .expect("Set an ephemeral AER_PAIRING_TOKEN in the host environment");
+        let gateway = gateway::Gateway::with_host_token(token)
+            .expect("Invalid pairing credential configuration");
+        tauri::async_runtime::block_on(async move {
+            let server = gateway.clone();
+            let task = tauri::async_runtime::spawn(async move { server.serve().await });
+            for _ in 0..100 {
+                if !gateway.address.lock().unwrap().is_empty() {
+                    break;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            }
+            println!(
+                "{}",
+                serde_json::json!({"baseUrl":*gateway.address.lock().unwrap(),"mode":"browser-gateway"})
+            );
+            task.await
+                .expect("Gateway task failed")
+                .expect("Gateway failed");
+        });
+        return;
+    }
     let gateway = gateway::Gateway::new();
     let server = gateway.clone();
     tauri::Builder::default()

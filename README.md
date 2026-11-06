@@ -4,6 +4,10 @@ A provider-independent, Windows-first Tauri + TypeScript runtime: a particle bod
 
 ![Browser sandbox](docs/evidence/browser-desktop.png)
 
+## Browser / multiplexer quick start
+
+See [browser and Codex/Claude guide](docs/browser-and-hosts.md). Run `pwsh -File scripts/start-browser.ps1 -CopyToken` from a terminal pane; WebGL is displayed in the browser window. The working tree includes a breaking primitive update and receipt `pending` semantics documented in [admission](docs/admission.md).
+
 ## Run
 
 Requires Node.js 22.12+ (or 24), npm, and for desktop Rust stable, Microsoft C++ Build Tools and WebView2.
@@ -38,7 +42,7 @@ Browser smoke test: start `npm run dev`, install Chromium with `npx playwright i
 - Strict envelope/AST validation, byte-limited UTF-8 JSONL framing and atomic rejection.
 - Sequence, parallel, wait, immutable versioned define/call macros, bounded compiler cache and resource checks.
 - Monotonic scheduler, property conflict detection, epoch cancellation, stale sequence/TTL admission, bounded append queue, replacement from displayed morph weights and baseline patches.
-- Seeded sphere, ring, wave and cloud with orbit, turbulence and pulse; color, point size, brightness and dispersion.
+- Seeded sphere, wall, pin, screw, pyramid, wave and cloud with orbit, turbulence and pulse; color, point size, brightness and dispersion.
 - Worker compiler, feature-tested OffscreenCanvas renderer, main-thread fallback, reduced motion and manual particle quality tiers.
 - Separate content/expression adapter APIs, bounded/acknowledged Tauri IPC, privacy-conscious counters and explicit opt-in replay.
 - Loopback Rust HTTP gateway with ephemeral pairing token, strict Origin/Host policy, single-controller sessions, dedup, admission deadline and bounded SSE feedback.
@@ -56,7 +60,7 @@ Product-code license remains undecided. This public repository is a source previ
 ## Example
 
 ```json
-{"v":1,"epoch":"runtime-assigned","seq":1,"kind":"program","track":"body","policy":"replace","body":{"type":"parallel","children":[{"type":"morph","target":"ring","durationMs":900},{"type":"flow","field":"orbit","strength":0.35,"durationMs":1800}]}}
+{"v":1,"epoch":"runtime-assigned","seq":1,"kind":"program","track":"body","policy":"replace","body":{"type":"parallel","children":[{"type":"morph","target":"wall","durationMs":900},{"type":"flow","field":"orbit","strength":0.35,"durationMs":1800}]}}
 ```
 
 Epoch and sequence must be assigned by the application adapter, not trusted from a model. Expressions are selected behavior, not evidence of internal emotion. Input can never supply JavaScript, Rust, shader code, I/O or recursion.

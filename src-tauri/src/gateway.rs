@@ -37,7 +37,6 @@ struct Pending {
     session: String,
     epoch: String,
     seq: u64,
-    started: Instant,
     feedback: Vec<String>,
 }
 struct Session {
@@ -45,7 +44,7 @@ struct Session {
     epoch: String,
     seq: u64,
     dedup: VecDeque<(String, Instant, Receipt)>,
-    created: Instant,
+    last_active: Instant,
 }
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -67,6 +66,7 @@ pub struct Gateway {
     events: broadcast::Sender<Value>,
     event_id: Arc<AtomicU64>,
     connections: Arc<Semaphore>,
+    renderer_connections: Arc<Semaphore>,
     origins: Arc<Vec<String>>,
     control: Arc<Mutex<(Option<String>, Option<BridgeEvent>)>>,
 }
@@ -87,6 +87,19 @@ struct Cancel {
     epoch: String,
 }
 impl Gateway {
+    pub fn with_host_token(token: String) -> Result<Self, String> {
+        if token.len() < 32
+            || token.len() > 128
+            || !token
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+        {
+            return Err("pairing_token_requires_32_to_128_safe_characters".into());
+        }
+        let mut gateway = Self::new();
+        gateway.token = Arc::new(token);
+        Ok(gateway)
+    }
     pub fn new() -> Self {
         let (events, _) = broadcast::channel(64);
         Self {
@@ -102,6 +115,7 @@ impl Gateway {
             events,
             event_id: Arc::new(AtomicU64::new(0)),
             connections: Arc::new(Semaphore::new(4)),
+            renderer_connections: Arc::new(Semaphore::new(1)),
             control: Arc::default(),
             origins: Arc::new(
                 std::env::var("AER_ALLOWED_ORIGINS")
@@ -113,8 +127,19 @@ impl Gateway {
             ),
         }
     }
+    #[cfg(test)]
+    pub fn expire_session_for_test(&self) {
+        if let Some(s) = self.session.lock().unwrap().as_mut() {
+            s.last_active = Instant::now() - Duration::from_secs(1801);
+        }
+    }
     pub fn pairing(&self) -> Value {
-        json!({"baseUrl":*self.address.lock().unwrap(),"token":self.token.as_str(),"protocolVersion":1,"instructionVersion":"1.0.0"})
+        json!({"baseUrl":*self.address.lock().unwrap(),"token":self.token.as_str(),"protocolVersion":1,"instructionVersion":"1.1.0"})
+    }
+    #[cfg(test)]
+    pub fn with_test_origin(mut self, origin: &str) -> Self {
+        self.origins = Arc::new(vec![origin.to_owned()]);
+        self
     }
     pub fn subscribe(&self, bridge: Bridge) {
         *self.control.lock().unwrap() = (None, None);
@@ -123,6 +148,7 @@ impl Gateway {
         self.revoke();
     }
     fn dispatch(&self, event: BridgeEvent) -> Result<(), String> {
+        let control_epoch = (event.kind != "expression").then(|| event.epoch.clone());
         if event.kind != "expression" {
             let mut control = self.control.lock().unwrap();
             if control.0.is_some() {
@@ -131,13 +157,21 @@ impl Gateway {
             }
             control.0 = Some(event.epoch.clone());
         }
-        let bridge = self
-            .bridge
-            .lock()
-            .unwrap()
-            .clone()
-            .ok_or("renderer_disconnected")?;
-        bridge(event)
+        let bridge = self.bridge.lock().unwrap().clone();
+        let result = if let Some(bridge) = bridge {
+            bridge(event)
+        } else {
+            Err("renderer_disconnected".into())
+        };
+        if result.is_err() {
+            if let Some(epoch) = control_epoch {
+                let mut control = self.control.lock().unwrap();
+                if control.0.as_deref() == Some(&epoch) {
+                    *control = (None, None);
+                }
+            }
+        }
+        result
     }
     pub fn control_ack(&self, epoch: String) {
         let next = {
@@ -166,7 +200,7 @@ impl Gateway {
                 .as_ref()
                 .map(|s| s.epoch.clone());
             let (status, code) = if current.as_deref() != Some(&p.epoch) {
-                ("rejected".to_owned(), Some("stale_epoch".to_owned()))
+                ("cancelled".to_owned(), Some("epoch_cancelled".to_owned()))
             } else {
                 (status, code)
             };
@@ -195,7 +229,7 @@ impl Gateway {
         }
     }
     pub fn feedback(&self, epoch: String, seq: u64, status: String) {
-        if !["applied", "completed"].contains(&status.as_str()) {
+        if !["applied", "completed", "cancelled"].contains(&status.as_str()) {
             return;
         }
         {
@@ -211,9 +245,14 @@ impl Gateway {
             }
         }
         if let Some(s) = self.session.lock().unwrap().as_ref() {
-            if s.epoch == epoch {
+            if s.epoch == epoch
+                || (status == "cancelled"
+                    && s.dedup
+                        .iter()
+                        .any(|(_, _, r)| r.epoch == epoch && r.seq == seq))
+            {
                 let receipt = Receipt {
-                    id: format!("{}:{seq}", s.id),
+                    id: format!("{}:{}:{seq}", s.id, epoch),
                     session: s.id.clone(),
                     epoch,
                     seq,
@@ -225,42 +264,93 @@ impl Gateway {
         }
     }
     pub fn revoke(&self) {
-        let previous = self.session.lock().unwrap().take();
-        if let Some(s) = previous {
-            let epoch = Uuid::new_v4().to_string();
-            let _ = self.dispatch(BridgeEvent {
-                kind: "closed",
-                id: String::new(),
-                epoch,
-                record: None,
-            });
-            for (_, p) in self.pending.lock().unwrap().drain() {
-                let _ = p.reply.send(Receipt {
-                    id: String::new(),
-                    session: s.id.clone(),
-                    epoch: s.epoch.clone(),
-                    seq: p.seq,
-                    status: "rejected".into(),
-                    code: Some("session_closed".into()),
-                });
+        let mut slot = self.session.lock().unwrap();
+        if let Some(session) = slot.take() {
+            self.revoke_taken(session);
+        }
+    }
+    fn revoke_id(&self, id: &str) -> bool {
+        let mut slot = self.session.lock().unwrap();
+        if !slot.as_ref().is_some_and(|s| s.id == id) {
+            return false;
+        }
+        if let Some(session) = slot.take() {
+            self.revoke_taken(session);
+        }
+        true
+    }
+    fn revoke_expired(&self) {
+        let mut slot = self.session.lock().unwrap();
+        if slot
+            .as_ref()
+            .is_some_and(|s| s.last_active.elapsed() >= Duration::from_secs(1800))
+        {
+            if let Some(session) = slot.take() {
+                self.revoke_taken(session);
             }
+        }
+    }
+    fn revoke_taken(&self, s: Session) {
+        self.publish(
+            &Receipt {
+                id: String::new(),
+                session: s.id.clone(),
+                epoch: s.epoch.clone(),
+                seq: s.seq,
+                status: "closed".into(),
+                code: None,
+            },
+            "closed",
+            None,
+        );
+        let epoch = Uuid::new_v4().to_string();
+        let _ = self.dispatch(BridgeEvent {
+            kind: "closed",
+            id: String::new(),
+            epoch,
+            record: None,
+        });
+        for (id, p) in self.pending.lock().unwrap().drain() {
+            let _ = p.reply.send(Receipt {
+                id,
+                session: s.id.clone(),
+                epoch: s.epoch.clone(),
+                seq: p.seq,
+                status: "cancelled".into(),
+                code: Some("session_closed".into()),
+            });
         }
     }
     pub fn router(&self) -> Router {
         Router::new()
             .route("/v1/capabilities", get(capabilities))
             .route("/v1/sessions", post(create_session))
+            .route("/v1/sessions/{id}", axum::routing::delete(close_session))
             .route("/v1/sessions/{id}/expressions", post(expression))
             .route("/v1/sessions/{id}/cancel", post(cancel))
             .route("/v1/sessions/{id}/events", get(events))
+            .route("/v1/renderer/events", get(renderer_events))
+            .route("/v1/renderer/complete", post(renderer_complete))
+            .route("/v1/renderer/feedback", post(renderer_feedback))
+            .route("/v1/renderer/control-ack", post(renderer_control_ack))
             .layer(DefaultBodyLimit::max(32768))
             .layer(middleware::from_fn_with_state(self.clone(), authorize))
             .with_state(self.clone())
     }
     pub async fn serve(self) -> Result<(), String> {
-        let listener = tokio::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
-            .await
-            .map_err(|_| "bind_failed")?;
+        // Select a browser-safe dynamic port, independent of a machine's custom ephemeral range.
+        let first = (Uuid::new_v4().as_u128() % 16384) as u16;
+        let mut listener = None;
+        for offset in 0..128u16 {
+            let port = 49152 + ((first + offset) % 16384);
+            if let Ok(bound) =
+                tokio::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, port)).await
+            {
+                listener = Some(bound);
+                break;
+            }
+        }
+        let listener = listener.ok_or("bind_failed")?;
         *self.address.lock().unwrap() = format!(
             "http://{}",
             listener.local_addr().map_err(|_| "address_failed")?
@@ -274,6 +364,59 @@ fn error(status: StatusCode, code: &str) -> Response {
     (status, Json(json!({"status":"rejected","code":code}))).into_response()
 }
 async fn authorize(State(g): State<Gateway>, request: Request, next: Next) -> Response {
+    if request.method() == axum::http::Method::OPTIONS {
+        let headers = request.headers();
+        let host = headers
+            .get("host")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+        let origin = headers
+            .get("origin")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+        let method = headers
+            .get("access-control-request-method")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+        let requested = headers
+            .get("access-control-request-headers")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+        if !(host.starts_with("127.0.0.1:") || host.starts_with("localhost:"))
+            || !g.origins.iter().any(|v| v == origin)
+            || !["GET", "POST", "DELETE"].contains(&method)
+            || requested
+                .split(',')
+                .map(|v| v.trim().to_ascii_lowercase())
+                .any(|v| {
+                    !v.is_empty()
+                        && !["authorization", "content-type", "last-event-id"].contains(&v.as_str())
+                })
+        {
+            return error(StatusCode::FORBIDDEN, "preflight_denied");
+        }
+        let mut response = StatusCode::NO_CONTENT.into_response();
+        response
+            .headers_mut()
+            .insert("access-control-allow-origin", origin.parse().unwrap());
+        response.headers_mut().insert(
+            "access-control-allow-methods",
+            "GET, POST, DELETE".parse().unwrap(),
+        );
+        response.headers_mut().insert(
+            "access-control-allow-headers",
+            "Authorization, Content-Type, Last-Event-ID"
+                .parse()
+                .unwrap(),
+        );
+        response.headers_mut().insert(
+            "vary",
+            "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+                .parse()
+                .unwrap(),
+        );
+        return response;
+    }
     let headers = request.headers();
     let auth = headers
         .get("authorization")
@@ -320,22 +463,21 @@ async fn authorize(State(g): State<Gateway>, request: Request, next: Next) -> Re
 }
 async fn capabilities() -> Json<Value> {
     Json(
-        json!({"v":1,"instructionVersion":"1.0.0","shapes":["sphere","ring","wave","cloud"],"fields":["orbit","turbulence","pulse"],"tracks":["body"],"easing":["linear","smoothstep"],"limits":{"recordBytes":32768,"depth":16,"inputNodes":128,"expandedNodes":512,"macros":32,"params":8,"durationMs":10000,"queue":8,"inFlight":4,"recordsPerSecond":10,"pointSize":8,"ttlMs":5000},"feedbackBuffer":64,"dedupEntries":256,"dedupTtlMs":60000,"admissionDeadlineMs":500,"modelApiCalls":false}),
+        serde_json::from_str(include_str!("../../src/contracts/capabilities.json"))
+            .expect("bundled capability manifest"),
     )
 }
 async fn create_session(State(g): State<Gateway>) -> Response {
+    g.revoke_expired();
     let mut slot = g.session.lock().unwrap();
-    if slot
-        .as_ref()
-        .is_some_and(|s| s.created.elapsed() < Duration::from_secs(1800))
-    {
+    if slot.is_some() {
         return error(StatusCode::CONFLICT, "controller_active");
     }
     let id = Uuid::new_v4().to_string();
     let epoch = Uuid::new_v4().to_string();
     if g.dispatch(BridgeEvent {
         kind: "epoch",
-        id: String::new(),
+        id: id.clone(),
         epoch: epoch.clone(),
         record: None,
     })
@@ -348,7 +490,7 @@ async fn create_session(State(g): State<Gateway>) -> Response {
         epoch: epoch.clone(),
         seq: 0,
         dedup: VecDeque::new(),
-        created: Instant::now(),
+        last_active: Instant::now(),
     });
     (
         StatusCode::CREATED,
@@ -374,6 +516,7 @@ async fn expression(
         if command.epoch != s.epoch {
             return error(StatusCode::CONFLICT, "stale_epoch");
         }
+        s.last_active = Instant::now();
         s.dedup
             .retain(|(_, at, _)| at.elapsed() < Duration::from_secs(60));
         if let Some((_, _, previous)) = s
@@ -383,7 +526,9 @@ async fn expression(
         {
             return (
                 if previous.status == "pending" {
-                    StatusCode::CONFLICT
+                    StatusCode::ACCEPTED
+                } else if previous.status == "rejected" {
+                    StatusCode::UNPROCESSABLE_ENTITY
                 } else {
                     StatusCode::OK
                 },
@@ -392,13 +537,13 @@ async fn expression(
                 .into_response();
         }
         let mut pending = g.pending.lock().unwrap();
-        pending.retain(|_, p| p.started.elapsed() < Duration::from_secs(1));
+        // Pending decisions occupy bounded slots until a definitive result or session close.
         if pending.len() >= 4 {
             return error(StatusCode::TOO_MANY_REQUESTS, "gateway_full");
         }
         s.seq += 1;
         receipt = Receipt {
-            id: format!("{}:{}", s.id, s.seq),
+            id: format!("{}:{}:{}", s.id, s.epoch, s.seq),
             session: s.id.clone(),
             epoch: s.epoch.clone(),
             seq: s.seq,
@@ -412,7 +557,6 @@ async fn expression(
                 session: s.id.clone(),
                 epoch: s.epoch.clone(),
                 seq: s.seq,
-                started: Instant::now(),
                 feedback: Vec::new(),
             },
         );
@@ -457,6 +601,8 @@ async fn expression(
         Ok(Ok(result)) => (
             if result.status == "accepted" {
                 StatusCode::ACCEPTED
+            } else if result.status == "cancelled" {
+                StatusCode::OK
             } else {
                 StatusCode::UNPROCESSABLE_ENTITY
             },
@@ -464,12 +610,15 @@ async fn expression(
         )
             .into_response(),
         _ => {
-            g.finish(
-                receipt.id,
-                "rejected".into(),
-                Some("admission_timeout".into()),
-            );
-            error(StatusCode::SERVICE_UNAVAILABLE, "admission_timeout")
+            // The ACK may be delayed after renderer admission. Never claim rejection here.
+            (
+                StatusCode::ACCEPTED,
+                Json(Receipt {
+                    code: Some("admission_pending".into()),
+                    ..receipt
+                }),
+            )
+                .into_response()
         }
     }
 }
@@ -485,9 +634,10 @@ async fn cancel(
     if command.epoch != s.epoch {
         return error(StatusCode::CONFLICT, "stale_epoch");
     }
+    s.last_active = Instant::now();
     s.epoch = Uuid::new_v4().to_string();
     s.seq = 0;
-    s.dedup.clear();
+    // Dedup receipts remain session-scoped across cancellation.
     let epoch = s.epoch.clone();
     drop(slot);
     let _ = g.dispatch(BridgeEvent {
@@ -502,7 +652,14 @@ async fn cancel(
     }
     Json(json!({"id":id,"epoch":epoch,"status":"cancelled"})).into_response()
 }
+async fn close_session(State(g): State<Gateway>, Path(id): Path<String>) -> Response {
+    if !g.revoke_id(&id) {
+        return error(StatusCode::NOT_FOUND, "session");
+    }
+    StatusCode::NO_CONTENT.into_response()
+}
 async fn events(State(g): State<Gateway>, Path(id): Path<String>, headers: HeaderMap) -> Response {
+    let mut receiver = g.events.subscribe();
     let snapshot = {
         let slot = g.session.lock().unwrap();
         let Some(s) = slot.as_ref().filter(|s| s.id == id) else {
@@ -513,13 +670,12 @@ async fn events(State(g): State<Gateway>, Path(id): Path<String>, headers: Heade
     let Ok(permit) = g.connections.clone().try_acquire_owned() else {
         return error(StatusCode::TOO_MANY_REQUESTS, "sse_full");
     };
-    let mut receiver = g.events.subscribe();
     let current = g.event_id.load(Ordering::SeqCst);
     let last = headers
         .get("last-event-id")
         .and_then(|h| h.to_str().ok())
         .and_then(|v| v.parse::<u64>().ok());
-    let stream = async_stream::stream! {let _permit=permit;if last.is_some_and(|n|n<current){yield Ok::<Event,Infallible>(Event::default().event("gap").id(current.to_string()).data(json!({"status":"gap","through":current}).to_string()));}yield Ok(Event::default().event("snapshot").id(current.to_string()).data(snapshot.to_string()));loop{match receiver.recv().await{Ok(value)=>{if value["session"]==id{yield Ok(Event::default().event("feedback").id(value["id"].to_string()).data(value.to_string()));}},Err(broadcast::error::RecvError::Lagged(count))=>{yield Ok(Event::default().event("gap").data(json!({"status":"gap","lost":count,"animationsReplayed":false}).to_string()));},Err(_)=>break}}};
+    let stream = async_stream::stream! {let _permit=permit;if last.is_some_and(|n|n<current){yield Ok::<Event,Infallible>(Event::default().event("gap").id(current.to_string()).data(json!({"status":"gap","through":current}).to_string()));}yield Ok(Event::default().event("snapshot").id(current.to_string()).data(snapshot.to_string()));loop{match receiver.recv().await{Ok(value)=>{if value["session"]==id{yield Ok(Event::default().event("feedback").id(value["id"].to_string()).data(value.to_string()));if value["status"]=="closed" {break;}}},Err(broadcast::error::RecvError::Lagged(count))=>{if !g.session.lock().unwrap().as_ref().is_some_and(|s|s.id==id){break;}yield Ok(Event::default().event("gap").data(json!({"status":"gap","lost":count,"animationsReplayed":false}).to_string()));},Err(_)=>break}}};
     Sse::new(stream)
         .keep_alive(KeepAlive::default())
         .into_response()
@@ -528,6 +684,57 @@ async fn events(State(g): State<Gateway>, Path(id): Path<String>, headers: Heade
 #[tauri::command]
 pub fn gateway_pairing(state: tauri::State<'_, Gateway>) -> Value {
     state.pairing()
+}
+async fn renderer_events(State(g): State<Gateway>) -> Response {
+    let Ok(permit) = g.renderer_connections.clone().try_acquire_owned() else {
+        return error(StatusCode::TOO_MANY_REQUESTS, "renderer_connected");
+    };
+    let (sender, mut receiver) = tokio::sync::mpsc::channel::<BridgeEvent>(4);
+    let (control_sender, mut controls) = tokio::sync::mpsc::channel::<BridgeEvent>(1);
+    g.subscribe(Arc::new(move |event| {
+        if event.kind == "expression" {
+            sender
+                .try_send(event)
+                .map_err(|_| "renderer_mailbox_full".into())
+        } else {
+            control_sender
+                .try_send(event)
+                .map_err(|_| "renderer_control_closed".into())
+        }
+    }));
+    let stream = async_stream::stream! {let _permit=permit;yield Ok::<Event,Infallible>(Event::default().comment("connected"));loop {let event=tokio::select!{biased; control=controls.recv()=>control,record=receiver.recv()=>record};let Some(event)=event else{break;};yield Ok::<Event,Infallible>(Event::default().event("bridge").data(serde_json::to_string(&event).unwrap()));}};
+    Sse::new(stream)
+        .keep_alive(KeepAlive::default())
+        .into_response()
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Completion {
+    id: String,
+    status: String,
+    code: Option<String>,
+}
+async fn renderer_complete(State(g): State<Gateway>, Json(c): Json<Completion>) -> Response {
+    if !["accepted", "rejected", "cancelled"].contains(&c.status.as_str()) {
+        return error(StatusCode::BAD_REQUEST, "status");
+    }
+    g.finish(c.id, c.status, c.code);
+    StatusCode::NO_CONTENT.into_response()
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Feedback {
+    epoch: String,
+    seq: u64,
+    status: String,
+}
+async fn renderer_feedback(State(g): State<Gateway>, Json(f): Json<Feedback>) -> Response {
+    g.feedback(f.epoch, f.seq, f.status);
+    StatusCode::NO_CONTENT.into_response()
+}
+async fn renderer_control_ack(State(g): State<Gateway>, Json(c): Json<Cancel>) -> Response {
+    g.control_ack(c.epoch);
+    StatusCode::NO_CONTENT.into_response()
 }
 #[tauri::command]
 pub fn gateway_subscribe(
