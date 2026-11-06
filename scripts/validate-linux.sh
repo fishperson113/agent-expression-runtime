@@ -3,9 +3,11 @@ set -eu
 mkdir -p /work
 if [ -d /source ]; then
   tar -C /source --exclude=./node_modules --exclude=./.git --exclude=./src-tauri/target \
-    --exclude=./.runtime --exclude=./dist -cf - . | tar -C /work -xf -
+    --exclude=./.runtime --exclude=./dist --exclude='./.env*' --exclude=./.codex \
+    --exclude=./.agents --exclude=./.npm-cache -cf - . | tar -C /work -xf -
 fi
 cd /work
+export CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-2}
 uname -a
 node --version
 cargo --version

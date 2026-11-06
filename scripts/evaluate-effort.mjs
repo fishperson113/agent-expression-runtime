@@ -79,8 +79,8 @@ async function evaluator({ base, token, page, signal }) {
 async function playClip(api, session, page, trial, clip, signal) {
   const cancelled = await api(`/v1/sessions/${session.id}/cancel`, { epoch: session.epoch });
   session.epoch = cancelled.epoch;
-  const submit = async body => {
-    const command = { epoch: session.epoch, requestId: randomUUID(), body };
+  const submit = async (body, kind = 'program') => {
+    const command = { epoch: session.epoch, requestId: randomUUID(), body, kind };
     let receipt = await api(`/v1/sessions/${session.id}/expressions`, command);
     for (let i = 0; receipt.status === 'pending' && i < 4; i++) {
       await delay(100, undefined, { signal });
@@ -89,10 +89,10 @@ async function playClip(api, session, page, trial, clip, signal) {
     if (receipt.status !== 'accepted') throw Error('evaluation_admission_unconfirmed');
   };
   await page.locator('#motion').uncheck();
+  await submit({ dispersion: 0, brightness: 0.65, durationMs: 0 }, 'state');
   await submit({ type: 'parallel', children: [
     { type: 'morph', target: 'sphere', durationMs: 0 },
     { type: 'flow', field: 'orbit', strength: 0, durationMs: 0 },
-    { type: 'style', dispersion: 0, brightness: 0.65, durationMs: 0 },
   ] });
   await delay(400, undefined, { signal });
   console.log(`Clip ${clip.toUpperCase()}`);
