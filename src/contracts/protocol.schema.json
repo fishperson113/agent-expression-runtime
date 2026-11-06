@@ -30,13 +30,24 @@
           "const": "body"
         },
         "policy": {
-          "enum": ["append", "replace"]
+          "enum": [
+            "append",
+            "replace"
+          ]
         },
         "body": {
           "$ref": "#/$defs/node"
         }
       },
-      "required": ["v", "epoch", "seq", "kind", "track", "policy", "body"],
+      "required": [
+        "v",
+        "epoch",
+        "seq",
+        "kind",
+        "track",
+        "policy",
+        "body"
+      ],
       "additionalProperties": false
     },
     {
@@ -87,25 +98,80 @@
               "maximum": 10000
             },
             "easing": {
-              "enum": ["linear", "smoothstep"]
+              "enum": [
+                "linear",
+                "smoothstep"
+              ]
+            },
+            "rise": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "advance": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "spread": {
+              "type": "number",
+              "minimum": 0.25,
+              "maximum": 2
+            },
+            "grow": {
+              "type": "number",
+              "minimum": 0.25,
+              "maximum": 2
             }
           },
           "required": [],
           "additionalProperties": false,
           "anyOf": [
             {
-              "required": ["brightness"]
+              "required": [
+                "brightness"
+              ]
             },
             {
-              "required": ["pointSize"]
+              "required": [
+                "pointSize"
+              ]
             },
             {
-              "required": ["dispersion"]
+              "required": [
+                "dispersion"
+              ]
+            },
+            {
+              "required": [
+                "rise"
+              ]
+            },
+            {
+              "required": [
+                "advance"
+              ]
+            },
+            {
+              "required": [
+                "spread"
+              ]
+            },
+            {
+              "required": [
+                "grow"
+              ]
             }
           ]
         }
       },
-      "required": ["v", "epoch", "seq", "kind", "body"],
+      "required": [
+        "v",
+        "epoch",
+        "seq",
+        "kind",
+        "body"
+      ],
       "additionalProperties": false
     },
     {
@@ -152,18 +218,32 @@
                 "pattern": "^[a-zA-Z][\\w]{0,63}$"
               },
               "additionalProperties": {
-                "enum": ["number", "string"]
+                "enum": [
+                  "number",
+                  "string"
+                ]
               }
             },
             "body": {
               "$ref": "#/$defs/template"
             }
           },
-          "required": ["name", "revision", "params", "body"],
+          "required": [
+            "name",
+            "revision",
+            "params",
+            "body"
+          ],
           "additionalProperties": false
         }
       },
-      "required": ["v", "epoch", "seq", "kind", "body"],
+      "required": [
+        "v",
+        "epoch",
+        "seq",
+        "kind",
+        "body"
+      ],
       "additionalProperties": false
     }
   ],
@@ -180,7 +260,10 @@
           "maxLength": 128
         }
       },
-      "required": ["type", "name"],
+      "required": [
+        "type",
+        "name"
+      ],
       "additionalProperties": false
     },
     "node": {
@@ -212,7 +295,10 @@
               "maximum": 2
             },
             "path": {
-              "enum": ["spoke", "arc"]
+              "enum": [
+                "spoke",
+                "arc"
+              ]
             },
             "effort": {
               "type": "object",
@@ -242,23 +328,37 @@
               "maximum": 10000
             },
             "easing": {
-              "enum": ["linear", "smoothstep"]
+              "enum": [
+                "linear",
+                "smoothstep"
+              ]
             }
           },
-          "required": ["type", "durationMs"],
+          "required": [
+            "type",
+            "durationMs"
+          ],
           "additionalProperties": false,
           "anyOf": [
             {
-              "required": ["rise"]
+              "required": [
+                "rise"
+              ]
             },
             {
-              "required": ["advance"]
+              "required": [
+                "advance"
+              ]
             },
             {
-              "required": ["spread"]
+              "required": [
+                "spread"
+              ]
             },
             {
-              "required": ["grow"]
+              "required": [
+                "grow"
+              ]
             }
           ]
         },
@@ -269,7 +369,15 @@
               "const": "morph"
             },
             "target": {
-              "enum": ["sphere", "wall", "wave", "cloud", "pin", "screw", "pyramid"]
+              "enum": [
+                "sphere",
+                "wall",
+                "wave",
+                "cloud",
+                "pin",
+                "screw",
+                "pyramid"
+              ]
             },
             "durationMs": {
               "type": "integer",
@@ -277,7 +385,10 @@
               "maximum": 10000
             },
             "easing": {
-              "enum": ["linear", "smoothstep"]
+              "enum": [
+                "linear",
+                "smoothstep"
+              ]
             },
             "effort": {
               "type": "object",
@@ -302,7 +413,11 @@
               "additionalProperties": false
             }
           },
-          "required": ["type", "target", "durationMs"],
+          "required": [
+            "type",
+            "target",
+            "durationMs"
+          ],
           "additionalProperties": false
         },
         {
@@ -312,7 +427,11 @@
               "const": "flow"
             },
             "field": {
-              "enum": ["orbit", "turbulence", "pulse"]
+              "enum": [
+                "orbit",
+                "turbulence",
+                "pulse"
+              ]
             },
             "strength": {
               "type": "number",
@@ -325,7 +444,10 @@
               "maximum": 10000
             },
             "easing": {
-              "enum": ["linear", "smoothstep"]
+              "enum": [
+                "linear",
+                "smoothstep"
+              ]
             },
             "effort": {
               "type": "object",
@@ -350,7 +472,12 @@
               "additionalProperties": false
             }
           },
-          "required": ["type", "field", "strength", "durationMs"],
+          "required": [
+            "type",
+            "field",
+            "strength",
+            "durationMs"
+          ],
           "additionalProperties": false
         },
         {
@@ -384,7 +511,10 @@
               "maximum": 10000
             },
             "easing": {
-              "enum": ["linear", "smoothstep"]
+              "enum": [
+                "linear",
+                "smoothstep"
+              ]
             },
             "effort": {
               "type": "object",
@@ -409,20 +539,31 @@
               "additionalProperties": false
             }
           },
-          "required": ["type", "durationMs"],
+          "required": [
+            "type",
+            "durationMs"
+          ],
           "additionalProperties": false,
           "anyOf": [
             {
-              "required": ["color"]
+              "required": [
+                "color"
+              ]
             },
             {
-              "required": ["brightness"]
+              "required": [
+                "brightness"
+              ]
             },
             {
-              "required": ["pointSize"]
+              "required": [
+                "pointSize"
+              ]
             },
             {
-              "required": ["dispersion"]
+              "required": [
+                "dispersion"
+              ]
             }
           ]
         },
@@ -438,7 +579,10 @@
               "maximum": 10000
             }
           },
-          "required": ["type", "durationMs"],
+          "required": [
+            "type",
+            "durationMs"
+          ],
           "additionalProperties": false
         },
         {
@@ -456,7 +600,10 @@
               }
             }
           },
-          "required": ["type", "children"],
+          "required": [
+            "type",
+            "children"
+          ],
           "additionalProperties": false
         },
         {
@@ -474,7 +621,10 @@
               }
             }
           },
-          "required": ["type", "children"],
+          "required": [
+            "type",
+            "children"
+          ],
           "additionalProperties": false
         },
         {
@@ -497,11 +647,19 @@
               "type": "object",
               "maxProperties": 8,
               "additionalProperties": {
-                "type": ["string", "number"]
+                "type": [
+                  "string",
+                  "number"
+                ]
               }
             }
           },
-          "required": ["type", "name", "revision", "args"],
+          "required": [
+            "type",
+            "name",
+            "revision",
+            "args"
+          ],
           "additionalProperties": false
         }
       ]
@@ -563,7 +721,10 @@
               ]
             },
             "path": {
-              "enum": ["spoke", "arc"]
+              "enum": [
+                "spoke",
+                "arc"
+              ]
             },
             "effort": {
               "type": "object",
@@ -623,7 +784,10 @@
             "easing": {
               "anyOf": [
                 {
-                  "enum": ["linear", "smoothstep"]
+                  "enum": [
+                    "linear",
+                    "smoothstep"
+                  ]
                 },
                 {
                   "$ref": "#/$defs/param"
@@ -631,20 +795,31 @@
               ]
             }
           },
-          "required": ["type", "durationMs"],
+          "required": [
+            "type",
+            "durationMs"
+          ],
           "additionalProperties": false,
           "anyOf": [
             {
-              "required": ["rise"]
+              "required": [
+                "rise"
+              ]
             },
             {
-              "required": ["advance"]
+              "required": [
+                "advance"
+              ]
             },
             {
-              "required": ["spread"]
+              "required": [
+                "spread"
+              ]
             },
             {
-              "required": ["grow"]
+              "required": [
+                "grow"
+              ]
             }
           ]
         },
@@ -657,7 +832,15 @@
             "target": {
               "anyOf": [
                 {
-                  "enum": ["sphere", "wall", "wave", "cloud", "pin", "screw", "pyramid"]
+                  "enum": [
+                    "sphere",
+                    "wall",
+                    "wave",
+                    "cloud",
+                    "pin",
+                    "screw",
+                    "pyramid"
+                  ]
                 },
                 {
                   "$ref": "#/$defs/param"
@@ -679,7 +862,10 @@
             "easing": {
               "anyOf": [
                 {
-                  "enum": ["linear", "smoothstep"]
+                  "enum": [
+                    "linear",
+                    "smoothstep"
+                  ]
                 },
                 {
                   "$ref": "#/$defs/param"
@@ -730,7 +916,11 @@
               "additionalProperties": false
             }
           },
-          "required": ["type", "target", "durationMs"],
+          "required": [
+            "type",
+            "target",
+            "durationMs"
+          ],
           "additionalProperties": false
         },
         {
@@ -742,7 +932,11 @@
             "field": {
               "anyOf": [
                 {
-                  "enum": ["orbit", "turbulence", "pulse"]
+                  "enum": [
+                    "orbit",
+                    "turbulence",
+                    "pulse"
+                  ]
                 },
                 {
                   "$ref": "#/$defs/param"
@@ -776,7 +970,10 @@
             "easing": {
               "anyOf": [
                 {
-                  "enum": ["linear", "smoothstep"]
+                  "enum": [
+                    "linear",
+                    "smoothstep"
+                  ]
                 },
                 {
                   "$ref": "#/$defs/param"
@@ -827,7 +1024,12 @@
               "additionalProperties": false
             }
           },
-          "required": ["type", "field", "strength", "durationMs"],
+          "required": [
+            "type",
+            "field",
+            "strength",
+            "durationMs"
+          ],
           "additionalProperties": false
         },
         {
@@ -898,7 +1100,10 @@
             "easing": {
               "anyOf": [
                 {
-                  "enum": ["linear", "smoothstep"]
+                  "enum": [
+                    "linear",
+                    "smoothstep"
+                  ]
                 },
                 {
                   "$ref": "#/$defs/param"
@@ -949,20 +1154,31 @@
               "additionalProperties": false
             }
           },
-          "required": ["type", "durationMs"],
+          "required": [
+            "type",
+            "durationMs"
+          ],
           "additionalProperties": false,
           "anyOf": [
             {
-              "required": ["color"]
+              "required": [
+                "color"
+              ]
             },
             {
-              "required": ["brightness"]
+              "required": [
+                "brightness"
+              ]
             },
             {
-              "required": ["pointSize"]
+              "required": [
+                "pointSize"
+              ]
             },
             {
-              "required": ["dispersion"]
+              "required": [
+                "dispersion"
+              ]
             }
           ]
         },
@@ -985,7 +1201,10 @@
               ]
             }
           },
-          "required": ["type", "durationMs"],
+          "required": [
+            "type",
+            "durationMs"
+          ],
           "additionalProperties": false
         },
         {
@@ -1003,7 +1222,10 @@
               }
             }
           },
-          "required": ["type", "children"],
+          "required": [
+            "type",
+            "children"
+          ],
           "additionalProperties": false
         },
         {
@@ -1021,7 +1243,10 @@
               }
             }
           },
-          "required": ["type", "children"],
+          "required": [
+            "type",
+            "children"
+          ],
           "additionalProperties": false
         },
         {
@@ -1046,7 +1271,10 @@
               "additionalProperties": {
                 "anyOf": [
                   {
-                    "type": ["string", "number"]
+                    "type": [
+                      "string",
+                      "number"
+                    ]
                   },
                   {
                     "$ref": "#/$defs/param"
@@ -1055,7 +1283,12 @@
               }
             }
           },
-          "required": ["type", "name", "revision", "args"],
+          "required": [
+            "type",
+            "name",
+            "revision",
+            "args"
+          ],
           "additionalProperties": false
         }
       ]

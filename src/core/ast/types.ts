@@ -59,6 +59,10 @@ export type Envelope = { v: 1; epoch: string; seq: number; ttlMs?: number } & (
         brightness?: number;
         pointSize?: number;
         dispersion?: number;
+        rise?: number;
+        advance?: number;
+        spread?: number;
+        grow?: number;
         durationMs?: number;
         easing?: Easing;
       };

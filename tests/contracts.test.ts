@@ -16,6 +16,8 @@ it('published protocol schema agrees with compiler for valid and invalid wire fi
       body: { type: 'flow', field, strength: 0.5, durationMs: 10 },
     })),
     { v: 1, epoch: 'e', seq: 1, kind: 'state', body: { brightness: 0.2 } },
+    { v: 1, epoch: 'e', seq: 1, kind: 'state', body: { rise: -1, advance: 1, spread: 0.25, grow: 2 } },
+    { v: 1, epoch: 'e', seq: 1, kind: 'state', body: { grow: 3 } },
     ...[
       { type: 'style', color: '#abcdef', durationMs: 0 },
       { type: 'wait', durationMs: 10 },

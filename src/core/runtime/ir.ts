@@ -28,7 +28,7 @@ export type StateIR = {
   ttlMs: number;
   receivedAt: number;
   deadlineAt?: number;
-  patch: Partial<Record<'brightness' | 'pointSize' | 'dispersion', number>>;
+  patch: Partial<Record<'brightness' | 'pointSize' | 'dispersion' | 'rise' | 'advance' | 'spread' | 'grow', number>>;
   duration: number;
   easing: Easing;
 };

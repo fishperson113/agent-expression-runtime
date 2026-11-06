@@ -21,7 +21,7 @@ Example tool arguments:
 {"body":{"type":"parallel","children":[{"type":"morph","target":"wall","durationMs":900},{"type":"flow","field":"orbit","strength":0.35,"durationMs":1800}]},"policy":"replace"}
 ```
 
-Use `replace` for a new intent; it smoothly replaces the active body program. Use `append` only for deliberate ordered choreography; the queue is limited to eight. State (`kind:"state"`) patches baseline brightness, pointSize or dispersion. Programs temporarily own their properties and blend back to baseline afterward.
+Use `replace` for a new intent; it smoothly replaces the active body program. Use `append` only for deliberate ordered choreography; the queue is limited to eight. State (`kind:"state"`) patches baseline brightness, pointSize, dispersion, rise, advance, spread or grow. Programs temporarily own their properties and blend back to baseline over 250ms afterward. Cancellation and session changes reset the posture baseline to rise/advance 0 and spread/grow 1. Matching flow effort on overlapping parallel branches is coalesced; different values conflict. Viewport containment can uniformly reduce extreme posture combinations to keep the body visible.
 
 Keep programs small: input ≤128 nodes, depth ≤16, expanded ≤512, program ≤10 seconds, ≤10 records/second. Do not send per-particle positions, per-frame commands, code, shaders, network operations or filesystem requests.
 

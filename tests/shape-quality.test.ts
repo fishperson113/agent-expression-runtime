@@ -140,3 +140,37 @@ it.each(['cancel', 'close', 'complete'])('restores neutral posture after %s', re
   for (const [key, value] of Object.entries({ rise: 0, advance: 0, spread: 1, grow: 1, arcOffset: 0 }))
     expect(scheduler.state[key as keyof typeof scheduler.state]).toBeCloseTo(value);
 });
+it('coalesces matching flow effort across parallel branches and rejects conflicting values', () => {
+  const compiler = new Compiler();
+  const body = { type: 'parallel', children: [
+    { type: 'morph', target: 'wall', durationMs: 200, effort: { flow: 0.6 } },
+    { type: 'flow', field: 'orbit', strength: 0.5, durationMs: 500, effort: { flow: 0.6 } },
+  ] };
+  const envelope = { v: 1, epoch: 'e', seq: 1, kind: 'program', track: 'body', policy: 'replace', body };
+  const ir = compiler.compile(envelope, 0);
+  if (ir.kind !== 'program') throw Error('program required');
+  expect(ir.ops.filter(op => op.property === 'effortFlow')).toHaveLength(1);
+  expect(ir.ops.find(op => op.property === 'effortFlow')?.duration).toBe(500);
+  body.children[1].effort.flow = 0.2;
+  expect(() => compiler.compile(envelope, 0)).toThrow('property_conflict');
+});
+it('accepts posture baseline patches, restores them after programs, and clears them on a new epoch', () => {
+  let now = 0;
+  const compiler = new Compiler();
+  const scheduler = new Scheduler({ now: () => now }, { apply() {}, dispose() {} }, { count() {} });
+  scheduler.cancel('e');
+  const stamp = { v: 1, epoch: 'e' };
+  expect(scheduler.admit(compiler.compile({ ...stamp, seq: 1, kind: 'state',
+    body: { rise: 0.2, advance: -0.2, spread: 0.8, grow: 1.2, durationMs: 0 } }, 0))).toBe('state');
+  scheduler.tick();
+  expect(scheduler.state.rise).toBe(0.2);
+  scheduler.admit(compiler.compile({ ...stamp, seq: 2, kind: 'program', track: 'body', policy: 'replace',
+    body: { type: 'shapeQuality', rise: 1, durationMs: 100 } }, 0));
+  now = 100; scheduler.tick();
+  now = 350; scheduler.tick();
+  expect(scheduler.state.rise).toBeCloseTo(0.2);
+  scheduler.cancel('new-session');
+  now = 600; scheduler.tick();
+  expect(scheduler.state.rise).toBe(0);
+  expect(scheduler.state.grow).toBe(1);
+});
