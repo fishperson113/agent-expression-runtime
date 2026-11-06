@@ -113,7 +113,7 @@ export class RenderHost {
     this.worker = undefined;
     for (const p of this.pending.values()) {
       clearTimeout(p.timer);
-      p.resolve('pending');
+      p.resolve('cancelled');
     }
     this.pending.clear();
     clearTimeout(this.timeout);
@@ -126,6 +126,9 @@ export class RenderHost {
     }
     this.mode = 'main thread fallback';
     this.ready = false;
+    this.startMainRenderer();
+  }
+  private startMainRenderer() {
     try {
       this.renderer = new ThreeRenderer(this.canvas, this.error, this.seed);
       this.renderer.quality(5000);
@@ -139,30 +142,31 @@ export class RenderHost {
       );
       this.scheduler.cancel(this.epoch);
       this.size();
-      let previous = performance.now(),
-        samples: number[] = [];
-      const frame = () => {
-        if (this.stopped) return;
-        const now = performance.now();
-        if (!document.hidden) {
-          samples.push(now - previous);
-          if (samples.length > 120) samples.shift();
-          this.scheduler?.tick();
-          if (samples.length % 30 === 0)
-            this.stats({
-              frameP95: [...samples].sort((a, b) => a - b)[Math.floor(samples.length * 0.95)] ?? 0,
-              queue: this.scheduler?.queueDepth ?? 0,
-              particles: this.particles,
-            });
-        }
-        previous = now;
-        this.raf = requestAnimationFrame(frame);
-      };
-      this.raf = requestAnimationFrame(frame);
+      this.startFrames();
     } catch {
       this.mode = 'unavailable';
       this.error('webgl_unavailable');
     }
+  }
+  private startFrames() {
+    let previous = performance.now();
+    const samples: number[] = [];
+    const frame = () => {
+      if (this.stopped) return;
+      const now = performance.now();
+      if (!document.hidden) {
+        samples.push(now - previous);
+        if (samples.length > 120) samples.shift();
+        this.scheduler?.tick();
+        if (samples.length % 30 === 0) this.stats({
+          frameP95: [...samples].sort((a, b) => a - b)[Math.floor(samples.length * 0.95)] ?? 0,
+          queue: this.scheduler?.queueDepth ?? 0, particles: this.particles,
+        });
+      }
+      previous = now;
+      this.raf = requestAnimationFrame(frame);
+    };
+    this.raf = requestAnimationFrame(frame);
   }
   private visibility = () => {
     this.worker?.postMessage({ type: 'visible', visible: !document.hidden });
@@ -200,8 +204,8 @@ export class RenderHost {
       const id = ++this.next;
       return new Promise((resolve) => {
         const timer = setTimeout(() => {
-          this.error('render_ack_delayed');
-        }, 500);
+          this.fallback('render_ack_timeout');
+        }, 1500);
         this.pending.set(id, { resolve, timer });
         this.worker!.postMessage({
           type: 'ir',

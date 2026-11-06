@@ -84,3 +84,22 @@ it('preserves diagnostic paths and request context from the compiler worker', ()
   expect(host.depth).toBe(0);
   host.dispose();
 });
+it('terminates a compiler that never replies and frees every pending slot', () => {
+  vi.useFakeTimers();
+  try {
+    const workers: any[] = [];
+    vi.stubGlobal('Worker', class {
+      postMessage = vi.fn(); terminate = vi.fn();
+      constructor() { workers.push(this); }
+    });
+    const error = vi.fn(), host = new CompilerHost(() => {}, error);
+    for (let i = 0; i < 4; i++) host.submit({}, 0, `receipt-${i}`);
+    vi.advanceTimersByTime(1500);
+    expect(workers[0].terminate).toHaveBeenCalledOnce();
+    expect(host.depth).toBe(0);
+    expect(workers).toHaveLength(2);
+    expect(error).toHaveBeenCalledWith('compiler_timeout', 'receipt-0');
+    expect(error).toHaveBeenCalledWith('compiler_restarted');
+    host.dispose();
+  } finally { vi.useRealTimers(); }
+});

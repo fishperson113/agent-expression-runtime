@@ -149,7 +149,16 @@ impl Gateway {
         // A reloaded compiler has a fresh macro registry; require a fresh controller session.
         self.revoke();
     }
+    fn watch_pending(&self, id: String) {
+        let gateway = self.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_secs(2)).await;
+            let expired = gateway.pending.lock().unwrap().get(&id).map(|p| p.session.clone());
+            if let Some(session) = expired { gateway.revoke_id(&session); }
+        });
+    }
     fn dispatch(&self, event: BridgeEvent) -> Result<(), String> {
+        if event.kind == "expression" { self.watch_pending(event.id.clone()); }
         let control_epoch = (event.kind != "expression").then(|| event.epoch.clone());
         if event.kind != "expression" {
             let mut control = self.control.lock().unwrap();

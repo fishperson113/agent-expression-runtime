@@ -70,7 +70,8 @@ let replayTimers: ReturnType<typeof setTimeout>[] = [];
 const capture: { at: number; ir: Compiled }[] = [];
 let captureStart = 0;
 const diagnostic = (code: string) => {
-  if (code === 'render_worker_crash' && externalController) void gateway?.revoke();
+  if (['render_worker_crash', 'render_ack_timeout', 'context_lost', 'context_recovery_exhausted'].includes(code) &&
+      externalController) void gateway?.revoke();
   errors++;
   $('counts').textContent = `${compiledRecords} / ${errors}`;
   $('diagnostic').textContent = code;

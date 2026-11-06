@@ -10,6 +10,32 @@ use std::sync::{
 };
 use tower::ServiceExt;
 #[tokio::test]
+async fn stalled_admission_revokes_its_session_and_frees_gateway_slots() {
+    let g = Gateway::new();
+    let owner = g.clone();
+    g.subscribe(Arc::new(move |event| {
+        if event.kind != "expression" { owner.control_ack(event.epoch); }
+        Ok(())
+    }));
+    let app = g.router();
+    let first = json_response(app.clone().oneshot(request(&g, "/v1/sessions", Some(json!({}))))
+        .await.unwrap()).await;
+    let url = format!("/v1/sessions/{}/expressions", first["id"].as_str().unwrap());
+    let response = app.clone().oneshot(request(&g, &url, Some(json!({
+        "epoch": first["epoch"], "requestId": "stalled", "body": {"type":"wait","durationMs":1}
+    })))).await.unwrap();
+    assert_eq!(json_response(response).await["status"], "pending");
+    tokio::time::sleep(std::time::Duration::from_millis(1600)).await;
+    let second = json_response(app.clone().oneshot(request(&g, "/v1/sessions", Some(json!({}))))
+        .await.unwrap()).await;
+    assert_ne!(first["id"], second["id"]);
+    let url = format!("/v1/sessions/{}/expressions", second["id"].as_str().unwrap());
+    let response = app.oneshot(request(&g, &url, Some(json!({
+        "epoch": second["epoch"], "requestId": "new", "body": {"type":"wait","durationMs":1}
+    })))).await.unwrap();
+    assert_eq!(response.status(), StatusCode::ACCEPTED);
+}
+#[tokio::test]
 async fn compiler_diagnostic_path_survives_receipt_and_dedup() {
     let g = Gateway::new();
     let owner = g.clone();
