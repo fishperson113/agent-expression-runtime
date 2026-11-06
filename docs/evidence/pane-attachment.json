@@ -1,0 +1,21 @@
+{
+  "timestamp": "2026-11-06T23:54:30.650Z",
+  "status": {
+    "status": "attached",
+    "agent": "codex",
+    "agentPane": "w4:pJ",
+    "rendererPane": "w4:pK",
+    "renderer": "braille",
+    "frames": 347,
+    "expressions": 1,
+    "shape": "sphere"
+  },
+  "agents": [
+    {
+      "pane_id": "w4:pJ",
+      "agent": "codex"
+    }
+  ],
+  "nativeTextObserved": true,
+  "visualScreenshotVerified": false
+}

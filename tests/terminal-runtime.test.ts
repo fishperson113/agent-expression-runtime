@@ -4,6 +4,7 @@ import { TerminalEngine } from '../src/terminal/runtime';
 it('renders the real compiler/scheduler particle body without a browser or WebGL', () => {
   let now = 0;
   const engine = new TerminalEngine(() => now);
+  expect(() => engine.express({ kind: 'state', track: 'body', body: {} })).toThrow('unknown_field');
   const sphere = Buffer.from(engine.frame(256, 160));
   expect(sphere).toHaveLength(256 * 160 * 3);
   expect(engine.express({ body: { type: 'morph', target: 'wall', durationMs: 100 } }).status).toBe('accepted');

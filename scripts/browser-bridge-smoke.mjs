@@ -221,10 +221,15 @@ try {
   evidence.cancelledFeedback = true;
   await api(`/v1/sessions/${session.id}`, undefined, 'DELETE');
   session = await api('/v1/sessions', {});
-  const missing = await express({
-    body: { type: 'call', name: 'smokeMacro', revision: 1, args: {} },
-  });
-  if (missing.code !== 'unknown_macro') throw Error('macro_leaked_across_sessions');
+  const missingCommand = { epoch: session.epoch, requestId: `smoke-${++requestId}`,
+    body: { type: 'call', name: 'smokeMacro', revision: 1, args: {} } };
+  let missing;
+  for (let attempt = 0; attempt < 12; attempt++) {
+    missing = await api(`/v1/sessions/${session.id}/expressions`, missingCommand);
+    if (missing.status !== 'pending') break;
+    await delay(100);
+  }
+  if (missing.code !== 'unknown_macro') throw Error(`macro_isolation_failed: ${JSON.stringify(missing)}`);
   await api(`/v1/sessions/${session.id}`, undefined, 'DELETE');
   evidence.sessionMacroIsolation = true;
   await delay(100);

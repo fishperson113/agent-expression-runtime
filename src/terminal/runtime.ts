@@ -29,7 +29,9 @@ export class TerminalRenderer implements RendererSink {
     const angle = this.orbit.advance(now, state.flowStrength * state.flowWeights[capability.fields.indexOf('orbit')]);
     sampleBody(this.shapes, this.positions, this.count, state, now, angle);
     frameBody(this.positions, this.count, this.camera);
-    for (let i = 0; i < this.pixels.length; i += 3) this.pixels.set([8, 14, 20], i);
+    for (let i = 0; i < this.pixels.length; i += 3) {
+      this.pixels[i] = 8; this.pixels[i + 1] = 14; this.pixels[i + 2] = 20;
+    }
     const color = parseInt(String(state.color).slice(1), 16);
     if (!Number(state.pointSize) || !Number(state.brightness)) return;
     for (let i = 0; i < this.positions.length; i += 3) {
@@ -68,6 +70,7 @@ export class TerminalEngine {
     const allowed = ['body', 'kind', 'policy', 'track', 'ttlMs'];
     if (Object.keys(args).some(key => !allowed.includes(key))) throw Error('unknown_field');
     const kind = args.kind ?? 'program';
+    if (kind !== 'program' && (args.track !== undefined || args.policy !== undefined)) throw Error('unknown_field');
     const record = { v: 1, epoch: this.epoch, seq: ++this.seq, ttlMs: args.ttlMs, kind, body: args.body,
       ...(kind === 'program' ? { track: args.track ?? 'body', policy: args.policy ?? 'replace' } : {}) };
     const ir = kind === 'define' ? this.compiler.prepareDefinition(record, this.now()) : this.compiler.compile(record, this.now());

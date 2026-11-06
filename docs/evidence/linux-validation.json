@@ -13,13 +13,15 @@
   "rustTests": "passed",
   "javascriptTests": "passed",
   "browserBridge": "passed",
-  "timestamp": "2026-11-06T23:24:14.293Z",
-  "javascriptTestCount": 83,
+  "timestamp": "2026-11-06T23:57:09.780Z",
+  "javascriptTestCount": 92,
   "rustTestCount": 11,
-  "sourceCommit": "31ed9a7a61db8b240ebd3520bf39648f1c8fba72",
+  "sourceBaseCommit": "8018cb5",
+  "includesUncommittedRuntimeAndSmokeFixes": true,
   "binarySha256": "28df7fb3c9fd6cd24e78f81acd74633f9d214dab526cf8a3196c990f8d0a4e3b",
   "binaryBytes": 27397208,
   "artifact": ".runtime/linux/fisch-engine",
+  "liveLinuxHerdrDisplay": "not-assessed",
   "nativeWebViewVisualAcceptance": "not-assessed",
   "humanEffortAcceptance": "not-assessed"
 }
