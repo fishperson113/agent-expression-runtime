@@ -171,7 +171,7 @@ async function handle(message) {
   const { method, params } = message;
   if (method === 'initialize') return {
     protocolVersion: '2025-06-18', capabilities: { tools: {}, resources: {} },
-    serverInfo: { name: 'agent-expression-runtime', version: '0.1.0' },
+    serverInfo: { name: 'fisch', version: '0.1.0' },
     instructions: instructions,
   };
   if (method === 'ping') return {};

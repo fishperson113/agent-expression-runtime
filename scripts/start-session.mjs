@@ -134,7 +134,7 @@ async function openBody(origin, base, token, headless) {
       break;
     } catch { /* Try the next installed browser. */ }
   }
-  if (!browser) throw Error('Install Microsoft Edge or Google Chrome, then run npm start again.');
+  if (!browser) throw Error('Install Microsoft Edge or Google Chrome, then run fisch run again.');
   try {
     const page = await browser.newPage();
     page.setDefaultTimeout(15000);
@@ -209,7 +209,7 @@ export async function runSession({ headless = false, runHost = codexHost } = {})
       body.page.once('close', () => resolve(0));
       gateway.child.once('exit', () => resolve(1));
     });
-    console.log('Expression engine paired. Starting Codex in this pane; exit Codex or close the body to stop.');
+    console.log('Fisch engine paired. Starting Codex in this pane; exit Codex or close the body to stop.');
     return await Promise.race([
       runHost({ base, token, origin, page: body.page, gateway: gateway.child, signal: abort.signal }),
       disconnected, interrupted,
@@ -228,7 +228,7 @@ export async function runSession({ headless = false, runHost = codexHost } = {})
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   prepareSession().then(() => runSession()).then(code => { process.exitCode = code; }).catch(error => {
-    console.error('Session failed: ' + (error.message.startsWith('Install ') || error.message.includes('failed.') || error.message.startsWith('Could not start ') ? error.message : 'Check Edge/Chrome, Codex login and the gateway build, then run npm start again.'));
+    console.error('Session failed: ' + (error.message.startsWith('Install ') || error.message.includes('failed.') || error.message.startsWith('Could not start ') ? error.message : 'Check Edge/Chrome, Codex login and the gateway build, then run fisch run again.'));
     process.exitCode = 1;
   });
 }

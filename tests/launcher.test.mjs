@@ -61,7 +61,7 @@ it.skipIf(!native)('auto-pairs the real browser and admits an MCP expression, th
     const mcp = mcpClient(base, context.token);
     try {
       const initialized = await mcp.call('initialize', {});
-      expect(initialized.serverInfo.name).toBe('agent-expression-runtime');
+      expect(initialized.serverInfo.name).toBe('fisch');
       const resource = await mcp.call('resources/read', { uri: 'aer://instructions/v1' });
       expect(resource.contents[0].text).toContain('morph');
       await admitted(mcp.call, { body: { type: 'morph', target: 'wall', durationMs: 100 } });

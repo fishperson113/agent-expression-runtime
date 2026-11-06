@@ -1,9 +1,9 @@
 # Herdr: one command
 
-Keep the current chat in one pane. In the other pane, from the repository root, run:
+Link the checkout once with `npm link`. Keep the current chat in one pane. In the other pane, from the repository root, run:
 
 ```powershell
-npm start
+fisch run
 ```
 
 This opens the particle body in a browser and starts a fresh Codex session in the pane running the command. Pairing and MCP configuration happen automatically. No Herdr pane IDs, socket API, clipboard token or global Codex configuration are needed.
