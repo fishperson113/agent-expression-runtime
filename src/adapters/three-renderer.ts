@@ -3,6 +3,7 @@ import type { BodyState, RendererSink } from '../core/ports';
 import { MotionPhase } from './motion-phase';
 import { capability } from '../primitives/registry';
 import { sampleBody } from './body-geometry';
+import { TargetBoids } from '../core/geometry/boids';
 import { shapeBuffers } from '../core/geometry/primitives';
 export { shapeBuffers } from '../core/geometry/primitives';
 export function frameBody(positions: Float32Array, count: number, camera: THREE.PerspectiveCamera) {
@@ -34,6 +35,7 @@ export function fitCamera(camera: THREE.PerspectiveCamera, aspect: number) {
   camera.updateProjectionMatrix();
 }
 export class ThreeRenderer implements RendererSink {
+  private swarm = new TargetBoids();
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
   private camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
@@ -112,6 +114,7 @@ export class ThreeRenderer implements RendererSink {
     const amp = this.reducedMotion ? 0.08 : 1;
     const angle = this.orbit.advance(now, state.flowStrength * amp * state.flowWeights[capability.fields.indexOf('orbit')]);
     sampleBody(this.shapes, this.positions, this.count, state, now, angle, this.reducedMotion);
+    this.swarm.apply(this.positions, this.count, now, state.particleGroups, !this.reducedMotion);
     frameBody(this.positions, this.count, this.camera);
     this.geometry.attributes.position.needsUpdate = true;
     this.material.uniforms.color.value = this.color.set(String(state.color));

@@ -7,6 +7,7 @@ export type BodyState = Record<Property, Value> & {
   shapeWeights: number[];
   flowWeights: number[];
   particlePositions?: Float32Array;
+  particleGroups?: Uint8Array;
 };
 export interface RendererSink {
   apply(state: BodyState, now: number): void;

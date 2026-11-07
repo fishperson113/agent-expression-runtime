@@ -15,7 +15,8 @@ export class ParticleFormation {
   private progress = 1;
   private sampledAt = NaN;
   private primitives?: Float32Array[];
-  constructor(readonly count = capability.assembly.particles) {}
+  readonly groups: Uint8Array;
+  constructor(readonly count = capability.assembly.particles) { this.groups = new Uint8Array(count); }
   private origin(weights: number[], seed: number) {
     this.primitives ??= shapeBuffers(this.count, seed);
     const points = new Float32Array(this.count * 3);
@@ -34,6 +35,7 @@ export class ParticleFormation {
         ? { positions: this.primitives[capability.shapes.indexOf(target)], parts: [], partIndices: new Uint8Array(this.count), topology: 'primitive:' + target }
         : sculptureCloud(target, this.count);
       if (cloud.topology !== this.topology) this.mapping = spatialAssignment(this.from, cloud.positions);
+      for (let i = 0; i < this.count; i++) this.groups[i] = cloud.partIndices[this.mapping![i]] ?? 0;
       this.cloud = cloud; this.topology = cloud.topology; this.start = now; this.operation = operation;
     }
     this.progress = t;
@@ -56,5 +58,6 @@ export class ParticleFormation {
     this.cloud = { positions, parts: [], partIndices: new Uint8Array(this.count), topology: 'frozen' };
     this.from = positions; this.mapping = Uint32Array.from({ length: this.count }, (_, i) => i);
     this.operation = undefined; this.topology = 'frozen'; this.progress = 1;
+    this.groups.fill(0);
   }
 }

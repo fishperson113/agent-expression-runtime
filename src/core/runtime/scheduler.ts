@@ -275,6 +275,7 @@ export class Scheduler {
     this.advance(now);
     this.sampleBaseline(now);
     this.formation.tick(now); this.state.particlePositions = this.formation.points;
+    this.state.particleGroups = this.formation.points ? this.formation.groups : undefined;
     this.sink.apply({ ...this.state, shapeWeights: [...this.state.shapeWeights] }, now);
   }
   dispose() {

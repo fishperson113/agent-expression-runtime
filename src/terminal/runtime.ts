@@ -7,8 +7,10 @@ import { shapeBuffers, fitCamera, frameBody } from '../adapters/three-renderer';
 import { sampleBody } from '../adapters/body-geometry';
 import { MotionPhase } from '../adapters/motion-phase';
 import { capability } from '../primitives/registry';
+import { TargetBoids } from '../core/geometry/boids';
 
 export class TerminalRenderer implements RendererSink {
+  readonly swarm = new TargetBoids();
   readonly count = 2000;
   private shapes = shapeBuffers(this.count);
   private positions = new Float32Array(this.count * 3);
@@ -28,6 +30,7 @@ export class TerminalRenderer implements RendererSink {
     if (!this.width) this.resize(384, 256);
     const angle = this.orbit.advance(now, state.flowStrength * state.flowWeights[capability.fields.indexOf('orbit')]);
     sampleBody(this.shapes, this.positions, this.count, state, now, angle);
+    this.swarm.apply(this.positions, this.count, now, state.particleGroups);
     frameBody(this.positions, this.count, this.camera);
     for (let i = 0; i < this.pixels.length; i += 3) {
       this.pixels[i] = 8; this.pixels[i + 1] = 14; this.pixels[i + 2] = 20;
