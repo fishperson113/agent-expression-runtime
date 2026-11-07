@@ -7,7 +7,7 @@ export class ExpressionPlanner {
   status = 'unknown'; mode = 'disabled'; error = null; closed = false; paused = false;
   lastRequest = -Infinity; seen = new Set();
   constructor({ engine, plan, now = () => performance.now(), wallNow = Date.now, timeoutMs = 45000,
-    intervalMs = 60000, onApplied = () => {}, requireAssembly = false, reason }) {
+    intervalMs = 10000, onApplied = () => {}, requireAssembly = false, reason }) {
     Object.assign(this, { engine, plan, now, wallNow, timeoutMs, intervalMs, onApplied, requireAssembly, reason });
     this.mode = plan ? 'ready' : 'disabled';
   }
@@ -28,8 +28,8 @@ export class ExpressionPlanner {
       this.obstacle = null; this.requestsThisTurn = 0; this.lastRequest = -Infinity; this.pending = this.current;
     } else if (event.type === 'interrupted') this.invalidate();
     else if (['task_failure', 'task_success', 'needs_user'].includes(event.type)) {
-      if (['needs_user', 'task_failure'].includes(event.type)) this.obstacle = event;
-      if (this.status === 'working' && this.requestsThisTurn < 2) this.pending = event;
+      if (event.type === 'needs_user') this.obstacle = event;
+      if (this.status === 'working' && this.requestsThisTurn < 2 && this.pending?.type !== 'user_message') this.pending = event;
     }
     return true;
   }

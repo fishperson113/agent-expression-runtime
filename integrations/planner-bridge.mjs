@@ -20,16 +20,18 @@ export function paneActivity(engine, agent, call, config = plannerConfig(undefin
     },
     event(event) {
       if (!planner.accept(event)) return { status: 'ignored' };
-      received++; body.cue(event.type); source = event.type === 'user_message' ? 'listening' : 'reflex';
+      received++; body.cue(event.type);
+      if (event.type === 'user_message') source = 'listening';
+      else if (event.type === 'needs_user' || event.type === 'interrupted') source = 'reflex';
       return { status: 'accepted', eventId: event.id };
     },
     tick() { planner.tick(); if (!planner.paused) body.tick(status); },
     express(args) {
       const result = engine.express(args);
-      if (result.status === 'accepted' && args.kind !== 'define') { planner.invalidate(); source = 'manual'; }
+      if (result.status === 'accepted' && args.kind !== 'define') { planner.invalidate(); body.releaseAttention(); source = 'manual'; }
       return result;
     },
-    cancel() { planner.invalidate(); source = 'cancelled'; return engine.cancel(); },
+    cancel() { planner.invalidate(); body.releaseAttention(); source = 'cancelled'; return engine.cancel(); },
     close() { planner.close(); },
     get status() { return status; },
     get source() { return source; },

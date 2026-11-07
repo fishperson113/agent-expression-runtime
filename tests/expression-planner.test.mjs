@@ -3,6 +3,7 @@ import { ExpressionPlanner } from '../integrations/expression-planner.mjs';
 import { normalizeHook } from '../integrations/interaction-events.mjs';
 import { paneActivity } from '../integrations/planner-bridge.mjs';
 import { TerminalEngine } from '../src/terminal/runtime.ts';
+import { InteractionBody } from '../integrations/interaction-body.mjs';
 
 const event = (turn = 'turn', type = 'UserPromptSubmit') => normalizeHook({ session_id: 's', turn_id: turn,
   hook_event_name: type, prompt: 'Cảm ơn bạn!', tool_use_id: turn });
@@ -104,4 +105,34 @@ it('keeps a newer needs-user cue from being overwritten by a delayed earlier rea
     resolve(); await f.planner.job;
     expect(f.submitted).toHaveLength(0); expect(f.planner.info.discarded).toBe(1);
   } finally { f.planner.close(); }
+});
+it('keeps a praise reaction after a test failure and dispatches the failure reaction before expiry', async () => {
+  let now = 0, resolve; const admitted = [], calls = [];
+  const planner = new ExpressionPlanner({ now: () => now, wallNow: () => now,
+    engine: { express(value) { admitted.push(value); return { status: 'accepted' }; } },
+    plan: context => { calls.push(context.event.type); return calls.length === 1 ?
+      new Promise(done => { resolve = () => done(result(context)); }) : Promise.resolve(result(context)); } });
+  try {
+    planner.update('working'); planner.accept({ ...event(), at: 0 }); planner.tick();
+    const initial = planner.job; now = 3000;
+    const failure = normalizeHook({ session_id: 's', turn_id: 'turn', hook_event_name: 'PostToolUseFailure',
+      tool_input: { command: 'npm test' } }, now);
+    planner.accept(failure); now = 13000; resolve(); await initial;
+    expect(planner.info).toMatchObject({ applied: 1, discarded: 0 });
+    planner.tick(); await planner.job;
+    expect(calls).toEqual(['user_message', 'task_failure']); expect(admitted).toHaveLength(2);
+  } finally { planner.close(); }
+});
+it('holds listening posture throughout inference, releases on reaction and times out without a model', () => {
+  let now = 0; const engine = new TerminalEngine(() => now), body = new InteractionBody(engine, () => now);
+  try {
+    body.cue('user_message');
+    for (const at of [280, 500, 3000, 13000]) {
+      now = at; body.tick('working'); engine.frame(64, 64);
+      expect(Number(engine.state.advance)).toBeCloseTo(0.16);
+    }
+    body.react({ intensity: 0.5 }); now += 350; engine.frame(64, 64); expect(Number(engine.state.advance)).toBe(0);
+    body.cue('user_message'); now += 500; engine.frame(64, 64); expect(Number(engine.state.advance)).toBeCloseTo(0.16);
+    now += 45000; body.tick('idle'); now += 1000; engine.frame(64, 64); expect(Number(engine.state.advance)).toBe(0);
+  } finally { engine.dispose(); }
 });

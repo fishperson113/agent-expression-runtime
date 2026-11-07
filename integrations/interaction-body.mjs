@@ -18,26 +18,38 @@ export class InteractionBody {
     if (type !== 'user_message' && now - this.lastCue < 1000) return;
     this.lastCue = now; this.lastAt = now; this.frozen = false; this.intensity = 0.5;
     if (type === 'user_message') {
+      this.attendingUntil = now + 45000;
+      this.engine.express({ kind: 'state', body: { advance: 0.16, grow: 1.04, durationMs: 280 } });
       this.engine.express({ body: attentionBody(this.engine.state?.shape === 'assembled') }); return;
     }
+    if (now < (this.attendingUntil ?? 0) && type !== 'needs_user' && type !== 'interrupted') return;
     const rise = { task_success: 0.12, task_failure: -0.08, needs_user: 0.04 }[type] ?? 0;
     this.engine.express({ body: { type: 'parallel', children: [
       { type: 'shapeQuality', rise, advance: type === 'needs_user' ? 0.15 : 0, grow: 1, durationMs: 450 },
       { type: 'flow', field: 'pulse', strength: 0.04, durationMs: 450 },
     ] } });
   }
-  react(reaction) { this.lastAt = this.now(); this.intensity = reaction.intensity; this.frozen = false; }
+  releaseAttention() {
+    if (!this.attendingUntil) return;
+    this.attendingUntil = 0;
+    this.engine.express({ kind: 'state', body: { advance: 0, grow: 1, durationMs: 350 } });
+  }
+  react(reaction) {
+    this.releaseAttention(); this.lastAt = this.now(); this.intensity = reaction.intensity; this.frozen = false;
+  }
   tick(status) {
     const now = this.now();
+    if (this.attendingUntil && now >= this.attendingUntil) this.releaseAttention();
     if (now - this.lastTick < 2000) return;
     this.lastTick = now;
     const idle = ['idle', 'done', 'unknown'].includes(status);
     const residual = this.intensity * Math.exp(-Math.max(0, now - this.lastAt) / 30000);
-    if (idle && !this.frozen && now - this.lastAt > 30000) {
+    const attending = now < (this.attendingUntil ?? 0);
+    if (idle && !attending && !this.frozen && now - this.lastAt > 30000) {
       this.engine.settle?.(); this.frozen = true;
       this.engine.express({ body: { type: 'flow', field: 'pulse', strength: 0.04, durationMs: 500 } });
     }
     this.engine.express({ kind: 'state', body: { brightness: (idle ? 0.65 : 0.78) + residual * 0.12,
-      grow: 1 + (idle ? Math.sin(now / 2200) * 0.006 : 0), durationMs: 1000 } });
+      grow: attending ? 1.04 : 1 + (idle ? Math.sin(now / 2200) * 0.006 : 0), durationMs: 1000 } });
   }
 }

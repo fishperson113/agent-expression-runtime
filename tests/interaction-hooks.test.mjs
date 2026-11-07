@@ -29,6 +29,11 @@ it('only forwards explicit lifecycle events and structured task outcomes, never 
   expect(normalizeHook({ ...input, tool_response: { output: 'ALL TESTS PASSED token=private' } })).toBeNull();
   expect(normalizeHook({ ...input, tool_input: { command: 'echo test' }, tool_response: { exit_code: 0 } })).toBeNull();
 });
+it.each(['grep missing file', 'rg missing .', 'test -f absent', 'diff a b', 'git diff --exit-code'])('ignores normal nonzero shell outcomes: %s', command => {
+  const input = { ...prompt, tool_input: { command }, tool_response: { exit_code: 1 } };
+  expect(normalizeHook({ ...input, hook_event_name: 'PostToolUse' })).toBeNull();
+  expect(normalizeHook({ ...input, hook_event_name: 'PostToolUseFailure' })).toBeNull();
+});
 it('merges hook configuration idempotently without replacing other integrations or preferences', () => {
   const original = { model: 'existing', hooks: { Stop: [{ hooks: [{ type: 'command', command: 'my-harness check' }] }] } };
   const first = hookConfiguration(original, 'codex');

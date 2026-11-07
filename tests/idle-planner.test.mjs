@@ -4,7 +4,8 @@ import { InteractionBody } from '../integrations/interaction-body.mjs';
 import { normalizeHook } from '../integrations/interaction-events.mjs';
 
 const message = (turn, at) => normalizeHook({ session_id: 's', turn_id: turn, hook_event_name: 'UserPromptSubmit', prompt: 'Hello' }, at);
-const task = (turn, at) => normalizeHook({ session_id: 's', turn_id: turn, hook_event_name: 'PostToolUseFailure', tool_use_id: String(at) }, at);
+const task = (turn, at) => normalizeHook({ session_id: 's', turn_id: turn, hook_event_name: 'PostToolUseFailure',
+  tool_input: { command: 'npm test' }, tool_use_id: String(at) }, at);
 const response = context => ({ eventId: context.event.id, body: { type: 'sequence', children: [{ type: 'parallel',
   children: [{ type: 'morph', target: 'wave', durationMs: 300 }] }] } });
 function fixture(plan = async context => response(context)) {
@@ -29,12 +30,12 @@ it('responds once to a user event during idle, then holds without new inference 
     expect(f.calls).toHaveLength(1); expect(f.planner.info.applied).toBe(1);
   } finally { f.planner.close(); }
 });
-it('coalesces milestones, respects a minute cooldown and caps attempts at two per turn', async () => {
+it('coalesces milestones, dispatches before expiry and caps attempts at two per turn', async () => {
   const f = fixture();
   try {
     f.planner.update('working'); f.planner.accept(message('a', 0)); await f.at(0);
     f.planner.accept(task('a', 2000)); await f.at(2000); expect(f.calls).toHaveLength(1);
-    await f.at(40000); expect(f.calls).toHaveLength(1);
+    await f.at(10000); expect(f.calls).toHaveLength(2);
     f.planner.accept(task('a', 60000)); await f.at(60000); expect(f.calls).toHaveLength(2);
     f.planner.accept(task('a', 120000)); await f.at(120000); expect(f.calls).toHaveLength(2);
     f.planner.accept(message('b', 120000)); await f.at(120000); expect(f.calls).toHaveLength(3);

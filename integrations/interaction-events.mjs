@@ -8,14 +8,13 @@ export function redactMessage(text) {
     .replace(/((?:api[_-]?key|token|password|secret)\s*[=:]\s*)[^\s,;]+/gi, '$1[REDACTED]').slice(0, 6000);
 }
 function outcome(input) {
+  const command = input.tool_input?.command ?? input.tool_input?.cmd;
+  if (typeof command !== 'string' || !/^(?:(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:test|build|check)|(?:npx\s+)?vitest|pytest|python(?:3)?\s+-m\s+pytest|node\s+--test|cargo\s+(?:test|build|check)|go\s+test|dotnet\s+(?:test|build))\b/i.test(command.trim())) return null;
   const response = input.tool_response;
   const code = response?.exit_code ?? response?.exitCode;
   if (input.hook_event_name === 'PostToolUseFailure' || response?.isError === true || (Number.isInteger(code) && code !== 0))
     return 'task_failure';
-  const command = input.tool_input?.command ?? input.tool_input?.cmd;
-  if (code === 0 && typeof command === 'string' &&
-      /(?:^|[;&|]\s*)(?:(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:test|build|check)|(?:npx\s+)?vitest|pytest|cargo\s+(?:test|build|check)|go\s+test)\b/i.test(command))
-    return 'task_success';
+  if (code === 0) return 'task_success';
   return null;
 }
 export function normalizeHook(input, now = Date.now()) {
