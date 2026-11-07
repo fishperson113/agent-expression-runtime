@@ -1,7 +1,7 @@
 import { capability } from '../../primitives/registry';
-import type { ParticleCloud, Sculpture } from './types';
+import type { ParticleCloud, Sculpture, Vec3 } from './types';
 import { shapeBuffers } from './primitives';
-import { sculptureCloud, animatedPoint } from './sampling';
+import { sculptureCloud, animatedPoint, motionTransforms } from './sampling';
 import { spatialAssignment } from './assignment';
 
 export class ParticleFormation {
@@ -43,8 +43,9 @@ export class ParticleFormation {
     if (!this.points || !this.cloud || !this.from || !this.mapping) return;
     if (this.sampledAt === now) return;
     this.sampledAt = now;
+    const matrices = motionTransforms(this.cloud, now - this.start), target: Vec3 = [0, 0, 0];
     for (let i = 0; i < this.count; i++) {
-      const target = animatedPoint(this.cloud, this.mapping[i], now - this.start), j = i * 3;
+      animatedPoint(this.cloud, this.mapping[i], matrices, target); const j = i * 3;
       for (let k = 0; k < 3; k++) this.points[j + k] = this.from[j + k] + (target[k] - this.from[j + k]) * this.progress;
     }
   }

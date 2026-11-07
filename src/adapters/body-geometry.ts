@@ -12,7 +12,7 @@ export function sampleBody(shapes: Float32Array[], positions: Float32Array, coun
       let x = 0,
         y = 0,
         z = 0;
-      for (let k = 0; k < shapes.length; k++) {
+      if (!state.particlePositions) for (let k = 0; k < shapes.length; k++) {
         const weight = state.shapeWeights[k];
         x += shapes[k][j] * weight;
         y += shapes[k][j + 1] * weight;

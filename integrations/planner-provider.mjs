@@ -38,7 +38,7 @@ export function modelPlanner(config, request = fetch) {
   return async (context, signal) => {
     const response = await request(config.endpoint, { method: 'POST', signal, redirect: 'error',
       headers: { 'Content-Type': 'application/json', ...(config.key ? { Authorization: `Bearer ${config.key}` } : {}) },
-      body: JSON.stringify({ model: config.model, store: false, max_output_tokens: 1800,
+      body: JSON.stringify({ model: config.model, store: false, max_output_tokens: 6000,
         instructions: plannerInstructions, input: JSON.stringify(context),
         text: { format: { type: 'json_schema', name: 'fisch_expression', strict: true, schema: planSchema } } }),
     });
