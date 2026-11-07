@@ -1,3 +1,6 @@
+import { validatePerformance, validateIdleScenes } from './expression-plan.mjs';
+import { IdleScenes } from './idle-scenes.mjs';
+
 const eyes = [-0.32, 0.32].map((x, index) => ({ id: 'eye-' + index, kind: 'ellipsoid',
   center: [x, 0.25, 0], scale: [0.09, 0.14, 0.06] }));
 export function attentionBody(assembled = false) {
@@ -12,11 +15,15 @@ export function attentionBody(assembled = false) {
 }
 export class InteractionBody {
   lastAt = -Infinity; lastTick = -Infinity; lastCue = -Infinity; frozen = false; intensity = 0;
-  constructor(engine, now = () => performance.now()) { this.engine = engine; this.now = now; }
+  constructor(engine, now = () => performance.now()) {
+    this.engine = engine; this.now = now; this.idle = new IdleScenes(engine, now, score => this.setPerformance(score));
+  }
   scores = new WeakMap();
+  scenes = new WeakMap();
   remember(value) {
     const score = validatePerformance(value.performance, value.body);
     if (value.body && typeof value.body === 'object') this.scores.set(value.body, score);
+    if (value.body && typeof value.body === 'object') this.scenes.set(value.body, validateIdleScenes(value.idleScenes));
   }
   setPerformance(score) {
     this.score = score;
@@ -26,17 +33,18 @@ export class InteractionBody {
   presence(status) {
     if (!this.engine.state) return;
     const previous = this.engine.state.presenceIntent;
-    this.engine.state.presenceIntent = { ...previous, activity: status ?? 'unknown',
+    this.engine.state.presenceIntent = { ...previous, activity: this.idle.active ? 'idle-scene' : status ?? 'unknown',
       mood: this.mood ?? 'neutral', intensity: this.intensity * Math.exp(-Math.max(0, this.now() - this.lastAt) / 30000),
       performance: this.score ?? null,
       mode: previous?.mode ?? (['off', 'reduced'].includes(process.env.FISCH_MOTION) ? process.env.FISCH_MOTION : 'normal') };
   }
   cue(type) {
     const now = this.now();
-    if (['interrupted', 'needs_user'].includes(type)) this.setPerformance(null);
+    if (['interrupted', 'needs_user'].includes(type)) { this.idle.clear(); this.setPerformance(null); }
     if (type !== 'user_message' && now - this.lastCue < 1000) return;
     this.lastCue = now; this.lastAt = now; this.frozen = false; this.intensity = 0.5;
     if (type === 'user_message') {
+      this.idle.clear();
       this.setPerformance(null);
       this.attendingUntil = now + 45000;
       this.engine.express({ kind: 'state', body: { advance: 0.16, grow: 1.04, durationMs: 280 } });
@@ -58,10 +66,13 @@ export class InteractionBody {
     this.releaseAttention(); this.lastAt = this.now(); this.intensity = reaction.intensity; this.frozen = false;
     this.mood = reaction.mood;
     this.setPerformance(geometry ? this.scores.get(geometry) ?? null : null);
+    if (geometry) this.idle.install(geometry, this.score, this.scenes.get(geometry) ?? []);
   }
-  tick(status) {
+  tick(status, baseline = true) {
     const now = this.now();
     this.presence(status);
+    this.idle.tick(status);
+    if (!baseline) return;
     if (this.attendingUntil && now >= this.attendingUntil) this.releaseAttention();
     if (now - this.lastTick < 2000) return;
     this.lastTick = now;
@@ -72,4 +83,3 @@ export class InteractionBody {
       grow: attending ? 1.04 : 1, durationMs: 1000 } });
   }
 }
-import { validatePerformance } from './expression-plan.mjs';

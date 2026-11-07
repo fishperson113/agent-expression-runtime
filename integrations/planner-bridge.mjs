@@ -3,7 +3,19 @@ import { plannerConfig, modelPlanner } from './planner-provider.mjs';
 import { processPlanner } from './planner-process.mjs';
 import { warmCodexPlanner } from './planner-codex.mjs';
 import { InteractionBody, attentionBody } from './interaction-body.mjs';
-import { validatePerformance } from './expression-plan.mjs';
+import { validatePerformance, validateIdleScenes } from './expression-plan.mjs';
+
+function manualExpression(engine, planner, body, args) {
+  const score = validatePerformance(args.performance, args.body), scenes = validateIdleScenes(args.idleScenes);
+  if (scenes.length && (args.kind && args.kind !== 'program' || args.body?.type !== 'sequence')) throw Error('invalid_idle_scenes');
+  const { performance, idleScenes, ...command } = args;
+  const result = engine.express(command);
+  if (result.status === 'accepted' && args.kind !== 'define') {
+    planner.invalidate(); body.releaseAttention(); body.idle.clear(false); body.setPerformance(score);
+    body.idle.install(args.body, score, scenes);
+  }
+  return result;
+}
 
 function performancePlanner(plan, body) {
   if (!plan) return null;
@@ -37,25 +49,22 @@ export function paneActivity(engine, agent, call, config = plannerConfig(undefin
       else if (event.type === 'needs_user' || event.type === 'interrupted') source = 'reflex';
       return { status: 'accepted', eventId: event.id };
     },
-    tick() { planner.tick(); if (planner.paused) body.presence(status); else body.tick(status); },
+    tick() { planner.tick(); body.tick(status, !planner.paused); },
     express(args) {
-      const score = validatePerformance(args.performance, args.body), { performance, ...command } = args;
-      const result = engine.express(command);
-      if (result.status === 'accepted' && args.kind !== 'define') {
-        planner.invalidate(); body.releaseAttention(); body.setPerformance(score); source = 'manual';
-      }
+      const result = manualExpression(engine, planner, body, args);
+      if (result.status === 'accepted' && args.kind !== 'define') source = 'manual';
       return result;
     },
     cancel() {
       planner.invalidate(); body.releaseAttention(); source = 'cancelled';
-      const result = engine.cancel(); body.setPerformance(null); return result;
+      const result = engine.cancel(); body.idle.clear(false); body.setPerformance(null); return result;
     },
     close() { planner.close(); },
     get status() { return status; },
-    get source() { return source; },
+    get source() { return body.idle.active ? 'idle-scene' : source; },
     get transitions() { return transitions; },
     get planner() { return { ...planner.info, backend: config.backend, interactionEvents: received,
-      ambient: engine.state?.presencePose,
+      ambient: engine.state?.presencePose, idleScenes: body.idle.info,
       eventSource: received ? 'agent-hooks' : 'awaiting-agent-hooks' }; },
   };
 }

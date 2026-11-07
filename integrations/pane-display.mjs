@@ -1,41 +1,23 @@
-const dots = [[0, 0, 1], [0, 1, 2], [0, 2, 4], [1, 0, 8], [1, 1, 16], [1, 2, 32], [0, 3, 64], [1, 3, 128]];
-function brightestPixel(pixels, width, height, dotX, dotY, dotWidth, dotHeight) {
-  const left = Math.min(width - 1, Math.floor(dotX * width / dotWidth));
-  const top = Math.min(height - 1, Math.floor(dotY * height / dotHeight));
-  const right = Math.min(width, Math.max(left + 1, Math.floor((dotX + 1) * width / dotWidth)));
-  const bottom = Math.min(height, Math.max(top + 1, Math.floor((dotY + 1) * height / dotHeight)));
-  let best = -1, peak = 35;
-  for (let y = top; y < bottom; y++) for (let x = left; x < right; x++) {
-    const offset = (y * width + x) * 3;
-    const value = Math.max(pixels[offset], pixels[offset + 1], pixels[offset + 2]);
-    if (value > peak) { best = offset; peak = value; }
+import { BrailleRenderer } from './braille-renderer.mjs';
+
+const renderers = new WeakMap();
+function paneCaption(text, columns) {
+  let result = '', width = 0;
+  for (const character of text.replace(/[\p{Cc}\p{Cf}]/gu, ' ')) {
+    const point = character.codePointAt(0);
+    const wide = point >= 0x1100 && (point <= 0x115f || point >= 0x2e80 && point <= 0xa4cf ||
+      point >= 0xac00 && point <= 0xd7a3 || point >= 0xf900 && point <= 0xfaff ||
+      point >= 0xfe10 && point <= 0xfe6f || point >= 0xff00 && point <= 0xff60 || point >= 0x1f300);
+    const advance = /\p{Mark}/u.test(character) ? 0 : wide ? 2 : 1;
+    if (width + advance > columns) break;
+    result += character; width += advance;
   }
-  return best;
-}
-function brailleCell(pixels, width, height, columns, rows, col, row) {
-  let mask = 0, count = 0; const rgb = [0, 0, 0];
-  for (const [dx, dy, bit] of dots) {
-    const offset = brightestPixel(pixels, width, height, col * 2 + dx, row * 4 + dy, columns * 2, rows * 4);
-    if (offset < 0) continue;
-    mask |= bit; count++;
-    for (let channel = 0; channel < 3; channel++) rgb[channel] += pixels[offset + channel];
-  }
-  return { mask, color: rgb.map(value => Math.min(255, Math.round(value / (count || 1) / 16) * 16)).join(';') };
+  return result;
 }
 export function brailleFrame(pixels, width, height, columns, rows, colored = false) {
-  const lines = [];
-  let foreground = '';
-  for (let row = 0; row < rows; row++) {
-    let line = '';
-    for (let col = 0; col < columns; col++) {
-      const { mask, color } = brailleCell(pixels, width, height, columns, rows, col, row);
-      if (colored && mask && color !== foreground) { line += `\x1b[38;2;${color}m`; foreground = color; }
-      line += String.fromCharCode(mask ? 0x2800 + mask : 32);
-    }
-    lines.push(line);
-  }
-  return lines.join('\x1b[K\n');
+  return new BrailleRenderer().render(pixels, width, height, columns, rows, colored);
 }
+export function brailleInfo(output = process.stdout) { return renderers.get(output)?.info ?? null; }
 export function displaySize(snapshot, paneId) {
   const rectangle = snapshot.layouts.flatMap(layout => layout.panes).find(pane => pane.pane_id === paneId)?.rect;
   const columns = Math.max(12, Math.min(150, (rectangle?.width ?? 80) - 4));
@@ -44,10 +26,23 @@ export function displaySize(snapshot, paneId) {
   const scale = Math.min(1, 512 / width, 384 / height);
   return { columns, rows, width: Math.round(width * scale), height: Math.round(height * scale) };
 }
-export async function drawFrame({ pixels, size, mode, paneId, call, output = process.stdout, title }) {
-  output.write(`\x1b[H\x1b[2K${title}\n\x1b[2K${mode === 'pixels' ? 'Inline particles' : 'Terminal particles (Braille)'} · q to quit\n`);
-  if (mode === 'pixels') await call('pane.graphics.set', { pane_id: paneId, format: 'rgb',
-    image_width: size.width, image_height: size.height, data_base64: pixels.toString('base64'),
-    placement: { viewport_col: 1, viewport_row: 3, grid_cols: size.columns, grid_rows: size.rows } });
-  else output.write(brailleFrame(pixels, size.width, size.height, size.columns, size.rows, true) + '\x1b[0m\x1b[J');
+export async function drawFrame({ pixels, size, mode, paneId, call, output = process.stdout, title, caption, reset = false }) {
+  const label = caption ? paneCaption(caption, size.columns)
+    : `${mode === 'pixels' ? 'Inline particles' : 'Terminal particles (Braille)'} · q to quit`;
+  const header = `\x1b[H\x1b[2K${title}\n\x1b[2K${label}\n`;
+  if (mode === 'pixels') {
+    output.write(header);
+    await call('pane.graphics.set', { pane_id: paneId, format: 'rgb',
+      image_width: size.width, image_height: size.height, data_base64: pixels.toString('base64'),
+      placement: { viewport_col: 1, viewport_row: 3, grid_cols: size.columns, grid_rows: size.rows } });
+  }
+  else {
+    if (reset) renderers.delete(output);
+    let renderer = renderers.get(output);
+    if (!renderer) {
+      renderer = new BrailleRenderer({ style: process.env.FISCH_BRAILLE_STYLE === 'peak' ? 'peak' : 'adaptive' });
+      renderers.set(output, renderer);
+    }
+    output.write(header + renderer.render(pixels, size.width, size.height, size.columns, size.rows, true) + '\x1b[0m\x1b[J');
+  }
 }

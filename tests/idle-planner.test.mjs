@@ -3,8 +3,113 @@ import { ExpressionPlanner } from '../integrations/expression-planner.mjs';
 import { InteractionBody } from '../integrations/interaction-body.mjs';
 import { normalizeHook } from '../integrations/interaction-events.mjs';
 import { paneActivity } from '../integrations/planner-bridge.mjs';
-import { validatePerformance } from '../integrations/expression-plan.mjs';
-import { brailleFrame } from '../integrations/pane-display.mjs';
+import { validatePerformance, validateIdleScenes } from '../integrations/expression-plan.mjs';
+import { brailleFrame, drawFrame } from '../integrations/pane-display.mjs';
+import { BrailleRenderer } from '../integrations/braille-renderer.mjs';
+import { IdleScenes } from '../integrations/idle-scenes.mjs';
+
+const sceneBody = id => ({ type: 'sequence', children: [{ type: 'parallel', children: [
+  { type: 'assemble', durationMs: 600, parts: [{ id, kind: 'ellipsoid', center: [0, 0, 0], scale: [0.6, 0.4, 0.1] }] },
+] }] });
+const preparedScenes = () => ['invented-a', 'invented-b', 'invented-c'].map((id, i) => ({
+  id, afterMs: 10000 + i * 10000, caption: `local scene ${i + 1}`, body: sceneBody(id),
+}));
+
+it('locally changes full geometry during idle, visits every eligible scene and restores on return', () => {
+  let now = 0; const submitted = [], scores = [], base = sceneBody('base');
+  const director = new IdleScenes({ express(value) { submitted.push(value); return { status: 'accepted' }; } },
+    () => now, score => scores.push(score));
+  director.install(base, 'base-score', preparedScenes()); director.tick('idle');
+  expect(submitted).toHaveLength(0);
+  for (now = 10000; now <= 180000; now += 1000) director.tick('idle');
+  expect(new Set(submitted.map(value => value.body.children[0].children[0].parts[0].id)).size).toBe(3);
+  expect(director.info.played).toBeGreaterThan(3);
+  director.tick('working');
+  expect(submitted.at(-1).body).toBe(base);
+  expect(scores.at(-1)).toBe('base-score'); expect(director.caption).toBe(null);
+});
+it('does not run absent-user scenes for unknown status, motion-off or rejected geometry', () => {
+  let now = 0, submitted = 0;
+  const engine = { state: { presenceIntent: { mode: 'off' } }, express() { submitted++; throw Error('invalid_geometry'); } };
+  const director = new IdleScenes(engine, () => now); director.install(sceneBody('base'), null, preparedScenes());
+  director.tick('unknown'); now = 100000; director.tick('unknown'); expect(submitted).toBe(0);
+  director.tick('idle'); now += 20000; director.tick('idle'); expect(submitted).toBe(0);
+  engine.state.presenceIntent.mode = 'normal';
+  for (now = 130000; now <= 400000; now += 1000) director.tick('idle');
+  expect(submitted).toBe(3); expect(director.info.failed).toBe(3);
+});
+it('varies replay phase and tempo locally while keeping generated geometry and amplitudes immutable', () => {
+  let now = 0; const submitted = [], scenes = preparedScenes().slice(0, 2);
+  scenes[0].body.children[0].children[0].parts[0].motion = { pivot: [0, 0, 0], translate: [0.1, 0, 0],
+    rotate: [0, 0, 0.2], periodMs: 2000, phase: 0 };
+  const original = structuredClone(scenes);
+  const director = new IdleScenes({ express(value) { submitted.push(value); return { status: 'accepted' }; } }, () => now);
+  director.install(sceneBody('base'), null, scenes); director.tick('idle');
+  for (now = 10000; now <= 100000; now += 1000) director.tick('idle');
+  const motion = submitted.map(v => v.body.children[0].children[0].parts[0]).filter(p => p.id === 'invented-a').map(p => p.motion);
+  expect(motion.length).toBeGreaterThan(1);
+  expect(motion[1].phase).not.toBe(motion[0].phase);
+  expect(motion[1].translate).toEqual(motion[0].translate);
+  expect(motion[1].periodMs).toBeGreaterThanOrEqual(1000);
+  expect(motion[1].periodMs).toBeLessThanOrEqual(10000);
+  expect(scenes).toEqual(original);
+});
+it('validates scene geometry budgets and prevents captions from injecting terminal controls', () => {
+  expect(validateIdleScenes(preparedScenes())).toHaveLength(3);
+  const unsafe = preparedScenes(); unsafe[0].caption = '\x1b[2J';
+  expect(() => validateIdleScenes(unsafe)).toThrow('invalid_idle_scenes');
+  const duplicate = preparedScenes(); duplicate[1].id = duplicate[0].id;
+  expect(() => validateIdleScenes(duplicate)).toThrow('invalid_idle_scenes');
+  const early = preparedScenes(); early[0].afterMs = 1;
+  expect(() => validateIdleScenes(early)).toThrow('invalid_idle_scenes');
+});
+it('prepares idle scenes on a real event, then plays them with zero extra model requests', async () => {
+  let now = 0, calls = 0; const engine = { state: {}, express: () => ({ status: 'accepted' }), cancel() {} };
+  const activity = paneActivity(engine, {}, async () => ({}), { enabled: true }, { now: () => now,
+    plan: async context => { calls++; return { eventId: context.event.id, mood: 'playful', intensity: 0.6,
+      target: 'user', concept: 'invented continuation', body: sceneBody('base'), idleScenes: preparedScenes() }; } });
+  try {
+    activity.update('working'); activity.event(normalizeHook({ session_id: 's', turn_id: 't',
+      hook_event_name: 'UserPromptSubmit', prompt: 'hello' })); activity.tick();
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+    activity.update('idle'); activity.tick();
+    for (now = 1000; now <= 300000; now += 1000) activity.tick();
+    expect(calls).toBe(1); expect(activity.planner.idleScenes.played).toBeGreaterThan(4);
+    expect(activity.source).toBe('idle-scene');
+    expect(activity.planner.idleInference).toBe(false);
+  } finally { activity.close(); }
+});
+it('manual replacement and cancel cannot accidentally restore a previous idle scene', () => {
+  let now = 0; const submitted = [];
+  const engine = { state: {}, express(value) { submitted.push(value); return { status: 'accepted' }; },
+    cancel() { submitted.push('cancelled'); return { status: 'cancelled' }; } };
+  const activity = paneActivity(engine, {}, async () => ({}), { enabled: false }, { now: () => now });
+  try {
+    activity.express({ body: sceneBody('base'), idleScenes: preparedScenes() });
+    activity.update('idle'); activity.tick(); now = 10000; activity.tick();
+    expect(activity.source).toBe('idle-scene');
+    const replacement = sceneBody('replacement'); activity.express({ body: replacement });
+    expect(submitted.at(-1).body).toBe(replacement);
+    activity.cancel(); expect(submitted.at(-1)).toBe('cancelled');
+    expect(activity.planner.idleScenes.available).toBe(0);
+  } finally { activity.close(); }
+});
+it('preserves authored scene movement after thirty seconds of idle instead of freezing it', () => {
+  let now = 0;
+  const engine = new TerminalEngine(() => now), body = new InteractionBody(engine, () => now);
+  const scenes = preparedScenes().slice(0, 1);
+  scenes[0].body.children[0].children[0].parts[0].motion = { pivot: [0, 0, 0],
+    translate: [0.2, 0, 0], rotate: [0, 0, 0.2], periodMs: 4000, phase: 0 };
+  try {
+    engine.express({ body: sceneBody('base') });
+    body.idle.install(sceneBody('base'), null, scenes); body.tick('idle');
+    for (now = 500; now <= 61000; now += 500) { body.tick('idle'); engine.frame(80, 80); }
+    const before = engine.state.particlePositions.slice();
+    now = 61700; body.tick('idle'); engine.frame(80, 80);
+    expect(engine.state.presenceIntent.activity).toBe('idle-scene');
+    expect(engine.state.particlePositions).not.toEqual(before);
+  } finally { engine.dispose(); }
+});
 
 it('preserves thin off-grid pixels when downsampling each Braille dot', () => {
   const pixels = Buffer.alloc(4 * 8 * 3);
@@ -286,4 +391,66 @@ it('renders ambient motion without changing semantic geometry and holds render t
     const frozen = Buffer.from(engine.frame(160, 120));
     now += 5000; expect(engine.frame(160, 120)).toEqual(frozen);
   } finally { engine.dispose(); }
+});
+
+it('renders saturated dots without permanent holes from the ordered matrix or hysteresis', () => {
+  const renderer = new BrailleRenderer();
+  expect(renderer.render(Buffer.alloc(16 * 16 * 3, 255), 16, 16, 8, 4, false, 0))
+    .toBe(Array(4).fill('\u28ff'.repeat(8)).join('\x1b[K\n'));
+});
+it('keeps a constant background empty and clears real disappearance without trails', () => {
+  const renderer = new BrailleRenderer();
+  renderer.render(Buffer.alloc(16 * 16 * 3, 255), 16, 16, 8, 4, false, 0);
+  const empty = renderer.render(Buffer.alloc(16 * 16 * 3, 20), 16, 16, 8, 4, false, 50);
+  expect(empty.replace(/\x1b\[K|\n/g, '').trim()).toBe('');
+});
+it('supports the previous peak-area glyph style as a compatibility option', () => {
+  const pixels = Buffer.alloc(4 * 8 * 3, 20);
+  pixels[(1 * 4 + 1) * 3] = 36; pixels[(7 * 4 + 3) * 3] = 35;
+  expect(new BrailleRenderer({ style: 'peak' }).render(pixels, 4, 8, 1, 1, false, 0)).toBe('\u2801');
+});
+it('reduces threshold chatter without changing the spatial dither pattern each frame', () => {
+  const plain = new BrailleRenderer({ hysteresis: 0 }), stable = new BrailleRenderer({ hysteresis: 0.08 });
+  let previousPlain, previousStable, plainChanges = 0, stableChanges = 0;
+  for (let frame = 0; frame < 40; frame++) {
+    const pixels = Buffer.alloc(16 * 16 * 3, 20);
+    for (let x = 0; x < 16; x++) pixels.fill(255, (15 * 16 + x) * 3, (15 * 16 + x + 1) * 3);
+    const value = Math.round(20 + 235 * Math.pow(8.5 / 16, 1 / 1.5)) + (frame % 2 ? 2 : -2);
+    pixels.fill(value, 3, 6);
+    const a = plain.render(pixels, 16, 16, 8, 4, false, frame * 50);
+    const b = stable.render(pixels, 16, 16, 8, 4, false, frame * 50);
+    if (previousPlain !== undefined) { plainChanges += a !== previousPlain; stableChanges += b !== previousStable; }
+    previousPlain = a; previousStable = b;
+  }
+  expect(plainChanges).toBeGreaterThan(20);
+  expect(stableChanges).toBeLessThan(plainChanges / 2);
+});
+it('smooths exposure and resets its history for a new viewport or resumed session', () => {
+  const renderer = new BrailleRenderer();
+  renderer.render(Buffer.alloc(16 * 16 * 3, 255), 16, 16, 8, 4, false, 0);
+  const original = renderer.exposure;
+  renderer.render(Buffer.alloc(16 * 16 * 3, 130), 16, 16, 8, 4, false, 50);
+  expect(renderer.exposure).toBeLessThan(original);
+  expect(renderer.exposure).toBeGreaterThan(0.6);
+  renderer.render(Buffer.alloc(16 * 16 * 3, 130), 16, 16, 8, 4, false, 5000);
+  expect(renderer.exposure).toBeLessThan(0.5);
+  renderer.render(Buffer.alloc(8 * 8 * 3, 255), 8, 8, 4, 2, false, 5050);
+  expect(renderer.ink).toHaveLength(64);
+  expect(renderer.exposure).toBeGreaterThan(0.9);
+});
+it('keeps hue on red and blue input instead of requiring a green signal', () => {
+  for (const channel of [0, 2]) {
+    const pixels = Buffer.alloc(8 * 8 * 3);
+    for (let i = channel; i < pixels.length; i += 3) pixels[i] = 255;
+    const output = new BrailleRenderer().render(pixels, 8, 8, 4, 2, true, 0);
+    expect(output).toContain(channel === 0 ? '\x1b[38;2;255;0;0m' : '\x1b[38;2;0;0;255m');
+  }
+});
+it('shows an optional caption only inside the pane and clips wide text without terminal controls', async () => {
+  let output = '';
+  await drawFrame({ pixels: Buffer.alloc(8 * 8 * 3), size: { width: 8, height: 8, columns: 4, rows: 2 },
+    mode: 'braille', title: 'test', caption: '\x1b你好世界', output: { write(text) { output += text; } } });
+  expect(output).toContain(' 你');
+  expect(output).not.toContain('世界');
+  expect(output).not.toContain('\x1b你好');
 });

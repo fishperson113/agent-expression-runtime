@@ -6,7 +6,7 @@ import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { herdrCall, selectAgent, graphicsMode } from '../integrations/herdr.mjs';
 import { openControl } from '../integrations/terminal-ipc.mjs';
-import { displaySize, drawFrame } from '../integrations/pane-display.mjs';
+import { displaySize, drawFrame, brailleInfo } from '../integrations/pane-display.mjs';
 import { AgentEventHook } from '../integrations/agent-hooks.mjs';
 import { paneActivity } from '../integrations/planner-bridge.mjs';
 import { inspectInteractionHooks } from '../integrations/interaction-hooks.mjs';
@@ -70,7 +70,7 @@ export async function runPaneSession({ agentPane, call = herdrCall, subscribe = 
     if (message.method === 'stop') { stop(); return { status: 'stopped' }; }
     if (message.method === 'status') return { status: 'attached', agent: agent.agent, agentPane: agent.pane_id,
       rendererPane: own.pane_id, renderer: mode, frames, expressions: commands, shape: engine.state.shape,
-      integration: 'automatic-hooks', activity: activity.status, transitions: activity.transitions,
+      integration: 'automatic-hooks', activity: activity.status, transitions: activity.transitions, rendering: mode === 'braille' ? brailleInfo(output) : undefined,
       eventsConnected: events.connected, interactionHooks: hookStatus(hooks, activity), bodySource: activity.source, planner: activity.planner, swarm: engine.renderer.swarm.info };
     throw Error('unknown_method');
   });
@@ -92,7 +92,7 @@ export async function runPaneSession({ agentPane, call = herdrCall, subscribe = 
       }
       activity.tick(); const size = displaySize(snapshot, own.pane_id), pixels = engine.frame(size.width, size.height);
       await drawFrame({ pixels, size, mode, paneId: own.pane_id, call, output,
-        title: paneTitle(activity, hooks) });
+        title: paneTitle(activity, hooks), caption: activity.planner.idleScenes?.caption, reset: frames === 0 });
       frames++; await delay(50);
     }
     return 0;

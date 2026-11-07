@@ -6,7 +6,7 @@
 
 Báo cáo trả lời câu hỏi: **Fisch đang xây dựng trên những ý tưởng nào, đã áp dụng đến đâu, và còn điều gì phải tự kiểm chứng?** Đây là tài liệu lưu dấu quyết định thiết kế, không phải một systematic literature review hay tuyên bố về tính mới học thuật.
 
-Tại thời điểm viết, nền Git là `cd48ad0` trên `main`; các thay đổi về continuous presence và generated performance đang ở working tree, chưa commit/push. Remote `origin/main` được kiểm tra trực tiếp và cũng ở `cd48ad0`.
+Đợt continuous presence, generated performance và sửa lấy mẫu Braille theo vùng đã được commit/push tại `193fa15` trên `main` trong phiên làm việc này. Phần tone-mapping và idle scenes cập nhật ở mục 10 được phát triển tiếp trên mốc đó; trạng thái commit/push của đợt tiếp theo cần xem trong Git. Phụ lục giữ các ghi chép lịch sử từ nền `cd48ad0`.
 
 Ba loại liên hệ được phân biệt trong báo cáo:
 
@@ -198,6 +198,81 @@ Cần kiểm chứng tiếp: độ rõ ở kích thước Braille thực tế; m
 Khi thêm nguồn mới, ghi rõ phát hiện của nguồn, phạm vi đã đọc, ảnh hưởng cụ thể đến quyết định và đường dẫn code tương ứng. Khi tái sử dụng code/assets, bổ sung commit/version cùng thông tin license riêng. Khi có đánh giá người dùng, ghi protocol, số người tham gia, điều kiện renderer và kết quả, thay vì thay thế chúng bằng test tự động.
 
 Phụ lục giữ lại nhật ký và kế hoạch của đợt nâng cấp đầu tiên để bảo toàn lịch sử. Các mốc cũ bên trong phụ lục cần được đọc theo thời điểm, không thay cho trạng thái tổng hợp ở trên.
+
+## 10. Cập nhật: Braille theo thời gian và idle scene tự do
+
+### 10.1. Phạm vi yêu cầu và lựa chọn của người dùng
+
+Người dùng bổ sung ghi chú nghiên cứu về tone-mapping, dithering và animation; đồng thời phản hồi rằng một khuôn mặt với một động tác lặp lại chưa đủ sinh động. Lựa chọn đã xác nhận: **không gọi model khi idle**, chỉ diễn trong pane bằng hình/chuyển động hoặc chữ ngắn, không thông báo ngoài pane và không âm thanh.
+
+Các con số trong ghi chú người dùng là kết quả do người dùng cung cấp, chưa được tái lập nguyên trạng. Baseline mới của project là area-peak sampler trong `193fa15`, khác baseline lấy một pixel được ghi chú nêu. Không gán sẵn mức giảm nhấp nháy 40% cho bản mới.
+
+### 10.2. Nghiên cứu bổ sung
+
+| Nguồn chính | Điều được kiểm tra | Liên hệ và giới hạn |
+| --- | --- | --- |
+| [R12 — dapple](https://github.com/queelius/dapple) | Nhiều backend terminal, preprocessing contrast/gamma/dither và capability detection | Hữu ích để phân biệt preprocessing với encoding. Chưa xác minh xếp hạng “autocontrast tác động lớn nhất” trong một benchmark độc lập |
+| [R13 — Scalar Spatiotemporal Blue Noise Masks, EGSR 2022](https://www.ea.com/technology/news/egsr-2022-blue-noise) | Phân bố noise trong không gian/thời gian, ổn định khi temporal filtering | Không suy ra rằng đổi noise mask mỗi frame sẽ làm Braille ổn định hơn; terminal hiện không có TAA. Bản này dùng Bayer cố định, không tích hợp STBN assets |
+| [R14 — ASCII characters are not pixels](https://alexharri.com/blog/ascii-rendering) | Sampling theo hình dạng glyph và tăng tương phản ranh giới | Là hướng tham khảo cho glyph matching. Chưa chạy thuật toán đó trên particle của Fisch, nên chưa kết luận hơn/kém Braille |
+| [R15 — Chafa configuration API](https://hpjansson.org/chafa/ref/chafa-ChafaCanvasConfig.html), [release 1.16.0](https://github.com/hpjansson/chafa/releases/tag/1.16.0) | Preprocessing, symbol maps, dithering, nhiều đường xuất terminal | Giữ làm baseline/tùy chọn sau; không thêm dependency Chafa trong đợt này |
+| [R16 — Unicode 16, Chapter 22](https://www.unicode.org/versions/Unicode16.0.0/core-spec/chapter-22/) | Các nhóm ký hiệu đồ họa legacy/terminal | Không bật octant mặc định khi chưa kiểm tra font và Herdr thực tế. Không khẳng định tình trạng tương thích của mọi terminal |
+
+Tên `img2dots` trong ghi chú chưa được nối chắc chắn với một repository/phiên bản nguồn chính, nên pipeline cụ thể gán cho nó chưa được dùng làm bằng chứng độc lập ở đây. Floyd–Steinberg không được chọn cho đường animation mặc định; ảnh hưởng khuếch tán không gian là lý do kỹ thuật để cân nhắc, nhưng đợt benchmark bên dưới không chạy implementation Floyd–Steinberg.
+
+### 10.3. Pipeline Braille được triển khai
+
+Implementation mới: [braille-renderer.mjs](../integrations/braille-renderer.mjs), được [pane-display.mjs](../integrations/pane-display.mjs) giữ riêng một instance theo output/session.
+
+1. Tính signal trên toàn footprint của mỗi chấm. Dùng mean density cộng 25% peak để bảo vệ nét mảnh; tách nền tối cố định của renderer trước khi tính signal. Noise floor vẫn tồn tại để không khuếch đại nền, nhưng không còn dùng một ngưỡng sáng cố định làm quyết định on/off cho mọi chấm.
+2. Tính phân vị 98% trên signal foreground, làm mượt exposure khoảng 450 ms. Đây là lựa chọn kỹ thuật của project; foreground percentile giúp không lấy phân vị bằng zero khi vật thể chỉ chiếm ít diện tích.
+3. Áp lũy thừa 1,5 lên density chuẩn hóa để phân biệt vùng dày và lớp vỏ thưa. Đây là đường cong density mang tính trình bày, không phải tuyên bố hiệu chỉnh gamma vật lý chính xác của terminal.
+4. So với Bayer 4 × 4 cố định theo tọa độ. Thêm hysteresis 0,10; signal biến mất thật thì chấm tắt ngay, không giữ trail trên nền rỗng.
+5. Giữ hue, làm mượt màu ô khoảng 120 ms rồi lượng tử hóa ANSI color. Reset history khi đổi viewport, tiếp tục sau một khoảng ngắt dài hoặc bắt đầu session mới. Gửi cả frame Braille trong một lần write để tránh chia header/body thành hai đợt output.
+
+API `brailleFrame` vẫn dùng được cho ảnh đơn. Animation cần giữ `BrailleRenderer` qua các frame; live `drawFrame` đã làm điều đó. Sự ổn định được kiểm tra riêng bằng input tĩnh, near-threshold chatter, blank-frame clearing và reset viewport; không chỉ dựa trên animation có chuyển động thật.
+
+Style mặc định là `adaptive`. Có thể đặt biến môi trường khi khởi chạy `FISCH_BRAILLE_STYLE=peak` để giữ glyph density theo area-peak trước đây; đây là lựa chọn về trình bày, không thay geometry, scene hay số lần gọi model. Biến này hiện đọc từ môi trường shell, không từ `.env`.
+
+`fisch status` có `rendering` để kiểm tra style đang thực sự chạy, exposure, viewport và số lit dots. Đây là metadata để đối chiếu live với video; không phải điểm đánh giá thẩm mỹ.
+
+### 10.4. Benchmark trên hình động
+
+Fixture là hai geometry native Codex đã ghi trong `docs/evidence/interaction-smoke.json`, không phải ảnh nguồn của một thư viện khác. Mỗi trường hợp có 20 warmup frame và 100 frame đo ở 20 FPS. Tất cả variant nhận đúng cùng RGB frame, camera, particle count và thời điểm.
+
+Metric chính: tổng số ô có mask thay đổi chia cho tổng số ô có hình trong union của hai frame liên tiếp. Nó bao gồm pulse, boids và chuyển động có chủ ý; không đo riêng “flicker không mong muốn” hay preference. Cũng lưu active-dot change, độ phủ và thời gian chuyển đổi để không che mất tradeoff.
+
+| Fixture / pane | Baseline area-peak hiện tại | Tone + Bayer + hysteresis | Giảm tương đối theo metric ô |
+| --- | --- | --- | --- |
+| Praise / 40 × 14 | 26,4% | 16,5% | khoảng 38% |
+| Frustration / 40 × 14 | 16,7% | 10,4% | khoảng 38% |
+| Praise / 87 × 43 | 44,7% | 33,5% | khoảng 25% |
+| Frustration / 87 × 43 | 27,9% | 21,7% | khoảng 22% |
+
+Đây là mẫu ngắn trên hai fixture, không phải bảo đảm giảm 40% cho mọi scene. Tone-mapping chủ động giảm độ phủ lớp vỏ; với metric bit-dot đã chuẩn hóa, một số trường hợp pane nhỏ có tỷ lệ thay đổi cao hơn baseline dày đặc. Vì vậy không suy ra mọi metric hoặc mọi chi tiết đều tốt hơn. Cần người dùng so sánh độ đọc được của hình và độ phân tâm thực tế.
+
+Số liệu đầy đủ: `.runtime/braille-animation-benchmark.json`; script tái tạo: `.runtime/benchmark-braille.mjs`. Thời gian đo local, có lúc chạy đồng thời với test/build, không phải benchmark cách ly để chứng nhận performance. Preview ban đầu ở `.runtime/braille-animation-contact.png` được tạo trước lần cân bằng 25% peak cuối cùng; xem video/demo mới khi đánh giá cấu hình cuối.
+
+### 10.5. Idle phát triển bằng nội dung đã chuẩn bị
+
+Schema model có thêm `idleScenes`: tối đa ba cảnh, mỗi cảnh có ID tự do, thời điểm đủ điều kiện, caption tùy chọn và geometry program riêng. Model chuẩn bị các cảnh trong **cùng lần phản ứng với tương tác thật**; không tạo request theo timer idle. Caption được kiểm tra control characters và clip theo bề rộng pane. Không có gửi chat, âm thanh hay notification API trong director.
+
+[IdleScenes](../integrations/idle-scenes.mjs) đổi toàn bộ assembly theo thời gian idle/done, ưu tiên cảnh eligible ít được phát gần đây, tránh lặp ngay và có khoảng nghỉ 22–33 giây. Khi phát lại, runtime chỉ thay nhịp và phase trong giới hạn motion đã được model khai báo, giữ nguyên geometry/pivot/amplitude và không sửa dữ liệu gốc. Không có danh mục “wink”, “wave”, “BRB” hoặc phân loại anatomy trong production code.
+
+Khi user quay lại/working, khôi phục program tương tác và flow trước cảnh idle. Tin nhắn mới, manual replacement và cancel xóa scene continuation cũ đúng thứ tự. Cảnh lỗi bị bỏ qua, không retry mỗi frame. Authored motion của cảnh idle được giữ hoạt động sau mốc 30 giây; không bị policy settling cũ đóng băng. Motion-off chặn chuyển sang cảnh mới.
+
+Một lần chạy Codex thật trong trạng thái working đã tạo hình chính phi khuôn mặt và hai cảnh khác trong khoảng 44 giây, bên trong deadline 45 giây nhưng rất sát giới hạn. Tên và ý tưởng cảnh do model chọn. Đây không phải latency guarantee; tăng độ phong phú output vẫn có rủi ro timeout, cần tiếp tục tối ưu.
+
+Giới hạn quan trọng: số cảnh và nội dung là hữu hạn trong mỗi lượt. Playback local có thể biến tấu, nhưng không tự sáng tạo ngữ nghĩa/geometry hoàn toàn mới mãi mãi khi đã cấm idle inference. Tương tác thật tiếp theo có thể chuẩn bị một tập cảnh mới. Nếu model trả `idleScenes: []` hoặc generation thất bại, vẫn có fallback presence nhưng không có cảnh mới để phát.
+
+Cache cảnh hiện chỉ nằm trong RAM. Một lần khởi chạy mới chưa nhận tương tác thật sẽ có fallback ban đầu; không tự nạp fixture đánh giá thành thư viện gesture hay gọi model lúc idle để lấp cache.
+
+### 10.6. Kiểm chứng và phần tiếp theo
+
+Full suite đã đạt 195 test sau khi thêm biến tấu phase/tempo và style tương thích. Sau khi gộp test renderer vào file idle-planner để giữ change set trong giới hạn mười file, nhóm regression renderer/idle/pane 48 test đã pass. Build và architecture boundary check đã pass. Test bao phủ việc phát nhiều geometry mà không tăng model calls, không bỏ sót scene eligible, restore/clear, caption injection, motion-off, rejected scenes và chuyển động sau hơn 30 giây idle.
+
+Demo `.runtime/idle-evolution-demo.mp4` dùng cùng nguồn RGB ở hai nửa so sánh renderer và phát cảnh do native model đã chuẩn bị. Timeline demo được ghi rõ ở tốc độ 2×: 120 giây mô phỏng thành 60 giây video, có giai đoạn working → idle → quay lại working. `.runtime/idle-demo-protocol.json` ghi số cảnh và kiểm tra không có inference trong playback. Artifact `.runtime/` vẫn ignored và không đi theo push Git thông thường.
+
+Các hướng chưa triển khai: chiếu particle trực tiếp lên lưới dot, giữ group/importance metadata tới bước raster, benchmark Chafa/octant/blue-noise với font thật, đo native terminal output/backpressure và đánh giá dài với người dùng. Nếu thêm importance, phải do model/host khai báo tường minh; không suy ra mắt/miệng từ tên part. Direct projection cần được đối chiếu về silhouette, motion continuity và chi phí, không mặc định tốt hơn chỉ vì ít một bước sampling.
 
 <details>
 <summary>Phụ lục — Nhật ký research, triển khai và kế hoạch nâng cấp gốc</summary>
