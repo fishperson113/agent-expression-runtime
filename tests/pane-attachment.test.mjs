@@ -71,7 +71,7 @@ it('automatically follows agent events without prompts or expression tool calls 
     return { connected: true, close() { closed = true; } };
   };
   try {
-    expect(await runPaneSession({ call, subscribe, output: { write() { rendered++; } } })).toBe(0);
+    expect(await runPaneSession({ call, subscribe, installHooks: () => ({ installed: true }), output: { write() { rendered++; } } })).toBe(0);
     await pending;
     expect(closed).toBe(true); expect(rendered).toBeGreaterThan(2);
     await expect(sendControl('status', {}, codex.pane_id)).rejects.toThrow('No Fisch body');
