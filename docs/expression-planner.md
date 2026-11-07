@@ -1,33 +1,42 @@
 # Contextual expression planner
 
-Run `fisch run` beside your existing Codex or Claude pane. Fisch keeps immediate status reflexes and runs a separate, noninteractive planner process for context-sensitive expressions. The original agent receives no prompt or tool instruction. No browser or interactive agent window is opened.
+Run `fisch run` beside your existing Codex or Claude pane. Fisch observes agent status and recent terminal context automatically; the main agent needs no Fisch tool calls. No browser or interactive agent window opens.
 
-Default backend selection follows the attached agent: `codex exec` or `claude -p`. It uses the CLI's existing authentication, with no separate API key required. This is a new background inference process, not access to the main agent's hidden reasoning or reuse of its in-memory conversation. It consumes provider usage under the CLI account and can incur charges according to that account's plan.
+The native backend follows the attached agent: a persistent `codex app-server --stdio` process, or `claude -p`. Both use existing CLI authentication. This is separate inference, not access to the main agent's hidden reasoning or in-memory conversation. Provider usage and account charges still apply. An external API is optional.
 
-## Data and timing
+## Context and timing
 
-Fisch reads up to 32 recent unwrapped terminal lines from the selected agent pane, clips the cleaned excerpt to 6,000 characters, and includes the current activity status. It does not read transcript files or another pane. Common credential patterns are redacted, but arbitrary terminal output can still contain sensitive data. Context is sent through process stdin, not command arguments, and is not written by Fisch to logs or conversation files. CLI/provider behavior and retention policies still apply.
+Fisch reads up to 32 recent unwrapped lines from the selected agent pane, clipped to 6,000 characters. Common credentials are redacted, but arbitrary terminal output can contain sensitive data. Context travels through process stdin rather than command arguments. Fisch does not save these excerpts to conversation files; CLI/provider retention policies still apply.
 
-Context is sampled at most every two seconds. Unchanged context creates no model call. Native planning also waits for a two-second quiet context window; changing terminal clocks are filtered. Native planner requests are spaced at least 30 seconds apart and time out after 45 seconds. The visible body continues rendering while inference runs. A status or captured context change aborts obsolete in-flight inference and queues the latest context; stale results cannot overwrite the current expression. Ordinary terminal text updates do not reset an already admitted plan. A real agent status change still cancels its motion and applies the new status reflex immediately. During working, completion of a plan does not force another model request.
+Context is sampled at most every two seconds. Native planning uses a 750 ms quiet window, at least eight seconds between requests and a 45-second deadline. Terminal updates coalesce into the latest queued context instead of repeatedly killing inference. Working-to-idle/done transitions accept the same turn's pending result. New work, interruption and manual control invalidate obsolete jobs. Rendering continues throughout.
 
-The model returns a bounded JSON expression: at most four sequential beats, each containing up to three parallel morph/assembly/flow/shape-quality primitives. Beat durations are 200–1,500 ms. Shapes and fields come from the shared capability manifest. A small planner guard and the existing compiler validate the result before admission. Invalid JSON, conflicting properties, refusal, missing CLI/login and timeouts preserve the reflex layer. Plans illustrate communicative context, not evidence of private emotions.
+Codex keeps one process warm with fresh ephemeral threads. Generation still takes seconds: a live signed-in call with the current schema took about 13 seconds. Local repertoire playback supplies immediate motion while the model runs. Keeping a process warm does not guarantee faster generation.
+
+## Geometry and repertoire
+
+Model output contains a short concept label and a bounded AST with at least one assembly. Up to four sequential beats may each contain three parallel primitives, lasting 200–1,500 ms per beat. The prompt asks for coherent silhouettes, independent part motion and concepts different from recent history. Schema guards and the compiler reject invalid geometry or property conflicts. Failure preserves the current body or bootstrap reflex. See [swarm geometry](swarm-geometry.md).
+
+Up to eight distinct model-authored compositions are retained locally. Idle/done rotates them every 12 seconds; working rotates them every 18 seconds. These are local engine submissions, not fresh AI decisions. Ordinary working/idle transitions preserve geometry and adjust brightness instead of resetting to sphere/cloud/wall. An empty repertoire uses status reflexes until the first valid assembly arrives.
+
+The ignored `.runtime/repertoire.json` stores bounded geometry ASTs and concept labels, without terminal excerpts or credentials. Restarting restores these forms immediately. Set `FISCH_REPERTOIRE_CACHE=off` to keep only an in-memory repertoire. Geometry fingerprints deduplicate near-identical forms; semantic originality is not guaranteed.
+
+Unchanged idle/done context becomes eligible for a fresh model plan after 60 seconds, including after failures. This consumes provider inference while idle. Manual expressions/cancellation pause automatic activity until the next status change or ten seconds before it can resume. Closing Fisch stops inference and replay.
 
 ## Configuration
 
-No configuration is needed for native CLI planning. Optional settings are read from the checkout's ignored `.env` file, with environment variables taking precedence:
+No settings are needed for native CLI planning. Optional settings come from the checkout's ignored `.env`, with environment variables taking precedence:
 
 ```dotenv
 FISCH_PLANNER_BACKEND=codex
 # Alternatives: claude, api, off
-# Optional model override; otherwise the CLI selects its default model.
 # FISCH_PLANNER_MODEL=your-model
-# Optional executable or JavaScript CLI path, without shell arguments.
 # FISCH_PLANNER_COMMAND=/absolute/path/to/codex
+# FISCH_REPERTOIRE_CACHE=off
 ```
 
-`fisch status` includes planner backend, mode, attempts, applied plans, stale results discarded, a sanitized error code, the last admitted AST and its admission timestamp. The pane header and `bodySource` show whether the last automatic body program came from `reflex` or `planner`; admission is not a claim about how long it remained visible. `off` keeps automatic status reflexes without reading terminal context or starting an inference process. API credentials alone never switch the backend to API.
+`fisch status` reports attempts, fresh `applied` plans, discarded results, sanitized errors, the last AST/concept, repertoire size/play count and process/request counts. `bodySource` distinguishes `reflex`, `repertoire`, `planner` and manual control. Admission counters do not certify human recognition. Backend `off` retains status reflexes without reading context or starting inference. API credentials alone never select the API backend.
 
-Native Codex runs ephemeral, outside the repository in a temporary scratch directory, with user configuration ignored but its normal authentication retained. It uses read-only sandboxing and disables shell, apps, plugins, hooks, multi-agent, browser/computer and image features. It does not inherit custom user model providers from `config.toml`. Claude runs without built-in tools, external MCP configurations or session persistence and does not load settings sources. Neither path relaxes approvals or edits the main agent's configuration. These flags require compatible recent CLI versions; unsupported versions fall back to status reflexes.
+Codex runs outside the repository in a temporary scratch directory, with normal authentication/configuration retained. Configured MCP servers, shell, apps, plugins, hooks, multi-agent, browser/computer and image features are disabled. Threads are ephemeral, read-only and receive planner instructions instead of repository instructions. See the official [Codex app-server protocol](https://developers.openai.com/codex/app-server). Claude remains a separate tool-free, nonpersistent process per request, without external MCP configuration or settings sources. Neither path edits the main agent's configuration. Compatible recent CLI versions are required; failed inference leaves local animation running.
 
 ## Optional API backend
 
@@ -38,20 +47,8 @@ FISCH_PLANNER_URL=https://api.openai.com/v1/responses
 OPENAI_API_KEY=your-private-key
 ```
 
-Keep keys out of chat and Git. The optional transport uses the [Responses structured-output format](https://developers.openai.com/api/docs/guides/structured-outputs), with `store: false`. A compatible local Responses endpoint may use HTTP on localhost and omit a key. Other endpoints require HTTPS. `FISCH_PLANNER_API_KEY` supplies credentials for a custom endpoint; the OpenAI key is never automatically forwarded to another hostname. API requests have a four-second deadline and ten-second minimum spacing.
+Keep keys out of chat and Git. The transport uses [Responses structured output](https://developers.openai.com/api/docs/guides/structured-outputs) with `store: false`, a four-second deadline and five-second minimum spacing. Localhost endpoints may use HTTP without a key; other endpoints require HTTPS. `FISCH_PLANNER_API_KEY` supplies custom endpoint credentials. OpenAI credentials are never automatically forwarded to another hostname.
 
 ## Verification and limits
 
-Automated tests cover context throttling/redaction, stale-result rejection after status or context changes, timeouts, invalid plans, real child-process stdin/cancellation, CLI flags and bounded HTTP responses. A live signed-in Codex process returned a three-beat plan accepted by the compiler in about 14 seconds. Live Claude inference and human assessment of contextual expressiveness remain unverified. Terminal context is lossy and includes tool output; this first implementation does not provide typed user-message or work-phase events. Braille also cannot establish subtle perceptual differences.
-
-## Idle expression lifecycle
-
-Both Herdr `idle` and `done` mean the agent is waiting. In these states the planner can generate ambient expressions even when the terminal excerpt is unchanged or empty. After an inference finishes, unchanged idle context becomes eligible for a fresh plan after 60 seconds; normal backend spacing and the context debounce still apply. Failures also wait 60 seconds before an idle retry. This uses provider inference while the agent is idle, typically no more than about one refresh per minute for unchanged context.
-
-Between model requests Fisch replays the current admitted idle plan every 12 seconds, leaving quiet pauses between short gestures. These replays are local engine submissions, not new AI decisions. `idleCycles` counts scheduled idle refreshes, `idleReplays` counts admitted local replays, and `applied` counts fresh model plans. `lastReplayAt` is separate from `lastAppliedAt`.
-
-Idle instructions ask for breathing, a small stretch, a curious sway or a lingering conversational tone, with gentle variation from `previousPlan`. They must not invent a new user message, work item or error. A real agent status change cancels idle motion and any stale inference immediately. A changed context invalidates the replay candidate until a fresh plan is admitted. An accepted manual expression or cancellation pauses idle refresh/replay until context or status changes; closing Fisch stops both. Setting the planner backend to `off` keeps status reflexes and creates no idle model calls.
-
-Clock-controlled regressions cover unchanged and empty idle context, `done`, refresh cadence, replay without inference, failure backoff, cancellation, close and resuming work. A real signed-in Codex process also produced an accepted plan for a synthetic idle scenario; this does not certify a real idle transition or human perception.
-
-Geometry planning: `assemble` lets the model invent multipart silhouettes and per-part motion. See [swarm geometry](swarm-geometry.md) for the data model, identity rules, budgets and limitations.
+Tests cover throttling/redaction, coalescing, invalidation, timeouts, malformed plans, child-process cancellation, bounded RPC/HTTP, fresh ephemeral threads, cache restoration/deduplication and preserved geometry across working/idle transitions. Live signed-in Codex inference is verified; live Claude inference and human assessment of expressiveness remain unverified. Terminal context is lossy and includes tool output. Braille has lower detail than WebGL and cannot establish subtle perceptual differences. Plans communicate context; they are not evidence of private emotions.

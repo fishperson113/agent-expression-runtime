@@ -27,6 +27,7 @@ it('reuses one Codex process with fresh ephemeral threads, no MCP tools and stru
     const thread = calls.find(call => call.method === 'thread/start').params;
     expect(thread).toMatchObject({ ephemeral: true, approvalPolicy: 'never', config: { mcp_servers: { external: { enabled: false } } } });
     expect(calls.filter(call => call.method === 'thread/unsubscribe')).toHaveLength(2);
+    expect(calls.find(call => call.method === 'turn/start').params.sandboxPolicy).toEqual({ type: 'readOnly' });
   } finally { client.close(); }
 });
 it('exchanges bounded RPC records with a real background process', async () => {

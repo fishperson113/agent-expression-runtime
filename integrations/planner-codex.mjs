@@ -56,7 +56,7 @@ export class WarmCodexPlanner {
     signal.addEventListener('abort', abort, { once: true });
     try {
       const result = await this.rpc.request('turn/start', { threadId: thread.id, effort: 'low', summary: 'none',
-        sandboxPolicy: { type: 'readOnly', access: { type: 'restricted', includePlatformDefaults: true, readableRoots: [this.directory] } },
+        sandboxPolicy: { type: 'readOnly' },
         input: [{ type: 'text', text: JSON.stringify(context) }], outputSchema: planSchema });
       job.turnId = result.turn.id; if (signal.aborted) abort();
       return await promise;

@@ -32,11 +32,13 @@ Optional per-part motion independently applies periodic translation and Euler ro
 {"pivot":[0,-0.7,0],"translate":[0,0.03,0],"rotate":[0,0,0.06],"periodMs":4000,"phase":0}
 ```
 
-Translation amplitudes are bounded to ±0.4, rotation amplitudes to ±0.6 radians, and periods to 1–10 seconds. Part motion continues after the assemble transition completes. Cancellation freezes it at the current pose. Agent status changes retain their preemption priority.
+Translation amplitudes are bounded to ±0.4, rotation amplitudes to ±0.6 radians, and periods to 1–10 seconds. Part motion continues after the assemble transition completes. Cancellation freezes it at the current pose. Ordinary working/idle status changes preserve admitted geometry when a composition repertoire is available.
 
 Keep IDs, kinds, weights and curve point counts stable between consecutive poses. Declaration order is irrelevant. The engine reuses the particle-to-part mapping for that topology. Different topologies receive a deterministic spatial Morton-order assignment. Each particle retains its identity, and interrupted transitions start at its current geometry position. Primitive/assembly transitions share this path after the first assembly.
 
-Spatial assignment is approximate, not globally optimal transport; paths can cross. There is no collision avoidance, contact physics, joint solver, arbitrary mesh loader, shader injection or generated executable code. Connected parts need consistent coordinates and pivots from the model. This is a kinematic composition system inspired by a microbot swarm, not a physical simulation.
+Both native and WebGL rendering now use target-aware boids after geometry sampling. Attraction to assigned targets dominates; mild separation, alignment and target-relative cohesion add flock motion without pulling a hand or face into a generic flock. Neighbours belong to the same part. A spatial grid limits each particle to 32 candidate checks and eight neighbours; timestep subdivision, damping and a speed cap bound long-frame behaviour. Reduced motion bypasses steering. `fisch status` exposes particle count, neighbour checks and mean target error under `swarm`.
+
+Spatial assignment is approximate, not globally optimal transport; paths can cross. Separation is visual steering, not guaranteed collision avoidance. There is no contact physics, joint solver, arbitrary mesh loader, shader injection or generated executable code. Connected parts need consistent coordinates and pivots from the model. This is a kinematic composition system inspired by a microbot swarm, not a physical simulation.
 
 ## Planner and verification
 

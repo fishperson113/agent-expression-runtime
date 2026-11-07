@@ -1,0 +1,63 @@
+{
+  "recordedAt": "2026-11-07T02:43:13.668Z",
+  "live": {
+    "activity": "working",
+    "shape": "assembled",
+    "bodySource": "planner",
+    "renderer": "braille",
+    "planner": {
+      "mode": "planning",
+      "attempts": 7,
+      "applied": 6,
+      "discarded": 0,
+      "queued": false,
+      "error": null,
+      "lastAppliedAt": "2026-11-07T02:43:02.984Z",
+      "idleCycles": 0,
+      "idleReplays": 0,
+      "lastReplayAt": "2026-11-07T02:43:00.106Z",
+      "repertoire": {
+        "size": 8,
+        "cache": true,
+        "cacheError": null,
+        "recentConcepts": [
+          "An angular plumb gauge steadies a suspended pointer above a reference plate, ev描",
+          "A compact microscope gently adjusts its lens above a steady stage, expressing a_",
+          "Three ascending test steps carry a gently settling checkmark: verified progress,",
+          "A compact bridge carries a gently rocking test carriage, expressing careful work",
+          "A joinery clamp gently tightens around a fitted beam: integration holding steady"
+        ]
+      },
+      "repertoirePlays": 2,
+      "lastConcept": "An angular plumb gauge steadies a suspended pointer above a reference plate, ev描",
+      "transport": {
+        "type": "persistent-codex",
+        "starts": 1,
+        "requests": 7
+      },
+      "backend": "codex"
+    },
+    "swarm": {
+      "mode": "target-boids",
+      "particles": 2000,
+      "neighbourChecks": 27483,
+      "maxChecksPerParticle": 32,
+      "meanTargetError": 0.00008064020993277261
+    }
+  },
+  "verification": {
+    "windowsTests": 143,
+    "linuxTests": 143,
+    "rustTests": 12,
+    "build": true,
+    "architecture": true,
+    "webglSmoke": true,
+    "isolatedNativeInferenceMs": 12978,
+    "humanRecognition": "not-assessed"
+  },
+  "notes": [
+    "Local repertoire playback is not fresh inference.",
+    "Warm process reuse does not guarantee faster generation.",
+    "Native renderer is Braille on this Herdr build."
+  ]
+}
