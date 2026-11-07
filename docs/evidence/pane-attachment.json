@@ -1,15 +1,23 @@
 {
-  "timestamp": "2026-11-06T23:54:30.650Z",
+  "timestamp": "2026-11-07T00:14:54.565Z",
   "status": {
     "status": "attached",
     "agent": "codex",
     "agentPane": "w4:pJ",
     "rendererPane": "w4:pK",
     "renderer": "braille",
-    "frames": 347,
-    "expressions": 1,
-    "shape": "sphere"
+    "frames": 1719,
+    "expressions": 0,
+    "shape": "cloud",
+    "integration": "automatic-hooks",
+    "activity": "working",
+    "transitions": 1,
+    "eventsConnected": true
   },
+  "hookSource": "Herdr pane.agent_status_changed",
+  "nativeProviderHooksInstalled": false,
+  "agentPromptsSent": 0,
+  "manualExpressionsSent": 0,
   "agents": [
     {
       "pane_id": "w4:pJ",
