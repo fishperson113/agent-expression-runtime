@@ -138,7 +138,7 @@ async function openBody(origin, base, token, headless) {
   try {
     const page = await browser.newPage();
     page.setDefaultTimeout(15000);
-    await page.goto(origin);
+    await page.goto(origin, { waitUntil: 'domcontentloaded' });
     await pairRenderer(page, base, token);
     page.on('domcontentloaded', () => { void pairRenderer(page, base, token).catch(() => {}); });
     return { browser, page };
