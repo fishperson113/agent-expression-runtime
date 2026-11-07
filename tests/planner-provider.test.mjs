@@ -4,9 +4,10 @@ import { plannerConfig, modelPlanner } from '../integrations/planner-provider.mj
 import { paneActivity } from '../integrations/planner-bridge.mjs';
 import { terminalEngine } from '../scripts/pane-session.mjs';
 import { planSchema } from '../integrations/expression-plan.mjs';
+import { normalizeHook } from '../integrations/interaction-events.mjs';
 
 const absent = new URL('../.runtime/no-planner-env', import.meta.url);
-const plan = { concept: 'a playful arch', body: { type: 'sequence', children: [{ type: 'parallel', children: [
+const plan = { mood: 'playful', intensity: 0.5, target: 'user', concept: 'a playful arch', body: { type: 'sequence', children: [{ type: 'parallel', children: [
   { type: 'assemble', parts: [{ id: 'arch', kind: 'curve', points: [[-0.5, 0, 0], [0, 0.5, 0], [0.5, 0, 0]], radius: 0.03 }], durationMs: 200 },
 ] }] } };
 const result = value => ({ status: 'completed', output: [{ content: [{ type: 'output_text', text: JSON.stringify(value) }] }] });
@@ -31,24 +32,26 @@ it('requires explicit model config, protects credentials and permits local infer
   expect(() => plannerConfig({ FISCH_PLANNER_BACKEND: 'api', FISCH_PLANNER_MODEL: 'test', FISCH_PLANNER_URL: 'https://host.invalid/?key=private' }, absent)).toThrow();
   expect(plannerConfig({ FISCH_PLANNER_BACKEND: 'api', FISCH_PLANNER_MODEL: 'test', FISCH_PLANNER_URL: 'https://api.openai.com/v1/responses' }, absent).reason).toBe('missing_api_key');
 });
-it('runs pane context through HTTP structured planning into the actual compiler', async () => {
+it('runs a real user event through HTTP structured planning into the actual compiler without terminal reads', async () => {
   let request;
   const server = createServer(async (req, res) => {
     let text = ''; for await (const chunk of req) text += chunk;
-    request = JSON.parse(text); res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(result(plan)));
+    request = JSON.parse(text); res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify(result({ ...plan, eventId: JSON.parse(request.input).event.id })));
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const engine = await terminalEngine(); let reads = 0;
   const activity = paneActivity(engine, { pane_id: 'agent-pane' }, async (method, args) => {
-    expect(method).toBe('pane.read'); expect(args.pane_id).toBe('agent-pane'); reads++;
-    return { read: { text: 'We found a promising solution. token=private' } };
+    reads++; throw Error('terminal context must not be sampled');
   }, { enabled: true, model: 'fake-local-model', endpoint: `http://127.0.0.1:${server.address().port}/v1/responses` });
   try {
-    activity.update('working'); activity.tick();
+    activity.update('working');
+    activity.event(normalizeHook({ session_id: 's', turn_id: 't', hook_event_name: 'UserPromptSubmit',
+      prompt: 'We found a promising solution. token=private' })); activity.tick();
     for (let i = 0; i < 100 && activity.planner.applied === 0 && activity.planner.mode !== 'fallback'; i++) {
       await new Promise(resolve => setTimeout(resolve, 10));
     }
-    expect(activity.planner.applied).toBe(1); expect(reads).toBe(1);
+    expect(activity.planner.applied).toBe(1); expect(reads).toBe(0);
     expect(request.store).toBe(false); expect(request.text.format.strict).toBe(true);
     expect(request.input).toContain('[REDACTED]'); expect(request.input).not.toContain('private');
     expect(request.model).toBe('fake-local-model');

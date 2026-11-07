@@ -9,6 +9,7 @@ import { openControl } from '../integrations/terminal-ipc.mjs';
 import { displaySize, drawFrame } from '../integrations/pane-display.mjs';
 import { AgentEventHook } from '../integrations/agent-hooks.mjs';
 import { paneActivity } from '../integrations/planner-bridge.mjs';
+import { installInteractionHooks } from '../integrations/interaction-hooks.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 async function bundler() {
@@ -40,22 +41,28 @@ export function capabilities() {
     schema: JSON.parse(readFileSync(resolve(root, 'src/contracts/protocol.schema.json'), 'utf8')),
     instructions: readFileSync(resolve(root, 'integrations/instructions-v1.md'), 'utf8') };
 }
-export async function runPaneSession({ agentPane, call = herdrCall, subscribe = (id, update) => new AgentEventHook(id, update), output = process.stdout, signal } = {}) {
+function sessionAlive(snapshot, own, agent) {
+  return snapshot.panes.some(pane => pane.pane_id === own.pane_id) &&
+    snapshot.agents.some(peer => peer.pane_id === agent.pane_id && peer.agent === agent.agent);
+}
+export async function runPaneSession({ agentPane, call = herdrCall, subscribe = (id, update) => new AgentEventHook(id, update), installHooks = installInteractionHooks, output = process.stdout, signal } = {}) {
   let { snapshot } = await call('session.snapshot');
   const { own, agent } = selectAgent(snapshot, process.env.HERDR_PANE_ID, agentPane);
   let mode = await graphicsMode(call);
   const engine = await terminalEngine();
   const abort = new AbortController(), stop = () => abort.abort();
   const activity = paneActivity(engine, agent, call);
+  const hooks = installHooks(agent);
   let commands = 0, frames = 0;
   const control = await openControl(agent.pane_id, message => {
     if (message.method === 'express') { commands++; return activity.express(message.args); }
+    if (message.method === 'event') return activity.event(message.args);
     if (message.method === 'cancel') return activity.cancel();
     if (message.method === 'stop') { stop(); return { status: 'stopped' }; }
     if (message.method === 'status') return { status: 'attached', agent: agent.agent, agentPane: agent.pane_id,
       rendererPane: own.pane_id, renderer: mode, frames, expressions: commands, shape: engine.state.shape,
       integration: 'automatic-hooks', activity: activity.status, transitions: activity.transitions,
-      eventsConnected: events.connected, bodySource: activity.source, planner: activity.planner, swarm: engine.renderer.swarm.info };
+      eventsConnected: events.connected, interactionHooks: hooks, bodySource: activity.source, planner: activity.planner, swarm: engine.renderer.swarm.info };
     throw Error('unknown_method');
   });
   const events = subscribe(agent.pane_id, status => activity.update(status));
@@ -70,8 +77,7 @@ export async function runPaneSession({ agentPane, call = herdrCall, subscribe = 
     while (!abort.signal.aborted) {
       if (frames % 10 === 0) {
         snapshot = (await call('session.snapshot')).snapshot;
-        if (!snapshot.panes.some(pane => pane.pane_id === own.pane_id) ||
-            !snapshot.agents.some(peer => peer.pane_id === agent.pane_id && peer.agent === agent.agent)) break;
+        if (!sessionAlive(snapshot, own, agent)) break;
         if (mode === 'braille' && frames > 0) mode = await graphicsMode(call);
         activity.update(snapshot.agents.find(peer => peer.pane_id === agent.pane_id).agent_status ?? 'unknown');
       }

@@ -86,6 +86,7 @@ export class TerminalEngine {
     this.compiler.discardDefinitions(); this.scheduler.cancel(this.epoch);
     return { status: 'cancelled' };
   }
+  settle() { this.scheduler.cancel(this.epoch); }
   frame(width: number, height: number) {
     if (width !== this.renderer.width || height !== this.renderer.height) this.renderer.resize(width, height);
     this.scheduler.tick();

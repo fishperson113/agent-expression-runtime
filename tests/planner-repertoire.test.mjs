@@ -6,6 +6,7 @@ import { Repertoire } from '../integrations/planner-repertoire.mjs';
 import { ExpressionPlanner } from '../integrations/expression-planner.mjs';
 import { paneActivity } from '../integrations/planner-bridge.mjs';
 import { TerminalEngine } from '../src/terminal/runtime.ts';
+import { normalizeHook } from '../integrations/interaction-events.mjs';
 
 const body = x => ({ type: 'sequence', children: [{ type: 'parallel', children: [{ type: 'assemble', durationMs: 200,
   parts: [{ id: 'figure', kind: 'curve', points: [[-0.5, x, 0], [0, 0.6, 0], [0.5, x, 0]], radius: 0.03 }] }] }] });
@@ -30,23 +31,26 @@ it('restores geometry-only cache and rejects oversized cache files', () => {
 it('keeps an in-flight working plan relevant when the same turn becomes idle', async () => {
   let resolve; const received = [];
   const planner = new ExpressionPlanner({ engine: { express(value) { received.push(value); return { status: 'accepted' }; } },
-    readContext: async () => 'same conversation', plan: () => new Promise(done => { resolve = done; }) });
-  planner.update('working'); planner.tick(); await planner.reading;
-  planner.update('done'); resolve({ body: body(0), concept: 'arch' }); await planner.job;
+    plan: () => new Promise(done => { resolve = done; }) });
+  const event = normalizeHook({ session_id: 's', turn_id: 't', hook_event_name: 'UserPromptSubmit', prompt: 'hello' });
+  planner.update('working'); planner.accept(event); planner.tick();
+  planner.update('done'); resolve({ eventId: event.id, body: body(0), concept: 'arch' }); await planner.job;
   expect(received).toHaveLength(1); expect(planner.info.discarded).toBe(0); planner.close();
 });
-it('preserves assembled geometry across normal status changes and serves the repertoire without a model call', async () => {
-  let now = 0, text = 'current topic', calls = 0;
+it('preserves assembled geometry across normal status changes without rotating the repertoire', async () => {
+  let now = 0, calls = 0;
   const engine = new TerminalEngine(() => now);
-  const activity = paneActivity(engine, {}, async () => ({ read: { text } }), { enabled: false },
-    { now: () => now, plan: async () => { calls++; return { body: body(0), concept: 'arch' }; } });
+  const activity = paneActivity(engine, {}, async () => { throw Error('no reads'); }, { enabled: false },
+    { now: () => now, plan: async context => { calls++; return { eventId: context.event.id, body: body(0), concept: 'arch', intensity: 0.5 }; } });
   try {
-    activity.update('working'); activity.tick(); for (let i = 0; i < 10; i++) await Promise.resolve();
+    activity.update('working');
+    activity.event(normalizeHook({ session_id: 's', turn_id: 't', hook_event_name: 'UserPromptSubmit', prompt: 'hello' }));
+    activity.tick(); for (let i = 0; i < 10; i++) await Promise.resolve();
     now = 300; engine.frame(64, 64); expect(engine.state.shape).toBe('assembled');
     activity.update('idle'); now = 700; engine.frame(64, 64);
     expect(engine.state.shape).toBe('assembled'); expect(activity.source).toBe('planner');
     now = 13000; activity.tick(); for (let i = 0; i < 10; i++) await Promise.resolve();
-    expect(activity.planner.repertoirePlays).toBe(1); expect(calls).toBe(1);
+    expect(activity.planner.repertoireRotation).toBe(false); expect(calls).toBe(1);
     activity.update('working'); now += 300; engine.frame(64, 64); expect(engine.state.shape).toBe('assembled');
   } finally { activity.close(); engine.dispose(); }
 });

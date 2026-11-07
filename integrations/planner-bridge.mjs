@@ -1,34 +1,29 @@
-import { activityHook } from './agent-hooks.mjs';
 import { ExpressionPlanner } from './expression-planner.mjs';
 import { plannerConfig, modelPlanner } from './planner-provider.mjs';
 import { processPlanner } from './planner-process.mjs';
 import { warmCodexPlanner } from './planner-codex.mjs';
+import { InteractionBody, attentionBody } from './interaction-body.mjs';
 
 export function paneActivity(engine, agent, call, config = plannerConfig(undefined, undefined, agent), { plan, now } = {}) {
-  const reflex = activityHook(engine);
-  let source = 'reflex', status, transitions = 0;
-  const native = ['codex', 'claude'].includes(config.backend);
+  let source = 'ambient', status, transitions = 0, received = 0;
+  const native = ['codex', 'claude'].includes(config.backend), body = new InteractionBody(engine, now);
   const inference = config.backend === 'codex' ? warmCodexPlanner(config) : native ? processPlanner(config) : modelPlanner(config);
   const planner = new ExpressionPlanner({ engine, now, plan: plan ?? inference, reason: config.reason,
-    cachePath: config.cachePath, requireAssembly: !!config.enabled,
-    timeoutMs: native ? 45000 : 4000, intervalMs: 60000, debounceMs: native ? 750 : 0,
-    onApplied: (_, origin = 'planner') => { source = origin; },
-    readContext: async () => {
-      const result = await call('pane.read', { pane_id: agent.pane_id, source: 'recent_unwrapped', lines: 32, format: 'text' });
-      return result.read?.text ?? result.text ?? '';
-    },
-  });
+    requireAssembly: !!config.enabled, timeoutMs: native ? 45000 : 4000,
+    onApplied: (_, reaction) => { source = 'planner'; body.react(reaction); } });
+  engine.express({ body: attentionBody() });
   return {
     update(next) {
       if (next === status) return false;
-      planner.update(next); status = next; transitions++;
-      if (planner.pool.entries.length) {
-        engine.express({ kind: 'state', body: { brightness: ['idle', 'done'].includes(next) ? 0.72 : 0.88, durationMs: 350 } });
-        if (!planner.lastPlan) planner.reuse(); return true;
-      }
-      engine.cancel(); source = 'reflex'; return reflex.update(next);
+      if (next === 'blocked' && !planner.paused) body.cue('needs_user');
+      planner.update(next); status = next; transitions++; return true;
     },
-    tick() { planner.tick(); },
+    event(event) {
+      if (!planner.accept(event)) return { status: 'ignored' };
+      received++; body.cue(event.type); source = event.type === 'user_message' ? 'listening' : 'reflex';
+      return { status: 'accepted', eventId: event.id };
+    },
+    tick() { planner.tick(); if (!planner.paused) body.tick(status); },
     express(args) {
       const result = engine.express(args);
       if (result.status === 'accepted' && args.kind !== 'define') { planner.invalidate(); source = 'manual'; }
@@ -39,6 +34,7 @@ export function paneActivity(engine, agent, call, config = plannerConfig(undefin
     get status() { return status; },
     get source() { return source; },
     get transitions() { return transitions; },
-    get planner() { return { ...planner.info, backend: config.backend }; },
+    get planner() { return { ...planner.info, backend: config.backend, interactionEvents: received,
+      eventSource: received ? 'agent-hooks' : 'awaiting-agent-hooks' }; },
   };
 }
