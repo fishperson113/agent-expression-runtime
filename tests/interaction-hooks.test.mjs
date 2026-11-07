@@ -36,6 +36,17 @@ it.each(['grep missing file', 'rg missing .', 'test -f absent', 'diff a b', 'git
   expect(normalizeHook({ ...input, hook_event_name: 'PostToolUse' })).toBeNull();
   expect(normalizeHook({ ...input, hook_event_name: 'PostToolUseFailure' })).toBeNull();
 });
+it('uses Claude success/failure hook semantics without inventing an exit-code field', () => {
+  const input = { ...prompt, prompt_id: 'claude-turn', turn_id: undefined, hook_event_name: 'PostToolUse',
+    tool_name: 'Bash', tool_input: { command: 'node --test pass.test.mjs' },
+    tool_response: { stdout: 'synthetic output', stderr: '', interrupted: false, isImage: false } };
+  expect(normalizeHook(input, Date.now(), 'claude').type).toBe('task_success');
+  expect(normalizeHook(input)).toBeNull();
+  expect(normalizeHook({ ...input, hook_event_name: 'PostToolUseFailure', tool_response: undefined,
+    error: 'Exit code 1\n synthetic failure' }, Date.now(), 'claude').type).toBe('task_failure');
+  expect(normalizeHook({ ...input, tool_response: { ...input.tool_response, interrupted: true } }, Date.now(), 'claude')).toBeNull();
+  expect(normalizeHook({ ...input, tool_input: { command: 'npm test; grep missing file' }, tool_response: { exit_code: 1 } })).toBeNull();
+});
 it('merges hook configuration idempotently without replacing other integrations or preferences', () => {
   const original = { model: 'existing', hooks: { Stop: [{ hooks: [{ type: 'command', command: 'my-harness check' }] }] } };
   const first = hookConfiguration(original, 'codex');

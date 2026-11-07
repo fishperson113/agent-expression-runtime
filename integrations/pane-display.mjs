@@ -1,15 +1,23 @@
 const dots = [[0, 0, 1], [0, 1, 2], [0, 2, 4], [1, 0, 8], [1, 1, 16], [1, 2, 32], [0, 3, 64], [1, 3, 128]];
-export function brailleFrame(pixels, width, height, columns, rows) {
+function brailleCell(pixels, width, height, columns, rows, col, row) {
+  let mask = 0, count = 0; const rgb = [0, 0, 0];
+  for (const [dx, dy, bit] of dots) {
+    const x = Math.min(width - 1, Math.floor((col * 2 + dx) * width / (columns * 2)));
+    const y = Math.min(height - 1, Math.floor((row * 4 + dy) * height / (rows * 4))), offset = (y * width + x) * 3;
+    if (Math.max(pixels[offset], pixels[offset + 1], pixels[offset + 2]) <= 35) continue;
+    mask |= bit; count++;
+    for (let channel = 0; channel < 3; channel++) rgb[channel] += pixels[offset + channel];
+  }
+  return { mask, color: rgb.map(value => Math.min(255, Math.round(value / (count || 1) / 16) * 16)).join(';') };
+}
+export function brailleFrame(pixels, width, height, columns, rows, colored = false) {
   const lines = [];
+  let foreground = '';
   for (let row = 0; row < rows; row++) {
     let line = '';
     for (let col = 0; col < columns; col++) {
-      let mask = 0;
-      for (const [dx, dy, bit] of dots) {
-        const x = Math.min(width - 1, Math.floor((col * 2 + dx) * width / (columns * 2)));
-        const y = Math.min(height - 1, Math.floor((row * 4 + dy) * height / (rows * 4)));
-        if (pixels[(y * width + x) * 3 + 1] > 35) mask |= bit;
-      }
+      const { mask, color } = brailleCell(pixels, width, height, columns, rows, col, row);
+      if (colored && mask && color !== foreground) { line += `\x1b[38;2;${color}m`; foreground = color; }
       line += String.fromCharCode(mask ? 0x2800 + mask : 32);
     }
     lines.push(line);
@@ -29,5 +37,5 @@ export async function drawFrame({ pixels, size, mode, paneId, call, output = pro
   if (mode === 'pixels') await call('pane.graphics.set', { pane_id: paneId, format: 'rgb',
     image_width: size.width, image_height: size.height, data_base64: pixels.toString('base64'),
     placement: { viewport_col: 1, viewport_row: 3, grid_cols: size.columns, grid_rows: size.rows } });
-  else output.write('\x1b[38;2;121;230;211m' + brailleFrame(pixels, size.width, size.height, size.columns, size.rows) + '\x1b[0m\x1b[J');
+  else output.write(brailleFrame(pixels, size.width, size.height, size.columns, size.rows, true) + '\x1b[0m\x1b[J');
 }

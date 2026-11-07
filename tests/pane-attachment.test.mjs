@@ -52,6 +52,12 @@ it('renders actual RGB particles into pane text when the client cannot display i
   pixels[1] = 255;
   expect(brailleFrame(pixels, 2, 4, 1, 1)).toBe('\u2801');
 });
+it.each([[255, 0, 0], [0, 0, 255], [255, 0, 255], [0, 255, 0]])('keeps Braille particles visible in RGB %j', (...color) => {
+  const pixels = Buffer.alloc(2 * 4 * 3);
+  pixels.set(color, 0);
+  expect(brailleFrame(pixels, 2, 4, 1, 1)).toBe('\u2801');
+  expect(brailleFrame(pixels, 2, 4, 1, 1, true)).toContain('\x1b[38;2;' + color.join(';') + 'm');
+});
 it('automatically follows agent events without prompts or expression tool calls and cleans up', async () => {
   const previous = { socket: process.env.HERDR_SOCKET_PATH, pane: process.env.HERDR_PANE_ID, backend: process.env.FISCH_PLANNER_BACKEND };
   process.env.FISCH_PLANNER_BACKEND = 'off';

@@ -1,0 +1,217 @@
+{
+  "synthetic": true,
+  "elapsedMs": 12897,
+  "eventMatched": true,
+  "admission": {
+    "status": "accepted",
+    "seq": 1
+  },
+  "plan": {
+    "eventId": "a2957891918417bb518c0dafa0777c8a9072f9dd334b4ff89d69ad5267083812",
+    "mood": "warm",
+    "intensity": 0.6,
+    "target": "user",
+    "concept": "Warm smiling face nodding thanks for the praise",
+    "body": {
+      "type": "sequence",
+      "children": [
+        {
+          "type": "parallel",
+          "children": [
+            {
+              "type": "assemble",
+              "durationMs": 900,
+              "parts": [
+                {
+                  "id": "face",
+                  "kind": "ellipsoid",
+                  "weight": 3,
+                  "motion": {
+                    "pivot": [
+                      0,
+                      -0.9,
+                      0
+                    ],
+                    "translate": [
+                      0,
+                      0.03,
+                      0.02
+                    ],
+                    "rotate": [
+                      0.06,
+                      0,
+                      0
+                    ],
+                    "periodMs": 2600,
+                    "phase": 0
+                  },
+                  "center": [
+                    0,
+                    0,
+                    0
+                  ],
+                  "scale": [
+                    0.95,
+                    1,
+                    0.25
+                  ],
+                  "rotation": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "eyeL",
+                  "kind": "curve",
+                  "weight": 1,
+                  "motion": null,
+                  "points": [
+                    [
+                      -0.5,
+                      0.22,
+                      0.28
+                    ],
+                    [
+                      -0.36,
+                      0.36,
+                      0.3
+                    ],
+                    [
+                      -0.22,
+                      0.22,
+                      0.28
+                    ]
+                  ],
+                  "radius": 0.05
+                },
+                {
+                  "id": "eyeR",
+                  "kind": "curve",
+                  "weight": 1,
+                  "motion": null,
+                  "points": [
+                    [
+                      0.22,
+                      0.22,
+                      0.28
+                    ],
+                    [
+                      0.36,
+                      0.36,
+                      0.3
+                    ],
+                    [
+                      0.5,
+                      0.22,
+                      0.28
+                    ]
+                  ],
+                  "radius": 0.05
+                },
+                {
+                  "id": "smile",
+                  "kind": "curve",
+                  "weight": 1.5,
+                  "motion": {
+                    "pivot": [
+                      0,
+                      -0.3,
+                      0.3
+                    ],
+                    "translate": [
+                      0,
+                      0.015,
+                      0
+                    ],
+                    "rotate": [
+                      0,
+                      0,
+                      0
+                    ],
+                    "periodMs": 2600,
+                    "phase": 0.4
+                  },
+                  "points": [
+                    [
+                      -0.45,
+                      -0.2,
+                      0.28
+                    ],
+                    [
+                      -0.25,
+                      -0.45,
+                      0.3
+                    ],
+                    [
+                      0,
+                      -0.52,
+                      0.31
+                    ],
+                    [
+                      0.25,
+                      -0.45,
+                      0.3
+                    ],
+                    [
+                      0.45,
+                      -0.2,
+                      0.28
+                    ]
+                  ],
+                  "radius": 0.06
+                },
+                {
+                  "id": "blush",
+                  "kind": "patch",
+                  "weight": 0.6,
+                  "motion": null,
+                  "points": [
+                    [
+                      -0.7,
+                      -0.05,
+                      0.27
+                    ],
+                    [
+                      -0.5,
+                      -0.05,
+                      0.29
+                    ],
+                    [
+                      -0.5,
+                      -0.15,
+                      0.29
+                    ],
+                    [
+                      -0.7,
+                      -0.15,
+                      0.27
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "flow",
+              "field": "pulse",
+              "strength": 0.2,
+              "durationMs": 900
+            },
+            {
+              "type": "shapeQuality",
+              "rise": 0.1,
+              "grow": 1.08,
+              "effort": {
+                "time": 0.4,
+                "weight": 0.3,
+                "flow": 0.8
+              },
+              "durationMs": 900
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "humanRecognition": "not-assessed"
+}

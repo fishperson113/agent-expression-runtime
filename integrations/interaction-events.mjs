@@ -7,20 +7,24 @@ export function redactMessage(text) {
     .replace(/\b(?:sk-|ghp_|github_pat_)[A-Za-z0-9_-]{12,}/g, '[REDACTED]')
     .replace(/((?:api[_-]?key|token|password|secret)\s*[=:]\s*)[^\s,;]+/gi, '$1[REDACTED]').slice(0, 6000);
 }
-function outcome(input) {
+function outcome(input, provider) {
   const command = input.tool_input?.command ?? input.tool_input?.cmd;
-  if (typeof command !== 'string' || !/^(?:(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:test|build|check)|(?:npx\s+)?vitest|pytest|python(?:3)?\s+-m\s+pytest|node\s+--test|cargo\s+(?:test|build|check)|go\s+test|dotnet\s+(?:test|build))\b/i.test(command.trim())) return null;
+  if (typeof command !== 'string' || /[;&|`\r\n]/.test(command) ||
+      !/^(?:(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:test|build|check)|(?:npx\s+)?vitest|pytest|python(?:3)?\s+-m\s+pytest|node\s+--test|cargo\s+(?:test|build|check)|go\s+test|dotnet\s+(?:test|build))\b/i.test(command.trim())) return null;
   const response = input.tool_response;
+  if (input.is_interrupt === true || response?.interrupted === true) return null;
   const code = response?.exit_code ?? response?.exitCode;
   if (input.hook_event_name === 'PostToolUseFailure' || response?.isError === true || (Number.isInteger(code) && code !== 0))
     return 'task_failure';
   if (code === 0) return 'task_success';
+  if (provider === 'claude' && input.hook_event_name === 'PostToolUse' && ['Bash', 'PowerShell'].includes(input.tool_name) &&
+      typeof response?.stdout === 'string' && response.interrupted === false) return 'task_success';
   return null;
 }
-export function normalizeHook(input, now = Date.now()) {
+export function normalizeHook(input, now = Date.now(), provider = 'codex') {
   if (!input || input.agent_id || !label(input.session_id)) return null;
   const type = { UserPromptSubmit: 'user_message', Stop: 'work_finished', PermissionRequest: 'needs_user',
-    Interrupt: 'interrupted' }[input.hook_event_name] ?? outcome(input);
+    Interrupt: 'interrupted' }[input.hook_event_name] ?? outcome(input, provider);
   if (!type) return null;
   const sessionId = label(input.session_id);
   const turnId = label(input.turn_id ?? input.prompt_id) || (type === 'user_message' ? 'prompt-' + randomUUID() : '');

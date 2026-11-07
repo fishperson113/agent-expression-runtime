@@ -1,0 +1,34 @@
+{
+  "synthetic": true,
+  "events": [
+    {
+      "event": "UserPromptSubmit",
+      "hasPromptId": true,
+      "responseFields": []
+    },
+    {
+      "event": "PostToolUse",
+      "tool": "Bash",
+      "hasPromptId": true,
+      "command": "node --test pass.test.mjs",
+      "responseFields": [
+        "stdout",
+        "stderr",
+        "interrupted",
+        "isImage",
+        "noOutputExpected"
+      ],
+      "interrupted": false
+    },
+    {
+      "event": "PostToolUseFailure",
+      "tool": "Bash",
+      "hasPromptId": true,
+      "command": "node --test fail.test.mjs",
+      "responseFields": [],
+      "errorExitCode": "1"
+    }
+  ],
+  "successObserved": true,
+  "failureObserved": true
+}
