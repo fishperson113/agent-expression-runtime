@@ -1,0 +1,186 @@
+{
+  "synthetic": true,
+  "elapsedMs": 16005,
+  "eventMatched": true,
+  "admission": {
+    "status": "accepted",
+    "seq": 1
+  },
+  "plan": {
+    "eventId": "3016427ddd7fd36dfcae3e3cea7cc2f5f3734189abda21636d9081f51e87a4b3",
+    "mood": "playful",
+    "intensity": 0.7,
+    "target": "user",
+    "concept": "A friendly hand raises two fingers in a clear frontal peace sign with you.",
+    "body": {
+      "type": "sequence",
+      "children": [
+        {
+          "type": "parallel",
+          "children": [
+            {
+              "type": "assemble",
+              "parts": [
+                {
+                  "id": "palm",
+                  "weight": 0.34,
+                  "motion": null,
+                  "kind": "ellipsoid",
+                  "center": [
+                    0,
+                    -0.35,
+                    0
+                  ],
+                  "scale": [
+                    0.43,
+                    0.49,
+                    0.17
+                  ],
+                  "rotation": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "id": "index-finger",
+                  "weight": 0.19,
+                  "motion": null,
+                  "kind": "curve",
+                  "points": [
+                    [
+                      -0.19,
+                      -0.05,
+                      0
+                    ],
+                    [
+                      -0.3,
+                      0.35,
+                      0
+                    ],
+                    [
+                      -0.45,
+                      0.86,
+                      0
+                    ],
+                    [
+                      -0.48,
+                      1.06,
+                      0
+                    ]
+                  ],
+                  "radius": 0.115
+                },
+                {
+                  "id": "middle-finger",
+                  "weight": 0.2,
+                  "motion": null,
+                  "kind": "curve",
+                  "points": [
+                    [
+                      0.08,
+                      0,
+                      0
+                    ],
+                    [
+                      0.2,
+                      0.43,
+                      0
+                    ],
+                    [
+                      0.36,
+                      0.98,
+                      0
+                    ],
+                    [
+                      0.4,
+                      1.16,
+                      0
+                    ]
+                  ],
+                  "radius": 0.12
+                },
+                {
+                  "id": "folded-fingers",
+                  "weight": 0.15,
+                  "motion": null,
+                  "kind": "ellipsoid",
+                  "center": [
+                    0.26,
+                    -0.23,
+                    0.17
+                  ],
+                  "scale": [
+                    0.23,
+                    0.29,
+                    0.15
+                  ],
+                  "rotation": [
+                    0,
+                    0,
+                    -0.18
+                  ]
+                },
+                {
+                  "id": "thumb",
+                  "weight": 0.12,
+                  "motion": {
+                    "pivot": [
+                      -0.3,
+                      -0.48,
+                      0.1
+                    ],
+                    "translate": [
+                      0,
+                      0,
+                      0.015
+                    ],
+                    "rotate": [
+                      0,
+                      0,
+                      0.035
+                    ],
+                    "periodMs": 1800,
+                    "phase": 0
+                  },
+                  "kind": "curve",
+                  "points": [
+                    [
+                      -0.33,
+                      -0.51,
+                      0.14
+                    ],
+                    [
+                      -0.21,
+                      -0.3,
+                      0.25
+                    ],
+                    [
+                      0.02,
+                      -0.23,
+                      0.3
+                    ],
+                    [
+                      0.21,
+                      -0.31,
+                      0.28
+                    ]
+                  ],
+                  "radius": 0.125
+                }
+              ],
+              "durationMs": 900
+            },
+            {
+              "type": "flow",
+              "field": "pulse",
+              "strength": 0.1,
+              "durationMs": 900
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "humanRecognition": "not-assessed"
+}

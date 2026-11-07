@@ -1,0 +1,45 @@
+{
+  "sourceCommit": "675466f",
+  "recordedAt": "2026-11-07T06:08:33.409Z",
+  "windows": {
+    "javascriptPassed": 147,
+    "build": "passed",
+    "architecture": "passed",
+    "testCommand": "npm test (two workers)"
+  },
+  "linuxWSL2": {
+    "javascriptPassed": 147,
+    "rustPassed": 12,
+    "build": "passed",
+    "architecture": "passed",
+    "browserBridge": "passed",
+    "obsoleteRepertoireSourcesPruned": true
+  },
+  "syntheticNativePipeline": {
+    "hookProcess": "passed",
+    "privateIPC": "passed",
+    "realCompiler": "passed",
+    "signedInCodex": "passed",
+    "attentionMs": [
+      129.7904,
+      209.7096
+    ],
+    "reactionMs": [
+      12527.0905,
+      16296.8754
+    ],
+    "freeFormPeaceGeometry": "accepted"
+  },
+  "idle": {
+    "simulatedDay": "zero model requests",
+    "repertoireRotation": false
+  },
+  "currentPane": {
+    "agent": "w4:pJ",
+    "renderer": "w4:pK",
+    "interactionHooks": "installed-awaiting-native-trust-and-next-user-message",
+    "modelAttemptsAfterReload": 0
+  },
+  "humanContextualEmotionRecognition": "not-assessed",
+  "liveClaudeDeliveryAndInference": "not-assessed"
+}
