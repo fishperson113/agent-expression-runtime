@@ -47,7 +47,8 @@ it('renders actual RGB particles into pane text when the client cannot display i
   expect(brailleFrame(pixels, 2, 4, 1, 1)).toBe('\u2801');
 });
 it('automatically follows agent events without prompts or expression tool calls and cleans up', async () => {
-  const previous = { socket: process.env.HERDR_SOCKET_PATH, pane: process.env.HERDR_PANE_ID };
+  const previous = { socket: process.env.HERDR_SOCKET_PATH, pane: process.env.HERDR_PANE_ID, backend: process.env.FISCH_PLANNER_BACKEND };
+  process.env.FISCH_PLANNER_BACKEND = 'off';
   process.env.HERDR_SOCKET_PATH = 'lifecycle-' + randomUUID();
   process.env.HERDR_PANE_ID = own.pane_id;
   const snapshot = { panes: [own], agents: [{ ...codex, agent_status: 'working' }], layouts: [] };
@@ -75,7 +76,7 @@ it('automatically follows agent events without prompts or expression tool calls 
     expect(closed).toBe(true); expect(rendered).toBeGreaterThan(2);
     await expect(sendControl('status', {}, codex.pane_id)).rejects.toThrow('No Fisch body');
   } finally {
-    for (const [key, value] of [['HERDR_SOCKET_PATH', previous.socket], ['HERDR_PANE_ID', previous.pane]]) {
+    for (const [key, value] of [['HERDR_SOCKET_PATH', previous.socket], ['HERDR_PANE_ID', previous.pane], ['FISCH_PLANNER_BACKEND', previous.backend]]) {
       if (value === undefined) delete process.env[key]; else process.env[key] = value;
     }
   }

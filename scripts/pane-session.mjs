@@ -7,7 +7,8 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { herdrCall, selectAgent, graphicsMode } from '../integrations/herdr.mjs';
 import { openControl } from '../integrations/terminal-ipc.mjs';
 import { displaySize, drawFrame } from '../integrations/pane-display.mjs';
-import { AgentEventHook, activityHook } from '../integrations/agent-hooks.mjs';
+import { AgentEventHook } from '../integrations/agent-hooks.mjs';
+import { paneActivity } from '../integrations/planner-bridge.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 async function bundler() {
@@ -45,15 +46,16 @@ export async function runPaneSession({ agentPane, call = herdrCall, subscribe = 
   let mode = await graphicsMode(call);
   const engine = await terminalEngine();
   const abort = new AbortController(), stop = () => abort.abort();
-  const activity = activityHook(engine);
+  const activity = paneActivity(engine, agent, call);
   let commands = 0, frames = 0;
   const control = await openControl(agent.pane_id, message => {
     if (message.method === 'express') { commands++; return engine.express(message.args); }
-    if (message.method === 'cancel') return engine.cancel();
+    if (message.method === 'cancel') return activity.cancel();
     if (message.method === 'stop') { stop(); return { status: 'stopped' }; }
     if (message.method === 'status') return { status: 'attached', agent: agent.agent, agentPane: agent.pane_id,
       rendererPane: own.pane_id, renderer: mode, frames, expressions: commands, shape: engine.state.shape,
-      integration: 'automatic-hooks', activity: activity.status, transitions: activity.transitions, eventsConnected: events.connected };
+      integration: 'automatic-hooks', activity: activity.status, transitions: activity.transitions,
+      eventsConnected: events.connected, planner: activity.planner };
     throw Error('unknown_method');
   });
   const events = subscribe(agent.pane_id, status => activity.update(status));
@@ -73,9 +75,9 @@ export async function runPaneSession({ agentPane, call = herdrCall, subscribe = 
         if (mode === 'braille' && frames > 0) mode = await graphicsMode(call);
         activity.update(snapshot.agents.find(peer => peer.pane_id === agent.pane_id).agent_status ?? 'unknown');
       }
-      const size = displaySize(snapshot, own.pane_id), pixels = engine.frame(size.width, size.height);
+      activity.tick(); const size = displaySize(snapshot, own.pane_id), pixels = engine.frame(size.width, size.height);
       await drawFrame({ pixels, size, mode, paneId: own.pane_id, call, output,
-        title: `Fisch · ${agent.agent} ${agent.pane_id} · auto: ${activity.status}` });
+        title: `Fisch · ${agent.agent} ${agent.pane_id} · ${activity.status} · planner: ${activity.planner.mode}` });
       frames++; await delay(100);
     }
     return 0;
@@ -84,6 +86,6 @@ export async function runPaneSession({ agentPane, call = herdrCall, subscribe = 
     signal?.removeEventListener('abort', stop); process.stdin.off('data', key);
     if (process.stdin.isTTY) { process.stdin.setRawMode(wasRaw); process.stdin.pause(); }
     if (mode === 'pixels') await call('pane.graphics.clear', { pane_id: own.pane_id }).catch(() => {});
-    events.close(); await control.close(); engine.dispose(); output.write('\x1b[0m\x1b[?25h\x1b[?1049l');
+    events.close(); activity.close(); await control.close(); engine.dispose(); output.write('\x1b[0m\x1b[?25h\x1b[?1049l');
   }
 }
