@@ -15,12 +15,12 @@ export function controlAddress(paneId, namespace = process.env.HERDR_SOCKET_PATH
     throw Error('Fisch IPC directory is not private to this user.');
   return join(directory, hash + '.sock');
 }
-export function sendControl(method, args, paneId = process.env.HERDR_PANE_ID) {
+export function sendControl(method, args, paneId = process.env.HERDR_PANE_ID, timeoutMs = 3000) {
   return new Promise((resolve, reject) => {
     let buffer = '';
     const socket = net.connect(controlAddress(paneId), () => socket.write(JSON.stringify({ method, args }) + '\n'));
     const fail = () => { socket.destroy(); reject(Object.assign(Error('No Fisch body attached to this agent pane. Run fisch run in its neighboring pane.'), { public: true })); };
-    socket.setTimeout(3000, fail); socket.on('error', fail);
+    socket.setTimeout(timeoutMs, fail); socket.on('error', fail);
     socket.on('end', () => { if (!buffer.includes('\n')) fail(); });
     socket.on('data', chunk => {
       buffer += chunk;
