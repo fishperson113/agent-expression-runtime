@@ -49,7 +49,7 @@ export async function runPaneSession({ agentPane, call = herdrCall, subscribe = 
   const activity = paneActivity(engine, agent, call);
   let commands = 0, frames = 0;
   const control = await openControl(agent.pane_id, message => {
-    if (message.method === 'express') { commands++; return engine.express(message.args); }
+    if (message.method === 'express') { commands++; return activity.express(message.args); }
     if (message.method === 'cancel') return activity.cancel();
     if (message.method === 'stop') { stop(); return { status: 'stopped' }; }
     if (message.method === 'status') return { status: 'attached', agent: agent.agent, agentPane: agent.pane_id,

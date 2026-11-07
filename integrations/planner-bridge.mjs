@@ -21,6 +21,11 @@ export function paneActivity(engine, agent, call, config = plannerConfig(undefin
       return reflex.update(status);
     },
     tick() { planner.tick(); },
+    express(args) {
+      const result = engine.express(args);
+      if (result.status === 'accepted' && args.kind !== 'define') { planner.invalidate(); source = 'manual'; }
+      return result;
+    },
     cancel() { planner.invalidate(); source = 'cancelled'; return engine.cancel(); },
     close() { planner.close(); },
     get status() { return reflex.status; },

@@ -1,0 +1,54 @@
+{
+  "timestamp": "2026-11-07T01:23:31.791Z",
+  "provider": "codex-process",
+  "context": "synthetic idle scenario",
+  "elapsedMs": 7706,
+  "receipt": {
+    "status": "accepted",
+    "seq": 1
+  },
+  "plan": {
+    "type": "sequence",
+    "children": [
+      {
+        "type": "parallel",
+        "children": [
+          {
+            "type": "morph",
+            "target": "sphere",
+            "durationMs": 1400
+          },
+          {
+            "type": "shapeQuality",
+            "rise": 0.08,
+            "grow": 0.7,
+            "effort": {
+              "time": 0.2,
+              "weight": 0.15,
+              "flow": 0.8
+            },
+            "durationMs": 1400
+          }
+        ]
+      },
+      {
+        "type": "parallel",
+        "children": [
+          {
+            "type": "flow",
+            "field": "orbit",
+            "strength": 0.12,
+            "durationMs": 220
+          }
+        ]
+      }
+    ]
+  },
+  "liveHerdrIdleObserved": false,
+  "humanExpressiveness": "not-assessed",
+  "javascriptTests": 119,
+  "idleRegressionTests": 8,
+  "refreshIntervalMs": 60000,
+  "replayIntervalMs": 12000,
+  "checkedAt": "2026-11-07T01:26:19.732Z"
+}
