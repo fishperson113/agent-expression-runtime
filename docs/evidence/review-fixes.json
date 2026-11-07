@@ -1,0 +1,47 @@
+{
+  "sourceCommit": "f8ba3b4",
+  "recordedAt": "2026-11-07T06:38:45.396Z",
+  "windows": {
+    "tests": 166,
+    "build": "passed",
+    "architecture": "passed"
+  },
+  "linuxWSL2": {
+    "tests": 166,
+    "rustTests": 12,
+    "build": "passed",
+    "browserBridge": "passed"
+  },
+  "regressions": {
+    "ordinaryNonzeroExit": "ignored",
+    "testFailurePreservesUserReaction": "passed",
+    "taskCooldownMs": 10000,
+    "eventLifetimeMs": 30000,
+    "listeningHoldSamplesMs": [
+      280,
+      500,
+      3000,
+      13000
+    ],
+    "listeningAdvance": 0.16,
+    "listeningDeadlineMs": 45000,
+    "explicitHookCLI": "passed",
+    "outsideHerdrNodeSuppression": "passed-with-native-shell",
+    "uninstallKeepsOtherHooks": "passed",
+    "herdrSettings": "read-only",
+    "brailleRedBlueMagenta": "passed",
+    "growLandscapePortrait": "passed"
+  },
+  "claude": {
+    "version": "2.1.309",
+    "realHookProbe": "passed",
+    "successExitCodeField": "absent",
+    "successHook": "PostToolUse",
+    "failureHook": "PostToolUseFailure",
+    "realPlannerElapsedMs": 12897,
+    "compilerAdmission": "accepted"
+  },
+  "localLegacyCodexHooks": "uninstalled",
+  "interactiveClaudeHerdrDelivery": "not-assessed",
+  "humanEmotionRecognition": "not-assessed"
+}
