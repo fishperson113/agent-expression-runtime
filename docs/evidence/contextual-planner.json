@@ -1,23 +1,23 @@
 {
-  "timestamp": "2026-11-07T00:35:40.674Z",
+  "timestamp": "2026-11-07T00:38:43.498Z",
   "status": {
     "status": "attached",
     "agent": "codex",
     "agentPane": "w4:pJ",
     "rendererPane": "w4:pK",
     "renderer": "braille",
-    "frames": 336,
+    "frames": 766,
     "expressions": 0,
-    "shape": "sphere",
+    "shape": "cloud",
     "integration": "automatic-hooks",
     "activity": "working",
     "transitions": 1,
     "eventsConnected": true,
     "planner": {
       "mode": "ready",
-      "attempts": 2,
+      "attempts": 3,
       "applied": 1,
-      "discarded": 1,
+      "discarded": 2,
       "queued": true,
       "error": null,
       "backend": "codex"
@@ -28,5 +28,6 @@
   "directApiConfigured": false,
   "contextStoredInEvidence": false,
   "liveClaudeInference": "not-assessed",
-  "humanExpressiveness": "not-assessed"
+  "humanExpressiveness": "not-assessed",
+  "sourceCommit": "23deabb"
 }
