@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 export const eventKinds = ['user_message', 'work_finished', 'needs_user', 'task_success', 'task_failure', 'interrupted'];
 const label = value => typeof value === 'string' ? value.slice(0, 160) : '';
@@ -23,7 +23,9 @@ export function normalizeHook(input, now = Date.now()) {
   const type = { UserPromptSubmit: 'user_message', Stop: 'work_finished', PermissionRequest: 'needs_user',
     Interrupt: 'interrupted' }[input.hook_event_name] ?? outcome(input);
   if (!type) return null;
-  const sessionId = label(input.session_id), turnId = label(input.turn_id ?? input.prompt_id);
+  const sessionId = label(input.session_id);
+  const turnId = label(input.turn_id ?? input.prompt_id) || (type === 'user_message' ? 'prompt-' + randomUUID() : '');
+  if (!turnId) return null;
   const text = type === 'user_message' ? redactMessage(input.prompt) : '';
   if (type === 'user_message' && !text.trim()) return null;
   const key = [sessionId, turnId, type, label(input.tool_use_id), text].join('\0');

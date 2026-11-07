@@ -7,13 +7,14 @@ export async function forwardHook(input, send = sendControl, env = process.env) 
   const event = normalizeHook(input);
   if (event) await send('event', event, env.HERDR_PANE_ID, 500).catch(() => {});
 }
-export async function readHook(stream = process.stdin) {
+export async function readHook(stream = process.stdin, forward = forwardHook) {
+  stream.setEncoding('utf8');
   let buffer = '', overflow = false;
   for await (const chunk of stream) {
-    if (Buffer.byteLength(buffer) + chunk.length > 1048576) { overflow = true; buffer = ''; }
+    if (Buffer.byteLength(buffer) + Buffer.byteLength(chunk) > 1048576) { overflow = true; buffer = ''; }
     if (!overflow) buffer += chunk;
   }
-  if (!overflow) await forwardHook(JSON.parse(buffer));
+  if (!overflow) await forward(JSON.parse(buffer));
 }
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
   const timer = setTimeout(() => process.exit(0), 1000);

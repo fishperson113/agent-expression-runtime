@@ -23,7 +23,7 @@ Codex uses `~/.codex/hooks.json` (or `CODEX_HOME`); Claude uses `~/.claude/setti
 
 The initial attentive face is a local fallback, not a fixed-avatar restriction. Subsequent model geometry may take any supported form. Part IDs and existing topology preserve continuity where possible. Status metadata supplies working/waiting information; it never guesses the words a user said from tool logs.
 
-Hooks receive actual `prompt` text, session and turn/prompt IDs. Subagent events are ignored. Ordinary tool output is not forwarded. Explicit exit codes or error flags can produce task events; a success cue for supported test/build commands means that command exited successfully, not that the whole project is complete. Events without a usable outcome are ignored. Current provider versions with turn IDs provide the strongest stale-event isolation; older versions without them only support session-level correlation.
+Hooks receive actual `prompt` text, session and turn/prompt IDs. Subagent events are ignored. Ordinary tool output is not forwarded. Explicit exit codes or error flags can produce task events; a success cue for supported test/build commands means that command exited successfully, not that the whole project is complete. Events without a usable outcome are ignored. Older provider versions without turn IDs support prompt-only reactions: uncorrelated tool/finish hooks are ignored instead of being assigned to a guessed turn.
 
 ## Timing, continuity and usage
 

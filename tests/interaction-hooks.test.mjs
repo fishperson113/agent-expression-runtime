@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { normalizeHook, validEvent } from '../integrations/interaction-events.mjs';
 import { hookConfiguration, installInteractionHooks } from '../integrations/interaction-hooks.mjs';
-import { forwardHook } from '../scripts/fisch-hook.mjs';
+import { forwardHook, readHook } from '../scripts/fisch-hook.mjs';
 import { openControl } from '../integrations/terminal-ipc.mjs';
 
 const prompt = { session_id: 'session', turn_id: 'turn', hook_event_name: 'UserPromptSubmit', prompt: 'Cảm ơn bạn!' };
@@ -37,6 +37,20 @@ it('merges hook configuration idempotently without replacing other integrations 
   expect(first.model).toBe('existing'); expect(original.hooks.UserPromptSubmit).toBeUndefined();
   expect(first.hooks.UserPromptSubmit[0].hooks[0].commandWindows).toContain('node "');
   expect(hookConfiguration({}, 'claude').hooks.PostToolUseFailure).toHaveLength(1);
+  expect(() => hookConfiguration([], 'codex')).toThrow('invalid_hook_config');
+});
+it('preserves fragmented UTF-8 input and bounds oversized stdin without forwarding', async () => {
+  const bytes = Buffer.from(JSON.stringify(prompt)), pieces = Array.from(bytes, byte => Buffer.from([byte]));
+  let received;
+  await readHook(Readable.from(pieces), async value => { received = value; });
+  expect(received.prompt).toBe('Cảm ơn bạn!'); received = undefined;
+  await readHook(Readable.from([Buffer.alloc(1048577)]), async value => { received = value; });
+  expect(received).toBeUndefined();
+});
+it('supports repeated legacy prompts without guessing which turn a legacy tool result belongs to', () => {
+  const legacy = { ...prompt, turn_id: undefined };
+  expect(normalizeHook(legacy).id).not.toBe(normalizeHook(legacy).id);
+  expect(normalizeHook({ ...legacy, hook_event_name: 'Stop' })).toBeNull();
 });
 it('fails closed on malformed settings without overwriting them', () => {
   const home = mkdtempSync(join(tmpdir(), 'fisch-hooks-')), file = join(home, 'settings.json');

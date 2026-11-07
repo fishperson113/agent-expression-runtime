@@ -7,6 +7,7 @@ import { randomUUID } from 'node:crypto';
 const script = fileURLToPath(new URL('../scripts/fisch-hook.mjs', import.meta.url)).replaceAll('\\', '/');
 const quote = value => "'" + value.replaceAll("'", "'\\''") + "'";
 export function hookConfiguration(original, provider) {
+  if (!original || typeof original !== 'object' || Array.isArray(original)) throw Error('invalid_hook_config');
   const config = structuredClone(original);
   if (config.hooks !== undefined && (!config.hooks || Array.isArray(config.hooks) || typeof config.hooks !== 'object'))
     throw Error('invalid_hook_config');
