@@ -58,16 +58,17 @@ it('bounds and redacts common credentials from context', () => {
   expect(cleanContext('context\n• Working (10m 01s • esc to interrupt) · 1 background terminal running'))
     .toBe(cleanContext('context\n• Working (10m 02s • esc to interrupt) · 1 background terminal running'));
 });
-it('invalidates in-flight work when context changes within the same working status', async () => {
+it('coalesces terminal updates without discarding same-turn inference', async () => {
   let now = 0, text = 'old request', resolve, reflexes = 0; const submitted = [];
   const planner = new ExpressionPlanner({ now: () => now, readContext: async () => text,
     onContextChange() { reflexes++; },
     engine: { express(value) { submitted.push(value); return { status: 'accepted' }; } },
     plan: () => new Promise(done => { resolve = done; }) });
   planner.update('working'); planner.tick(); await planner.reading;
-  const oldJob = planner.job; text = 'new user topic'; now = 2001;
+  const oldJob = planner.job; text = 'latest tool output'; now = 2001;
   planner.tick(); await planner.reading; resolve(planValue('cloud')); await oldJob;
-  expect(submitted).toEqual([]); expect(reflexes).toBe(2); expect(planner.info.discarded).toBe(1); planner.close();
+  expect(submitted).toHaveLength(1); expect(reflexes).toBe(2); expect(planner.info.discarded).toBe(0);
+  expect(planner.info.queued).toBe(true); planner.close();
 });
 it('waits for a quiet context window before starting a native process', async () => {
   let now = 0, text = 'streaming', calls = 0;

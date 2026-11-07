@@ -6,8 +6,8 @@ import { terminalEngine } from '../scripts/pane-session.mjs';
 import { planSchema } from '../integrations/expression-plan.mjs';
 
 const absent = new URL('../.runtime/no-planner-env', import.meta.url);
-const plan = { body: { type: 'sequence', children: [{ type: 'parallel', children: [
-  { type: 'morph', target: 'wave', durationMs: 200 },
+const plan = { concept: 'a playful arch', body: { type: 'sequence', children: [{ type: 'parallel', children: [
+  { type: 'assemble', parts: [{ id: 'arch', kind: 'curve', points: [[-0.5, 0, 0], [0, 0.5, 0], [0.5, 0, 0]], radius: 0.03 }], durationMs: 200 },
 ] }] } };
 const result = value => ({ status: 'completed', output: [{ content: [{ type: 'output_text', text: JSON.stringify(value) }] }] });
 it('keeps all nested geometry objects compatible with strict structured outputs', () => {

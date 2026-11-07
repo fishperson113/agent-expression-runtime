@@ -20,11 +20,11 @@ const quality = object({ type: { const: 'shapeQuality' }, rise: { type: 'number'
 const assembly = object({ type: { const: 'assemble' }, parts: geometry.properties.parts, durationMs });
 const parallel = object({ type: { const: 'parallel' },
   children: { type: 'array', minItems: 1, maxItems: 3, items: { anyOf: [morph, assembly, flow, quality] } } });
-export const planSchema = object({ body: object({ type: { const: 'sequence' },
+export const planSchema = object({ concept: { type: 'string', minLength: 1, maxLength: 80 }, body: object({ type: { const: 'sequence' },
   children: { type: 'array', minItems: 1, maxItems: 4, items: parallel } }) });
 planSchema.$defs = strictSchema(geometry.$defs);
 
-export function planBody(value) {
+export function planBody(value, requireAssembly = false) {
   const steps = value?.body?.children;
   if (value?.body?.type !== 'sequence' || !Array.isArray(steps) || !steps.length || steps.length > 4)
     throw Error('invalid_plan');
@@ -38,10 +38,14 @@ export function planBody(value) {
           !Number.isFinite(node.grow) || node.grow < 0.7 || node.grow > 1.3)) throw Error('invalid_plan');
     }
   }
+  if (requireAssembly && !steps.some(step => step.children.some(node => node.type === 'assemble'))) throw Error('assembly_required');
   return value.body;
 }
 
 export const plannerInstructions = 'Create a clearly readable particle-body expression for the visible conversation context. '
+  + 'Prefer one compact beat with 3-5 parts, adding motion to only one or two parts and leaving other motion fields null. '
+  + 'Return a genuinely different concept from recentConcepts: vary silhouette and construction, not merely names or scale. '
+  + 'Do not repeatedly fall back to a round face, sphere, cloud, wall, circle or winged blob. Every plan must contain an assemble node. '
   + 'You control one reconfigurable swarm, not a fixed avatar. Prefer assemble to invent a coherent silhouette or object from curve tubes, ellipsoid shells and quadrilateral patches. '
   + 'Express ideas creatively: hands, creatures, symbols, tools or unexpected compositions are possible without named presets. Use a few readable parts, not visual clutter. '
   + 'Coordinates are world-space: x right, y up, z depth; keep the main silhouette near the XY plane and within [-1.4,1.4]. Curves trace smooth strokes; patches have four perimeter-ordered corners. '

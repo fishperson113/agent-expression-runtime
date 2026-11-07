@@ -24,6 +24,7 @@ export class WarmCodexPlanner {
     await this.rpc.request('initialize', { clientInfo: { name: 'fisch_planner', version: '0.1.0' }, capabilities: { experimentalApi: true } });
     this.rpc.send({ method: 'initialized' });
     const { config } = await this.rpc.request('config/read', { includeLayers: false });
+    if (!config || typeof config !== 'object') throw Error('planner_config_unavailable');
     this.threadConfig = { model_reasoning_effort: 'low', mcp_servers:
       Object.fromEntries(Object.keys(config?.mcp_servers ?? {}).map(name => [name, { enabled: false }])) };
   }
@@ -55,6 +56,7 @@ export class WarmCodexPlanner {
     signal.addEventListener('abort', abort, { once: true });
     try {
       const result = await this.rpc.request('turn/start', { threadId: thread.id, effort: 'low', summary: 'none',
+        sandboxPolicy: { type: 'readOnly', access: { type: 'restricted', includePlatformDefaults: true, readableRoots: [this.directory] } },
         input: [{ type: 'text', text: JSON.stringify(context) }], outputSchema: planSchema });
       job.turnId = result.turn.id; if (signal.aborted) abort();
       return await promise;

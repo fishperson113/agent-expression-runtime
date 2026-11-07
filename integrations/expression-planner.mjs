@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { planBody } from './expression-plan.mjs';
+import { Repertoire, geometryKey } from './planner-repertoire.mjs';
 
 export function cleanContext(text) {
   return String(text ?? '').replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '')
@@ -14,19 +15,26 @@ export class ExpressionPlanner {
   status = 'unknown'; lastHash = ''; lastRead = -Infinity; lastRequest = -Infinity;
   mode = 'disabled'; error = null; closed = false;
   idleCycles = 0; idleReplays = 0; nextIdleAt = Infinity;
-  constructor({ engine, plan, readContext, now = () => performance.now(), timeoutMs = 4000, intervalMs = 10000, debounceMs = 0, idleRefreshMs = 60000, idleReplayMs = 12000, onContextChange = () => {}, onApplied = () => {}, reason }) {
+  repertoirePlays = 0; paused = false;
+  constructor({ engine, plan, readContext, now = () => performance.now(), timeoutMs = 4000, intervalMs = 10000, debounceMs = 0, idleRefreshMs = 60000, idleReplayMs = 12000, onContextChange = () => {}, onApplied = () => {}, requireAssembly = false, cachePath, reason }) {
     Object.assign(this, { engine, plan, readContext, now, timeoutMs, intervalMs, debounceMs, idleRefreshMs, idleReplayMs, onContextChange, onApplied });
+    this.pool = new Repertoire(cachePath); this.requireAssembly = requireAssembly;
     this.mode = plan ? 'ready' : 'disabled'; this.reason = reason;
   }
   update(status) {
     if (this.closed || this.status === status) return;
-    this.invalidate(); this.status = status; this.lastHash = ''; this.lastRead = -Infinity; this.pending = null;
+    const completion = this.status === 'working' && ['idle', 'done'].includes(status);
+    const restChange = ['idle', 'done'].includes(this.status) && ['idle', 'done'].includes(status);
+    if (!completion && !restChange) { this.invalidate(); this.lastHash = ''; this.pending = null; this.lastRequest = -Infinity; }
+    this.status = status; this.lastRead = -Infinity; this.paused = false; this.resumeAt = 0;
     this.nextIdleAt = this.now() + this.idleRefreshMs;
-    if (this.plan) this.mode = 'ready';
+    if (this.plan) this.mode = this.controller ? 'planning' : 'ready';
   }
   invalidate() {
     this.generation++; this.controller?.abort(); this.controller = null; this.pending = null;
     this.nextIdleAt = Infinity;
+    this.paused = true;
+    this.resumeAt = this.now() + 10000;
     if (this.plan && !this.closed) this.mode = 'ready';
   }
   tick() {
@@ -43,12 +51,13 @@ export class ExpressionPlanner {
       this.contextText = text;
       const hash = createHash('sha256').update(text).digest('hex');
       if (hash !== this.lastHash) {
-        this.invalidate(); this.onContextChange(this.status); this.lastHash = hash; this.changedAt = this.now();
+        this.onContextChange(this.status); this.lastHash = hash; this.changedAt = this.now(); this.paused = false;
         this.nextIdleAt = this.now() + this.idleRefreshMs;
-        this.pending = { activity: this.status, visibleContext: text, trigger: 'context_change' };
+        this.pending = { activity: this.status, visibleContext: text, trigger: 'context_change', recentConcepts: this.pool.recent };
       }
       this.refreshIdle();
-      if (this.pending && !this.controller && this.now() - this.lastRequest >= this.intervalMs && this.now() - this.changedAt >= this.debounceMs) {
+      if (this.pending && !this.controller && this.now() >= (this.resumeAt ?? 0) &&
+          this.now() - this.lastRequest >= this.intervalMs && this.now() - this.changedAt >= this.debounceMs) {
         const context = this.pending; this.pending = null;
         this.job = this.request(context, this.generation);
       }
@@ -64,11 +73,12 @@ export class ExpressionPlanner {
       });
       const value = await Promise.race([this.plan(context, controller.signal), timeout]);
       if (this.closed || generation !== this.generation || controller.signal.aborted) { this.discarded++; return; }
-      const body = planBody(value), result = this.engine.express({ body });
+      const body = planBody(value, this.requireAssembly), result = this.engine.express({ body });
       if (result.status !== 'accepted') throw Error('invalid_plan');
       this.applied++; this.mode = 'ready'; this.lastPlan = body;
       this.lastPlanGeneration = generation; this.lastReplay = this.now();
-      this.lastAppliedAt = new Date().toISOString(); this.onApplied(body);
+      this.lastAppliedAt = new Date().toISOString(); this.lastConcept = value.concept;
+      this.pool.remember(body, value.concept); this.onApplied(body, 'planner');
     } catch (error) {
       if (this.closed || generation !== this.generation) this.discarded++;
       else { this.mode = 'fallback'; this.error = error.message === 'timeout' ? 'timeout' : 'plan_failed'; }
@@ -82,23 +92,38 @@ export class ExpressionPlanner {
   refreshIdle() {
     if (!this.isIdle || this.pending || this.controller || this.now() < this.nextIdleAt) return;
     this.pending = { activity: this.status, visibleContext: this.contextText ?? '', trigger: 'idle_refresh',
-      idleCycle: ++this.idleCycles, previousPlan: this.lastPlan };
+      idleCycle: ++this.idleCycles, previousPlan: this.lastPlan, recentConcepts: this.pool.recent };
     this.nextIdleAt = Infinity;
   }
   replayIdle() {
-    if (!this.isIdle || !this.lastPlan || this.lastPlanGeneration !== this.generation ||
-        this.now() - this.lastReplay < this.idleReplayMs) return;
+    const interval = this.isIdle ? this.idleReplayMs : 18000;
+    if (this.paused || this.now() < (this.resumeAt ?? 0) || !['idle', 'done', 'working'].includes(this.status) ||
+        this.now() - (this.lastReplay ?? -Infinity) < interval) return;
+    if (this.pool.entries.length) { this.reuse(); return; }
+    if (!this.isIdle || !this.lastPlan || this.lastPlanGeneration !== this.generation) return;
     this.lastReplay = this.now();
     try {
       if (this.engine.express({ body: this.lastPlan }).status !== 'accepted') return;
       this.idleReplays++; this.lastReplayAt = new Date().toISOString(); this.onApplied(this.lastPlan);
     } catch { this.error = 'idle_replay_failed'; }
   }
+  reuse() {
+    const item = this.pool.pick(geometryKey(this.lastPlan)); if (!item) return false;
+    this.lastReplay = this.now();
+    try {
+      if (this.engine.express({ body: item.body }).status !== 'accepted') return false;
+      this.lastPlan = item.body; this.lastConcept = item.concept; this.lastPlanGeneration = this.generation;
+      this.repertoirePlays++; if (this.isIdle) this.idleReplays++;
+      this.lastReplayAt = new Date().toISOString(); this.onApplied(item.body, 'repertoire'); return true;
+    } catch { this.pool.entries = this.pool.entries.filter(entry => entry.key !== item.key); return false; }
+  }
   get info() {
     return { mode: this.mode, reason: this.reason, attempts: this.attempts, applied: this.applied,
       discarded: this.discarded, queued: !!this.pending, error: this.error,
       lastPlan: this.lastPlan, lastAppliedAt: this.lastAppliedAt,
-      idleCycles: this.idleCycles, idleReplays: this.idleReplays, lastReplayAt: this.lastReplayAt };
+      idleCycles: this.idleCycles, idleReplays: this.idleReplays, lastReplayAt: this.lastReplayAt,
+      repertoire: this.pool.info, repertoirePlays: this.repertoirePlays, lastConcept: this.lastConcept,
+      transport: this.plan?.transport?.() };
   }
-  close() { this.closed = true; this.invalidate(); }
+  close() { this.closed = true; this.invalidate(); this.plan?.close?.(); }
 }

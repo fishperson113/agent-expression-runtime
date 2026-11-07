@@ -7,7 +7,8 @@ export function plannerConfig(env = process.env, file = new URL('../.env', impor
   const backend = values.FISCH_PLANNER_BACKEND ?? (agent.agent?.startsWith('claude') ? 'claude' : 'codex');
   if (backend === 'off') return { enabled: false, reason: 'disabled_by_config' };
   const model = values.FISCH_PLANNER_MODEL;
-  if (['codex', 'claude'].includes(backend)) return { enabled: true, backend, model, command: values.FISCH_PLANNER_COMMAND };
+  const cachePath = values.FISCH_REPERTOIRE_CACHE === 'off' ? undefined : new URL('../.runtime/repertoire.json', import.meta.url);
+  if (['codex', 'claude'].includes(backend)) return { enabled: true, backend, model, cachePath, command: values.FISCH_PLANNER_COMMAND };
   if (backend !== 'api') throw Error('Unknown Fisch planner backend.');
   const endpoint = values.FISCH_PLANNER_URL ?? (values.OPENAI_API_KEY ? 'https://api.openai.com/v1/responses' : undefined);
   if (!model || !endpoint) return { enabled: false, reason: 'missing_model_or_endpoint' };
@@ -16,7 +17,7 @@ export function plannerConfig(env = process.env, file = new URL('../.env', impor
     throw Error('Planner URL requires HTTPS or local HTTP, without embedded credentials.');
   const key = values.FISCH_PLANNER_API_KEY ?? (url.hostname === 'api.openai.com' ? values.OPENAI_API_KEY : undefined);
   if (url.hostname === 'api.openai.com' && !key) return { enabled: false, reason: 'missing_api_key' };
-  return { enabled: true, backend, model, endpoint: url.href, key };
+  return { enabled: true, backend, model, endpoint: url.href, key, cachePath };
 }
 
 async function boundedJson(response) {
