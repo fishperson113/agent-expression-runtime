@@ -68,7 +68,10 @@ export async function paneDoctor() {
   try {
     const attached = await sendControl('status').catch(() => null);
     if (attached) return [{ name: 'Pane attachment', ok: true,
-      detail: `${attached.agent} ${attached.agentPane} → ${attached.rendererPane} (${attached.renderer})` }];
+      detail: `${attached.agent} ${attached.agentPane} → ${attached.rendererPane} (${attached.renderer})` },
+      { name: 'Interaction hooks', ok: attached.interactionHooks?.delivery === 'live',
+        detail: attached.interactionHooks?.delivery === 'live' ? 'Receiving real agent events.' :
+          attached.interactionHooks?.installed ? 'Waiting for real events; Codex: review Fisch in /hooks. Claude: reload hooks if required.' : 'Hook installation failed; inspect agent configuration permissions.' }];
     const { snapshot } = await herdrCall('session.snapshot');
     selectAgent(snapshot, process.env.HERDR_PANE_ID);
     return [{ name: 'Herdr', ok: true, detail: snapshot.version },

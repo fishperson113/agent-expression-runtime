@@ -4,6 +4,7 @@ import { socketAddress, selectAgent } from '../integrations/herdr.mjs';
 import { runPaneSession } from '../scripts/pane-session.mjs';
 import { openControl, sendControl, controlAddress } from '../integrations/terminal-ipc.mjs';
 import { brailleFrame } from '../integrations/pane-display.mjs';
+import { normalizeHook } from '../integrations/interaction-events.mjs';
 
 const own = { pane_id: 'w1:p2', workspace_id: 'w1', tab_id: 'w1:t1', cwd: '/project' };
 const codex = { ...own, pane_id: 'w1:p1', agent: 'codex' };
@@ -65,6 +66,10 @@ it('automatically follows agent events without prompts or expression tool calls 
         update('blocked'); update('blocked'); update('done');
         expect(await sendControl('status', {}, id)).toMatchObject({ integration: 'automatic-hooks',
           activity: 'done', transitions: 3, expressions: 0 });
+        const event = normalizeHook({ session_id: 's', turn_id: 't', hook_event_name: 'UserPromptSubmit', prompt: 'hello' });
+        expect(await sendControl('event', event, id)).toMatchObject({ status: 'accepted', eventId: event.id });
+        expect(await sendControl('status', {}, id)).toMatchObject({ bodySource: 'listening',
+          interactionHooks: { delivery: 'live' }, planner: { interactionEvents: 1, attempts: 0 } });
         await sendControl('stop', {}, id); resolve();
       } catch (error) { reject(error); }
     }));

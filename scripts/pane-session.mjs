@@ -45,6 +45,15 @@ function sessionAlive(snapshot, own, agent) {
   return snapshot.panes.some(pane => pane.pane_id === own.pane_id) &&
     snapshot.agents.some(peer => peer.pane_id === agent.pane_id && peer.agent === agent.agent);
 }
+function hookStatus(hooks, activity) {
+  const live = activity.planner.interactionEvents > 0;
+  return { ...hooks, delivery: live ? 'live' : 'awaiting-event', review: live ? undefined : hooks.review };
+}
+function paneTitle(activity, hooks) {
+  const state = hookStatus(hooks, activity);
+  const delivery = state.delivery === 'live' ? 'live' : !state.installed ? 'install failed' : state.provider === 'codex' ? 'review /hooks' : 'waiting';
+  return `Fisch · ${activity.status} · ${activity.source} · hooks: ${delivery}`;
+}
 export async function runPaneSession({ agentPane, call = herdrCall, subscribe = (id, update) => new AgentEventHook(id, update), installHooks = installInteractionHooks, output = process.stdout, signal } = {}) {
   let { snapshot } = await call('session.snapshot');
   const { own, agent } = selectAgent(snapshot, process.env.HERDR_PANE_ID, agentPane);
@@ -62,7 +71,7 @@ export async function runPaneSession({ agentPane, call = herdrCall, subscribe = 
     if (message.method === 'status') return { status: 'attached', agent: agent.agent, agentPane: agent.pane_id,
       rendererPane: own.pane_id, renderer: mode, frames, expressions: commands, shape: engine.state.shape,
       integration: 'automatic-hooks', activity: activity.status, transitions: activity.transitions,
-      eventsConnected: events.connected, interactionHooks: hooks, bodySource: activity.source, planner: activity.planner, swarm: engine.renderer.swarm.info };
+      eventsConnected: events.connected, interactionHooks: hookStatus(hooks, activity), bodySource: activity.source, planner: activity.planner, swarm: engine.renderer.swarm.info };
     throw Error('unknown_method');
   });
   const events = subscribe(agent.pane_id, status => activity.update(status));
@@ -83,7 +92,7 @@ export async function runPaneSession({ agentPane, call = herdrCall, subscribe = 
       }
       activity.tick(); const size = displaySize(snapshot, own.pane_id), pixels = engine.frame(size.width, size.height);
       await drawFrame({ pixels, size, mode, paneId: own.pane_id, call, output,
-        title: `Fisch · ${activity.status} · body: ${activity.source} · planner: ${activity.planner.mode}` });
+        title: paneTitle(activity, hooks) });
       frames++; await delay(50);
     }
     return 0;
