@@ -18,6 +18,12 @@ A background Codex/Claude process also plans contextual expressions from a bound
 
 The installed Herdr client currently uses colored Braille particles; inline RGB is selected when Herdr supplies its graphics API and cell dimensions. This terminal rendering has lower visual fidelity than the browser reference renderer. See [pane workflow and controls](docs/multiplexer.md).
 
+## Reconfigurable swarm
+
+The model can now compose curve tubes, ellipsoid shells and surface patches with stable part IDs and independent motion through `assemble`. Hands, faces and creatures are geometry it constructs, rather than hard-coded shape names. See [the geometry language and limits](docs/swarm-geometry.md).
+
+![Particle peace sign](docs/evidence/composition-peace.png)
+
 ## Development entry points
 
 Requires Node.js 22.12+ (or 24), npm, Rust stable and the platform Tauri prerequisites. Windows desktop builds need Microsoft C++ Build Tools and WebView2; Linux builds need GTK/WebKit development packages.

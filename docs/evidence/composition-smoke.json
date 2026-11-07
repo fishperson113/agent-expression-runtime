@@ -2,12 +2,14 @@
   "results": [
     {
       "name": "peace",
-      "parts": 7,
       "feedback": "Submitted for validation."
     },
     {
       "name": "bird",
-      "parts": 6,
+      "feedback": "Submitted for validation."
+    },
+    {
+      "name": "generated",
       "feedback": "Submitted for validation."
     }
   ],

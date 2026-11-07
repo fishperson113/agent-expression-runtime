@@ -1,0 +1,47 @@
+# Reconfigurable particle body
+
+Fisch accepts model-authored geometry through `assemble`, alongside the seven legacy morph targets. Hands, faces, creatures and objects are compositions of geometric parts, not new hard-coded shape names. The same node runs through the compiler, macros, scheduler, worker WebGL renderer and native terminal renderer.
+
+```json
+{"type":"assemble","durationMs":1200,"parts":[
+  {"id":"leftEye","kind":"ellipsoid","center":[-0.35,0.4,0],"scale":[0.08,0.12,0.06]},
+  {"id":"rightEye","kind":"ellipsoid","center":[0.35,0.4,0],"scale":[0.08,0.12,0.06]},
+  {"id":"mouth","kind":"curve","points":[[-0.6,0,0],[0,-0.45,0],[0.6,0,0]],"radius":0.025}
+]}
+```
+
+Send an AST with `fisch express`, or let the background planner create it automatically. HTTP/MCP hosts use the existing program envelope. `fisch capabilities` includes the updated wire schema. `assemble` and `morph` both own shape, so they conflict if simultaneous; they can run alongside flow, style and posture. Sequence assemblies to animate poses. The main agent still needs no Fisch tool call.
+
+## Building blocks
+
+Coordinates use x right, y up, z depth. Frontal silhouettes close to the XY plane are easiest to read in a pane.
+
+| Kind | Data | Result |
+|---|---|---|
+| `curve` | 2–12 points, radius 0–0.25 | Catmull–Rom stroke/tube, approximately uniform arc-length samples |
+| `ellipsoid` | center, scale, optional Euler rotation | Ellipsoidal shell |
+| `patch` | Four perimeter-ordered corners | Bilinear quadrilateral surface |
+
+Each part has a unique ASCII `id` and optional particle `weight` (0.1–10, default 1). Weights allocate existing particles; adding parts does not add particles. Limits: 24 parts per assembly, eight assemblies per expanded program, 32 KiB per record and ten seconds per program. Coordinates are bounded to ±2, ellipsoid scales to 0.02–1.5 and rotations to ±π. The manifest declares geometry budgets. Invalid structures, coordinates and unsupported fields are rejected with AST paths.
+
+## Motion and identity
+
+Optional per-part motion independently applies periodic translation and Euler rotation around a world-space pivot:
+
+```json
+{"pivot":[0,-0.7,0],"translate":[0,0.03,0],"rotate":[0,0,0.06],"periodMs":4000,"phase":0}
+```
+
+Translation amplitudes are bounded to ±0.4, rotation amplitudes to ±0.6 radians, and periods to 1–10 seconds. Part motion continues after the assemble transition completes. Cancellation freezes it at the current pose. Agent status changes retain their preemption priority.
+
+Keep IDs, kinds, weights and curve point counts stable between consecutive poses. Declaration order is irrelevant. The engine reuses the particle-to-part mapping for that topology. Different topologies receive a deterministic spatial Morton-order assignment. Each particle retains its identity, and interrupted transitions start at its current geometry position. Primitive/assembly transitions share this path after the first assembly.
+
+Spatial assignment is approximate, not globally optimal transport; paths can cross. There is no collision avoidance, contact physics, joint solver, arbitrary mesh loader, shader injection or generated executable code. Connected parts need consistent coordinates and pivots from the model. This is a kinematic composition system inspired by a microbot swarm, not a physical simulation.
+
+## Planner and verification
+
+The planner receives a strict assembly schema and instructions to invent coherent geometry rather than merely select named shapes. It mixes assemblies with flow/posture nodes, preserves IDs between poses and can use independent part motion. Native inference now has a 45-second deadline because geometry output is larger. Synthetic creative Codex inference took about 26 seconds and produced an accepted eight-part character. The direct API path remains optional. Rendering continues while inference runs.
+
+`integrations/sculpture-examples.mjs` contains a seven-part peace-sign hand and a six-part bird with articulated wings as fixtures; neither is registered as a built-in shape. Actual WebGL screenshots are in `docs/evidence/composition-peace.png` and `composition-bird.png`. The independent Codex-generated example is `docs/evidence/generated-sculpture.json` and `composition-generated.png`.
+
+Braille still has lower detail than inline pixels or WebGL. Screenshot inspection demonstrates rendered geometry, not human recognition/emotion accuracy. Tests cover validation, macro lowering/conflicts, interrupted continuity, part motion, cancellation, schema agreement and legacy regressions. Local timing observations are not a performance certification.

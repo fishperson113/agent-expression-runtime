@@ -9,6 +9,7 @@ Nodes:
 - `shapeQuality`: absolute `rise`/`advance` targets −1…1, `spread`/`grow` scales 0.25…2, required durationMs. Negative rise/advance mean sink/retreat; scales below 1 mean enclose/shrink. Optional `path` is spoke or arc. `effort: {time,weight,flow}` has 0…1 values: sustained→sudden timing, bounded inertia, bound→free micro-motion. Repetition does not accumulate displacement or scale. These are POC transfer functions, not fixed emotion labels.
 
 - `morph`: `{ "type":"morph", "target":"wall", "durationMs":900 }`
+- `assemble`: invent geometry from `parts`, with required durationMs. Example: `{"type":"assemble","durationMs":1200,"parts":[{"id":"stroke","kind":"curve","points":[[-0.5,0,0],[0,0.5,0],[0.5,0,0]],"radius":0.03}]}`. Combine curve tubes, ellipsoid shells (`center`, `scale`, optional `rotation`) and quadrilateral patches (four perimeter-ordered `points`). Keep stable unique IDs, kinds, particle weights and point counts across poses. At most 24 parts, 12 curve control points and eight assemblies per expanded program; coordinates ±2. Optional per-part `motion` has `pivot`, `translate`, `rotate`, `periodMs`, `phase`; consult the shared schema. `assemble` owns the same channel as `morph`.
 - `flow`: `{ "type":"flow", "field":"orbit", "strength":0.35, "durationMs":1800 }`
 - `style`: optional color (`#RRGGBB`), brightness, pointSize, dispersion; required durationMs.
 - `sequence` / `parallel`: `children` array. Parallel branches must not write the same property during overlapping time ranges.
