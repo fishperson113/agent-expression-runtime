@@ -89,3 +89,18 @@ it.each([16 / 9, 9 / 16, 0.4])('contains every shapeQuality boundary combination
       }
     }
 });
+it.each([16 / 9, 9 / 16, 0.4])('reserves framing headroom so grow remains visible at aspect %s', aspect => {
+  const camera = new PerspectiveCamera(42, aspect, 0.1, 100), point = new Vector3(); fitCamera(camera, aspect);
+  const wall = shapeBuffers(200)[capability.shapes.indexOf('wall')];
+  const extent = (grow: number) => {
+    const positions = wall.map(value => value * grow); frameBody(positions, positions.length / 3, camera, grow);
+    let maximum = 0;
+    for (let i = 0; i < positions.length; i += 3) {
+      point.fromArray(positions, i).project(camera); maximum = Math.max(maximum, Math.abs(point.x), Math.abs(point.y));
+    }
+    return maximum;
+  };
+  const neutral = extent(1), expanded = extent(1.3), largest = extent(2);
+  expect(expanded / neutral).toBeGreaterThan(1.2); expect(largest / expanded).toBeGreaterThan(1.3);
+  expect(largest).toBeLessThanOrEqual(0.881);
+});

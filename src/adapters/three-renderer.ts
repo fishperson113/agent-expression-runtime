@@ -6,10 +6,10 @@ import { sampleBody } from './body-geometry';
 import { TargetBoids } from '../core/geometry/boids';
 import { shapeBuffers } from '../core/geometry/primitives';
 export { shapeBuffers } from '../core/geometry/primitives';
-export function frameBody(positions: Float32Array, count: number, camera: THREE.PerspectiveCamera) {
+export function frameBody(positions: Float32Array, count: number, camera: THREE.PerspectiveCamera, grow = 1) {
   camera.updateMatrixWorld();
   const view = camera.matrixWorldInverse.elements, projection = camera.projectionMatrix.elements;
-  const distance = -view[14], margin = 0.88;
+  const distance = -view[14], margin = 0.44 * Math.max(0.25, Math.min(2, grow));
   let fit = 1;
   for (let i = 0; i < count * 3; i += 3) {
     const x = positions[i], y = positions[i + 1], z = positions[i + 2];
@@ -115,7 +115,7 @@ export class ThreeRenderer implements RendererSink {
     const angle = this.orbit.advance(now, state.flowStrength * amp * state.flowWeights[capability.fields.indexOf('orbit')]);
     sampleBody(this.shapes, this.positions, this.count, state, now, angle, this.reducedMotion);
     this.swarm.apply(this.positions, this.count, now, state.particleGroups, !this.reducedMotion);
-    frameBody(this.positions, this.count, this.camera);
+    frameBody(this.positions, this.count, this.camera, Number(state.grow));
     this.geometry.attributes.position.needsUpdate = true;
     this.material.uniforms.color.value = this.color.set(String(state.color));
     this.material.uniforms.size.value = Number(state.pointSize);

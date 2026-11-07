@@ -38,6 +38,8 @@ Keep IDs, kinds, weights and curve point counts stable between consecutive poses
 
 Both native and WebGL rendering now use target-aware boids after geometry sampling. Attraction to assigned targets dominates; mild separation, alignment and target-relative cohesion add flock motion without pulling a hand or face into a generic flock. Neighbours belong to the same part. A spatial grid limits each particle to 32 candidate checks and eight neighbours; timestep subdivision, damping and a speed cap bound long-frame behaviour. Reduced motion bypasses steering. `fisch status` exposes particle count, neighbour checks and mean target error under `swarm`.
 
+Framing reserves growth headroom: a neutral body has half the maximum framing budget, and `grow: 2` may use the full safe 0.88 projection margin. `grow: 1.3` therefore remains visibly larger on landscape and portrait viewports instead of immediately being cancelled by auto-fit. The tradeoff is a smaller neutral silhouette. Extreme posture/spread combinations still fit within the safe frame.
+
 Spatial assignment is approximate, not globally optimal transport; paths can cross. Separation is visual steering, not guaranteed collision avoidance. There is no contact physics, joint solver, arbitrary mesh loader, shader injection or generated executable code. Connected parts need consistent coordinates and pivots from the model. This is a kinematic composition system inspired by a microbot swarm, not a physical simulation.
 
 ## Planner and verification

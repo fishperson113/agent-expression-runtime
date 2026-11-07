@@ -6,7 +6,7 @@ Keep Codex or Claude running in one pane. In the neighboring free pane, run:
 fisch run
 ```
 
-Fisch displays the body in that pane, discovers the existing agent and installs prompt/lifecycle hooks without replacing other configured integrations. The path is:
+Fisch displays the body in that pane and discovers the existing agent. Hook setup is explicit: `fisch hooks install codex` or `fisch hooks install claude`, with `fisch hooks uninstall` to remove it. Launch only inspects settings. The path is:
 
 `actual user message hook → immediate local attention → event-bound model reaction → expression engine → pane`
 
@@ -30,8 +30,8 @@ fisch cancel
 fisch stop
 ```
 
-`express` accepts an AST or an envelope containing `body`, `kind`, `track`, `policy` and `ttlMs`. `cancel` cancels motion and resets posture without selecting another shape. Manual control pauses automatic reactions until the next user message. `stop`, q or Ctrl+C closes the body and its private socket, leaving the existing agent running. Hook configuration remains installed but bounded delivery is a no-op without a body. If the agent disappears, Fisch exits. Restarting Fisch starts a fresh engine; definitions must be sent again.
+`express` accepts an AST or an envelope containing `body`, `kind`, `track`, `policy` and `ttlMs`. `cancel` cancels motion and resets posture without selecting another shape. Manual control pauses automatic reactions until the next user message. `stop`, q or Ctrl+C closes the body and its private socket, leaving the existing agent running. Explicitly installed hooks stay installed until uninstalled; shell guards skip Node outside Herdr and a missing body is a bounded no-op. The standalone managed runner does not depend on the checkout path. If the agent disappears, Fisch exits. Restarting Fisch starts a fresh engine; definitions must be sent again.
 
-Herdr clients with inline RGB support display projected particles. Otherwise Fisch uses colored Braille with lower detail, using the same geometry and scheduler. The installed preview reports unavailable cell dimensions and uses Braille. No browser fallback opens.
+Herdr clients with inline RGB support display projected particles. Otherwise Fisch uses lower-detail Braille with per-cell RGB colors, including red/blue particles with little green. Disabled graphics stays disabled: Fisch never edits Herdr configuration or reloads it. The installed preview uses Braille. No browser fallback opens.
 
 See [runtime requirements](browser-and-hosts.md) and `fisch doctor` for attachment/hook diagnostics.

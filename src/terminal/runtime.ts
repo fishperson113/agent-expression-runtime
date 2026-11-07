@@ -31,7 +31,7 @@ export class TerminalRenderer implements RendererSink {
     const angle = this.orbit.advance(now, state.flowStrength * state.flowWeights[capability.fields.indexOf('orbit')]);
     sampleBody(this.shapes, this.positions, this.count, state, now, angle);
     this.swarm.apply(this.positions, this.count, now, state.particleGroups);
-    frameBody(this.positions, this.count, this.camera);
+    frameBody(this.positions, this.count, this.camera, Number(state.grow));
     for (let i = 0; i < this.pixels.length; i += 3) {
       this.pixels[i] = 8; this.pixels[i + 1] = 14; this.pixels[i + 2] = 20;
     }
