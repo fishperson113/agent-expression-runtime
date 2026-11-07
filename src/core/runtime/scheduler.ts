@@ -1,10 +1,11 @@
-import type { BodyState, Clock, DiagnosticsSink, RendererSink } from '../ports';
+import type { Clock, DiagnosticsSink, RendererSink } from '../ports';
 import type { Compiled, ProgramIR, StateIR, Op } from './ir';
 import type { Property, Value } from '../ast/types';
 import { capability } from '../../primitives/registry';
 import { ParticleFormation } from '../geometry/morph';
 import type { Sculpture } from '../geometry/types';
-export const initialState = (): BodyState => ({
+import { PresenceMotion, type PresenceState } from './presence';
+export const initialState = (): PresenceState => ({
   shape: 'sphere',
   shapeWeights: capability.shapes.map(name => Number(name === 'sphere')),
   flow: 'orbit',
@@ -38,6 +39,9 @@ const restPosture = { rise: 0, advance: 0, spread: 1, grow: 1, arcOffset: 0 };
 type Blend = { from: number; to: number; start: number; duration: number; easing: string };
 export class Scheduler {
   private formation = new ParticleFormation();
+  private presence = new PresenceMotion();
+  private renderAt?: number;
+  private renderTime = 0;
   epoch = 'idle';
   state = initialState();
   private lastSeq = -1;
@@ -274,9 +278,21 @@ export class Scheduler {
     const now = this.clock.now();
     this.advance(now);
     this.sampleBaseline(now);
-    this.formation.tick(now); this.state.particlePositions = this.formation.points;
+    const requested = this.state.presenceIntent ?? { activity: 'idle' };
+    const renderer = this.sink as RendererSink & { reducedMotion?: boolean };
+    const intent = renderer.reducedMotion && requested.mode !== 'off'
+      ? { ...requested, mode: 'reduced' as const } : requested;
+    this.state.presencePose = this.presence.sample(now, intent,
+      ['shape', 'rise', 'advance', 'grow', 'spread', 'arcOffset'].some(p => this.owned.has(p as Property)));
+    this.formation.motionMode = intent.mode ?? 'normal';
+    this.formation.quiet = !!this.state.presenceIntent && ['idle', 'done', 'unknown'].includes(intent.activity);
+    this.formation.tick(now);
+    this.state.particlePositions = this.formation.perform(this.state.presencePose.parts);
     this.state.particleGroups = this.formation.points ? this.formation.groups : undefined;
-    this.sink.apply({ ...this.state, shapeWeights: [...this.state.shapeWeights] }, now);
+    const dt = this.renderAt === undefined ? 0 : Math.max(0, Math.min(100, now - this.renderAt));
+    this.renderAt = now;
+    if (intent.mode !== 'off') this.renderTime += dt;
+    this.sink.apply({ ...this.state, shapeWeights: [...this.state.shapeWeights] }, this.renderTime);
   }
   dispose() {
     this.active = undefined;

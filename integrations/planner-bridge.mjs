@@ -3,14 +3,26 @@ import { plannerConfig, modelPlanner } from './planner-provider.mjs';
 import { processPlanner } from './planner-process.mjs';
 import { warmCodexPlanner } from './planner-codex.mjs';
 import { InteractionBody, attentionBody } from './interaction-body.mjs';
+import { validatePerformance } from './expression-plan.mjs';
+
+function performancePlanner(plan, body) {
+  if (!plan) return null;
+  const wrapped = async (context, signal) => {
+    const value = await plan({ ...context, presentation: { medium: 'braille',
+      emphasis: 'large silhouette changes, articulated poses, readable holds' } }, signal);
+    body.remember(value); return value;
+  };
+  wrapped.close = () => plan.close?.(); wrapped.transport = () => plan.transport?.();
+  return wrapped;
+}
 
 export function paneActivity(engine, agent, call, config = plannerConfig(undefined, undefined, agent), { plan, now } = {}) {
   let source = 'ambient', status, transitions = 0, received = 0;
   const native = ['codex', 'claude'].includes(config.backend), body = new InteractionBody(engine, now);
   const inference = config.backend === 'codex' ? warmCodexPlanner(config) : native ? processPlanner(config) : modelPlanner(config);
-  const planner = new ExpressionPlanner({ engine, now, plan: plan ?? inference, reason: config.reason,
+  const planner = new ExpressionPlanner({ engine, now, plan: performancePlanner(plan ?? inference, body), reason: config.reason,
     requireAssembly: !!config.enabled, timeoutMs: native ? 45000 : 4000,
-    onApplied: (_, reaction) => { source = 'planner'; body.react(reaction); } });
+    onApplied: (geometry, reaction) => { source = 'planner'; body.react(reaction, geometry); } });
   engine.express({ body: attentionBody() });
   return {
     update(next) {
@@ -25,18 +37,25 @@ export function paneActivity(engine, agent, call, config = plannerConfig(undefin
       else if (event.type === 'needs_user' || event.type === 'interrupted') source = 'reflex';
       return { status: 'accepted', eventId: event.id };
     },
-    tick() { planner.tick(); if (!planner.paused) body.tick(status); },
+    tick() { planner.tick(); if (planner.paused) body.presence(status); else body.tick(status); },
     express(args) {
-      const result = engine.express(args);
-      if (result.status === 'accepted' && args.kind !== 'define') { planner.invalidate(); body.releaseAttention(); source = 'manual'; }
+      const score = validatePerformance(args.performance, args.body), { performance, ...command } = args;
+      const result = engine.express(command);
+      if (result.status === 'accepted' && args.kind !== 'define') {
+        planner.invalidate(); body.releaseAttention(); body.setPerformance(score); source = 'manual';
+      }
       return result;
     },
-    cancel() { planner.invalidate(); body.releaseAttention(); source = 'cancelled'; return engine.cancel(); },
+    cancel() {
+      planner.invalidate(); body.releaseAttention(); source = 'cancelled';
+      const result = engine.cancel(); body.setPerformance(null); return result;
+    },
     close() { planner.close(); },
     get status() { return status; },
     get source() { return source; },
     get transitions() { return transitions; },
     get planner() { return { ...planner.info, backend: config.backend, interactionEvents: received,
+      ambient: engine.state?.presencePose,
       eventSource: received ? 'agent-hooks' : 'awaiting-agent-hooks' }; },
   };
 }

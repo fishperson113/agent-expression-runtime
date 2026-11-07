@@ -1,10 +1,22 @@
 const dots = [[0, 0, 1], [0, 1, 2], [0, 2, 4], [1, 0, 8], [1, 1, 16], [1, 2, 32], [0, 3, 64], [1, 3, 128]];
+function brightestPixel(pixels, width, height, dotX, dotY, dotWidth, dotHeight) {
+  const left = Math.min(width - 1, Math.floor(dotX * width / dotWidth));
+  const top = Math.min(height - 1, Math.floor(dotY * height / dotHeight));
+  const right = Math.min(width, Math.max(left + 1, Math.floor((dotX + 1) * width / dotWidth)));
+  const bottom = Math.min(height, Math.max(top + 1, Math.floor((dotY + 1) * height / dotHeight)));
+  let best = -1, peak = 35;
+  for (let y = top; y < bottom; y++) for (let x = left; x < right; x++) {
+    const offset = (y * width + x) * 3;
+    const value = Math.max(pixels[offset], pixels[offset + 1], pixels[offset + 2]);
+    if (value > peak) { best = offset; peak = value; }
+  }
+  return best;
+}
 function brailleCell(pixels, width, height, columns, rows, col, row) {
   let mask = 0, count = 0; const rgb = [0, 0, 0];
   for (const [dx, dy, bit] of dots) {
-    const x = Math.min(width - 1, Math.floor((col * 2 + dx) * width / (columns * 2)));
-    const y = Math.min(height - 1, Math.floor((row * 4 + dy) * height / (rows * 4))), offset = (y * width + x) * 3;
-    if (Math.max(pixels[offset], pixels[offset + 1], pixels[offset + 2]) <= 35) continue;
+    const offset = brightestPixel(pixels, width, height, col * 2 + dx, row * 4 + dy, columns * 2, rows * 4);
+    if (offset < 0) continue;
     mask |= bit; count++;
     for (let channel = 0; channel < 3; channel++) rgb[channel] += pixels[offset + channel];
   }
