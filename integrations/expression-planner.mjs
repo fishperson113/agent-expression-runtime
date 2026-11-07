@@ -25,10 +25,11 @@ export class ExpressionPlanner {
     this.seen.add(event.id); if (this.seen.size > 128) this.seen.delete(this.seen.values().next().value);
     if (event.type === 'user_message') {
       this.invalidate(); this.paused = false; this.current = { ...event, text: redactMessage(event.text) };
-      this.requestsThisTurn = 0; this.lastRequest = -Infinity; this.pending = this.current;
+      this.obstacle = null; this.requestsThisTurn = 0; this.lastRequest = -Infinity; this.pending = this.current;
     } else if (event.type === 'interrupted') this.invalidate();
-    else if (['task_failure', 'task_success', 'needs_user'].includes(event.type) && !this.paused && this.status === 'working') {
-      if (this.pending?.type !== 'user_message') this.pending = event;
+    else if (['task_failure', 'task_success', 'needs_user'].includes(event.type)) {
+      if (['needs_user', 'task_failure'].includes(event.type)) this.obstacle = event;
+      if (this.status === 'working' && this.requestsThisTurn < 2) this.pending = event;
     }
     return true;
   }
@@ -58,6 +59,9 @@ export class ExpressionPlanner {
       });
       const value = await Promise.race([this.plan(context, controller.signal), timeout, cancellation]);
       if (this.closed || generation !== this.generation || controller.signal.aborted) { this.discarded++; return; }
+      if (this.obstacle && this.obstacle.id !== event.id && this.obstacle.at >= event.at) {
+        this.discarded++; this.mode = 'ready'; return;
+      }
       if (value.eventId !== event.id) throw Error('event_mismatch');
       const body = planBody(value, this.requireAssembly), result = this.engine.express({ body });
       if (result.status !== 'accepted') throw Error('invalid_plan');

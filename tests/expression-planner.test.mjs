@@ -96,3 +96,12 @@ it('settles moving geometry without discarding session macros', () => {
     expect(engine.express({ body: { type: 'call', name: 'remember', revision: 1, args: {} } }).status).toBe('accepted');
   } finally { engine.dispose(); }
 });
+it('keeps a newer needs-user cue from being overwritten by a delayed earlier reaction', async () => {
+  let resolve; const f = fixture(context => new Promise(done => { resolve = () => done(result(context)); }));
+  try {
+    f.planner.accept(event()); f.planner.tick();
+    expect(f.planner.accept(event('turn', 'PermissionRequest'))).toBe(true);
+    resolve(); await f.planner.job;
+    expect(f.submitted).toHaveLength(0); expect(f.planner.info.discarded).toBe(1);
+  } finally { f.planner.close(); }
+});
