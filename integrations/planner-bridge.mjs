@@ -8,7 +8,7 @@ export function paneActivity(engine, agent, call, config = plannerConfig(undefin
   let source = 'reflex';
   const native = ['codex', 'claude'].includes(config.backend);
   const planner = new ExpressionPlanner({ engine, now, plan: plan ?? (native ? processPlanner(config) : modelPlanner(config)), reason: config.reason,
-    timeoutMs: native ? 20000 : 4000, intervalMs: native ? 30000 : 10000, debounceMs: native ? 2000 : 0,
+    timeoutMs: native ? 45000 : 4000, intervalMs: native ? 30000 : 10000, debounceMs: native ? 2000 : 0,
     onApplied: () => { source = 'planner'; },
     readContext: async () => {
       const result = await call('pane.read', { pane_id: agent.pane_id, source: 'recent_unwrapped', lines: 32, format: 'text' });

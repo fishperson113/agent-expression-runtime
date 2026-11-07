@@ -28,7 +28,7 @@ function validateMotion(value: unknown, path: string) {
 function validatePart(value: unknown, path: string): Part {
   const p = object(value, ['id', 'kind', 'weight', 'motion', 'points', 'radius', 'center', 'scale', 'rotation'], path);
   if (typeof p.id !== 'string' || !/^[A-Za-z][\w-]{0,31}$/.test(p.id)) fail(path + '.id');
-  scalar(p.weight ?? 1, 0.1, 10, path + '.weight');
+  scalar(p.weight === undefined ? 1 : p.weight, 0.1, 10, path + '.weight');
   validateMotion(p.motion, path + '.motion');
   const fields = p.kind === 'curve' ? ['points', 'radius'] : p.kind === 'ellipsoid' ? ['center', 'scale', 'rotation']
     : p.kind === 'patch' ? ['points'] : fail(path + '.kind');

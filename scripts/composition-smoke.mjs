@@ -18,6 +18,7 @@ try {
   for (const [name, parts] of [['peace', peaceParts()], ['bird', birdParts()]]) {
     await page.getByLabel('Program body', { exact: true }).fill(JSON.stringify(sculptureProgram(parts)));
     await page.getByRole('button', { name: 'Apply program', exact: true }).click();
+    await page.waitForFunction(() => document.querySelector('#shape')?.textContent.includes('assembled'));
     await page.waitForTimeout(1600);
     const feedback = await page.locator('#feedback').textContent();
     if (/diagnostic|reject|error/i.test(feedback)) throw Error(feedback);

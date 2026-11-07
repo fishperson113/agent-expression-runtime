@@ -4,10 +4,12 @@ import { RenderHost } from './render-host';
 import { FakeAgent, capabilityPrompt, type AgentStreamAdapter } from '../adapters/provider';
 import { capability } from '../primitives/registry';
 import type { Envelope } from '../core/ast/types';
-import type { Compiled } from '../core/runtime/ir';
+import type { Compiled, ProgramIR } from '../core/runtime/ir';
 import { TauriAgent } from '../adapters/tauri-agent';
 import { GatewayConnection } from '../adapters/gateway-client';
 import { HttpGatewayConnection } from '../adapters/http-gateway-client';
+const describeIntent = (ir: ProgramIR) => ir.ops.filter(o => o.property === 'shape' || o.property === 'flow')
+  .map(o => typeof o.value === 'object' ? `assembled (${o.value.parts.length} parts)` : o.value).join(' / ') || 'style transition';
 const root = document.querySelector<HTMLDivElement>('#app')!;
 root.innerHTML = `<header><a class="brand" href="/">fisch<span> / </span>expression runtime</a><span class="badge">LOCAL SANDBOX · v0.1</span></header>
 <main><section class="intro"><div><p class="eyebrow">A BODY FOR YOUR AGENT</p><h1>Presence, in motion.</h1><p>Declarative expression. Independent content. One particle body.</p></div><div class="session"><span class="dot"></span><span id="session">Idle · procedural presence</span></div></section>
@@ -133,13 +135,7 @@ const compiler = new CompilerHost(
           compiler.settleDefinition(ir, ['accepted', 'state', 'defined'].includes(status)),
         );
     else compiler.settleDefinition(ir, false);
-    if (ir.kind === 'program') {
-      $('shape').textContent =
-        ir.ops
-          .filter((o) => o.property === 'shape' || o.property === 'flow')
-          .map((o) => o.value)
-          .join(' / ') || 'style transition';
-    }
+    if (ir.kind === 'program') $('shape').textContent = describeIntent(ir);
     if ($<HTMLInputElement>('record').checked && capture.length < 1000)
       capture.push({ at: performance.now() - captureStart, ir });
     $('queue').textContent = `${compiler.depth} / 4`;

@@ -3,12 +3,26 @@ import { createServer } from 'node:http';
 import { plannerConfig, modelPlanner } from '../integrations/planner-provider.mjs';
 import { paneActivity } from '../integrations/planner-bridge.mjs';
 import { terminalEngine } from '../scripts/pane-session.mjs';
+import { planSchema } from '../integrations/expression-plan.mjs';
 
 const absent = new URL('../.runtime/no-planner-env', import.meta.url);
 const plan = { body: { type: 'sequence', children: [{ type: 'parallel', children: [
   { type: 'morph', target: 'wave', durationMs: 200 },
 ] }] } };
 const result = value => ({ status: 'completed', output: [{ content: [{ type: 'output_text', text: JSON.stringify(value) }] }] });
+it('keeps all nested geometry objects compatible with strict structured outputs', () => {
+  function visit(value) {
+    if (!value || typeof value !== 'object') return;
+    if (value.type === 'object') {
+      expect(value.additionalProperties).toBe(false);
+      expect([...value.required].sort()).toEqual(Object.keys(value.properties).sort());
+    }
+    for (const child of Object.values(value)) {
+      if (Array.isArray(child)) child.forEach(visit); else visit(child);
+    }
+  }
+  visit(planSchema);
+});
 it('requires explicit model config, protects credentials and permits local inference', () => {
   expect(plannerConfig({}, absent).backend).toBe('codex');
   const local = plannerConfig({ FISCH_PLANNER_BACKEND: 'api', FISCH_PLANNER_MODEL: 'test', FISCH_PLANNER_URL: 'http://127.0.0.1:8000/v1/responses', OPENAI_API_KEY: 'private' }, absent);
