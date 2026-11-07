@@ -8,11 +8,13 @@ fisch run
 
 Fisch renders inside that pane and automatically subscribes to Herdr lifecycle events for the existing agent. The default path is:
 
-`agent activity → Herdr status event → Fisch activity hook → expression engine → pane`
+`agent activity → immediate reflex → expression engine → pane`
 
-The model does not call a tool, run `fisch express`, receive attachment prompts, or choose these expressions. There is no browser, new conversation, model API key or agent restart. The hook receives status metadata only; Fisch does not read chat text or transcripts.
+`bounded pane context → background Codex/Claude planner → validated plan → same engine`
 
-Working selects cloud/orbit, blocked selects wall/pulse, done selects sphere/pulse, and idle selects a quiet sphere/orbit. These are editable activity presets in `integrations/agent-hooks.mjs`, not inferred emotions or semantic reactions to the conversation. Repeated statuses do not restart a morph. The event socket reconnects with bounded backoff; periodic snapshots reconcile missed state changes.
+The main agent does not call a tool, run `fisch express`, or receive attachment prompts. A separate noninteractive process chooses contextual expressions. There is no browser, new conversation, model API key or agent restart. The reflex hook receives status metadata; the planner reads a bounded recent terminal excerpt from the selected pane, not transcript files. See [planner data scope and configuration](expression-planner.md).
+
+Working selects cloud/orbit, blocked selects wall/pulse, done selects sphere/pulse, and idle selects a quiet sphere/orbit. These are editable activity presets in `integrations/agent-hooks.mjs`, not inferred emotions. The asynchronous planner can replace them with context-sensitive plans. Repeated statuses do not restart a morph. The event socket reconnects with bounded backoff; periodic snapshots reconcile missed state changes.
 
 Discovery prefers the same tab and working directory within the same workspace. If several agents match equally, Fisch asks for `fisch run --agent <pane-id>` rather than guessing. The renderer pane itself is excluded.
 

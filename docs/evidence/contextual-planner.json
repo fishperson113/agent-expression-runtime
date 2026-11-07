@@ -1,0 +1,32 @@
+{
+  "timestamp": "2026-11-07T00:35:40.674Z",
+  "status": {
+    "status": "attached",
+    "agent": "codex",
+    "agentPane": "w4:pJ",
+    "rendererPane": "w4:pK",
+    "renderer": "braille",
+    "frames": 336,
+    "expressions": 0,
+    "shape": "sphere",
+    "integration": "automatic-hooks",
+    "activity": "working",
+    "transitions": 1,
+    "eventsConnected": true,
+    "planner": {
+      "mode": "ready",
+      "attempts": 2,
+      "applied": 1,
+      "discarded": 1,
+      "queued": true,
+      "error": null,
+      "backend": "codex"
+    }
+  },
+  "liveProvider": "signed-in Codex CLI process",
+  "mainAgentToolCallsRequired": false,
+  "directApiConfigured": false,
+  "contextStoredInEvidence": false,
+  "liveClaudeInference": "not-assessed",
+  "humanExpressiveness": "not-assessed"
+}

@@ -22,4 +22,4 @@ For custom HTTP/MCP hosts, see [the protocol reference](integration.md). That ad
 
 ## Hook scope
 
-This uses the multiplexer’s `pane.agent_status_changed` event hook for Codex and Claude, not native provider hook configuration. It requires no edits to agent settings or hook trust. Native Codex [lifecycle hooks](https://learn.chatgpt.com/docs/hooks) are a separate mechanism requiring review and trust; Fisch does not bypass that mechanism. Current presets visualize activity only and do not interpret the meaning of replies.
+This uses the multiplexer’s `pane.agent_status_changed` event hook for Codex and Claude, not native provider hook configuration. It requires no edits to agent settings or hook trust. Native Codex [lifecycle hooks](https://learn.chatgpt.com/docs/hooks) are a separate mechanism requiring review and trust; Fisch does not bypass that mechanism. Status presets visualize activity immediately. A separate background Codex/Claude process adds contextual planning from a bounded terminal excerpt; see [the planner guide](expression-planner.md). API transport is optional.

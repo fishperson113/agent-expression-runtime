@@ -1,4 +1,4 @@
-import { activityHook } from './agent-hooks.mjs';
+import { activityHook, activityBody } from './agent-hooks.mjs';
 import { ExpressionPlanner } from './expression-planner.mjs';
 import { plannerConfig, modelPlanner } from './planner-provider.mjs';
 import { processPlanner } from './planner-process.mjs';
@@ -7,7 +7,8 @@ export function paneActivity(engine, agent, call, config = plannerConfig(undefin
   const reflex = activityHook(engine);
   const native = ['codex', 'claude'].includes(config.backend);
   const planner = new ExpressionPlanner({ engine, plan: native ? processPlanner(config) : modelPlanner(config), reason: config.reason,
-    timeoutMs: native ? 20000 : 4000, intervalMs: native ? 30000 : 10000,
+    timeoutMs: native ? 20000 : 4000, intervalMs: native ? 30000 : 10000, debounceMs: native ? 2000 : 0,
+    onContextChange: status => { engine.cancel(); engine.express({ body: activityBody(status) }); },
     readContext: async () => {
       const result = await call('pane.read', { pane_id: agent.pane_id, source: 'recent_unwrapped', lines: 32, format: 'text' });
       return result.read?.text ?? result.text ?? '';

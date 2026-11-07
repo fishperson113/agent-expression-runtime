@@ -54,14 +54,26 @@ it('bounds and redacts common credentials from context', () => {
   expect(text.length).toBeLessThanOrEqual(6000);
   expect(text).not.toContain('abcdefghijklmnopqrstuvwxyz'); expect(text).not.toContain('private');
   expect(text).not.toContain('\x1b');
+  expect(cleanContext('context\n• Working (10m 01s • esc to interrupt) · 1 background terminal running'))
+    .toBe(cleanContext('context\n• Working (10m 02s • esc to interrupt) · 1 background terminal running'));
 });
 it('invalidates in-flight work when context changes within the same working status', async () => {
-  let now = 0, text = 'old request', resolve; const submitted = [];
+  let now = 0, text = 'old request', resolve, reflexes = 0; const submitted = [];
   const planner = new ExpressionPlanner({ now: () => now, readContext: async () => text,
+    onContextChange() { reflexes++; },
     engine: { express(value) { submitted.push(value); return { status: 'accepted' }; } },
     plan: () => new Promise(done => { resolve = done; }) });
   planner.update('working'); planner.tick(); await planner.reading;
   const oldJob = planner.job; text = 'new user topic'; now = 2001;
   planner.tick(); await planner.reading; resolve(planValue('cloud')); await oldJob;
-  expect(submitted).toEqual([]); expect(planner.info.discarded).toBe(1); planner.close();
+  expect(submitted).toEqual([]); expect(reflexes).toBe(2); expect(planner.info.discarded).toBe(1); planner.close();
+});
+it('waits for a quiet context window before starting a native process', async () => {
+  let now = 0, text = 'streaming', calls = 0;
+  const planner = new ExpressionPlanner({ now: () => now, debounceMs: 2000, readContext: async () => text,
+    engine: { express() { return { status: 'accepted' }; } }, plan: async () => { calls++; return planValue('wave'); } });
+  planner.update('working'); planner.tick(); await planner.reading; expect(calls).toBe(0);
+  text = 'stable'; now = 2000; planner.tick(); await planner.reading; expect(calls).toBe(0);
+  now = 4000; planner.tick(); await planner.reading; await planner.job;
+  expect(calls).toBe(1); expect(planner.info.applied).toBe(1); planner.close();
 });

@@ -1,6 +1,6 @@
 # Fisch
 
-A provider-independent, Windows-first Tauri + TypeScript runtime: a particle body controlled by a bounded, declarative JSON AST. External agents connect through authenticated local HTTP/SSE or the MCP adapter. The engine itself requires no model account, model SDK or API key; the pane launcher attaches to your existing Codex or Claude session.
+A provider-independent, Windows-first Tauri + TypeScript runtime: a particle body controlled by a bounded, declarative JSON AST. External agents connect through authenticated local HTTP/SSE or the MCP adapter. The expression engine and status reflexes require no model account, model SDK or API key; the pane launcher attaches to your existing Codex or Claude session.
 
 ![Browser sandbox](docs/evidence/browser-desktop.png)
 
@@ -13,6 +13,8 @@ fisch run
 ```
 
 Fisch displays its particle body inside that pane, discovers the existing agent in the same workspace, and subscribes to its lifecycle status events. Activity automatically drives the expression engine; the agent receives no extra prompt and calls no Fisch tool. It opens no browser and starts no new agent. Requires Node 22.12+ and Herdr. Missing npm dependencies are installed automatically.
+
+A background Codex/Claude process also plans contextual expressions from a bounded excerpt of the agent pane, using its existing CLI login. The original agent does not call Fisch tools. API inference is optional. See [planner configuration, data scope and limits](docs/expression-planner.md). Set `FISCH_PLANNER_BACKEND=off` to keep status-only behavior.
 
 The installed Herdr client currently uses colored Braille particles; inline RGB is selected when Herdr supplies its graphics API and cell dimensions. This terminal rendering has lower visual fidelity than the browser reference renderer. See [pane workflow and controls](docs/multiplexer.md).
 
