@@ -28,7 +28,7 @@ export function plannerCommand(config, schema, directory, env = process.env, pla
   return { command, args: [...prefix, ...args] };
 }
 
-function terminate(child) {
+export function terminatePlannerProcess(child) {
   if (!child.pid || child.exitCode !== null) return;
   if (process.platform === 'win32') execFile('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true }, () => {});
   else { try { process.kill(-child.pid, 'SIGKILL'); } catch { child.kill(); } }
@@ -42,7 +42,7 @@ export function runPlannerProcess(command, args, input, signal, directory) {
     const child = spawn(command, args, { cwd: directory, env, windowsHide: true, detached: process.platform !== 'win32',
       stdio: ['pipe', 'pipe', 'pipe'], shell: false });
     let output = '', bytes = 0, failed = false;
-    const abort = () => { failed = true; terminate(child); };
+    const abort = () => { failed = true; terminatePlannerProcess(child); };
     signal.addEventListener('abort', abort, { once: true });
     child.stdout.on('data', chunk => {
       bytes += chunk.length;
