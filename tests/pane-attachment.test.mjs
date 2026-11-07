@@ -46,26 +46,33 @@ it('renders actual RGB particles into pane text when the client cannot display i
   pixels[1] = 255;
   expect(brailleFrame(pixels, 2, 4, 1, 1)).toBe('\u2801');
 });
-it('attaches to the existing agent, retries a blocked notice and releases control on stop', async () => {
+it('automatically follows agent events without prompts or expression tool calls and cleans up', async () => {
   const previous = { socket: process.env.HERDR_SOCKET_PATH, pane: process.env.HERDR_PANE_ID };
   process.env.HERDR_SOCKET_PATH = 'lifecycle-' + randomUUID();
   process.env.HERDR_PANE_ID = own.pane_id;
-  const snapshot = { panes: [own], agents: [codex], layouts: [] };
-  let notices = 0, rendered = 0;
-  const call = async (method, args) => {
+  const snapshot = { panes: [own], agents: [{ ...codex, agent_status: 'working' }], layouts: [] };
+  let rendered = 0, closed = false, pending;
+  const call = async method => {
     if (method === 'session.snapshot') return { snapshot };
     if (method === 'pane.graphics.info') throw Object.assign(Error('unavailable'), { code: 'cell_size_unavailable' });
-    expect(method).toBe('agent.prompt'); expect(args.target).toBe(codex.pane_id);
-    if (++notices === 1) throw Object.assign(Error('blocked'), { code: 'agent_blocked' });
-    expect(args.text).toContain('EXISTING');
-    expect(await sendControl('express', { body: { type: 'morph', target: 'wall', durationMs: 1 } }, codex.pane_id))
-      .toMatchObject({ status: 'accepted' });
-    expect(await sendControl('status', {}, codex.pane_id)).toMatchObject({ agentPane: codex.pane_id, expressions: 1 });
-    await sendControl('stop', {}, codex.pane_id);
+    throw Error('Unexpected agent interaction: ' + method);
+  };
+  const subscribe = (id, update) => {
+    expect(id).toBe(codex.pane_id);
+    pending = new Promise((resolve, reject) => setImmediate(async () => {
+      try {
+        update('blocked'); update('blocked'); update('done');
+        expect(await sendControl('status', {}, id)).toMatchObject({ integration: 'automatic-hooks',
+          activity: 'done', transitions: 3, expressions: 0 });
+        await sendControl('stop', {}, id); resolve();
+      } catch (error) { reject(error); }
+    }));
+    return { connected: true, close() { closed = true; } };
   };
   try {
-    expect(await runPaneSession({ call, output: { write() { rendered++; } } })).toBe(0);
-    expect(notices).toBe(2); expect(rendered).toBeGreaterThan(3);
+    expect(await runPaneSession({ call, subscribe, output: { write() { rendered++; } } })).toBe(0);
+    await pending;
+    expect(closed).toBe(true); expect(rendered).toBeGreaterThan(2);
     await expect(sendControl('status', {}, codex.pane_id)).rejects.toThrow('No Fisch body');
   } finally {
     for (const [key, value] of [['HERDR_SOCKET_PATH', previous.socket], ['HERDR_PANE_ID', previous.pane]]) {

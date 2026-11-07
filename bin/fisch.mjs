@@ -8,12 +8,12 @@ const usage = `Fisch ${version} — a particle body for your agent
 
 Usage: fisch <command>
 
-  run        Show the body in this pane; attach to existing Codex/Claude
+  run        Show the body; automatically follow Codex/Claude activity hooks
   status     Inspect the body attached to this agent pane
-  express    Send a JSON AST to the attached body
+  express    Debug: send a JSON AST to the attached body
   cancel     Cancel expressions and reset posture
   stop       Stop the attached body, keeping the agent running
-  capabilities  Print the expression contract for the agent
+  capabilities  Debug: print the expression contract
   build      Build the frontend and native engine
   test       Build and run the automated checks
   evaluate   Run browser reference A/B comparisons, without a model

@@ -12,7 +12,7 @@ Link the checkout once with `npm link`. Keep Codex or Claude running in one Herd
 fisch run
 ```
 
-Fisch displays its particle body inside that pane, discovers the existing agent in the same workspace, and sends it attachment instructions. It opens no browser and starts no new agent. Requires Node 22.12+ and Herdr. Missing npm dependencies are installed automatically.
+Fisch displays its particle body inside that pane, discovers the existing agent in the same workspace, and subscribes to its lifecycle status events. Activity automatically drives the expression engine; the agent receives no extra prompt and calls no Fisch tool. It opens no browser and starts no new agent. Requires Node 22.12+ and Herdr. Missing npm dependencies are installed automatically.
 
 The installed Herdr client currently uses colored Braille particles; inline RGB is selected when Herdr supplies its graphics API and cell dimensions. This terminal rendering has lower visual fidelity than the browser reference renderer. See [pane workflow and controls](docs/multiplexer.md).
 

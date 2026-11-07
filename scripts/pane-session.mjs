@@ -1,11 +1,13 @@
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { resolve, dirname } from 'node:path';
-import { mkdirSync, readFileSync, existsSync } from 'node:fs';
+import { mkdirSync, readFileSync, existsSync, rmSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { herdrCall, selectAgent, graphicsMode } from '../integrations/herdr.mjs';
 import { openControl } from '../integrations/terminal-ipc.mjs';
 import { displaySize, drawFrame } from '../integrations/pane-display.mjs';
+import { AgentEventHook, activityHook } from '../integrations/agent-hooks.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 async function bundler() {
@@ -24,39 +26,38 @@ async function bundler() {
 export async function terminalEngine() {
   const { build } = await bundler();
   mkdirSync(resolve(root, '.runtime'), { recursive: true });
-  const outfile = resolve(root, '.runtime/terminal.mjs');
-  await build({ entryPoints: [resolve(root, 'src/terminal/runtime.ts')], outfile,
-    bundle: true, format: 'esm', platform: 'node', target: 'node22', packages: 'external' });
-  const { TerminalEngine } = await import(pathToFileURL(outfile).href + '?build=' + Date.now());
-  return new TerminalEngine();
+  const outfile = resolve(root, `.runtime/terminal-${randomUUID()}.mjs`);
+  try {
+    await build({ entryPoints: [resolve(root, 'src/terminal/runtime.ts')], outfile,
+      bundle: true, format: 'esm', platform: 'node', target: 'node22', packages: 'external' });
+    const { TerminalEngine } = await import(pathToFileURL(outfile).href);
+    return new TerminalEngine();
+  } finally { rmSync(outfile, { force: true }); }
 }
 export function capabilities() {
   return { capabilities: JSON.parse(readFileSync(resolve(root, 'src/contracts/capabilities.json'), 'utf8')),
     schema: JSON.parse(readFileSync(resolve(root, 'src/contracts/protocol.schema.json'), 'utf8')),
     instructions: readFileSync(resolve(root, 'integrations/instructions-v1.md'), 'utf8') };
 }
-async function notifyAgent(call, agent) {
-  try {
-    await call('agent.prompt', { target: agent.pane_id, text:
-      'Fisch is now attached to this EXISTING agent session in a neighboring Herdr pane. Use `fisch status` to acknowledge, `fisch capabilities` for the AST contract, `fisch express \'{"type":"morph","target":"sphere","durationMs":900}\'` for a body expression, and `fisch cancel` to reset. Keep working on the user request. Do not launch another agent or browser.' });
-    return true;
-  } catch (error) { if (error.code === 'agent_blocked') return false; throw error; }
-}
-export async function runPaneSession({ agentPane, call = herdrCall, notify = true, output = process.stdout, signal } = {}) {
+export async function runPaneSession({ agentPane, call = herdrCall, subscribe = (id, update) => new AgentEventHook(id, update), output = process.stdout, signal } = {}) {
   let { snapshot } = await call('session.snapshot');
   const { own, agent } = selectAgent(snapshot, process.env.HERDR_PANE_ID, agentPane);
   let mode = await graphicsMode(call);
   const engine = await terminalEngine();
   const abort = new AbortController(), stop = () => abort.abort();
-  let commands = 0, frames = 0, notified = !notify;
+  const activity = activityHook(engine);
+  let commands = 0, frames = 0;
   const control = await openControl(agent.pane_id, message => {
     if (message.method === 'express') { commands++; return engine.express(message.args); }
     if (message.method === 'cancel') return engine.cancel();
     if (message.method === 'stop') { stop(); return { status: 'stopped' }; }
     if (message.method === 'status') return { status: 'attached', agent: agent.agent, agentPane: agent.pane_id,
-      rendererPane: own.pane_id, renderer: mode, frames, expressions: commands, shape: engine.state.shape };
+      rendererPane: own.pane_id, renderer: mode, frames, expressions: commands, shape: engine.state.shape,
+      integration: 'automatic-hooks', activity: activity.status, transitions: activity.transitions, eventsConnected: events.connected };
     throw Error('unknown_method');
   });
+  const events = subscribe(agent.pane_id, status => activity.update(status));
+  activity.update(agent.agent_status ?? 'unknown');
   process.once('SIGINT', stop); process.once('SIGTERM', stop); signal?.addEventListener('abort', stop, { once: true });
   if (signal?.aborted) stop();
   const wasRaw = process.stdin.isRaw ?? false;
@@ -70,11 +71,11 @@ export async function runPaneSession({ agentPane, call = herdrCall, notify = tru
         if (!snapshot.panes.some(pane => pane.pane_id === own.pane_id) ||
             !snapshot.agents.some(peer => peer.pane_id === agent.pane_id && peer.agent === agent.agent)) break;
         if (mode === 'braille' && frames > 0) mode = await graphicsMode(call);
-        if (!notified) notified = await notifyAgent(call, agent);
+        activity.update(snapshot.agents.find(peer => peer.pane_id === agent.pane_id).agent_status ?? 'unknown');
       }
       const size = displaySize(snapshot, own.pane_id), pixels = engine.frame(size.width, size.height);
       await drawFrame({ pixels, size, mode, paneId: own.pane_id, call, output,
-        title: `Fisch · ${agent.agent} ${agent.pane_id} · ${commands ? 'receiving expressions' : 'waiting for first expression'}` });
+        title: `Fisch · ${agent.agent} ${agent.pane_id} · auto: ${activity.status}` });
       frames++; await delay(100);
     }
     return 0;
@@ -83,6 +84,6 @@ export async function runPaneSession({ agentPane, call = herdrCall, notify = tru
     signal?.removeEventListener('abort', stop); process.stdin.off('data', key);
     if (process.stdin.isTTY) { process.stdin.setRawMode(wasRaw); process.stdin.pause(); }
     if (mode === 'pixels') await call('pane.graphics.clear', { pane_id: own.pane_id }).catch(() => {});
-    await control.close(); engine.dispose(); output.write('\x1b[0m\x1b[?25h\x1b[?1049l');
+    events.close(); await control.close(); engine.dispose(); output.write('\x1b[0m\x1b[?25h\x1b[?1049l');
   }
 }
