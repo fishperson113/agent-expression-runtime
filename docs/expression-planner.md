@@ -1,44 +1,56 @@
-# Contextual expression planner
+# Interaction-driven expression planner
 
-Run `fisch run` beside your existing Codex or Claude pane. Fisch observes agent status and recent terminal context automatically; the main agent needs no Fisch tool calls. No browser or interactive agent window opens.
+Fisch keeps free-form `assemble` generation: faces, hands, creatures and unexpected shapes remain possible. What changes is the trigger and purpose. A model plan responds to a specific user interaction; neither idle timers nor a repertoire slideshow create new shapes.
 
-The native backend follows the attached agent: a persistent `codex app-server --stdio` process, or `claude -p`. Both use existing CLI authentication. This is separate inference, not access to the main agent's hidden reasoning or in-memory conversation. Provider usage and account charges still apply. An external API is optional.
+## One-command attachment
 
-## Context and timing
+Run `fisch run` beside an existing Codex or Claude pane. Fisch installs a small command hook into the attached provider's user configuration, merging with existing hooks. It forwards events through private, pane-scoped IPC. The main agent calls no Fisch tools and receives no injected prompt. No browser or new interactive agent starts.
 
-Fisch reads up to 32 recent unwrapped lines from the selected agent pane, clipped to 6,000 characters. Common credentials are redacted, but arbitrary terminal output can contain sensitive data. Context travels through process stdin rather than command arguments. Fisch does not save these excerpts to conversation files; CLI/provider retention policies still apply.
+Codex uses `~/.codex/hooks.json` (or `CODEX_HOME`); Claude uses `~/.claude/settings.json` (or `CLAUDE_CONFIG_DIR`). Existing integrations and preferences are preserved. An invalid or concurrently edited configuration is left untouched and reported as an installation failure. Hooks are quiet, fail open and do nothing outside Herdr. Closing the body leaves the hook installed; without an attached body, delivery is a bounded local no-op.
 
-Context is sampled at most every two seconds without model usage. Planning has a 60-second minimum spacing within a work phase; native inference also uses a 750 ms quiet window and a 45-second deadline. A new work phase may request an initial plan immediately. Subsequent context must differ by at least 35% of the union of word tokens from the last requested context. Numbers and word order do not count; small accumulated log additions must eventually cross the threshold. This local heuristic is not semantic intent recognition and can miss short meaningful changes. Terminal updates coalesce instead of repeatedly killing inference. Working-to-idle/done transitions accept the same turn's pending result. New work, interruption and manual control invalidate obsolete jobs. Rendering continues throughout.
+**Codex requires native trust for new hook definitions.** Open `/hooks`, review the Fisch command and trust it. This is a Codex requirement, not an extra Fisch permission flow; Fisch does not modify trust records. Claude may require reviewing/reloading changed hook settings. The pane header, `fisch status` and `fisch doctor` distinguish waiting for hooks from receiving events. Installation alone does not prove delivery. See [OpenAI Docs: hooks](https://learn.chatgpt.com/docs/hooks) and [Claude hook reference](https://code.claude.com/docs/en/hooks).
 
-Codex keeps one process warm with fresh ephemeral threads. Generation still takes seconds: a live signed-in call with the current schema took about 13 seconds. Local repertoire playback supplies immediate motion while the model runs. Keeping a process warm does not guarantee faster generation.
+## What drives expression
 
-## Geometry and repertoire
+| Event | Immediate local reaction | Model use |
+|---|---|---|
+| `UserPromptSubmit` | Face the viewer, approach slightly and pulse quietly; keep an existing assembled form | One contextual reaction request |
+| `PermissionRequest` | Orient toward the user | Eligible task event while working |
+| Structured task success/failure | Small rise or hesitation on the current form | Eligible task event while working |
+| `Stop` | Settle the current gesture | No new request |
+| Codex `Interrupt` | Invalidate outstanding inference | No new request |
+| Idle/done without a new user message | Hold the previous form, breathe and let intensity fade | **Zero requests** |
 
-Model output contains a short concept label and a bounded AST with at least one assembly. Up to four sequential beats may each contain three parallel primitives, lasting 200–1,500 ms per beat. The prompt asks for coherent silhouettes, independent part motion and concepts different from recent history. Schema guards and the compiler reject invalid geometry or property conflicts. Failure preserves the current body or bootstrap reflex. See [swarm geometry](swarm-geometry.md).
+The initial attentive face is a local fallback, not a fixed-avatar restriction. Subsequent model geometry may take any supported form. Part IDs and existing topology preserve continuity where possible. Status metadata supplies working/waiting information; it never guesses the words a user said from tool logs.
 
-Up to eight distinct model-authored compositions are retained locally. Idle/done rotates them every 12 seconds; working rotates them every 18 seconds. These are local engine submissions, not fresh AI decisions. Ordinary working/idle transitions preserve geometry and adjust brightness instead of resetting to sphere/cloud/wall. An empty repertoire uses status reflexes until the first valid assembly arrives.
+Hooks receive actual `prompt` text, session and turn/prompt IDs. Subagent events are ignored. Ordinary tool output is not forwarded. Explicit exit codes or error flags can produce task events; a success cue for supported test/build commands means that command exited successfully, not that the whole project is complete. Events without a usable outcome are ignored. Current provider versions with turn IDs provide the strongest stale-event isolation; older versions without them only support session-level correlation.
 
-The ignored `.runtime/repertoire.json` stores bounded geometry ASTs and concept labels, without terminal excerpts or credentials. Restarting restores these forms immediately. Set `FISCH_REPERTOIRE_CACHE=off` to keep only an in-memory repertoire. Geometry fingerprints deduplicate near-identical forms; semantic originality is not guaranteed.
+## Timing, continuity and usage
 
-Idle/done waits five minutes before requesting a fresh plan, then waits another five minutes after completion before a second attempt. Each idle period permits at most two requests, including failures. Terminal text changes and idle/done transitions cannot bypass the delay or replenish this budget. Only resuming working resets the budget; a working request already in flight may still finish during idle without spending an idle request. After exhaustion, local repertoire animation continues without model calls. Status exposes `idleBudget.used`, `limit` and `intervalMs`. Manual expressions/cancellation pause automatic activity until a later context/status change; requests also respect a ten-second hold after manual control. Closing Fisch stops inference and replay.
+Local attention precedes inference and does not wait for a model. It aims for subsecond acknowledgement, but exact display latency depends on the machine and CLI hook startup. Native Codex uses one warm background app-server process with a fresh ephemeral thread per request. Claude uses separate noninteractive processes. Neither reuses the main agent's hidden reasoning or in-memory chat. Existing CLI authentication is used; provider usage/charges still apply. API inference is optional.
 
-## Configuration
+Each new user message starts a reaction turn. At most two model attempts are allowed in that turn: its initial reaction and, if appropriate, one later task event. Failures consume attempts. Task requests have a 60-second cooldown, coalesce into the latest event, and expire after 30 seconds rather than reacting long after the moment. There is no automatic retry timer. New user messages can react immediately, invalidate older inference and replenish the per-turn allowance. Rapid user messages can therefore still consume provider usage; this is not a global hourly token budget.
 
-No settings are needed for native CLI planning. Optional settings come from the checkout's ignored `.env`, with environment variables taking precedence:
+Idle does not schedule inference, retry failures or rotate cached shapes. A user-message request already pending or running may finish after the agent becomes idle; it is still a reaction to that message. Lingering intensity decays locally over roughly 30 seconds. Persistent part motion then freezes at its current pose and a quiet pulse remains. Settling preserves the silhouette and session macros. Manual `express`/`cancel` pauses automatic reactions until the next user message. Closing Fisch stops inference and releases its IPC resources.
+
+The model returns the triggering `eventId`, a communicative mood, intensity, target (`user` or `task`), a short concept and a bounded geometry AST. Relevance and continuity take precedence over novelty. A schema guard and the compiler validate each result; mismatched event IDs and superseded turns cannot overwrite newer expressions. These are performed expressions, not evidence that an agent has private feelings.
+
+## Configuration and data
+
+Optional settings are read from the checkout's ignored `.env`, with environment variables taking precedence:
 
 ```dotenv
 FISCH_PLANNER_BACKEND=codex
 # Alternatives: claude, api, off
 # FISCH_PLANNER_MODEL=your-model
 # FISCH_PLANNER_COMMAND=/absolute/path/to/codex
-# FISCH_REPERTOIRE_CACHE=off
 ```
 
-`fisch status` reports attempts, fresh `applied` plans, discarded results, sanitized errors, the last AST/concept, repertoire size/play count and process/request counts. `bodySource` distinguishes `reflex`, `repertoire`, `planner` and manual control. Admission counters do not certify human recognition. Backend `off` retains status reflexes without reading context or starting inference. API credentials alone never select the API backend.
+`off` retains local attention/settling without model calls. Fisch no longer samples recent terminal lines or automatically loads `.runtime/repertoire.json`; `FISCH_REPERTOIRE_CACHE` is retired. New prompts are bounded to 6,000 characters with common credentials redacted. Redaction cannot identify every secret. Raw user messages are held in memory, sent through stdin/local IPC, and are not saved by Fisch. CLI/provider data policies still apply. Status exposes event IDs and reaction metadata rather than raw message text.
 
-Codex runs outside the repository in a temporary scratch directory, with normal authentication/configuration retained. Configured MCP servers, shell, apps, plugins, hooks, multi-agent, browser/computer and image features are disabled. Threads are ephemeral, read-only and receive planner instructions instead of repository instructions. See the official [Codex app-server protocol](https://developers.openai.com/codex/app-server). Claude remains a separate tool-free, nonpersistent process per request, without external MCP configuration or settings sources. Neither path edits the main agent's configuration. Compatible recent CLI versions are required; failed inference leaves local animation running.
+Codex's planner runs read-only outside the repository, with configured MCP servers, tools, plugins, hooks and other interactive features disabled. Claude's planner has no built-in tools, external MCP configurations or session persistence. Native inference has a 45-second deadline; generated geometry is bounded to four beats with three primitives per beat and 200–1,500 ms durations. See [geometry limits](swarm-geometry.md).
 
-## Optional API backend
+The optional API backend uses [Responses structured output](https://developers.openai.com/api/docs/guides/structured-outputs), `store: false`, a four-second deadline and the same event budgets:
 
 ```dotenv
 FISCH_PLANNER_BACKEND=api
@@ -47,8 +59,10 @@ FISCH_PLANNER_URL=https://api.openai.com/v1/responses
 OPENAI_API_KEY=your-private-key
 ```
 
-Keep keys out of chat and Git. The transport uses [Responses structured output](https://developers.openai.com/api/docs/guides/structured-outputs) with `store: false`, a four-second deadline and the same quota scheduling as native planning. Localhost endpoints may use HTTP without a key; other endpoints require HTTPS. `FISCH_PLANNER_API_KEY` supplies custom endpoint credentials. OpenAI credentials are never automatically forwarded to another hostname.
+Keep keys out of chat and Git. Localhost may use HTTP without a key; other endpoints require HTTPS. `FISCH_PLANNER_API_KEY` supplies custom endpoint credentials. OpenAI credentials are never automatically sent to a different hostname.
 
-## Verification and limits
+## Verification
 
-Tests cover throttling/redaction, coalescing, invalidation, timeouts, malformed plans, child-process cancellation, bounded RPC/HTTP, fresh ephemeral threads, cache restoration/deduplication and preserved geometry across working/idle transitions. Live signed-in Codex inference is verified; live Claude inference and human assessment of expressiveness remain unverified. Terminal context is lossy and includes tool output. Braille has lower detail than WebGL and cannot establish subtle perceptual differences. Plans communicate context; they are not evidence of private emotions.
+Tests exercise real hook stdin/IPC, config merging, redaction, immediate attention before inference, duplicate/expired/wrong-turn events, stale model rejection, timeout/cancellation, task request caps, a full simulated day of idle with zero inference, preserved geometry and macro-safe settling. `node scripts/interaction-smoke.mjs` explicitly runs signed-in Codex on synthetic praise/frustration fixtures and saves native-renderer images and timing evidence. This consumes provider usage and is not part of ordinary idle operation.
+
+Synthetic hook tests do not certify delivery from a trusted hook in a user's interactive CLI. Live Claude inference and human assessment of contextual emotion remain unverified. Braille has less detail than the reference renderer. The next acceptance check is whether people recognize each expression as an appropriate response to its paired message, not simply whether model output compiled.

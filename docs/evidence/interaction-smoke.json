@@ -1,0 +1,346 @@
+{
+  "synthetic": true,
+  "results": [
+    {
+      "name": "praise",
+      "syntheticUserMessage": "Cảm ơn bạn, làm tốt lắm!",
+      "attentionMs": 209.70960000000002,
+      "inferenceMs": 16296.875399999999,
+      "image": "docs/evidence/reaction-praise.png",
+      "reaction": {
+        "eventId": "5ac564029baf5e48d8f795637e049fd0e6bb23cf4964a4a9216f8aeb3b22e3b5",
+        "mood": "warm",
+        "intensity": 0.65,
+        "target": "user"
+      },
+      "concept": "A soft smiling face offers a small appreciative nod.",
+      "body": {
+        "type": "sequence",
+        "children": [
+          {
+            "type": "parallel",
+            "children": [
+              {
+                "type": "assemble",
+                "parts": [
+                  {
+                    "id": "face",
+                    "weight": 0.6,
+                    "motion": {
+                      "pivot": [
+                        0,
+                        0,
+                        0
+                      ],
+                      "translate": [
+                        0,
+                        -0.035,
+                        0.025
+                      ],
+                      "rotate": [
+                        0.06,
+                        0,
+                        0
+                      ],
+                      "periodMs": 2200,
+                      "phase": 0
+                    },
+                    "kind": "ellipsoid",
+                    "center": [
+                      0,
+                      0,
+                      0
+                    ],
+                    "scale": [
+                      0.8,
+                      0.73,
+                      0.22
+                    ],
+                    "rotation": [
+                      0,
+                      0,
+                      0
+                    ]
+                  },
+                  {
+                    "id": "left-eye",
+                    "weight": 0.1,
+                    "motion": null,
+                    "kind": "curve",
+                    "points": [
+                      [
+                        -0.43,
+                        0.15,
+                        0.25
+                      ],
+                      [
+                        -0.34,
+                        0.23,
+                        0.27
+                      ],
+                      [
+                        -0.25,
+                        0.24,
+                        0.27
+                      ],
+                      [
+                        -0.16,
+                        0.16,
+                        0.25
+                      ]
+                    ],
+                    "radius": 0.035
+                  },
+                  {
+                    "id": "right-eye",
+                    "weight": 0.1,
+                    "motion": null,
+                    "kind": "curve",
+                    "points": [
+                      [
+                        0.16,
+                        0.16,
+                        0.25
+                      ],
+                      [
+                        0.25,
+                        0.24,
+                        0.27
+                      ],
+                      [
+                        0.34,
+                        0.23,
+                        0.27
+                      ],
+                      [
+                        0.43,
+                        0.15,
+                        0.25
+                      ]
+                    ],
+                    "radius": 0.035
+                  },
+                  {
+                    "id": "smile",
+                    "weight": 0.2,
+                    "motion": null,
+                    "kind": "curve",
+                    "points": [
+                      [
+                        -0.32,
+                        -0.15,
+                        0.26
+                      ],
+                      [
+                        -0.17,
+                        -0.29,
+                        0.28
+                      ],
+                      [
+                        0,
+                        -0.33,
+                        0.29
+                      ],
+                      [
+                        0.17,
+                        -0.29,
+                        0.28
+                      ],
+                      [
+                        0.32,
+                        -0.15,
+                        0.26
+                      ]
+                    ],
+                    "radius": 0.04
+                  }
+                ],
+                "durationMs": 1500
+              },
+              {
+                "type": "flow",
+                "field": "pulse",
+                "strength": 0.12,
+                "durationMs": 1500
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "frustration",
+      "syntheticUserMessage": "Tôi đang bực vì lỗi này vẫn chưa sửa được.",
+      "attentionMs": 129.79039999999804,
+      "inferenceMs": 12527.090499999998,
+      "image": "docs/evidence/reaction-frustration.png",
+      "reaction": {
+        "eventId": "bce6625636195a8408fbbedb67574a40eb4e88e684e632b98aafcd0c296fd673",
+        "mood": "concerned",
+        "intensity": 0.45,
+        "target": "user"
+      },
+      "concept": "The familiar face softens its smile into calm concern and leans gently toward -{",
+      "body": {
+        "type": "sequence",
+        "children": [
+          {
+            "type": "parallel",
+            "children": [
+              {
+                "type": "assemble",
+                "parts": [
+                  {
+                    "id": "face",
+                    "weight": 0.6,
+                    "motion": {
+                      "pivot": [
+                        0,
+                        0,
+                        0
+                      ],
+                      "translate": [
+                        0,
+                        -0.015,
+                        0.035
+                      ],
+                      "rotate": [
+                        0.025,
+                        0,
+                        0
+                      ],
+                      "periodMs": 3200,
+                      "phase": 0
+                    },
+                    "kind": "ellipsoid",
+                    "center": [
+                      0,
+                      0,
+                      0
+                    ],
+                    "scale": [
+                      0.8,
+                      0.73,
+                      0.22
+                    ],
+                    "rotation": [
+                      0,
+                      0,
+                      0
+                    ]
+                  },
+                  {
+                    "id": "left-eye",
+                    "weight": 0.1,
+                    "motion": null,
+                    "kind": "curve",
+                    "points": [
+                      [
+                        -0.43,
+                        0.16,
+                        0.25
+                      ],
+                      [
+                        -0.34,
+                        0.2,
+                        0.27
+                      ],
+                      [
+                        -0.25,
+                        0.24,
+                        0.27
+                      ],
+                      [
+                        -0.16,
+                        0.25,
+                        0.25
+                      ]
+                    ],
+                    "radius": 0.035
+                  },
+                  {
+                    "id": "right-eye",
+                    "weight": 0.1,
+                    "motion": null,
+                    "kind": "curve",
+                    "points": [
+                      [
+                        0.16,
+                        0.25,
+                        0.25
+                      ],
+                      [
+                        0.25,
+                        0.24,
+                        0.27
+                      ],
+                      [
+                        0.34,
+                        0.2,
+                        0.27
+                      ],
+                      [
+                        0.43,
+                        0.16,
+                        0.25
+                      ]
+                    ],
+                    "radius": 0.035
+                  },
+                  {
+                    "id": "smile",
+                    "weight": 0.2,
+                    "motion": null,
+                    "kind": "curve",
+                    "points": [
+                      [
+                        -0.27,
+                        -0.25,
+                        0.26
+                      ],
+                      [
+                        -0.14,
+                        -0.21,
+                        0.28
+                      ],
+                      [
+                        0,
+                        -0.2,
+                        0.29
+                      ],
+                      [
+                        0.14,
+                        -0.21,
+                        0.28
+                      ],
+                      [
+                        0.27,
+                        -0.25,
+                        0.26
+                      ]
+                    ],
+                    "radius": 0.04
+                  }
+                ],
+                "durationMs": 1500
+              },
+              {
+                "type": "flow",
+                "field": "pulse",
+                "strength": 0.055,
+                "durationMs": 1500
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "transport": {
+    "type": "persistent-codex",
+    "starts": 1,
+    "requests": 2
+  },
+  "realAttachedAgentHookDelivery": "requires-native-trust-and-next-user-message",
+  "humanRecognition": "not-assessed"
+}

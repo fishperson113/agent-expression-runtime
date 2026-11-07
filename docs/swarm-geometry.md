@@ -42,7 +42,7 @@ Spatial assignment is approximate, not globally optimal transport; paths can cro
 
 ## Planner and verification
 
-The planner receives a strict assembly schema and instructions to invent coherent geometry rather than merely select named shapes. It mixes assemblies with flow/posture nodes, preserves IDs between poses and can use independent part motion. Native inference now has a 45-second deadline because geometry output is larger. Synthetic creative Codex inference took about 26 seconds and produced an accepted eight-part character. The direct API path remains optional. Rendering continues while inference runs.
+The planner receives a strict assembly schema and the actual triggering interaction event. It can invent coherent geometry rather than merely select named shapes, but relevance to the user and continuity take priority over novelty. It mixes assemblies with flow/posture nodes, preserves IDs between poses and can use independent part motion. Native inference has a 45-second deadline. Rendering and immediate local attention continue while inference runs. Idle never generates or rotates shapes; it holds the current form and settles its motion. See [interaction planning](expression-planner.md).
 
 `integrations/sculpture-examples.mjs` contains a seven-part peace-sign hand and a six-part bird with articulated wings as fixtures; neither is registered as a built-in shape. Actual WebGL screenshots are in `docs/evidence/composition-peace.png` and `composition-bird.png`. The independent Codex-generated example is `docs/evidence/generated-sculpture.json` and `composition-generated.png`.
 
