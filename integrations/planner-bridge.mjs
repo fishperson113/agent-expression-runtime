@@ -11,7 +11,7 @@ export function paneActivity(engine, agent, call, config = plannerConfig(undefin
   const inference = config.backend === 'codex' ? warmCodexPlanner(config) : native ? processPlanner(config) : modelPlanner(config);
   const planner = new ExpressionPlanner({ engine, now, plan: plan ?? inference, reason: config.reason,
     cachePath: config.cachePath, requireAssembly: !!config.enabled,
-    timeoutMs: native ? 45000 : 4000, intervalMs: native ? 8000 : 5000, debounceMs: native ? 750 : 0,
+    timeoutMs: native ? 45000 : 4000, intervalMs: 60000, debounceMs: native ? 750 : 0,
     onApplied: (_, origin = 'planner') => { source = origin; },
     readContext: async () => {
       const result = await call('pane.read', { pane_id: agent.pane_id, source: 'recent_unwrapped', lines: 32, format: 'text' });

@@ -8,7 +8,7 @@ The native backend follows the attached agent: a persistent `codex app-server --
 
 Fisch reads up to 32 recent unwrapped lines from the selected agent pane, clipped to 6,000 characters. Common credentials are redacted, but arbitrary terminal output can contain sensitive data. Context travels through process stdin rather than command arguments. Fisch does not save these excerpts to conversation files; CLI/provider retention policies still apply.
 
-Context is sampled at most every two seconds. Native planning uses a 750 ms quiet window, at least eight seconds between requests and a 45-second deadline. Terminal updates coalesce into the latest queued context instead of repeatedly killing inference. Working-to-idle/done transitions accept the same turn's pending result. New work, interruption and manual control invalidate obsolete jobs. Rendering continues throughout.
+Context is sampled at most every two seconds without model usage. Planning has a 60-second minimum spacing within a work phase; native inference also uses a 750 ms quiet window and a 45-second deadline. A new work phase may request an initial plan immediately. Subsequent context must differ by at least 35% of the union of word tokens from the last requested context. Numbers and word order do not count; small accumulated log additions must eventually cross the threshold. This local heuristic is not semantic intent recognition and can miss short meaningful changes. Terminal updates coalesce instead of repeatedly killing inference. Working-to-idle/done transitions accept the same turn's pending result. New work, interruption and manual control invalidate obsolete jobs. Rendering continues throughout.
 
 Codex keeps one process warm with fresh ephemeral threads. Generation still takes seconds: a live signed-in call with the current schema took about 13 seconds. Local repertoire playback supplies immediate motion while the model runs. Keeping a process warm does not guarantee faster generation.
 
@@ -20,7 +20,7 @@ Up to eight distinct model-authored compositions are retained locally. Idle/done
 
 The ignored `.runtime/repertoire.json` stores bounded geometry ASTs and concept labels, without terminal excerpts or credentials. Restarting restores these forms immediately. Set `FISCH_REPERTOIRE_CACHE=off` to keep only an in-memory repertoire. Geometry fingerprints deduplicate near-identical forms; semantic originality is not guaranteed.
 
-Unchanged idle/done context becomes eligible for a fresh model plan after 60 seconds, including after failures. This consumes provider inference while idle. Manual expressions/cancellation pause automatic activity until the next status change or ten seconds before it can resume. Closing Fisch stops inference and replay.
+Idle/done waits five minutes before requesting a fresh plan, then waits another five minutes after completion before a second attempt. Each idle period permits at most two requests, including failures. Terminal text changes and idle/done transitions cannot bypass the delay or replenish this budget. Only resuming working resets the budget; a working request already in flight may still finish during idle without spending an idle request. After exhaustion, local repertoire animation continues without model calls. Status exposes `idleBudget.used`, `limit` and `intervalMs`. Manual expressions/cancellation pause automatic activity until a later context/status change; requests also respect a ten-second hold after manual control. Closing Fisch stops inference and replay.
 
 ## Configuration
 
@@ -47,7 +47,7 @@ FISCH_PLANNER_URL=https://api.openai.com/v1/responses
 OPENAI_API_KEY=your-private-key
 ```
 
-Keep keys out of chat and Git. The transport uses [Responses structured output](https://developers.openai.com/api/docs/guides/structured-outputs) with `store: false`, a four-second deadline and five-second minimum spacing. Localhost endpoints may use HTTP without a key; other endpoints require HTTPS. `FISCH_PLANNER_API_KEY` supplies custom endpoint credentials. OpenAI credentials are never automatically forwarded to another hostname.
+Keep keys out of chat and Git. The transport uses [Responses structured output](https://developers.openai.com/api/docs/guides/structured-outputs) with `store: false`, a four-second deadline and the same quota scheduling as native planning. Localhost endpoints may use HTTP without a key; other endpoints require HTTPS. `FISCH_PLANNER_API_KEY` supplies custom endpoint credentials. OpenAI credentials are never automatically forwarded to another hostname.
 
 ## Verification and limits
 

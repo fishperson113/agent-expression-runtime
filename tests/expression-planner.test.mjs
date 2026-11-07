@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { ExpressionPlanner, cleanContext } from '../integrations/expression-planner.mjs';
+import { ExpressionPlanner, cleanContext, contextChange } from '../integrations/expression-planner.mjs';
 import { terminalEngine } from '../scripts/pane-session.mjs';
 import { paneActivity } from '../integrations/planner-bridge.mjs';
 import { TerminalEngine } from '../src/terminal/runtime.ts';
@@ -7,6 +7,29 @@ import { TerminalEngine } from '../src/terminal/runtime.ts';
 const planValue = target => ({ body: { type: 'sequence', children: [{ type: 'parallel', children: [
   { type: 'morph', target, durationMs: 200 },
 ] }] } });
+it('filters progress counters and small log additions without hiding a substantially different context', () => {
+  const baseline = 'Inspect compiler scheduler renderer geometry tests integration validation pipeline';
+  expect(contextChange(baseline + ' progress 10', baseline + ' progress 99')).toBe(0);
+  expect(contextChange('10 / 100', '99 / 100')).toBe(0);
+  expect(contextChange(baseline, baseline + ' completed')).toBeLessThan(0.35);
+  expect(contextChange(baseline, 'Người dùng muốn tạo bàn tay peace sign vui vẻ')).toBeGreaterThan(0.35);
+});
+it('spaces working inference by a minute and requires cumulative context novelty', async () => {
+  let now = 0, text = 'Inspect compiler scheduler renderer geometry tests integration validation pipeline', calls = 0;
+  const activity = paneActivity({ cancel() {}, express() { return { status: 'accepted' }; } }, {},
+    async () => ({ read: { text } }), { enabled: false },
+    { now: () => now, plan: async () => { calls++; return planValue('wave'); } });
+  const tick = async time => { now = time; activity.tick(); for (let i = 0; i < 10; i++) await Promise.resolve(); };
+  try {
+    activity.update('working'); await tick(0); expect(calls).toBe(1);
+    text += ' completed'; await tick(60000); expect(calls).toBe(1);
+    text = 'User requests a joyful bird spreading wings above a little nest';
+    await tick(62000); expect(calls).toBe(2);
+    text = 'Unexpected network outage prevents authentication and requires user intervention';
+    await tick(64000); expect(calls).toBe(2);
+    await tick(122000); expect(calls).toBe(3);
+  } finally { activity.close(); }
+});
 it('plans from bounded context and throttles unchanged context without blocking reflexes', async () => {
   let now = 0, text = 'User asks to explore an idea', calls = 0;
   const engine = await terminalEngine();

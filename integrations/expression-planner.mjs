@@ -10,14 +10,24 @@ export function cleanContext(text) {
     .replace(/((?:api[_-]?key|token|password|secret)\s*[=:]\s*)[^\s,;]+/gi, '$1[REDACTED]').slice(-6000);
 }
 
+export function contextChange(previous, current) {
+  const tokens = text => new Set(String(text).toLowerCase().replace(/\d+/g, '#').match(/[\p{L}_]{3,}/gu) ?? []);
+  const before = tokens(previous), after = tokens(current), union = new Set([...before, ...after]);
+  if (!union.size) return 0;
+  let changed = 0;
+  for (const token of union) if (before.has(token) !== after.has(token)) changed++;
+  return changed / union.size;
+}
+
 export class ExpressionPlanner {
   generation = 0; attempts = 0; applied = 0; discarded = 0;
   status = 'unknown'; lastHash = ''; lastRead = -Infinity; lastRequest = -Infinity;
   mode = 'disabled'; error = null; closed = false;
   idleCycles = 0; idleReplays = 0; nextIdleAt = Infinity;
   repertoirePlays = 0; paused = false;
-  constructor({ engine, plan, readContext, now = () => performance.now(), timeoutMs = 4000, intervalMs = 10000, debounceMs = 0, idleRefreshMs = 60000, idleReplayMs = 12000, onContextChange = () => {}, onApplied = () => {}, requireAssembly = false, cachePath, reason }) {
-    Object.assign(this, { engine, plan, readContext, now, timeoutMs, intervalMs, debounceMs, idleRefreshMs, idleReplayMs, onContextChange, onApplied });
+  idleRequests = 0; lastPlannedContext = null;
+  constructor({ engine, plan, readContext, now = () => performance.now(), timeoutMs = 4000, intervalMs = 10000, debounceMs = 0, idleRefreshMs = 300000, idleRequestLimit = 2, idleReplayMs = 12000, onContextChange = () => {}, onApplied = () => {}, requireAssembly = false, cachePath, reason }) {
+    Object.assign(this, { engine, plan, readContext, now, timeoutMs, intervalMs, debounceMs, idleRefreshMs, idleRequestLimit, idleReplayMs, onContextChange, onApplied });
     this.pool = new Repertoire(cachePath); this.requireAssembly = requireAssembly;
     this.mode = plan ? 'ready' : 'disabled'; this.reason = reason;
   }
@@ -26,8 +36,10 @@ export class ExpressionPlanner {
     const completion = this.status === 'working' && ['idle', 'done'].includes(status);
     const restChange = ['idle', 'done'].includes(this.status) && ['idle', 'done'].includes(status);
     if (!completion && !restChange) { this.invalidate(); this.lastHash = ''; this.pending = null; this.lastRequest = -Infinity; }
+    if (status === 'working') { this.idleRequests = 0; this.lastPlannedContext = null; }
+    if (['idle', 'done'].includes(status) && !restChange) this.pending = null;
     this.status = status; this.lastRead = -Infinity; this.paused = false; this.resumeAt = 0;
-    this.nextIdleAt = this.now() + this.idleRefreshMs;
+    if (!restChange) this.nextIdleAt = this.now() + this.idleRefreshMs;
     if (this.plan) this.mode = this.controller ? 'planning' : 'ready';
   }
   invalidate() {
@@ -52,19 +64,21 @@ export class ExpressionPlanner {
       const hash = createHash('sha256').update(text).digest('hex');
       if (hash !== this.lastHash) {
         this.onContextChange(this.status); this.lastHash = hash; this.changedAt = this.now(); this.paused = false;
-        this.nextIdleAt = this.now() + this.idleRefreshMs;
-        this.pending = { activity: this.status, visibleContext: text, trigger: 'context_change', recentConcepts: this.pool.recent };
+        if (!this.isIdle) this.pending = { activity: this.status, visibleContext: text, trigger: 'context_change', recentConcepts: this.pool.recent };
       }
       this.refreshIdle();
       if (this.pending && !this.controller && this.now() >= (this.resumeAt ?? 0) &&
           this.now() - this.lastRequest >= this.intervalMs && this.now() - this.changedAt >= this.debounceMs) {
         const context = this.pending; this.pending = null;
+        if (!this.isIdle && this.lastPlannedContext !== null && contextChange(this.lastPlannedContext, text) < 0.35) return;
         this.job = this.request(context, this.generation);
       }
     } catch { if (!this.closed && generation === this.generation) { this.mode = 'fallback'; this.error = 'context_error'; } }
   }
   async request(context, generation) {
     const controller = this.controller = new AbortController();
+    if (this.isIdle) this.idleRequests++;
+    this.lastPlannedContext = context.visibleContext;
     this.lastRequest = this.now(); this.attempts++; this.mode = 'planning'; this.error = null;
     let timer;
     try {
@@ -90,7 +104,7 @@ export class ExpressionPlanner {
   }
   get isIdle() { return ['idle', 'done'].includes(this.status); }
   refreshIdle() {
-    if (!this.isIdle || this.pending || this.controller || this.now() < this.nextIdleAt) return;
+    if (!this.isIdle || this.paused || this.idleRequests >= this.idleRequestLimit || this.pending || this.controller || this.now() < this.nextIdleAt) return;
     this.pending = { activity: this.status, visibleContext: this.contextText ?? '', trigger: 'idle_refresh',
       idleCycle: ++this.idleCycles, previousPlan: this.lastPlan, recentConcepts: this.pool.recent };
     this.nextIdleAt = Infinity;
@@ -122,6 +136,7 @@ export class ExpressionPlanner {
       discarded: this.discarded, queued: !!this.pending, error: this.error,
       lastPlan: this.lastPlan, lastAppliedAt: this.lastAppliedAt,
       idleCycles: this.idleCycles, idleReplays: this.idleReplays, lastReplayAt: this.lastReplayAt,
+      idleBudget: { used: this.idleRequests, limit: this.idleRequestLimit, intervalMs: this.idleRefreshMs },
       repertoire: this.pool.info, repertoirePlays: this.repertoirePlays, lastConcept: this.lastConcept,
       transport: this.plan?.transport?.() };
   }
