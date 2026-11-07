@@ -1,0 +1,39 @@
+{
+  "sourceCommit": "476fe95",
+  "recordedAt": "2026-11-07T05:01:19.981Z",
+  "policy": {
+    "idleDelayMs": 300000,
+    "idleRequestLimit": 2,
+    "failuresSpendBudget": true,
+    "resetBudgetOn": "working",
+    "workingIntervalMs": 60000,
+    "contextTokenChangeThreshold": 0.35
+  },
+  "verification": {
+    "quotaAndContextTests": {
+      "passed": 19,
+      "failed": 0
+    },
+    "windowsFullSuite": {
+      "passed": 145,
+      "failed": 1,
+      "failure": "launcher browser page.goto exceeded 15000ms; reproduced on isolated retry"
+    },
+    "linuxWSL2": {
+      "javascriptPassed": 146,
+      "rustPassed": 12,
+      "build": "passed",
+      "architecture": "passed",
+      "browserBridge": "passed"
+    },
+    "livePane": {
+      "workingAttempts": 1,
+      "applied": 1,
+      "error": null
+    }
+  },
+  "limitations": [
+    "Context novelty is a local word-token heuristic, not semantic intent classification.",
+    "Idle budget is in memory; restarting Fisch starts a new budget."
+  ]
+}
