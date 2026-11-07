@@ -1,4 +1,5 @@
 import type { GatewayEvent } from './gateway-client';
+import { EpochInbox } from './epoch-inbox';
 /** Browser renderer bridge. The pairing credential stays in process memory and Authorization headers. */
 export class HttpGatewayConnection {
   private abort = new AbortController();
@@ -29,6 +30,7 @@ export class HttpGatewayConnection {
     if (!r.ok) throw Error(`http_${r.status}`);
   }
   async subscribe(receive: (event: GatewayEvent) => void) {
+    const inbox = new EpochInbox();
     const response = await fetch(this.baseUrl + '/v1/renderer/events', {
       headers: { Authorization: `Bearer ${this.token}` },
       signal: this.abort.signal,
@@ -44,9 +46,9 @@ export class HttpGatewayConnection {
           const { value, done } = await reader.read();
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
-          if (buffer.length > 65536) throw Error('bridge_buffer_limit');
           let end;
           while ((end = buffer.indexOf('\n\n')) >= 0) {
+            if (end > 65536) throw Error('bridge_buffer_limit');
             const block = buffer.slice(0, end);
             buffer = buffer.slice(end + 2);
             const data = block
@@ -58,10 +60,11 @@ export class HttpGatewayConnection {
             const event = JSON.parse(data) as GatewayEvent;
             if (event.kind === 'epoch' && event.id) this.sessionId = event.id;
             if (event.kind === 'closed') this.sessionId = undefined;
-            receive(event);
+            for (const admitted of inbox.accept(event)) receive(admitted);
             if (event.kind !== 'expression')
               await this.post('/v1/renderer/control-ack', { epoch: event.epoch });
           }
+          if (buffer.length > 65536) throw Error('bridge_buffer_limit');
         }
       } finally {
         reader.releaseLock();

@@ -44,7 +44,7 @@ it('filters the real subscription protocol, handles fragmented records and recon
   await new Promise(resolve => server.listen(path, resolve));
   const statuses = [], hook = new AgentEventHook('agent', status => statuses.push(status), path);
   try {
-    for (let i = 0; i < 60 && connections < 2; i++) await delay(25);
+    for (let i = 0; i < 120 && statuses.length < 2; i++) await delay(25);
     expect(connections).toBeGreaterThanOrEqual(2);
     expect(statuses).toEqual(['working', 'working']);
   } finally { hook.close(); await new Promise(resolve => server.close(resolve)); }

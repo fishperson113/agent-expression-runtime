@@ -1,0 +1,216 @@
+{
+  "timestamp": "2026-11-07T02:04:07.507Z",
+  "status": {
+    "status": "attached",
+    "agent": "codex",
+    "agentPane": "w4:pJ",
+    "rendererPane": "w4:pK",
+    "renderer": "braille",
+    "frames": 6206,
+    "expressions": 1,
+    "shape": "assembled",
+    "integration": "automatic-hooks",
+    "activity": "working",
+    "transitions": 1,
+    "eventsConnected": true,
+    "bodySource": "planner",
+    "planner": {
+      "mode": "planning",
+      "attempts": 21,
+      "applied": 4,
+      "discarded": 16,
+      "queued": false,
+      "error": null,
+      "lastPlan": {
+        "type": "sequence",
+        "children": [
+          {
+            "type": "parallel",
+            "children": [
+              {
+                "type": "assemble",
+                "parts": [
+                  {
+                    "id": "inspection-ring",
+                    "weight": 0.48,
+                    "motion": {
+                      "pivot": [
+                        -0.15,
+                        0.2,
+                        0
+                      ],
+                      "translate": [
+                        0.05,
+                        0.03,
+                        0
+                      ],
+                      "rotate": [
+                        0,
+                        0,
+                        0.04
+                      ],
+                      "periodMs": 4200,
+                      "phase": 0
+                    },
+                    "kind": "curve",
+                    "points": [
+                      [
+                        0.48,
+                        0.2,
+                        0
+                      ],
+                      [
+                        0.3,
+                        0.65,
+                        0
+                      ],
+                      [
+                        -0.15,
+                        0.83,
+                        0
+                      ],
+                      [
+                        -0.6,
+                        0.65,
+                        0
+                      ],
+                      [
+                        -0.78,
+                        0.2,
+                        0
+                      ],
+                      [
+                        -0.6,
+                        -0.25,
+                        0
+                      ],
+                      [
+                        -0.15,
+                        -0.43,
+                        0
+                      ],
+                      [
+                        0.3,
+                        -0.25,
+                        0
+                      ],
+                      [
+                        0.48,
+                        0.2,
+                        0
+                      ]
+                    ],
+                    "radius": 0.075
+                  },
+                  {
+                    "id": "inspection-handle",
+                    "weight": 0.25,
+                    "motion": {
+                      "pivot": [
+                        -0.15,
+                        0.2,
+                        0
+                      ],
+                      "translate": [
+                        0.05,
+                        0.03,
+                        0
+                      ],
+                      "rotate": [
+                        0,
+                        0,
+                        0.04
+                      ],
+                      "periodMs": 4200,
+                      "phase": 0
+                    },
+                    "kind": "curve",
+                    "points": [
+                      [
+                        0.29,
+                        -0.24,
+                        0
+                      ],
+                      [
+                        0.61,
+                        -0.58,
+                        0
+                      ],
+                      [
+                        0.98,
+                        -0.98,
+                        0
+                      ]
+                    ],
+                    "radius": 0.115
+                  },
+                  {
+                    "id": "verified-detail",
+                    "weight": 0.27,
+                    "motion": {
+                      "pivot": [
+                        -0.15,
+                        0.2,
+                        0
+                      ],
+                      "translate": [
+                        0.05,
+                        0.03,
+                        0
+                      ],
+                      "rotate": [
+                        0,
+                        0,
+                        0.04
+                      ],
+                      "periodMs": 4200,
+                      "phase": 0
+                    },
+                    "kind": "curve",
+                    "points": [
+                      [
+                        -0.48,
+                        0.18,
+                        0.04
+                      ],
+                      [
+                        -0.23,
+                        -0.06,
+                        0.04
+                      ],
+                      [
+                        0.19,
+                        0.43,
+                        0.04
+                      ]
+                    ],
+                    "radius": 0.067
+                  }
+                ],
+                "durationMs": 240
+              },
+              {
+                "type": "flow",
+                "field": "pulse",
+                "strength": 0.07,
+                "durationMs": 240
+              }
+            ]
+          }
+        ]
+      },
+      "lastAppliedAt": "2026-11-07T02:01:39.450Z",
+      "idleCycles": 0,
+      "idleReplays": 0,
+      "backend": "codex"
+    }
+  },
+  "localFrameObservation": {
+    "terminalParticles": 2000,
+    "geometryParticles": 10000,
+    "p50Ms": 1.46,
+    "p95Ms": 2.58,
+    "certified": false
+  },
+  "contextStored": false
+}

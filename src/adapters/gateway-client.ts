@@ -1,4 +1,5 @@
 import { Channel, invoke } from '@tauri-apps/api/core';
+import { EpochInbox } from './epoch-inbox';
 export type GatewayEvent = {
   kind: 'epoch' | 'closed' | 'expression';
   id: string;
@@ -7,9 +8,10 @@ export type GatewayEvent = {
 };
 export class GatewayConnection {
   async subscribe(receive: (event: GatewayEvent) => void) {
+    const inbox = new EpochInbox();
     const onEvent = new Channel<GatewayEvent>();
     onEvent.onmessage = (e) => {
-      receive(e);
+      for (const admitted of inbox.accept(e)) receive(admitted);
       if (e.kind !== 'expression') void invoke('gateway_control_ack', { epoch: e.epoch });
     };
     await invoke('gateway_subscribe', { onEvent });
