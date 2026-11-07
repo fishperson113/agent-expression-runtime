@@ -51,3 +51,11 @@ The default pane path subscribes to Herdr `pane.agent_status_changed` and feeds 
 ## Contextual planning
 
 Fisch now runs a one-shot background process of the attached provider (Codex or Claude) to plan bounded JSON expressions from a recent terminal excerpt. Direct API inference is opt-in. Immediate status reflexes continue while the planner waits; status/context changes cancel old work and restore reflexes. Windows live evidence records a Codex-process plan applied without a manual expression call. See [the planner guide](expression-planner.md) and [live evidence](evidence/contextual-planner.json). Human expressiveness and live Claude inference are not yet assessed.
+
+## Reconfigurable swarm geometry
+
+The core now accepts model-authored `assemble` scenes: curve tubes, ellipsoid shells and quadrilateral patches, with independent per-part motion. No peace-sign, face or bird name was added to the primitive target list. Spatial assignment is deterministic, same-topology poses retain particle-to-part mapping, and interrupted morphs preserve current positions. Validation caps parts, control points, assembly nodes and payload bytes. See [the geometry guide](swarm-geometry.md) for actual scope and limits.
+
+A signed-in Codex process created an eight-part character accepted by the compiler; the running planner also independently constructed tools/symbols. Native Braille and shared WebGL paths rendered compositions. Windows and Linux passed 133 JavaScript tests, 12 Rust tests, build and integration smoke as applicable. The Windows browser composition smoke captured the peace sign, articulated bird and model-generated character. Human recognition and collision-free transport are not certified.
+
+Validation also exposed two existing bridge defects: consecutive port search could stay entirely within Windows excluded ranges, and new-session expressions could arrive before their epoch control event. Port search now spans the browser-safe range; the bounded epoch inbox orders future records behind their control event and permits valid large SSE batches. Reconnect regression waits for delivered events rather than merely accepted socket connections.
