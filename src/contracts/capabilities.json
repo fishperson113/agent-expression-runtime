@@ -33,5 +33,6 @@
   "dedupEntries": 256,
   "dedupTtlMs": 60000,
   "admissionDeadlineMs": 500,
-  "modelApiCalls": false
+  "modelApiCalls": false,
+  "assembly": { "parts": 24, "controlPoints": 12, "particles": 10000, "kinds": ["curve", "ellipsoid", "patch"] }
 }
