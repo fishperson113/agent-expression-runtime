@@ -9,7 +9,7 @@ import { openControl } from '../integrations/terminal-ipc.mjs';
 import { displaySize, drawFrame } from '../integrations/pane-display.mjs';
 import { AgentEventHook } from '../integrations/agent-hooks.mjs';
 import { paneActivity } from '../integrations/planner-bridge.mjs';
-import { installInteractionHooks } from '../integrations/interaction-hooks.mjs';
+import { inspectInteractionHooks } from '../integrations/interaction-hooks.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 async function bundler() {
@@ -51,17 +51,17 @@ function hookStatus(hooks, activity) {
 }
 function paneTitle(activity, hooks) {
   const state = hookStatus(hooks, activity);
-  const delivery = state.delivery === 'live' ? 'live' : !state.installed ? 'install failed' : state.provider === 'codex' ? 'review /hooks' : 'waiting';
+  const delivery = state.delivery === 'live' ? 'live' : !state.installed ? state.installCommand ?? 'not installed' : state.provider === 'codex' ? 'review /hooks' : 'waiting';
   return `Fisch · ${activity.status} · ${activity.source} · hooks: ${delivery}`;
 }
-export async function runPaneSession({ agentPane, call = herdrCall, subscribe = (id, update) => new AgentEventHook(id, update), installHooks = installInteractionHooks, output = process.stdout, signal } = {}) {
+export async function runPaneSession({ agentPane, call = herdrCall, subscribe = (id, update) => new AgentEventHook(id, update), hooksStatus = inspectInteractionHooks, output = process.stdout, signal } = {}) {
   let { snapshot } = await call('session.snapshot');
   const { own, agent } = selectAgent(snapshot, process.env.HERDR_PANE_ID, agentPane);
   let mode = await graphicsMode(call);
   const engine = await terminalEngine();
   const abort = new AbortController(), stop = () => abort.abort();
   const activity = paneActivity(engine, agent, call);
-  const hooks = installHooks(agent);
+  const hooks = hooksStatus(agent);
   let commands = 0, frames = 0;
   const control = await openControl(agent.pane_id, message => {
     if (message.method === 'express') { commands++; return activity.express(message.args); }

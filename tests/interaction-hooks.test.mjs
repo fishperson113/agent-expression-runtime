@@ -1,12 +1,14 @@
 import { expect, it } from 'vitest';
-import { mkdtempSync, writeFileSync, readFileSync, rmSync, rmdirSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, rmSync, rmdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { Readable } from 'node:stream';
 import { randomUUID } from 'node:crypto';
-import { spawn } from 'node:child_process';
+import { spawn, execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { normalizeHook, validEvent } from '../integrations/interaction-events.mjs';
-import { hookConfiguration, installInteractionHooks } from '../integrations/interaction-hooks.mjs';
+import { hookConfiguration, installInteractionHooks, inspectInteractionHooks, uninstallInteractionHooks } from '../integrations/interaction-hooks.mjs';
+import { hookPaths } from '../integrations/hook-storage.mjs';
 import { forwardHook, readHook } from '../scripts/fisch-hook.mjs';
 import { openControl } from '../integrations/terminal-ipc.mjs';
 
@@ -40,7 +42,7 @@ it('merges hook configuration idempotently without replacing other integrations 
   expect(hookConfiguration(first, 'codex')).toEqual(first);
   expect(first.hooks.Stop[0]).toEqual(original.hooks.Stop[0]);
   expect(first.model).toBe('existing'); expect(original.hooks.UserPromptSubmit).toBeUndefined();
-  expect(first.hooks.UserPromptSubmit[0].hooks[0].commandWindows).toContain('node "');
+  expect(first.hooks.UserPromptSubmit[0].hooks[0].commandWindows).toContain('if defined HERDR_PANE_ID');
   expect(hookConfiguration({}, 'claude').hooks.PostToolUseFailure).toHaveLength(1);
   expect(() => hookConfiguration([], 'codex')).toThrow('invalid_hook_config');
 });
@@ -57,13 +59,46 @@ it('supports repeated legacy prompts without guessing which turn a legacy tool r
   expect(normalizeHook(legacy).id).not.toBe(normalizeHook(legacy).id);
   expect(normalizeHook({ ...legacy, hook_event_name: 'Stop' })).toBeNull();
 });
-it('fails closed on malformed settings without overwriting them', () => {
+it('fails closed on malformed settings without overwriting them', async () => {
   const home = mkdtempSync(join(tmpdir(), 'fisch-hooks-')), file = join(home, 'settings.json');
   try {
     writeFileSync(file, '{broken');
-    expect(installInteractionHooks({ agent: 'claude' }, { env: { CLAUDE_CONFIG_DIR: home } }).installed).toBe(false);
+    expect((await installInteractionHooks({ agent: 'claude' }, { env: { CLAUDE_CONFIG_DIR: home } })).installed).toBe(false);
     expect(readFileSync(file, 'utf8')).toBe('{broken');
   } finally { rmSync(file); rmdirSync(home); }
+});
+it('keeps launch inspection read-only and explicitly installs a standalone runner with reversible hooks', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'fisch-managed-')), options = { home, env: {} };
+  try {
+    expect(inspectInteractionHooks({ agent: 'codex' }, options).installed).toBe(false);
+    const installed = await installInteractionHooks({ agent: 'codex' }, options);
+    expect(installed.installed).toBe(true);
+    const paths = hookPaths('codex', options), bundle = readFileSync(paths.runner, 'utf8');
+    expect(bundle).not.toContain("from '../integrations/");
+    const configuration = JSON.parse(readFileSync(paths.config, 'utf8'));
+    configuration.model = 'preserve';
+    configuration.hooks.Stop.push({ hooks: [{ type: 'command', command: 'my-harness check' }] });
+    writeFileSync(paths.config, JSON.stringify(configuration));
+    expect(uninstallInteractionHooks('codex', options).status).toBe('uninstalled');
+    const remaining = JSON.parse(readFileSync(paths.config, 'utf8'));
+    expect(remaining.model).toBe('preserve'); expect(remaining.hooks.Stop).toHaveLength(1);
+    expect(inspectInteractionHooks({ agent: 'codex' }, options).installed).toBe(false);
+  } finally { rmSync(home, { recursive: true, force: true }); }
+});
+it('never starts Node outside Herdr, including when the installed runner path contains spaces', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'fisch hook gate-')), runner = join(directory, 'hook.mjs'), marker = join(directory, 'marker');
+  const win = process.platform === 'win32';
+  writeFileSync(runner, '');
+  writeFileSync(join(directory, win ? 'node.cmd' : 'node'), win ? '@echo invoked> "%FISCH_TEST_MARKER%"' : '#!/bin/sh\nprintf invoked > "$FISCH_TEST_MARKER"\n', { mode: 0o700 });
+  const handler = hookConfiguration({}, 'codex', runner).hooks.UserPromptSubmit[0].hooks[0];
+  const env = { ...process.env, PATH: directory + (win ? ';' : ':') + process.env.PATH, FISCH_TEST_MARKER: marker };
+  delete env.HERDR_SOCKET_PATH; delete env.HERDR_PANE_ID;
+  const command = win ? handler.commandWindows : handler.command;
+  const run = values => promisify(execFile)(win ? 'powershell.exe' : 'sh', win ? ['-NoProfile', '-NonInteractive', '-Command', command] : ['-c', command], { env: values, windowsHide: true });
+  try {
+    await run(env); expect(existsSync(marker)).toBe(false);
+    await run({ ...env, HERDR_SOCKET_PATH: 'test', HERDR_PANE_ID: 'test' }); expect(existsSync(marker)).toBe(true);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 it('forwards privately to the originating pane and remains silent when no body exists', async () => {
   let received;

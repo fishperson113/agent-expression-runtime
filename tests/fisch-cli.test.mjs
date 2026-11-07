@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdtempSync, symlinkSync, unlinkSync, rmdirSync, existsSync } from 'node:fs';
+import { mkdtempSync, symlinkSync, unlinkSync, rmdirSync, existsSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { dispatch } from '../bin/fisch.mjs';
@@ -22,6 +22,19 @@ it('prints branded help and version without starting the runtime', async () => {
 it('rejects unknown commands and extra arguments', async () => {
   await expect(dispatch(['unknown'], {})).rejects.toThrow('fisch --help');
   await expect(dispatch(['run', '--unsafe'], { run: vi.fn() })).rejects.toThrow('fisch --help');
+});
+it('requires explicit hook installation and supports actual install/status/uninstall commands', async () => {
+  await expect(dispatch(['hooks', 'install'], {})).rejects.toThrow('install codex|claude');
+  const home = mkdtempSync(join(tmpdir(), 'fisch-hook-cli-'));
+  const env = { ...process.env, CODEX_HOME: join(home, 'codex'), CLAUDE_CONFIG_DIR: join(home, 'claude'),
+    LOCALAPPDATA: home, XDG_DATA_HOME: home };
+  const command = async args => JSON.parse((await promisify(execFile)(process.execPath, ['bin/fisch.mjs', 'hooks', ...args], { env })).stdout);
+  try {
+    expect((await command(['install', 'codex']))[0].installed).toBe(true);
+    expect((await command(['status', 'codex']))[0].installed).toBe(true);
+    expect((await command(['uninstall']))[0].status).toBe('uninstalled');
+    expect((await command(['status', 'codex']))[0].installed).toBe(false);
+  } finally { rmSync(home, { recursive: true, force: true }); }
 });
 it('executes through a linked checkout, as npm link launches it', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'fisch-cli-')), link = join(directory, 'checkout');

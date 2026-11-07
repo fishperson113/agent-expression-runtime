@@ -1,7 +1,4 @@
 import net from 'node:net';
-import { readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { homedir } from 'node:os';
 import { sendControl } from './terminal-ipc.mjs';
 
 export function socketAddress(path, platform = process.platform) {
@@ -49,20 +46,7 @@ export function selectAgent(snapshot, paneId, requested) {
 }
 export async function graphicsMode(call = herdrCall) {
   try { await call('pane.graphics.info', { pane_id: process.env.HERDR_PANE_ID }); return 'pixels'; }
-  catch (error) {
-    if (error.code !== 'feature_disabled') return 'braille';
-    const file = process.env.HERDR_CONFIG_PATH ?? (process.platform === 'win32'
-      ? join(process.env.APPDATA, 'herdr/config.toml') : join(process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config'), 'herdr/config.toml'));
-    let text = readFileSync(file, 'utf8');
-    if (/^\[experimental\]/m.test(text)) {
-      text = text.replace(/(^\[experimental\][\s\S]*?)(?=^\[|(?![\s\S]))/m, section =>
-        /^kitty_graphics\s*=/m.test(section) ? section.replace(/^kitty_graphics\s*=.*$/m, 'kitty_graphics = true') : section + '\nkitty_graphics = true\n');
-    } else text += '\n[experimental]\nkitty_graphics = true\n';
-    writeFileSync(file, text);
-    await call('server.reload_config');
-    try { await call('pane.graphics.info', { pane_id: process.env.HERDR_PANE_ID }); return 'pixels'; }
-    catch { return 'braille'; }
-  }
+  catch { return 'braille'; }
 }
 export async function paneDoctor() {
   try {
@@ -71,7 +55,7 @@ export async function paneDoctor() {
       detail: `${attached.agent} ${attached.agentPane} → ${attached.rendererPane} (${attached.renderer})` },
       { name: 'Interaction hooks', ok: attached.interactionHooks?.delivery === 'live',
         detail: attached.interactionHooks?.delivery === 'live' ? 'Receiving real agent events.' :
-          attached.interactionHooks?.installed ? 'Waiting for real events; Codex: review Fisch in /hooks. Claude: reload hooks if required.' : 'Hook installation failed; inspect agent configuration permissions.' }];
+          attached.interactionHooks?.installed ? 'Waiting for real events; Codex: review Fisch in /hooks. Claude: reload hooks if required.' : attached.interactionHooks?.installCommand ?? 'Interaction hooks are not installed.' }];
     const { snapshot } = await herdrCall('session.snapshot');
     selectAgent(snapshot, process.env.HERDR_PANE_ID);
     return [{ name: 'Herdr', ok: true, detail: snapshot.version },

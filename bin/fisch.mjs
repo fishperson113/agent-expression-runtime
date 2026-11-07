@@ -18,6 +18,7 @@ Usage: fisch <command>
   test       Build and run the automated checks
   evaluate   Run browser reference A/B comparisons, without a model
   doctor     Check local prerequisites without changing anything
+  hooks      Explicitly install, uninstall or inspect Codex/Claude hooks
   --help     Show this help
   --version  Show the installed version`;
 
@@ -43,6 +44,20 @@ async function doctor() {
   for (const check of checks) console.log(`${check.ok ? 'OK' : 'MISSING'} ${check.name}: ${check.detail}`);
   return checks.every(check => check.ok || check.optional) ? 0 : 1;
 }
+async function hooks(args) {
+  const [action, provider] = args;
+  if (args.length > 2 || !['install', 'uninstall', 'status'].includes(action) ||
+      (provider && !['codex', 'claude'].includes(provider)) || (action === 'install' && !provider))
+    throw Object.assign(Error('Use fisch hooks install codex|claude, fisch hooks uninstall [codex|claude], or fisch hooks status.'), { public: true });
+  const { installInteractionHooks, uninstallInteractionHooks, inspectInteractionHooks } = await import('../integrations/interaction-hooks.mjs');
+  const results = [];
+  for (const agent of provider ? [provider] : ['codex', 'claude']) {
+    results.push(action === 'install' ? await installInteractionHooks({ agent }) :
+      action === 'uninstall' ? uninstallInteractionHooks(agent) : inspectInteractionHooks({ agent }));
+  }
+  console.log(JSON.stringify(results));
+  return results.some(result => result.error) ? 1 : 0;
+}
 
 export async function dispatch(args, handlers = { run, build, test, evaluate, doctor }) {
   if (!args.length || args.includes('--help') || args[0] === 'help') { console.log(usage); return 0; }
@@ -54,6 +69,7 @@ export async function dispatch(args, handlers = { run, build, test, evaluate, do
     console.log(JSON.stringify(capabilities())); return 0;
   }
   if (['express', 'status', 'cancel', 'stop'].includes(args[0])) return control(args);
+  if (args[0] === 'hooks') return (handlers.hooks ?? hooks)(args.slice(1));
   if (args.length === 3 && args[0] === 'run' && args[1] === '--agent') return handlers.run({ agentPane: args[2] });
   if (args.length !== 1 || !Object.hasOwn(handlers, args[0]))
     throw Object.assign(Error('Unknown command or option. Run fisch --help.'), { public: true });

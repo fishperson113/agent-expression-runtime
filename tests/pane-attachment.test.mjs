@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
-import { socketAddress, selectAgent } from '../integrations/herdr.mjs';
+import { socketAddress, selectAgent, graphicsMode } from '../integrations/herdr.mjs';
 import { runPaneSession } from '../scripts/pane-session.mjs';
 import { openControl, sendControl, controlAddress } from '../integrations/terminal-ipc.mjs';
 import { brailleFrame } from '../integrations/pane-display.mjs';
@@ -8,6 +8,11 @@ import { normalizeHook } from '../integrations/interaction-events.mjs';
 
 const own = { pane_id: 'w1:p2', workspace_id: 'w1', tab_id: 'w1:t1', cwd: '/project' };
 const codex = { ...own, pane_id: 'w1:p1', agent: 'codex' };
+it('uses Braille without mutating or reloading Herdr configuration when graphics is disabled', async () => {
+  const calls = [];
+  expect(await graphicsMode(async method => { calls.push(method); throw Object.assign(Error('off'), { code: 'feature_disabled' }); })).toBe('braille');
+  expect(calls).toEqual(['pane.graphics.info']);
+});
 it.each(['codex', 'claude'])('discovers existing %s in the same tab, excluding the renderer pane', provider => {
   const agent = { ...codex, agent: provider };
   expect(selectAgent({ panes: [own], agents: [{ ...own, agent: 'codex' }, agent] }, own.pane_id).agent).toBe(agent);
@@ -76,7 +81,7 @@ it('automatically follows agent events without prompts or expression tool calls 
     return { connected: true, close() { closed = true; } };
   };
   try {
-    expect(await runPaneSession({ call, subscribe, installHooks: () => ({ installed: true }), output: { write() { rendered++; } } })).toBe(0);
+    expect(await runPaneSession({ call, subscribe, hooksStatus: () => ({ installed: true }), output: { write() { rendered++; } } })).toBe(0);
     await pending;
     expect(closed).toBe(true); expect(rendered).toBeGreaterThan(2);
     await expect(sendControl('status', {}, codex.pane_id)).rejects.toThrow('No Fisch body');

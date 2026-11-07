@@ -1,46 +1,60 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync, rmSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import { randomUUID } from 'node:crypto';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { hookPaths, ownedHook, editHookFile, prepareHookRunner } from './hook-storage.mjs';
 
-const script = fileURLToPath(new URL('../scripts/fisch-hook.mjs', import.meta.url)).replaceAll('\\', '/');
 const quote = value => "'" + value.replaceAll("'", "'\\''") + "'";
-export function hookConfiguration(original, provider) {
+function cleanHooks(original) {
   if (!original || typeof original !== 'object' || Array.isArray(original)) throw Error('invalid_hook_config');
   const config = structuredClone(original);
-  if (config.hooks !== undefined && (!config.hooks || Array.isArray(config.hooks) || typeof config.hooks !== 'object'))
-    throw Error('invalid_hook_config');
-  config.hooks ??= {};
+  if (config.hooks === undefined) return config;
+  if (!config.hooks || typeof config.hooks !== 'object' || Array.isArray(config.hooks)) throw Error('invalid_hook_config');
+  for (const [event, groups] of Object.entries(config.hooks)) {
+    if (!Array.isArray(groups)) throw Error('invalid_hook_config');
+    const kept = groups.map(group => ({ ...group, hooks: group.hooks.filter(hook => !ownedHook(hook)) })).filter(group => group.hooks.length);
+    if (kept.length) config.hooks[event] = kept; else delete config.hooks[event];
+  }
+  if (!Object.keys(config.hooks).length) delete config.hooks;
+  return config;
+}
+export function hookConfiguration(original, provider, runner = hookPaths(provider).runner) {
+  const config = cleanHooks(original); config.hooks ??= {};
+  const script = runner.replaceAll('\\', '/');
+  if (/[\r\n"%!]/.test(script)) throw Error('unsupported_hook_path');
   const events = ['UserPromptSubmit', 'Stop', 'PermissionRequest', 'PostToolUse',
     ...(provider === 'codex' ? ['Interrupt'] : ['PostToolUseFailure'])];
   for (const event of events) {
-    const groups = config.hooks[event] ?? [];
-    if (!Array.isArray(groups)) throw Error('invalid_hook_config');
-    const kept = groups.map(group => ({ ...group, hooks: group.hooks.filter(hook =>
-      !String(hook.command ?? '').includes('/scripts/fisch-hook.mjs')) })).filter(group => group.hooks.length);
-    const command = { type: 'command', command: `node ${quote(script)}`, timeout: 2 };
-    if (provider === 'codex') command.commandWindows = `node "${script}"`;
-    config.hooks[event] = [...kept, { hooks: [command] }];
+    const command = { type: 'command', command: `if [ -n "$HERDR_SOCKET_PATH" ] && [ -n "$HERDR_PANE_ID" ] && [ -f ${quote(script)} ]; then node ${quote(script)} ${provider}; fi`, timeout: 2 };
+    if (provider === 'codex') command.commandWindows = `cmd.exe /d /c if defined HERDR_SOCKET_PATH if defined HERDR_PANE_ID if exist "${script}" node "${script}" ${provider}`;
+    config.hooks[event] = [...(config.hooks[event] ?? []), { hooks: [command] }];
   }
   return config;
 }
-export function installInteractionHooks(agent, { home = homedir(), env = process.env } = {}) {
-  const provider = agent.agent?.startsWith('claude') ? 'claude' : 'codex';
-  const directory = provider === 'codex' ? env.CODEX_HOME ?? join(home, '.codex') : env.CLAUDE_CONFIG_DIR ?? join(home, '.claude');
-  const file = join(directory, provider === 'codex' ? 'hooks.json' : 'settings.json');
-  let temporary;
+export function inspectInteractionHooks(agent, options) {
+  const provider = agent.agent?.startsWith('claude') ? 'claude' : 'codex', paths = hookPaths(provider, options);
   try {
-    const before = existsSync(file) ? readFileSync(file, 'utf8') : '';
-    const config = hookConfiguration(before ? JSON.parse(before) : {}, provider);
-    const content = JSON.stringify(config, null, 2) + '\n';
-    if (content !== before) {
-      mkdirSync(directory, { recursive: true }); temporary = file + '.' + randomUUID() + '.tmp';
-      writeFileSync(temporary, content, { mode: 0o600 });
-      if ((existsSync(file) ? readFileSync(file, 'utf8') : '') !== before) throw Error('hook_config_changed');
-      renameSync(temporary, file);
-    }
-    return { provider, installed: true, delivery: 'awaiting-event', review: provider === 'codex' ? '/hooks' : 'reload-if-required' };
+    const config = existsSync(paths.config) ? JSON.parse(readFileSync(paths.config, 'utf8')) : {};
+    const handlers = Object.values(config.hooks ?? {}).flatMap(groups => groups.flatMap(group => group.hooks)).filter(ownedHook);
+    const legacy = handlers.some(hook => String(hook.command).replaceAll('\\', '/').includes('/scripts/fisch-hook.mjs'));
+    return { provider, installed: handlers.length > 0 && !legacy && existsSync(paths.runner), legacy,
+      review: `/hooks`, installCommand: `fisch hooks install ${provider}` };
+  } catch { return { provider, installed: false, error: 'hook_config_unreadable' }; }
+}
+export async function installInteractionHooks(agent, options) {
+  const provider = agent.agent?.startsWith('claude') ? 'claude' : 'codex', paths = hookPaths(provider, options);
+  try {
+    if (existsSync(paths.config)) cleanHooks(JSON.parse(readFileSync(paths.config, 'utf8')));
+    await prepareHookRunner(paths.runner);
+    editHookFile(paths.config, config => hookConfiguration(config, provider, paths.runner));
+    return inspectInteractionHooks(agent, options);
   } catch { return { provider, installed: false, error: 'hook_install_failed' }; }
-  finally { if (temporary) rmSync(temporary, { force: true }); }
+}
+export function uninstallInteractionHooks(provider, options) {
+  const paths = hookPaths(provider, options);
+  try {
+    editHookFile(paths.config, cleanHooks);
+    const remaining = ['codex', 'claude'].some(agent => {
+      const state = inspectInteractionHooks({ agent }, options); return state.installed || state.error;
+    });
+    if (!remaining) rmSync(paths.runner, { force: true });
+    return { provider, installed: false, status: 'uninstalled' };
+  } catch { return { provider, status: 'rejected', error: 'hook_uninstall_failed' }; }
 }
