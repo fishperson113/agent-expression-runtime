@@ -6,6 +6,7 @@ export type BodyState = Record<Property, Value> & {
   flowStrength: number;
   shapeWeights: number[];
   flowWeights: number[];
+  particlePositions?: Float32Array;
 };
 export interface RendererSink {
   apply(state: BodyState, now: number): void;

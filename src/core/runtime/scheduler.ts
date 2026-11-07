@@ -2,6 +2,8 @@ import type { BodyState, Clock, DiagnosticsSink, RendererSink } from '../ports';
 import type { Compiled, ProgramIR, StateIR, Op } from './ir';
 import type { Property, Value } from '../ast/types';
 import { capability } from '../../primitives/registry';
+import { ParticleFormation } from '../geometry/morph';
+import type { Sculpture } from '../geometry/types';
 export const initialState = (): BodyState => ({
   shape: 'sphere',
   shapeWeights: capability.shapes.map(name => Number(name === 'sphere')),
@@ -35,6 +37,7 @@ type Active = {
 const restPosture = { rise: 0, advance: 0, spread: 1, grow: 1, arcOffset: 0 };
 type Blend = { from: number; to: number; start: number; duration: number; easing: string };
 export class Scheduler {
+  private formation = new ParticleFormation();
   epoch = 'idle';
   state = initialState();
   private lastSeq = -1;
@@ -62,6 +65,7 @@ export class Scheduler {
   }
   cancel(epoch: string) {
     this.tick();
+    this.formation.freeze(this.clock.now());
     if (this.active) this.feedback?.('cancelled', this.active.ir);
     for (const ir of this.queue) this.feedback?.('cancelled', ir);
     for (const f of this.stateFeedback) this.feedback?.('cancelled', f.ir);
@@ -180,9 +184,10 @@ export class Scheduler {
   }
   private sampleWeights(a: Active, op: Op, t: number) {
     if (op.property === 'shape') {
+      this.formation.sample(op, op.value as string | Sculpture, t, a.weights.get(op)!, a.ir.seed, this.clock.now());
       const target = capability.shapes.indexOf(String(op.value));
       this.state.shapeWeights = a.weights.get(op)!.map((w, i) => w + ((i === target ? 1 : 0) - w) * t);
-      this.state.shape = op.value;
+      this.state.shape = typeof op.value === 'string' ? op.value : 'assembled';
     }
     if (op.property === 'flow') {
       const target = capability.fields.indexOf(String(op.value));
@@ -269,6 +274,7 @@ export class Scheduler {
     const now = this.clock.now();
     this.advance(now);
     this.sampleBaseline(now);
+    this.formation.tick(now); this.state.particlePositions = this.formation.points;
     this.sink.apply({ ...this.state, shapeWeights: [...this.state.shapeWeights] }, now);
   }
   dispose() {

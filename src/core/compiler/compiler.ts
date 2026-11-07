@@ -1,4 +1,5 @@
-import { ExpressionError as Err, type Envelope, type Property } from '../ast/types';
+import { ExpressionError as Err, type Envelope, type Property, type Value } from '../ast/types';
+import { validateSculpture } from '../geometry/validate';
 import type { Compiled, Op } from '../runtime/ir';
 import { capability, primitives } from '../../primitives/registry';
 type Obj = Record<string, any>;
@@ -40,8 +41,8 @@ type Macro = {
   body: unknown;
 };
 type Lowered = { ops: Op[]; duration: number };
-type LowerContext = { macros: Map<string, Macro>; stack: string[]; input: number; expanded: number };
-type AddOp = (property: Property, value: string | number, strength?: number) => unknown;
+type LowerContext = { macros: Map<string, Macro>; stack: string[]; input: number; expanded: number; assemblies: number };
+type AddOp = (property: Property, value: Value, strength?: number) => unknown;
 export class Compiler {
   constructor(private seed = 42) {}
   private macros = new Map<string, Macro>();
@@ -189,13 +190,14 @@ export class Compiler {
     return raw;
   }
   private lower(raw: unknown, macros: Map<string, Macro>, stack: string[]): Lowered {
-    return this.walk(raw, '$.body', 0, 0, false, { macros, stack, input: 0, expanded: 0 });
+    return this.walk(raw, '$.body', 0, 0, false, { macros, stack, input: 0, expanded: 0, assemblies: 0 });
   }
   private walk(value: unknown, p: string, depth: number, at: number, inMacro: boolean, context: LowerContext): Lowered {
     if (depth > 16) fail('depth_budget', p);
     if (++context.expanded > 512) fail('expansion_budget', p);
     if (!inMacro && ++context.input > 128) fail('input_budget', p);
     const n = object(value, p), type = choice(n.type, capability.nodes, p + '.type');
+    if (type === 'assemble' && ++context.assemblies > capability.assembly.nodes) fail('assembly_budget', p);
     if (type === 'call') return this.call(n, p, depth, at, context);
     if (type === 'sequence' || type === 'parallel') return this.group(n, p, depth, at, inMacro, context);
     return this.primitive(n, p, at);
@@ -255,7 +257,7 @@ export class Compiler {
     return [...ops.filter(op => op.property !== 'effortFlow'), ...merged];
   }
   private primitive(n: Obj, p: string, at: number): Lowered {
-    const fields: Record<string, string[]> = { morph: ['target'], flow: ['field', 'strength'],
+    const fields: Record<string, string[]> = { morph: ['target'], assemble: ['parts'], flow: ['field', 'strength'],
       style: ['color', 'brightness', 'pointSize', 'dispersion'],
       shapeQuality: ['rise', 'advance', 'spread', 'grow', 'path'], wait: [] };
     keys(n, ['type', 'durationMs', ...(n.type === 'wait' ? [] : ['easing', 'effort']), ...fields[n.type]], p);
@@ -267,11 +269,12 @@ export class Compiler {
       for (const key of Object.keys(effort)) num(effort[key], p + '.effort.' + key, 0, 1);
     }
     const ops: Op[] = [];
-    const add = (property: Property, value: string | number, strength?: number) =>
+    const add = (property: Property, value: Value, strength?: number) =>
       ops.push({ at, duration, easing: ease, property, value, ...(effort ? { effort } : {}),
         ...(strength === undefined ? {} : { strength }) });
     if (n.type === 'shapeQuality') this.quality(n, p, ops, add);
     if (n.type === 'morph') add('shape', choice(n.target, primitives.morph.targets, p + '.target'));
+    if (n.type === 'assemble') add('shape', validateSculpture({ parts: n.parts }, p));
     if (n.type === 'flow') add('flow', choice(n.field, primitives.flow.fields, p + '.field'), num(n.strength, p + '.strength', 0, 1));
     if (n.type === 'style') this.style(n, p, ops, add);
     if (effort?.flow !== undefined) add('effortFlow', effort.flow);

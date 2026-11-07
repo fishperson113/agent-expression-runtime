@@ -6,6 +6,7 @@ export const primitives = Object.freeze({
     cost: 1,
   },
   morph: { writes: ['shape'] as Property[], cost: 1, targets: manifest.shapes },
+  assemble: { writes: ['shape'] as Property[], cost: 1, kinds: manifest.assembly.kinds },
   flow: { writes: ['flow'] as Property[], cost: 1, fields: manifest.fields },
   style: { writes: ['color', 'brightness', 'pointSize', 'dispersion'] as Property[], cost: 1 },
 });

@@ -48,4 +48,12 @@ export class ParticleFormation {
       for (let k = 0; k < 3; k++) this.points[j + k] = this.from[j + k] + (target[k] - this.from[j + k]) * this.progress;
     }
   }
+  freeze(now: number) {
+    if (!this.points) return;
+    this.tick(now);
+    const positions = this.points.slice();
+    this.cloud = { positions, parts: [], partIndices: new Uint8Array(this.count), topology: 'frozen' };
+    this.from = positions; this.mapping = Uint32Array.from({ length: this.count }, (_, i) => i);
+    this.operation = undefined; this.topology = 'frozen'; this.progress = 1;
+  }
 }

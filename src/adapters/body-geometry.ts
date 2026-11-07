@@ -18,6 +18,9 @@ export function sampleBody(shapes: Float32Array[], positions: Float32Array, coun
         y += shapes[k][j + 1] * weight;
         z += shapes[k][j + 2] * weight;
       }
+      if (state.particlePositions) {
+        x = state.particlePositions[j]; y = state.particlePositions[j + 1]; z = state.particlePositions[j + 2];
+      }
       const phase = i * 0.618;
       let scale = 1;
       scale += Math.sin(t * 2) * strength * 0.16 * fields.pulse;

@@ -14,7 +14,7 @@ export type Property =
   | 'grow'
   | 'arcOffset'
   | 'effortFlow';
-export type Value = number | string;
+export type Value = number | string | Sculpture;
 export type Param = { type: 'param'; name: string };
 export type Effort = { time?: number; weight?: number; flow?: number };
 export type Node =
@@ -30,6 +30,7 @@ export type Node =
       easing?: Easing;
     }
   | { type: 'morph'; target: Shape; durationMs: number; easing?: Easing; effort?: Effort }
+  | ({ type: 'assemble'; durationMs: number; easing?: Easing; effort?: Effort } & Sculpture)
   | {
       type: 'flow';
       field: Field;
@@ -86,3 +87,4 @@ export class ExpressionError extends Error {
     super(message);
   }
 }
+import type { Sculpture } from '../geometry/types';

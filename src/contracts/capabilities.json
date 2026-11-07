@@ -1,11 +1,11 @@
 {
   "v": 1,
-  "revision": "poc-2-breaking",
+  "revision": "poc-3-composition",
   "instructionVersion": "1.1.0",
   "tracks": ["body"],
   "shapes": ["sphere", "wall", "wave", "cloud", "pin", "screw", "pyramid"],
   "fields": ["orbit", "turbulence", "pulse"],
-  "nodes": ["morph", "flow", "style", "shapeQuality", "sequence", "parallel", "wait", "call"],
+  "nodes": ["morph", "assemble", "flow", "style", "shapeQuality", "sequence", "parallel", "wait", "call"],
   "shapeQuality": {
     "positionRange": [-1, 1],
     "scaleRange": [0.25, 2],
@@ -34,5 +34,5 @@
   "dedupTtlMs": 60000,
   "admissionDeadlineMs": 500,
   "modelApiCalls": false,
-  "assembly": { "parts": 24, "controlPoints": 12, "particles": 10000, "kinds": ["curve", "ellipsoid", "patch"] }
+  "assembly": { "parts": 24, "controlPoints": 12, "particles": 10000, "nodes": 8, "kinds": ["curve", "ellipsoid", "patch"] }
 }
