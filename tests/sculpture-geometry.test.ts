@@ -3,6 +3,7 @@ import { validateSculpture } from '../src/core/geometry/validate';
 import { sculptureCloud } from '../src/core/geometry/sampling';
 import { ParticleFormation } from '../src/core/geometry/morph';
 import { spatialAssignment } from '../src/core/geometry/assignment';
+import { shapeBuffers } from '../src/core/geometry/primitives';
 
 const scene = () => ({ parts: [
   { id: 'palm', kind: 'ellipsoid', center: [0, -0.3, 0], scale: [0.4, 0.4, 0.1], weight: 2 },
@@ -17,6 +18,7 @@ it('validates arbitrary bounded compositions and retains paths on malformed geom
   expect(() => validateSculpture({ parts: Array(25).fill(scene().parts[0]) }, '$')).toThrow();
   expect(() => validateSculpture({ parts: [scene().parts[0], scene().parts[0]] }, '$')).toThrow();
   expect(() => validateSculpture({ parts: [{ ...scene().parts[0], eval: 'run' }] }, '$')).toThrow();
+  expect(() => validateSculpture({ parts: [{ ...scene().parts[0], weight: null }] }, '$')).toThrow();
 });
 it('samples deterministically with stable allocation regardless of part order', () => {
   const form = validateSculpture(scene(), '$');
@@ -38,4 +40,15 @@ it('starts interrupted morphs at the exact current particle positions and reuses
   expect(f.points).not.toEqual(before);
   f.sample({}, 'sphere', 0, [1, 0, 0, 0, 0, 0, 0], 42, 1100); const returning = f.points!.slice(); f.tick(1100);
   expect(f.points).toEqual(returning);
+});
+it('keeps the same particles on their parts when a pose changes', () => {
+  const form = validateSculpture(scene(), '$'), f = new ParticleFormation(512);
+  const map = spatialAssignment(shapeBuffers(512)[0], sculptureCloud(form, 512).positions);
+  f.sample({}, form, 1, [1, 0, 0, 0, 0, 0, 0], 42, 0);
+  const next = structuredClone(form), finger = next.parts.find(p => p.id === 'middle')!;
+  if (finger.kind === 'curve') finger.points[finger.points.length - 1][0] += 0.3;
+  const target = sculptureCloud(next, 512).positions;
+  f.sample({}, next, 1, [0, 0, 0, 0, 0, 0, 0], 42, 500);
+  for (let i = 0; i < 512; i++) for (let k = 0; k < 3; k++)
+    expect(f.points![i * 3 + k]).toBeCloseTo(target[map[i] * 3 + k], 6);
 });

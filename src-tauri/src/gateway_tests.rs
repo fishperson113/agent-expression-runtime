@@ -9,6 +9,13 @@ use std::sync::{
     Arc,
 };
 use tower::ServiceExt;
+#[test]
+fn browser_port_search_spans_the_range_instead_of_staying_in_reserved_blocks() {
+    let ports: std::collections::HashSet<_> = (0..16384).map(|i| browser_port(15000, i)).collect();
+    assert_eq!(ports.len(), 16384);
+    assert!(ports.iter().all(|port| (49152..=65535).contains(port)));
+    assert!((0..4).any(|i| !(63936..=65135).contains(&browser_port(15000, i))));
+}
 #[tokio::test]
 async fn stalled_admission_revokes_its_session_and_frees_gateway_slots() {
     let g = Gateway::new();

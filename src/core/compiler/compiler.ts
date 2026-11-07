@@ -171,7 +171,7 @@ export class Compiler {
       'rise', 'advance', 'spread', 'grow', 'time', 'weight', 'flow'].includes(field);
     const symbolic = ['target', 'field', 'color', 'easing'].includes(field);
     if ((numeric && kind !== 'number') || (symbolic && kind !== 'string')) fail('parameter_type', '$.body.body');
-    if (kind === 'number') return ['spread', 'grow'].includes(field) ? 1 : 0;
+    if (kind === 'number') return field === 'periodMs' ? 2000 : ['spread', 'grow', 'scale', 'weight'].includes(field) ? 1 : 0;
     return ({ target: 'sphere', field: 'orbit', color: '#79e6d3', easing: 'linear' }[field] ?? 'sphere');
   }
   private substitute(raw: unknown, args: Obj, p: string): unknown {

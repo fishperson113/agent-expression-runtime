@@ -359,8 +359,8 @@ impl Gateway {
         // Select a browser-safe dynamic port, independent of a machine's custom ephemeral range.
         let first = (Uuid::new_v4().as_u128() % 16384) as u16;
         let mut listener = None;
-        for offset in 0..128u16 {
-            let port = 49152 + ((first + offset) % 16384);
+        for offset in 0..16384u32 {
+            let port = browser_port(first, offset);
             if let Ok(bound) =
                 tokio::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, port)).await
             {
@@ -377,6 +377,9 @@ impl Gateway {
             .await
             .map_err(|_| "gateway_stopped".into())
     }
+}
+pub(crate) fn browser_port(first: u16, offset: u32) -> u16 {
+    49152 + ((u32::from(first) + offset * 7919) % 16384) as u16
 }
 fn error(status: StatusCode, code: &str) -> Response {
     (status, Json(json!({"status":"rejected","code":code}))).into_response()

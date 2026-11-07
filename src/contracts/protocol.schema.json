@@ -1295,7 +1295,7 @@
           "additionalProperties": false
         },
         {
-          "$ref": "#/$defs/assembly"
+          "$ref": "#/$defs/assemblyTemplate"
         }
       ]
     },
@@ -1673,6 +1673,577 @@
         "durationMs"
       ],
       "additionalProperties": false
+    },
+    "assemblyTemplate": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "assemble"
+        },
+        "parts": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 24,
+          "items": {
+            "$ref": "#/$defs/assemblyTemplatePart"
+          }
+        },
+        "durationMs": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            {
+              "$ref": "#/$defs/param"
+            }
+          ]
+        },
+        "easing": {
+          "enum": [
+            "linear",
+            "smoothstep"
+          ]
+        },
+        "effort": {
+          "type": "object",
+          "properties": {
+            "time": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                {
+                  "$ref": "#/$defs/param"
+                }
+              ]
+            },
+            "weight": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                {
+                  "$ref": "#/$defs/param"
+                }
+              ]
+            },
+            "flow": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                {
+                  "$ref": "#/$defs/param"
+                }
+              ]
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "type",
+        "parts",
+        "durationMs"
+      ],
+      "additionalProperties": false
+    },
+    "assemblyTemplatePart": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][\\w-]{0,31}$"
+            },
+            "weight": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0.1,
+                  "maximum": 10
+                },
+                {
+                  "$ref": "#/$defs/param"
+                }
+              ]
+            },
+            "motion": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "pivot": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "minimum": -2,
+                            "maximum": 2
+                          },
+                          {
+                            "$ref": "#/$defs/param"
+                          }
+                        ]
+                      },
+                      "minItems": 3,
+                      "maxItems": 3
+                    },
+                    "translate": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "minimum": -0.4,
+                            "maximum": 0.4
+                          },
+                          {
+                            "$ref": "#/$defs/param"
+                          }
+                        ]
+                      },
+                      "minItems": 3,
+                      "maxItems": 3
+                    },
+                    "rotate": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "minimum": -0.6,
+                            "maximum": 0.6
+                          },
+                          {
+                            "$ref": "#/$defs/param"
+                          }
+                        ]
+                      },
+                      "minItems": 3,
+                      "maxItems": 3
+                    },
+                    "periodMs": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": 1000,
+                          "maximum": 10000
+                        },
+                        {
+                          "$ref": "#/$defs/param"
+                        }
+                      ]
+                    },
+                    "phase": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 6.283185307179586
+                        },
+                        {
+                          "$ref": "#/$defs/param"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "pivot",
+                    "translate",
+                    "rotate",
+                    "periodMs",
+                    "phase"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "kind": {
+              "const": "curve"
+            },
+            "points": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 12,
+              "items": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": -2,
+                      "maximum": 2
+                    },
+                    {
+                      "$ref": "#/$defs/param"
+                    }
+                  ]
+                },
+                "minItems": 3,
+                "maxItems": 3
+              }
+            },
+            "radius": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 0.25
+                },
+                {
+                  "$ref": "#/$defs/param"
+                }
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "points",
+            "radius"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][\\w-]{0,31}$"
+            },
+            "weight": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0.1,
+                  "maximum": 10
+                },
+                {
+                  "$ref": "#/$defs/param"
+                }
+              ]
+            },
+            "motion": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "pivot": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "minimum": -2,
+                            "maximum": 2
+                          },
+                          {
+                            "$ref": "#/$defs/param"
+                          }
+                        ]
+                      },
+                      "minItems": 3,
+                      "maxItems": 3
+                    },
+                    "translate": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "minimum": -0.4,
+                            "maximum": 0.4
+                          },
+                          {
+                            "$ref": "#/$defs/param"
+                          }
+                        ]
+                      },
+                      "minItems": 3,
+                      "maxItems": 3
+                    },
+                    "rotate": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "minimum": -0.6,
+                            "maximum": 0.6
+                          },
+                          {
+                            "$ref": "#/$defs/param"
+                          }
+                        ]
+                      },
+                      "minItems": 3,
+                      "maxItems": 3
+                    },
+                    "periodMs": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": 1000,
+                          "maximum": 10000
+                        },
+                        {
+                          "$ref": "#/$defs/param"
+                        }
+                      ]
+                    },
+                    "phase": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 6.283185307179586
+                        },
+                        {
+                          "$ref": "#/$defs/param"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "pivot",
+                    "translate",
+                    "rotate",
+                    "periodMs",
+                    "phase"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "kind": {
+              "const": "ellipsoid"
+            },
+            "center": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": -2,
+                    "maximum": 2
+                  },
+                  {
+                    "$ref": "#/$defs/param"
+                  }
+                ]
+              },
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "scale": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0.02,
+                    "maximum": 1.5
+                  },
+                  {
+                    "$ref": "#/$defs/param"
+                  }
+                ]
+              },
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "rotation": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": -3.141592653589793,
+                    "maximum": 3.141592653589793
+                  },
+                  {
+                    "$ref": "#/$defs/param"
+                  }
+                ]
+              },
+              "minItems": 3,
+              "maxItems": 3
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "center",
+            "scale"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][\\w-]{0,31}$"
+            },
+            "weight": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0.1,
+                  "maximum": 10
+                },
+                {
+                  "$ref": "#/$defs/param"
+                }
+              ]
+            },
+            "motion": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "pivot": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "minimum": -2,
+                            "maximum": 2
+                          },
+                          {
+                            "$ref": "#/$defs/param"
+                          }
+                        ]
+                      },
+                      "minItems": 3,
+                      "maxItems": 3
+                    },
+                    "translate": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "minimum": -0.4,
+                            "maximum": 0.4
+                          },
+                          {
+                            "$ref": "#/$defs/param"
+                          }
+                        ]
+                      },
+                      "minItems": 3,
+                      "maxItems": 3
+                    },
+                    "rotate": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "minimum": -0.6,
+                            "maximum": 0.6
+                          },
+                          {
+                            "$ref": "#/$defs/param"
+                          }
+                        ]
+                      },
+                      "minItems": 3,
+                      "maxItems": 3
+                    },
+                    "periodMs": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": 1000,
+                          "maximum": 10000
+                        },
+                        {
+                          "$ref": "#/$defs/param"
+                        }
+                      ]
+                    },
+                    "phase": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 6.283185307179586
+                        },
+                        {
+                          "$ref": "#/$defs/param"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "pivot",
+                    "translate",
+                    "rotate",
+                    "periodMs",
+                    "phase"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "kind": {
+              "const": "patch"
+            },
+            "points": {
+              "type": "array",
+              "minItems": 4,
+              "maxItems": 4,
+              "items": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": -2,
+                      "maximum": 2
+                    },
+                    {
+                      "$ref": "#/$defs/param"
+                    }
+                  ]
+                },
+                "minItems": 3,
+                "maxItems": 3
+              }
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "points"
+          ],
+          "additionalProperties": false
+        }
+      ]
     }
   }
 }

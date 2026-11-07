@@ -15,6 +15,7 @@ it('compiles composition atomically, including macros, and detects geometry/morp
     { type: 'morph', target: 'sphere', durationMs: 500 }] }), 0)).toThrow('property_conflict');
   compiler.compile({ v: 1, epoch: 'e', seq: 2, kind: 'define', body: { name: 'gesture', revision: 1, params: {}, body } }, 0);
   expect(compiler.compile(envelope({ type: 'call', name: 'gesture', revision: 1, args: {} }, 3), 0).kind).toBe('program');
+  expect(() => compiler.compile(envelope({ type: 'sequence', children: Array(9).fill(body) }), 0)).toThrow('assembly_budget');
 });
 it('renders a custom curve and preserves particle identity on interrupted replacement and cancellation', () => {
   let now = 0; const engine = new TerminalEngine(() => now);
