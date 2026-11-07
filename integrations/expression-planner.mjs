@@ -13,8 +13,8 @@ export class ExpressionPlanner {
   generation = 0; attempts = 0; applied = 0; discarded = 0;
   status = 'unknown'; lastHash = ''; lastRead = -Infinity; lastRequest = -Infinity;
   mode = 'disabled'; error = null; closed = false;
-  constructor({ engine, plan, readContext, now = () => performance.now(), timeoutMs = 4000, intervalMs = 10000, debounceMs = 0, onContextChange = () => {}, reason }) {
-    Object.assign(this, { engine, plan, readContext, now, timeoutMs, intervalMs, debounceMs, onContextChange });
+  constructor({ engine, plan, readContext, now = () => performance.now(), timeoutMs = 4000, intervalMs = 10000, debounceMs = 0, onContextChange = () => {}, onApplied = () => {}, reason }) {
+    Object.assign(this, { engine, plan, readContext, now, timeoutMs, intervalMs, debounceMs, onContextChange, onApplied });
     this.mode = plan ? 'ready' : 'disabled'; this.reason = reason;
   }
   update(status) {
@@ -56,9 +56,10 @@ export class ExpressionPlanner {
       });
       const value = await Promise.race([this.plan(context, controller.signal), timeout]);
       if (this.closed || generation !== this.generation || controller.signal.aborted) { this.discarded++; return; }
-      const result = this.engine.express({ body: planBody(value) });
+      const body = planBody(value), result = this.engine.express({ body });
       if (result.status !== 'accepted') throw Error('invalid_plan');
-      this.applied++; this.mode = 'ready';
+      this.applied++; this.mode = 'ready'; this.lastPlan = body;
+      this.lastAppliedAt = new Date().toISOString(); this.onApplied(body);
     } catch (error) {
       if (this.closed || generation !== this.generation) this.discarded++;
       else { this.mode = 'fallback'; this.error = error.message === 'timeout' ? 'timeout' : 'plan_failed'; }
@@ -66,7 +67,8 @@ export class ExpressionPlanner {
   }
   get info() {
     return { mode: this.mode, reason: this.reason, attempts: this.attempts, applied: this.applied,
-      discarded: this.discarded, queued: !!this.pending, error: this.error };
+      discarded: this.discarded, queued: !!this.pending, error: this.error,
+      lastPlan: this.lastPlan, lastAppliedAt: this.lastAppliedAt };
   }
   close() { this.closed = true; this.invalidate(); }
 }

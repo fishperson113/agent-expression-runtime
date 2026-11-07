@@ -55,7 +55,7 @@ export async function runPaneSession({ agentPane, call = herdrCall, subscribe = 
     if (message.method === 'status') return { status: 'attached', agent: agent.agent, agentPane: agent.pane_id,
       rendererPane: own.pane_id, renderer: mode, frames, expressions: commands, shape: engine.state.shape,
       integration: 'automatic-hooks', activity: activity.status, transitions: activity.transitions,
-      eventsConnected: events.connected, planner: activity.planner };
+      eventsConnected: events.connected, bodySource: activity.source, planner: activity.planner };
     throw Error('unknown_method');
   });
   const events = subscribe(agent.pane_id, status => activity.update(status));
@@ -77,7 +77,7 @@ export async function runPaneSession({ agentPane, call = herdrCall, subscribe = 
       }
       activity.tick(); const size = displaySize(snapshot, own.pane_id), pixels = engine.frame(size.width, size.height);
       await drawFrame({ pixels, size, mode, paneId: own.pane_id, call, output,
-        title: `Fisch · ${agent.agent} ${agent.pane_id} · ${activity.status} · planner: ${activity.planner.mode}` });
+        title: `Fisch · ${activity.status} · body: ${activity.source} · planner: ${activity.planner.mode}` });
       frames++; await delay(100);
     }
     return 0;

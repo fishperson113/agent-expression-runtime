@@ -1,0 +1,111 @@
+{
+  "timestamp": "2026-11-07T01:15:43.285Z",
+  "beforeFix": {
+    "attempts": 25,
+    "applied": 12,
+    "discarded": 13,
+    "shape": "cloud",
+    "terminalUpdatesResetMotion": true
+  },
+  "afterFix": {
+    "status": "attached",
+    "agent": "codex",
+    "agentPane": "w4:pJ",
+    "rendererPane": "w4:pK",
+    "renderer": "braille",
+    "frames": 451,
+    "expressions": 0,
+    "shape": "sphere",
+    "integration": "automatic-hooks",
+    "activity": "working",
+    "transitions": 1,
+    "eventsConnected": true,
+    "bodySource": "planner",
+    "planner": {
+      "mode": "ready",
+      "attempts": 2,
+      "applied": 1,
+      "discarded": 1,
+      "queued": true,
+      "error": null,
+      "lastPlan": {
+        "type": "sequence",
+        "children": [
+          {
+            "type": "parallel",
+            "children": [
+              {
+                "type": "morph",
+                "target": "wall",
+                "durationMs": 650
+              },
+              {
+                "type": "shapeQuality",
+                "rise": 0.15,
+                "grow": 0.9,
+                "effort": {
+                  "time": 0.35,
+                  "weight": 0.55,
+                  "flow": 0.25
+                },
+                "durationMs": 650
+              }
+            ]
+          },
+          {
+            "type": "parallel",
+            "children": [
+              {
+                "type": "morph",
+                "target": "wave",
+                "durationMs": 1200
+              },
+              {
+                "type": "flow",
+                "field": "pulse",
+                "strength": 0.25,
+                "durationMs": 1200
+              },
+              {
+                "type": "shapeQuality",
+                "rise": 0.25,
+                "grow": 1,
+                "effort": {
+                  "time": 0.3,
+                  "weight": 0.4,
+                  "flow": 0.75
+                },
+                "durationMs": 1200
+              }
+            ]
+          },
+          {
+            "type": "parallel",
+            "children": [
+              {
+                "type": "morph",
+                "target": "sphere",
+                "durationMs": 800
+              },
+              {
+                "type": "shapeQuality",
+                "rise": 0.15,
+                "grow": 0.9,
+                "effort": {
+                  "time": 0.25,
+                  "weight": 0.45,
+                  "flow": 0.45
+                },
+                "durationMs": 800
+              }
+            ]
+          }
+        ]
+      },
+      "lastAppliedAt": "2026-11-07T01:15:06.941Z",
+      "backend": "codex"
+    }
+  },
+  "regression": "admitted wave survives terminal text update; blocked status preempts it with wall",
+  "humanVisibility": "not-assessed"
+}

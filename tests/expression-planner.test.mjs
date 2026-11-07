@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import { ExpressionPlanner, cleanContext } from '../integrations/expression-planner.mjs';
 import { terminalEngine } from '../scripts/pane-session.mjs';
 import { paneActivity } from '../integrations/planner-bridge.mjs';
+import { TerminalEngine } from '../src/terminal/runtime.ts';
 
 const planValue = target => ({ body: { type: 'sequence', children: [{ type: 'parallel', children: [
   { type: 'morph', target, durationMs: 200 },
@@ -76,4 +77,29 @@ it('waits for a quiet context window before starting a native process', async ()
   text = 'stable'; now = 2000; planner.tick(); await planner.reading; expect(calls).toBe(0);
   now = 4000; planner.tick(); await planner.reading; await planner.job;
   expect(calls).toBe(1); expect(planner.info.applied).toBe(1); planner.close();
+});
+it('lets an admitted plan finish across terminal updates, but preempts it on a real status change', async () => {
+  let now = 0, text = 'exploring the request', cancelled = 0; const admitted = [];
+  const runtime = new TerminalEngine(() => now);
+  const engine = { cancel() { cancelled++; return runtime.cancel(); },
+    express(value) { admitted.push(value.body); return runtime.express(value); } };
+  const activity = paneActivity(engine, { pane_id: 'agent' }, async () => ({ read: { text } }), { enabled: false },
+    { now: () => now, plan: async () => planValue('wave') });
+  try {
+    activity.update('working'); activity.tick();
+    for (let i = 0; i < 8; i++) await Promise.resolve();
+    expect(activity.source).toBe('planner');
+    expect(activity.planner.lastPlan).toEqual(planValue('wave').body);
+    expect(activity.planner.lastAppliedAt).toBeTruthy();
+    const count = admitted.length, resets = cancelled;
+    text = 'terminal received more tool output'; now = 2001; activity.tick();
+    for (let i = 0; i < 8; i++) await Promise.resolve();
+    runtime.frame(64, 64); expect(runtime.state.shape).toBe('wave');
+    expect(admitted.length).toBe(count); expect(cancelled).toBe(resets);
+    expect(activity.source).toBe('planner');
+    activity.update('blocked'); expect(activity.source).toBe('reflex');
+    expect(cancelled).toBe(resets + 1);
+    expect(admitted.at(-1).children[0].target).toBe('wall');
+    now += 700; runtime.frame(64, 64); expect(runtime.state.shape).toBe('wall');
+  } finally { activity.close(); runtime.dispose(); }
 });
