@@ -1,0 +1,37 @@
+#!/bin/sh
+cache_dir="${HOME}/.cache/my-harness"
+cache="$cache_dir/python"
+probe='import sys; sys.exit(sys.version_info < (3, 8))'
+script="${0%/*}/../harness.py"
+
+save_python() {
+    (umask 077; mkdir -p "$cache_dir" && printf '%s\n%s\n' "$python" "$flag" > "$cache") 2>/dev/null || :
+}
+
+if [ -n "${MY_HARNESS_PYTHON:-}" ]; then
+    python="$MY_HARNESS_PYTHON"; flag=
+    if "$python" -c "$probe" </dev/null >/dev/null 2>&1; then
+        exec "$python" "$script" "$@"
+    fi
+elif [ -r "$cache" ]; then
+    { IFS= read -r python; IFS= read -r flag; } < "$cache"
+    if [ -n "$python" ] && command -v "$python" >/dev/null 2>&1; then
+        "$python" ${flag:+"$flag"} "$script" "$@"
+        result=$?
+        [ "$result" -eq 127 ] || exit "$result"
+    fi
+fi
+
+for candidate in python3 python py; do
+    python="$candidate"; flag=
+    [ "$candidate" != py ] || flag=-3
+    if "$python" ${flag:+"$flag"} -c "$probe" </dev/null >/dev/null 2>&1; then
+        resolved=$(command -v "$python")
+        [ -z "$resolved" ] || python="$resolved"
+        save_python
+        exec "$python" ${flag:+"$flag"} "$script" "$@"
+    fi
+done
+
+[ "${1:-}" != status ] || printf '%s\n' 'my-harness off: no Python 3.8+ found'
+exit 0
