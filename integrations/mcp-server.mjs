@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
-import { createLiveTools, liveInputSchema, liveToolDefinitions, liveResource } from './live-tools.mjs';
+import { createLiveTools, liveInputSchema, liveToolDefinitions, liveResource, restingFaceExpression } from './live-tools.mjs';
 const base = process.env.AER_BASE_URL,
   token = process.env.AER_PAIRING_TOKEN;
 if (!base || !token) {
@@ -153,6 +153,10 @@ async function invoke(params) {
 }
 async function toolCall(params) {
   try {
+    if (live && params?.name === 'return_to_face') {
+      if (!params.arguments || typeof params.arguments !== 'object' || Array.isArray(params.arguments) || Object.keys(params.arguments).length) throw Error('invalid_arguments');
+      params = { name: 'express', arguments: { body: restingFaceExpression() } };
+    }
     let result;
     try { result = await invoke(params); }
     catch (error) {
