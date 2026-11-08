@@ -10,7 +10,11 @@ mountLive(element('app'));
 const body = new LiveBody(element<HTMLCanvasElement>('body'), text => { element('body-status').textContent = text; });
 const observations = new FaceObservations(crypto.randomUUID());
 const bridge = new LiveBridge(body, observations);
-Object.assign(window, { fischLive: { pair: (base: string, token: string) => bridge.connect(base, token) } });
+Object.assign(window, { fischLive: { pair: (base: string, token: string) => bridge.connect(base, token),
+  activity: (value: { turn: 'idle' | 'working' | 'waiting' | 'interrupted'; output: number; quality: string }) => {
+    body.output = value.output; events(observations.turn(value.turn, Date.now()));
+    element('activity').textContent = `${value.turn} / nhịp chữ: ${value.quality}`;
+  } } });
 const recent: { type: LiveEventKind; at: number }[] = [];
 let sampleCount = 0, sampleAt = performance.now(), inferenceMs = 0, stopped = false;
 const camera = new VisionCamera(element<HTMLVideoElement>('camera'), sample, cameraStatus);
@@ -62,6 +66,7 @@ function stop() {
   if (stopped) return; stopped = true;
   camera.stop(); cameraStatus('stopped'); clearInterval(timer); bridge.stop(); body.dispose();
   element<HTMLButtonElement>('camera-start').disabled = true; element('connection').textContent = 'Đã dừng phiên Live';
+  void (window as any).fischLiveStop?.();
 }
 element('stop-all').onclick = stop;
 window.addEventListener('pagehide', stop);

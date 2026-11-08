@@ -93,7 +93,7 @@ export async function testSession() {
   await runChecked('cargo', ['test', '--locked', '--manifest-path', 'src-tauri/Cargo.toml']);
 }
 
-function startGateway(origin, token) {
+export function startGateway(origin, token) {
   const child = spawn(gatewayExecutable(), ['--browser-gateway'], {
     cwd: root, windowsHide: true, detached: process.platform !== 'win32',
     env: { ...process.env, AER_PAIRING_TOKEN: token, AER_ALLOWED_ORIGINS: origin },
