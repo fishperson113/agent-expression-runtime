@@ -3,6 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
+import { createLiveTools, liveInputSchema, liveToolDefinitions, liveResource } from './live-tools.mjs';
 const base = process.env.AER_BASE_URL,
   token = process.env.AER_PAIRING_TOKEN;
 if (!base || !token) {
@@ -21,12 +22,13 @@ if (
   console.error('A loopback HTTP base URL is required.');
   process.exit(1);
 }
-const instructions = readFileSync(new URL('./instructions-v1.md', import.meta.url), 'utf8');
+const live = process.env.FISCH_LIVE === '1';
+const instructions = readFileSync(new URL(live ? './live-instructions.md' : './instructions-v1.md', import.meta.url), 'utf8');
 let session, connecting;
 const definitions = new Map(), pendingDefinitions = new Map(), commands = new Map();
 const protocol = JSON.parse(readFileSync(new URL('../src/contracts/protocol.schema.json', import.meta.url), 'utf8'));
 const lifecycleErrors = ['session', 'session_closed', 'stale_epoch', 'http_404'];
-async function request(path, body,method=body===undefined?'GET':'POST') {
+async function request(path, body,method=body===undefined?'GET':'POST', timeoutMs=2000) {
   const response = await fetch(base + path, {
     method,
     headers: {
@@ -35,7 +37,7 @@ async function request(path, body,method=body===undefined?'GET':'POST') {
     },
     body: body === undefined ? undefined : JSON.stringify(body),
     redirect: 'error',
-    signal: AbortSignal.timeout(2000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if(response.status===204)return {};
   let result;
@@ -66,15 +68,17 @@ const inputSchema = {
 };
 function tools() {
   return { tools: [
-    { name: 'express', description: 'Choose a short particle expression. Read aer://instructions/v1. ACK is admission, not completion.', inputSchema },
+    { name: 'express', description: 'Choose a short particle expression. Read aer://instructions/v1. ACK is admission, not completion.', inputSchema: live ? liveInputSchema(inputSchema) : inputSchema },
     { name: 'cancel_expression', description: 'Cancel body work and reset posture; keep the agent running.',
       inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
+    ...(live ? liveToolDefinitions() : []),
   ] };
 }
 function resources(params) {
   const uri = params?.uri;
   if (uri === 'aer://instructions/v1') return { contents: [{ uri, mimeType: 'text/markdown', text: instructions }] };
   if (uri === 'aer://schema/v1') return { contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(protocol) }] };
+  if (live && uri === 'aer://live/v1') return { contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(liveResource()) }] };
   throw Error('unknown_resource');
 }
 function remember(args, result) {
@@ -167,6 +171,7 @@ async function toolCall(params) {
   }
 }
 let calls = Promise.resolve();
+const liveCall = createLiveTools(request, async () => { await connect(); return session; }, () => { session = undefined; });
 async function handle(message) {
   const { method, params } = message;
   if (method === 'initialize') return {
@@ -179,9 +184,11 @@ async function handle(message) {
   if (method === 'resources/list') return { resources: [
     { uri: 'aer://instructions/v1', name: 'Expression instructions v1', mimeType: 'text/markdown' },
     { uri: 'aer://schema/v1', name: 'Expression protocol schema v1', mimeType: 'application/json' },
+    ...(live ? [{ uri: 'aer://live/v1', name: 'Live observations and control schemas', mimeType: 'application/json' }] : []),
   ] };
   if (method === 'resources/read') return resources(params);
   if (method === 'tools/call') {
+    if (live && ['observe', 'look'].includes(params?.name)) return liveCall(params.name, params.arguments);
     const result = calls.then(() => toolCall(params));
     calls = result.catch(() => {});
     return result;
