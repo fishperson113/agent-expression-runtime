@@ -57,3 +57,11 @@ Configure your host to run `node <absolute-repo-path>/integrations/mcp-server.mj
 The host must actually load [instructions v1.1.0](../integrations/instructions-v1.md) into agent context. Merely exposing the resource cannot guarantee the client reads it. A standard sequential tool host can pause content generation even with fast ACK; only independent host dispatch meets simultaneous streaming intent. The fake-host integration test checks transport/IR equivalence and admission-only ACK, not a production agent-host compatibility matrix.
 
 The optional pane planner implements a Responses structured-output API backend in addition to native Codex/Claude processes. It is separate from this HTTP/MCP gateway; see [planner configuration](expression-planner.md). No license has been selected for product code; public source visibility is not yet a completed OSS licensing release.
+
+## Fisch Live extension
+
+`FISCH_LIVE=1` enables observe/look and the Live instruction bundle in the same stdio MCP server. `aer://live/v1` publishes observation/control schemas and signal capabilities. Live express extends the body schema with a staged Live configuration; legacy mode still rejects unsupported extension nodes. See [Live instructions](../integrations/live-instructions.md).
+
+Authenticated `GET /v1/sessions/{id}/observe?cursor=N` reads the latest snapshot plus bounded events/gap metadata. `GET /v1/live/context` is a non-consuming context read. `POST /v1/sessions/{id}/look` requires a short reason and returns synthetic JPEG only, with five-second cooldown and a two-second deadline. `ws://127.0.0.1:<port>/v1/live/channel` separately enforces allowed Origin/Host, then requires token/session in its first bounded message; credentials never enter query parameters. The browser supplies latest-value observations and synthetic look replies.
+
+The launcher provisions the browser and a dedicated Herdr Codex pane through transient environment. It does not persist tokens or modify global settings. Real-image fallback files are intentionally not implemented because the authorized look path is synthetic-only and native MCP image content was verified. See [Live workflow](fisch-live.md) for setup and the observe-first hook fallback.
