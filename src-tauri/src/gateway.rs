@@ -711,6 +711,7 @@ async fn events(State(g): State<Gateway>, Path(id): Path<String>, headers: Heade
         .into_response()
 }
 
+#[cfg(feature = "desktop")]
 #[tauri::command]
 pub fn gateway_pairing(state: tauri::State<'_, Gateway>) -> Value {
     state.pairing()
@@ -767,6 +768,7 @@ async fn renderer_control_ack(State(g): State<Gateway>, Json(c): Json<Cancel>) -
     g.control_ack(c.epoch);
     StatusCode::NO_CONTENT.into_response()
 }
+#[cfg(feature = "desktop")]
 #[tauri::command]
 pub fn gateway_subscribe(
     state: tauri::State<'_, Gateway>,
@@ -776,6 +778,7 @@ pub fn gateway_subscribe(
         on_event.send(e).map_err(|_| "ipc_closed".into())
     }));
 }
+#[cfg(feature = "desktop")]
 #[tauri::command]
 pub fn gateway_complete(
     state: tauri::State<'_, Gateway>,
@@ -786,14 +789,17 @@ pub fn gateway_complete(
 ) {
     state.finish_diagnostic(id, status, code, path);
 }
+#[cfg(feature = "desktop")]
 #[tauri::command]
 pub fn gateway_feedback(state: tauri::State<'_, Gateway>, epoch: String, seq: u64, status: String) {
     state.feedback(epoch, seq, status);
 }
+#[cfg(feature = "desktop")]
 #[tauri::command]
 pub fn gateway_revoke(state: tauri::State<'_, Gateway>) {
     state.revoke();
 }
+#[cfg(feature = "desktop")]
 #[tauri::command]
 pub fn gateway_control_ack(state: tauri::State<'_, Gateway>, epoch: String) {
     state.control_ack(epoch);
