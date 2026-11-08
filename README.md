@@ -6,7 +6,7 @@ A provider-independent, Windows-first Tauri + TypeScript runtime: a particle bod
 
 ## Fisch Live POC
 
-Run `node bin/fisch.mjs live` from a Herdr shell beside a Codex pane (or choose the source with `live --agent <pane-id>`). Live opens a local camera/debug + particle WebGL browser workspace and a dedicated Codex pane with transient MCP settings, preserving the old session. Camera starts off; real pixels stay local. Codex uses observe/express and synthetic-only look; there is no secondary planner. The optional output-rhythm proxy is experimental/off by default. Voice and human perception remain unverified. See [Live setup, privacy, controls and acceptance](docs/fisch-live.md) and [the implementation plan](docs/fisch-live-plan.md). A built native gateway, installed dependencies and existing Codex login are required; the current machine has been prepared.
+Run **`fisch live`** in a Herdr shell. One command prepares local assets/build, starts the gateway, opens the camera/debug + particle WebGL browser and a dedicated Codex session with transient MCP settings. It uses the calling shell's workspace; no existing Codex pane or parameters are required. Existing sessions stay available. Camera starts off; real pixels stay local and look is synthetic-only. `fisch run` keeps the panel workflow. Run `npm link` once when installing a fresh checkout; this machine is already linked. See [Live setup, privacy, controls and acceptance](docs/fisch-live.md) and [the implementation plan](docs/fisch-live-plan.md). Native hooks, voice and human perception remain unverified; output rhythm is experimental/off by default.
 
 ## Herdr quick start
 

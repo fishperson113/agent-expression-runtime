@@ -9,7 +9,15 @@ it('keeps credentials in inherited environment, never command arguments or a new
   expect(args).toContain('--no-daemon');
   expect(args).toContain('mcp_servers.fisch_live.env_vars=["AER_BASE_URL","AER_PAIRING_TOKEN","FISCH_LIVE"]');
   expect(args.some(value => value.includes('Read aer://'))).toBe(false);
-  expect(() => selectLiveSource({ agents: [{ agent: 'codex' }, { agent: 'codex' }] })).toThrow('Choose one');
+  expect(() => selectLiveSource({ agents: [{ agent: 'codex' }, { agent: 'codex' }] })).toThrow('Open a Herdr shell');
+});
+it('uses the calling shell workspace without needing an existing agent or pane argument', () => {
+  const shell = { pane_id: 'shell', workspace_id: 'workspace', cwd: 'C:/project' };
+  const other = { agent: 'codex', pane_id: 'elsewhere' };
+  expect(selectLiveSource({ agents: [], panes: [shell] }, undefined, 'shell')).toBe(shell);
+  expect(selectLiveSource({ agents: [other, { agent: 'codex' }], panes: [shell] }, undefined, 'shell')).toBe(shell);
+  expect(selectLiveSource({ agents: [], panes: [shell], focused_pane_id: 'shell' })).toBe(shell);
+  expect(selectLiveSource({ agents: [other], panes: [shell] }, 'elsewhere', 'shell')).toBe(other);
 });
 it('injects pairing values only into a new pane environment and preserves the old pane', async () => {
   const calls = [];

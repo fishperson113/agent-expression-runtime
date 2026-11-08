@@ -4,10 +4,15 @@ import { openLive, createLivePane } from '../integrations/live-launch.mjs';
 import { OutputActivity } from '../integrations/output-activity.mjs';
 import { openControl } from '../integrations/terminal-ipc.mjs';
 
-export function selectLiveSource(snapshot, requested) {
+export function selectLiveSource(snapshot, requested, paneId = process.env.HERDR_PANE_ID) {
   const candidates = snapshot.agents.filter(agent => agent.agent === 'codex' && (!requested || agent.pane_id === requested));
-  if (candidates.length !== 1) throw Object.assign(Error('Choose one existing Codex pane with fisch live --agent <pane-id>.'), { public: true });
-  return candidates[0];
+  if (!requested) {
+    const own = snapshot.panes?.find(pane => pane.pane_id === paneId) ??
+      snapshot.panes?.find(pane => pane.pane_id === snapshot.focused_pane_id);
+    if (own) return own;
+  }
+  if (candidates.length === 1) return candidates[0];
+  throw Object.assign(Error('Open a Herdr shell and run fisch live.'), { public: true });
 }
 export function liveControl(live, stop) {
   let delivered = 0;
