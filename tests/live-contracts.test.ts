@@ -34,3 +34,7 @@ it('turns stale values into unknown and resets session/cursor atomically', () =>
   store.ingest({ ...observation(), sessionId: 'other' }, [], 1000);
   expect(() => store.read(999, 1000)).toThrow('live_cursor');
 });
+it('keeps explicitly stale measurements stale even with a recent transport timestamp', () => {
+  const store = new ObservationStore(); store.ingest({ ...observation(), camera: 'stale' }, [], 1000);
+  expect(store.read(0, 1000).stale).toBe(true);
+});

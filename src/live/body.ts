@@ -27,7 +27,7 @@ export class LiveBody {
   constructor(private canvas: HTMLCanvasElement, private status: (text: string) => void) {
     this.renderer = new ThreeRenderer(canvas, status); this.renderer.quality(2000);
     this.scheduler = new Scheduler({ now: () => performance.now() }, { apply: (state, now) => this.apply(state, now),
-      dispose: () => this.renderer.dispose() }, { count: status }, (status, ir) => this.feedback?.({ status, epoch: ir.epoch, seq: ir.seq }));
+      dispose: () => this.renderer.dispose() }, { count: status }, (status, ir) => this.feedback?.({ status, epoch: ir.epoch, seq: ir.seq }), 2000);
     this.defaults.install(validateConfiguration(defaults), performance.now());
     this.resize = new ResizeObserver(() => this.size()); this.resize.observe(canvas); this.size();
     this.frame();

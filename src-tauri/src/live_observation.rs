@@ -43,7 +43,7 @@ impl Observations {
     }
     pub fn read(&self, cursor: u64, now: u64) -> Value {
         let age = self.snapshot.as_ref().and_then(|value| value["capturedAt"].as_u64()).map(|at| now.saturating_sub(at));
-        let stale = age.is_none_or(|age| age > 1500); let mut snapshot = self.snapshot.clone();
+        let stale = age.is_none_or(|age| age > 1500) || self.snapshot.as_ref().is_some_and(|value| value["camera"] == "stale"); let mut snapshot = self.snapshot.clone();
         if let Some(ref mut value) = snapshot {
             value["summary"] = json!(if stale { "Quan sát đã cũ; trạng thái người dùng chưa biết." } else if value["user"]["present"] == true { "Có người trong khung hình. Hướng đầu và nét mặt là ước lượng hình học." } else { "Chưa thấy khuôn mặt trong khung hình." });
             if stale { value["camera"] = json!("stale"); value["user"] = json!({"present":false,"quality":{"score":0,"basis":"unavailable"},"position":null,"head":null,"facingScreen":null,"expression":null,"mouthMoving":null}); }

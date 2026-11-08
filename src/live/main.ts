@@ -14,7 +14,8 @@ Object.assign(window, { fischLive: { pair: (base: string, token: string) => brid
   activity: (value: { turn: 'idle' | 'working' | 'waiting' | 'interrupted'; output: number; quality: string }) => {
     body.output = value.output; body.activity(value.turn); events(observations.turn(value.turn, Date.now()));
     element('activity').textContent = `${value.turn} / nhịp chữ: ${value.quality}`;
-  }, event: (type: string) => {
+  }, metrics: () => ({ ...body.metrics, camera: observations.snapshot.camera, cameraSeq: observations.snapshot.seq,
+    simulatedParticles: body.scheduler.state.particlePositions?.length ? body.scheduler.state.particlePositions.length / 3 : 2000 }), event: (type: string) => {
     const turn = type === 'user_message' ? 'working' : type === 'needs_user' ? 'waiting' : type === 'interrupted' ? 'interrupted' : 'idle';
     body.activity(turn); events(observations.turn(turn, Date.now()));
     if (type === 'interrupted') body.epoch(body.scheduler.epoch);
