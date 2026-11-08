@@ -4,7 +4,7 @@ Read README.md, docs/architecture.md and docs/validation.md before changing beha
 Keep the core independent of DOM, Workers, Three.js, Tauri and model providers.
 Preserve bounded queues, epoch cancellation, strict declarative input, loopback
 authentication and privacy defaults. Do not claim native/GPU acceptance from
-headless browser results. Product licensing remains undecided.
+headless browser results. Product code is MIT licensed; preserve third-party notices.
 
 Use the deterministic my-harness rules described in docs/my-harness.md. Run
 `python3 scripts/check-harness.py` before committing and before finishing; fix

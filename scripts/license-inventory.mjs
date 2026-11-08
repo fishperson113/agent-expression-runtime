@@ -21,5 +21,5 @@ const rust = cargo.packages
   );
 writeFileSync(
   'docs/dependency-licenses.md',
-  `# Dependency license metadata\n\nGenerated from installed package manifests and locked Cargo metadata. Product-code license is undecided. This inventory is metadata, not a substitute for the actual upstream license texts or a completed distribution review. The app icon was drawn for this project; no external font or image asset is bundled.\n\n| Ecosystem | Package | Version | Declared license |\n|---|---|---|---|\n${[...npm, ...rust].join('\n')}\n`,
+  `# Dependency license metadata\n\nGenerated from installed package manifests and locked Cargo metadata. Product code is covered by the root MIT LICENSE. Third-party components retain their own licenses. This inventory is metadata, not a substitute for the actual upstream license texts or a completed distribution review. The app icon was drawn for this project; no external font or image asset is bundled.\n\n| Ecosystem | Package | Version | Declared license |\n|---|---|---|---|\n${[...npm, ...rust].join('\n')}\n`,
 );

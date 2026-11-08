@@ -1,6 +1,6 @@
 # Dependency license metadata
 
-Generated from installed package manifests and locked Cargo metadata. Product-code license is undecided. This inventory is metadata, not a substitute for the actual upstream license texts or a completed distribution review. The app icon was drawn for this project; no external font or image asset is bundled.
+Generated from installed package manifests and locked Cargo metadata. Product code is covered by the root MIT LICENSE. Third-party components retain their own licenses. This inventory is metadata, not a substitute for the actual upstream license texts or a completed distribution review. The app icon was drawn for this project; no external font or image asset is bundled.
 
 | Ecosystem | Package | Version | Declared license |
 |---|---|---|---|
