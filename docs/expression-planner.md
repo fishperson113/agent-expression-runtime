@@ -1,6 +1,6 @@
 # Interaction-driven expression planner
 
-Fisch keeps free-form `assemble` generation: faces, hands, creatures and unexpected shapes remain possible. What changes is the trigger and purpose. A model plan responds to a specific user interaction; neither idle timers nor a repertoire slideshow create new shapes.
+Fisch keeps free-form `assemble` generation: faces, hands, creatures and unexpected shapes remain possible. What changes is the trigger and purpose. A model plan responds to a specific user interaction; idle timers never request inference. The same interaction can prepare finite idle scenes that later replace the full form through local playback.
 
 ## One-command attachment
 
@@ -31,7 +31,7 @@ The runner is bundled into `%LOCALAPPDATA%/fisch/hooks/hook.mjs` on Windows or `
 | Structured task success/failure | Small rise or hesitation on the current form | Eligible task event while working |
 | `Stop` | Settle the current gesture | No new request |
 | Codex `Interrupt` | Invalidate outstanding inference | No new request |
-| Idle/done without a new user message | Hold the previous form, breathe and let intensity fade | **Zero requests** |
+| Idle/done without a new user message | Local presence, prepared performance clips and eligible prepared idle scenes; fallback form if none are available | **Zero new requests** |
 
 The initial attentive face is a local fallback, not a fixed-avatar restriction. Subsequent model geometry may take any supported form. Part IDs and existing topology preserve continuity where possible. Status metadata supplies working/waiting information; it never guesses the words a user said from tool logs.
 
@@ -43,7 +43,9 @@ Local attention precedes inference and does not wait for a model. The approach p
 
 Each new user message starts a reaction turn. At most two model attempts are allowed in that turn: its initial reaction and, if appropriate, one later task event. Failures consume attempts. Task requests have a 10-second cooldown, coalesce into the latest event, and expire after 30 seconds rather than reacting long after the moment. There is no automatic retry timer. Test/build failures never discard an in-flight user-message reaction. A newer needs-user cue may suppress an outdated reaction; a new user message invalidates the older turn. New messages can react immediately and replenish the per-turn allowance. Rapid user messages can therefore still consume provider usage; this is not a global hourly token budget.
 
-Idle does not schedule inference, retry failures or rotate cached shapes. A user-message request already pending or running may finish after the agent becomes idle; it is still a reaction to that message. Lingering intensity decays locally over roughly 30 seconds. Persistent part motion then freezes at its current pose and a quiet pulse remains. Settling preserves the silhouette and session macros. Manual `express`/`cancel` pauses automatic reactions until the next user message. Closing Fisch stops inference and releases its IPC resources.
+Idle does not schedule inference or retry failed requests. A user-message request already pending or running may finish after the agent becomes idle; it is still a reaction to that message. Intensity decays locally over roughly 30 seconds without an automatic hard freeze. Shared `PresenceMotion` supplies local root movement and validated part performances. Manual `express`/`cancel` pauses inference until the next user message; local presence is controlled separately by `FISCH_MOTION=normal|reduced|off`. Closing Fisch stops inference and releases its IPC resources.
+
+An interaction response can include up to three `performance` clips bound to existing part IDs and up to three `idleScenes` with their own geometry. Clips select working/idle activity locally. Idle scenes become eligible after their declared delay (10–300 seconds), play during idle/done with 22–33 second gaps, and may show a short caption inside the pane. Playback varies declared motion phase/tempo without new geometry generation or inference. Leaving idle restores the interaction program and flow. New messages, accepted manual replacements and cancel clear older scene continuations; rejected scenes are skipped. Motion-off blocks new scene playback. Scenes exist only in memory, so a fresh launch has no prepared scenes. No sound or external notification is emitted.
 
 The model returns the triggering `eventId`, a communicative mood, intensity, target (`user` or `task`), a short concept and a bounded geometry AST. Relevance and continuity take precedence over novelty. A schema guard and the compiler validate each result; mismatched event IDs and superseded turns cannot overwrite newer expressions. These are performed expressions, not evidence that an agent has private feelings.
 
