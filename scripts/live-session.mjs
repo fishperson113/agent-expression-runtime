@@ -3,6 +3,18 @@ import { herdrCall } from '../integrations/herdr.mjs';
 import { openLive, createLivePane } from '../integrations/live-launch.mjs';
 import { OutputActivity } from '../integrations/output-activity.mjs';
 import { openControl } from '../integrations/terminal-ipc.mjs';
+import { runTerminalCodex } from '../integrations/live-terminal.mjs';
+
+export async function selectLiveHost({ env = process.env, cwd = process.cwd(), call = herdrCall, agentPane } = {}) {
+  if (!agentPane && !env.HERDR_PANE_ID && !env.HERDR_SOCKET && !env.HERDR_PORT) return { kind: 'terminal', cwd };
+  try {
+    const { snapshot } = await call('session.snapshot');
+    return { kind: 'herdr', source: selectLiveSource(snapshot, agentPane, env.HERDR_PANE_ID) };
+  } catch (error) {
+    if (agentPane) throw error;
+    return { kind: 'terminal', cwd };
+  }
+}
 
 export function selectLiveSource(snapshot, requested, paneId = process.env.HERDR_PANE_ID) {
   const candidates = snapshot.agents.filter(agent => agent.agent === 'codex' && (!requested || agent.pane_id === requested));
@@ -43,16 +55,21 @@ async function activityLoop(live, pane, call, signal, proxy) {
     await delay(100, undefined, { signal }).catch(() => {});
   }
 }
-export async function runLiveSession({ agentPane, call = herdrCall, headless = false, signal, launchCodex = true } = {}) {
-  const { snapshot } = await call('session.snapshot'), source = selectLiveSource(snapshot, agentPane);
+export async function runLiveSession({ agentPane, call = herdrCall, headless = false, signal, launchCodex = true, runHost = runTerminalCodex, open = openLive } = {}) {
+  const host = await selectLiveHost({ call, agentPane });
   const abort = new AbortController(), stop = () => abort.abort();
   signal?.addEventListener('abort', stop, { once: true });
   process.once('SIGINT', stop); process.once('SIGTERM', stop);
   let live, control;
   try {
-    live = await openLive({ headless });
+    live = await open({ headless });
     live.page.once('close', stop); live.gateway.once('exit', stop);
     await live.page.exposeFunction('fischLiveStop', stop);
+    if (host.kind === 'terminal') {
+      console.log('Fisch Live ready. Camera is off. Codex runs in this terminal; exit Codex or close the body to stop.');
+      return await runHost({ live, cwd: host.cwd, signal: abort.signal });
+    }
+    const source = host.source;
     const pane = launchCodex ? await createLivePane(call, source, live.base, live.token) : source;
     control = await openControl(pane.pane_id, liveControl(live, stop));
     console.log(`Fisch Live ready. Codex pane: ${pane.pane_id}. Camera is off; look is synthetic-only.`);

@@ -57,3 +57,27 @@ for browser mode instead of altering system privileges.
 Next: ordinary-terminal adapter with official stdio events; camera assets must
 not prevent camera-off startup. Real model/holdout gates stay blocked until
 authorized Cloud network access exists. Deadline unchanged: 22:41:03 UTC.
+
+## Checkpoint 2 — normal-terminal path
+
+Official app-server protocol reviewed at https://learn.chatgpt.com/docs/app-server
+and matched against generated CLI schemas. Selected stdio app-server behind an
+authenticated, single-client loopback relay for the existing Codex CLI remote
+interface: no replacement chat UI. Only agent-message delta notifications drive
+reply rhythm; tool/spinner output does not. Thread instructions are appended to,
+not substituted for, existing developer instructions. No global settings edited.
+
+Red: no-Herdr launch failed at unconditional session.snapshot. Added explicit
+host discovery with terminal cwd fallback and retained the Herdr adapter. Green:
+9 focused launcher/output/relay tests including stale-turn rejection, 600 ms
+decay, instruction preservation, unauthorized relay rejection and real stdio
+roundtrip through a deterministic child fixture. Architecture/build passed.
+Actual Cloud Codex TUI opened next to a paired headless body with HERDR_* absent;
+it remained service-blocked, so no semantic/model success is claimed. Ctrl+C
+closed owned CLI/server/browser/gateway. Camera-off startup now tolerates absent
+camera assets instead of blocking the entire conversation workflow.
+
+Counter 2/120: one timeout plus one conservatively counted queued /quit input
+during TUI smoke (interrupted, no successful model reply). No model holdout run.
+Cloud proxy explicitly returns 403 for chatgpt.com; do not retry around policy.
+Next: readable face, declared controls, scene/application trace and visual tests.
