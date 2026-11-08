@@ -3,12 +3,26 @@ name = "agent-expression-runtime"
 version = "0.1.0"
 description = "Bounded declarative expression runtime"
 edition = "2021"
+default-run = "agent-expression-runtime"
+
+[features]
+default = ["desktop"]
+desktop = ["dep:tauri", "dep:tauri-build"]
+
+[[bin]]
+name = "agent-expression-runtime"
+path = "src/main.rs"
+required-features = ["desktop"]
+
+[[bin]]
+name = "fisch-gateway"
+path = "src/gateway_main.rs"
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+tauri-build = { version = "2", features = [], optional = true }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = [], optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["sync", "time", "rt", "net", "macros"] }

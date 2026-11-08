@@ -7,8 +7,11 @@ import { resolve, dirname } from 'node:path';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 
-export const gatewayExecutable = (platform = process.platform) =>
-  resolve(root, 'src-tauri/target/debug/agent-expression-runtime' + (platform === 'win32' ? '.exe' : ''));
+export const gatewayExecutable = (platform = process.platform, available = existsSync) => {
+  const suffix = platform === 'win32' ? '.exe' : '';
+  const standalone = resolve(root, 'src-tauri/target/debug/fisch-gateway' + suffix);
+  return available(standalone) ? standalone : resolve(root, 'src-tauri/target/debug/agent-expression-runtime' + suffix);
+};
 
 export function codexArguments() {
   return ['--no-daemon', '--no-alt-screen', '-C', root,
@@ -82,7 +85,7 @@ export async function prepareSession({ withCodex = true } = {}) {
   if (!existsSync(resolve(root, 'node_modules/vite/package.json')) || !existsSync(resolve(root, 'node_modules/@playwright/test/package.json')))
     await runChecked(npm.command, [...npm.args, 'ci']);
   await runChecked(npm.command, [...npm.args, 'run', 'build']);
-  await runChecked('cargo', ['build', '--locked', '--manifest-path', 'src-tauri/Cargo.toml']);
+  await runChecked('cargo', ['build', '--locked', '--no-default-features', '--bin', 'fisch-gateway', '--manifest-path', 'src-tauri/Cargo.toml']);
 }
 
 export async function testSession() {
