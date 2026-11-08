@@ -1,6 +1,7 @@
 node_modules/
 .npm-cache/
 .runtime/
+public/live-assets/
 dist/
 src-tauri/target/
 src-tauri/gen/
