@@ -9,11 +9,13 @@ import type { BodyState } from '../core/ports';
 import type { PresenceState } from '../core/runtime/presence';
 import type { Observation, LiveEventKind } from '../core/live/types';
 import { faceProgram, faceWrites, isFace } from '../core/live/face';
+import { SceneTrace } from '../core/live/trace';
 
 export class LiveBody {
   readonly renderer: ThreeRenderer;
   readonly scheduler: Scheduler;
   readonly controls = new LiveCompositor();
+  readonly trace = new SceneTrace();
   private defaults = new LiveCompositor();
   private compiler = new LiveCompiler();
   private observation: Observation | null = null;
@@ -24,13 +26,16 @@ export class LiveBody {
   private samples: number[] = [];
   private previous = performance.now();
   private activityState = 'idle';
+  private attentionUntil = 0;
   private faceBlend = new Map<string, number>();
   output = 0;
   feedback?: (event: { epoch: string; seq: number; status: string }) => void;
   constructor(private canvas: HTMLCanvasElement, private status: (text: string) => void) {
     this.renderer = new ThreeRenderer(canvas, status); this.renderer.quality(2000);
     this.scheduler = new Scheduler({ now: () => performance.now() }, { apply: (state, now) => this.apply(state, now),
-      dispose: () => this.renderer.dispose() }, { count: status }, (status, ir) => this.feedback?.({ status, epoch: ir.epoch, seq: ir.seq }), 2000);
+      dispose: () => this.renderer.dispose() }, { count: status }, (status, ir) => {
+        this.trace.record(ir.seq, status, performance.now()); this.feedback?.({ status, epoch: ir.epoch, seq: ir.seq });
+      }, 2000);
     this.defaults.install(validateConfiguration(defaults), performance.now());
     this.restFace(0);
     this.resize = new ResizeObserver(() => this.size()); this.resize.observe(canvas); this.size();
@@ -49,7 +54,7 @@ export class LiveBody {
     if (time - this.defaultAt > 240000) { this.defaults.install(validateConfiguration(defaults), time); this.defaultAt = time; }
     const snapshot = this.observation && Date.now() - this.observation.capturedAt <= 1500 ? this.observation : null;
     const blocked = this.blocked(state), writes = new Map(this.defaults.sample(time, snapshot, this.output, blocked).map(write => [write.target.part + ':' + write.target.prop, write]));
-    if (isFace(parts)) for (const write of faceWrites(this.output > 0.01 ? 'replying' : this.activityState, this.output, this.controls.mode)) {
+    if (isFace(parts)) for (const write of faceWrites(this.faceActivity(time), this.output, this.controls.mode)) {
       const key = write.target.part + ':' + write.target.prop, from = this.faceBlend.get(key) ?? (write.target.prop.startsWith('scale') ? 1 : 0);
       const value = from + (write.value - from) * 0.18; this.faceBlend.set(key, value);
       writes.set(key, { ...write, value });
@@ -62,6 +67,8 @@ export class LiveBody {
       for (const [property, key] of Object.entries(ambient)) if (writes.has('body:' + property)) rendered.presencePose[key as 'x' | 'y' | 'yaw' | 'roll'] = 0;
     }
     this.renderer.apply(rendered, now);
+    const frame = this.renderer.renderSnapshot;
+    if (!frame.contextLost) this.trace.frame(frame.frame, frame.signature, time);
   }
   private blocked(state: BodyState) {
     const mapping: Record<string, string[]> = { rise: ['y'], advance: ['z'], grow: ['scaleX', 'scaleY', 'scaleZ'], spread: ['scaleX'], arcOffset: ['x'] };
@@ -69,6 +76,7 @@ export class LiveBody {
   }
   admit(record: any) {
     const at = performance.now();
+    this.trace.record(record?.seq, 'received', at);
     try {
       const compiled = record.kind === 'define' ? { program: this.compiler.compiler.prepareDefinition(record, at) } : this.compiler.compile(record, at);
       if (compiled.configuration) {
@@ -80,11 +88,17 @@ export class LiveBody {
       const result = this.scheduler.admit(compiled.program), accepted = ['accepted', 'state', 'defined'].includes(result);
       if (compiled.program.kind === 'define' && compiled.program.draft !== undefined) this.compiler.compiler.settleDefinition(compiled.program.draft, accepted);
       if (accepted && compiled.configuration) this.controls.install(compiled.configuration, at);
+      this.trace.record(record.seq, accepted ? 'admitted' : 'rejected', performance.now(), accepted ? undefined : result);
       this.status(accepted ? 'Biểu đạt đã được nhận.' : result);
       return { status: accepted ? 'accepted' : 'rejected', code: accepted ? undefined : result, latencyMs: performance.now() - at };
-    } catch (error) { return { status: 'rejected', code: error instanceof Error ? error.message : 'live_compile_failed' }; }
+    } catch (error) {
+      const code = error instanceof Error ? error.message : 'live_compile_failed';
+      this.trace.record(record?.seq, 'rejected', performance.now(), code);
+      return { status: 'rejected', code };
+    }
   }
   epoch(epoch: string, reset = false) {
+    this.trace.reset();
     this.controls.reset(); this.scheduler.cancel(epoch);
     if (reset) { this.compiler.compiler.reset(); this.partIds = ''; }
     else this.compiler.compiler.discardDefinitions();
@@ -98,17 +112,21 @@ export class LiveBody {
   }
   observe(snapshot: Observation) { this.observation = snapshot; }
   activity(activity: string) {
+    this.trace.activity(activity);
+    if (activity === 'working' && this.activityState !== 'working') this.attentionUntil = performance.now() + 250;
     this.activityState = activity;
     this.scheduler.state.presenceIntent = { ...this.scheduler.state.presenceIntent, activity,
       mode: this.controls.mode };
   }
+  private faceActivity(at: number) { return this.output > 0.01 ? 'replying' : at < this.attentionUntil ? 'attention' : this.activityState; }
   event(type: LiveEventKind) { const now = performance.now(); this.defaults.event(type, now); this.controls.event(type, now); }
   motion(mode: 'normal' | 'reduced' | 'off') {
     this.controls.mode = mode; this.defaults.mode = mode; this.renderer.reducedMotion = mode === 'reduced';
     this.scheduler.state.presenceIntent = { activity: 'idle', mode };
   }
   get metrics() { const sorted = [...this.samples].sort((a, b) => a - b); const p95 = sorted[Math.floor(sorted.length * 0.95)] ?? 0;
-    return { scene: isFace(this.scheduler.state.particleParts ?? []) ? 'face' : this.scheduler.state.shape,
+    return { activity: this.faceActivity(performance.now()), diagnostics: this.trace.snapshot(), render: this.renderer.renderSnapshot,
+      scene: isFace(this.scheduler.state.particleParts ?? []) ? 'face' : this.scheduler.state.shape,
       parts: this.scheduler.state.particleParts?.map(part => part.id) ?? [],
       frameP95: p95, meanFps: 1000 / (this.samples.reduce((sum, value) => sum + value, 0) / Math.max(1, this.samples.length)), particles: this.renderer.count }; }
   dispose() { cancelAnimationFrame(this.frameId); this.resize.disconnect(); this.scheduler.dispose(); }
