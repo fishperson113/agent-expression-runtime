@@ -7,6 +7,7 @@ import { LiveBridge } from './bridge';
 import type { LiveEventKind } from '../core/live/types';
 
 mountLive(element('app'));
+const synthetic = new URLSearchParams(location.search).get('fixture') === 'synthetic';
 const body = new LiveBody(element<HTMLCanvasElement>('body'), text => { element('body-status').textContent = text; });
 const observations = new FaceObservations(crypto.randomUUID());
 const cameraTransitions: { status: string; source: string; at: number }[] = [];
@@ -16,7 +17,8 @@ Object.assign(window, { fischLive: { pair: (base: string, token: string) => brid
     if (stopped) return;
     body.output = value.output; body.activity(value.turn); events(observations.turn(value.turn, Date.now()));
     element('activity').textContent = `${value.turn} / nhịp chữ: ${value.quality}`;
-  }, metrics: () => ({ ...body.metrics, camera: observations.snapshot.camera, cameraSeq: observations.snapshot.seq,
+  }, fixture: (mode: string) => fixture(mode), metrics: () => ({ ...body.metrics, syntheticFixture: synthetic,
+    camera: observations.snapshot.camera, cameraSeq: observations.snapshot.seq,
     cameraStatus: element('camera-status').textContent, cameraActive: !!element<HTMLVideoElement>('camera').srcObject,
     cameraTransitions, stopped,
     simulatedParticles: body.scheduler.state.particlePositions?.length ? body.scheduler.state.particlePositions.length / 3 : 2000 }), event: (type: string) => {
@@ -51,18 +53,32 @@ function drawLandmarks(value: FaceSample) {
   context.fillStyle = '#79e6d3';
   for (const point of value.landmarks) context.fillRect(point.x * 640, point.y * 480, 2, 2);
 }
+function fixture(mode: string) {
+  if (!synthetic || stopped || !['present', 'absent', 'denied', 'error', 'stale'].includes(mode)) throw Error('synthetic_fixture_unavailable');
+  if (mode === 'present' || mode === 'absent') sample({
+    landmarks: mode === 'present' ? Array.from({ length: 478 }, () => ({ x: 0.5, y: 0.5, z: 0 })) : [],
+    scores: { mouthSmileLeft: 0.4, mouthSmileRight: 0.4 }, matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+    durationMs: 0, delegate: 'SYNTHETIC / no inference' });
+  else { observations.status(mode as 'denied' | 'error' | 'stale', Date.now() - (mode === 'stale' ? 2000 : 0)); body.observe(observations.snapshot); }
+  element('camera-status').textContent = 'Dữ liệu tổng hợp / không camera';
+}
 function cameraStatus(status: string, source = 'vision') {
   cameraTransitions.push({ status, source, at: Date.now() }); cameraTransitions.splice(0, Math.max(0, cameraTransitions.length - 20));
   const messages: Record<string, string> = { starting: 'Đang khởi tạo camera…', denied: 'Chưa có quyền camera', camera_failed: 'Không mở được camera',
     vision_failed: 'Không chạy được thị giác', vision_timeout: 'Thị giác khởi tạo quá lâu', stopped: 'Camera đang tắt', 'recovering-CPU': 'Đang chuyển thị giác sang CPU…' };
   element('camera-status').textContent = messages[status] ?? (status.startsWith('ready-') ? `Camera sẵn sàng / ${status.replace('ready-', '')}` : `Camera lỗi: ${status}`);
   const active = status === 'starting' || status.startsWith('ready-') || status === 'recovering-CPU';
-  element<HTMLButtonElement>('camera-start').disabled = active;
+  element<HTMLButtonElement>('camera-start').disabled = active || synthetic;
   element<HTMLButtonElement>('camera-stop').disabled = !active;
   element('camera-placeholder').hidden = active;
   if (!status.startsWith('ready-')) { observations.status(status === 'starting' || status === 'recovering-CPU' ? 'starting' : status === 'denied' ? 'denied' : status === 'stopped' ? 'stopped' : 'error', Date.now()); body.observe(observations.snapshot); }
 }
 element('camera-start').onclick = () => { sampleCount = 0; sampleAt = performance.now(); inferenceMs = 0; void camera.start(); };
+if (synthetic) {
+  element<HTMLButtonElement>('camera-start').disabled = true;
+  element('camera-placeholder').textContent = 'Fixture tổng hợp. Không mở camera hoặc microphone.';
+  element('camera-status').textContent = 'Dữ liệu tổng hợp / không camera';
+}
 element('camera-stop').onclick = () => { camera.stop(); cameraStatus('stopped', 'button'); };
 element('cancel').onclick = () => body.epoch(body.scheduler.epoch);
 element<HTMLSelectElement>('motion').value = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'reduced' : 'normal';
@@ -71,6 +87,7 @@ body.motion(element<HTMLSelectElement>('motion').value as 'normal' | 'reduced');
 const timer = setInterval(() => {
   element('world-state').textContent = JSON.stringify(observations.snapshot, null, 2);
   const metrics = body.metrics;
+  element('scene-trace').textContent = JSON.stringify(metrics.diagnostics, null, 2);
   element('render-metrics').textContent = `${metrics.particles.toLocaleString()} hạt / ${metrics.meanFps.toFixed(0)} FPS / p95 ${metrics.frameP95.toFixed(1)} ms`;
 }, 500);
 function stop() {

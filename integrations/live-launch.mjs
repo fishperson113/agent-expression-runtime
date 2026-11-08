@@ -7,7 +7,7 @@ import { startGateway, stopChild } from '../scripts/start-session.mjs';
 import { prepareLiveAssets } from '../scripts/prepare-live-assets.mjs';
 
 export const liveRoot = fileURLToPath(new URL('../', import.meta.url));
-export async function openLive({ headless = false, signal, inspect = () => {}, production = true } = {}) {
+export async function openLive({ headless = false, signal, inspect = () => {}, production = true, synthetic = false } = {}) {
   try { await prepareLiveAssets(resolve(liveRoot, 'public/live-assets')); }
   catch { console.error('Camera assets unavailable. Live can run camera-off; prepare assets before enabling camera.'); }
   if (production) await build({ root: liveRoot });
@@ -24,7 +24,10 @@ export async function openLive({ headless = false, signal, inspect = () => {}, p
       ...(headless ? { args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] } : {}) });
     const page = await browser.newPage({ viewport: { width: 1360, height: 950 } });
     inspect(page);
-    await page.goto(origin + '/live.html' + (process.env.FISCH_VISION_DELEGATE === 'CPU' ? '?vision=cpu' : ''), { waitUntil: 'domcontentloaded', timeout: 30000 });
+    const query = new URLSearchParams();
+    if (process.env.FISCH_VISION_DELEGATE === 'CPU') query.set('vision', 'cpu');
+    if (synthetic) query.set('fixture', 'synthetic');
+    await page.goto(origin + '/live.html?' + query, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForFunction(() => !!window.fischLive);
     await page.evaluate(({ base, token }) => window.fischLive.pair(base, token), { base, token });
     await page.waitForFunction(() => document.getElementById('connection').textContent.includes('Đã nối'));

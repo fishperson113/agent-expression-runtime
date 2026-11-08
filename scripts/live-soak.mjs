@@ -7,15 +7,24 @@ import { birdParts, peaceParts, sculptureProgram } from '../integrations/sculptu
 
 const seconds = Number(process.env.FISCH_SOAK_SECONDS ?? 1800);
 const camera = process.argv.includes('--camera-local');
+const synthetic = process.argv.includes('--synthetic-camera');
+if (camera && synthetic) throw Error('Choose physical local camera or synthetic fixtures, never both');
 if (!Number.isFinite(seconds) || seconds < 10 || seconds > 7200) throw Error('Invalid soak duration');
 let counts;
-const live = await openLive({ headless: !camera, production: true, inspect: page => { counts = egressCounters(page); } });
 const errors = [], samples = [];
+const live = await openLive({ headless: !camera, production: true, synthetic,
+  inspect: page => { counts = egressCounters(page); page.on('pageerror', error => errors.push(error.message)); } });
 let client, cycle = 0;
-live.page.on('pageerror', error => errors.push(error.message));
 try {
   client = liveTestClient(live.base, live.token); await client.call('initialize');
   toolValue(await client.tool('express', { body: sculptureProgram(birdParts(), 600) }));
+  if (synthetic) await live.page.evaluate(() => {
+    const start = performance.now();
+    (window).fischSoakFixture = setInterval(() => {
+      const phase = Math.floor((performance.now() - start) / 1000) % 60;
+      window.fischLive.fixture(phase < 35 ? 'present' : phase < 45 ? 'absent' : phase < 50 ? 'stale' : phase < 55 ? 'denied' : 'error');
+    }, 1000 / 24);
+  });
   if (camera) {
     await live.page.context().grantPermissions(['camera'], { origin: new URL(live.page.url()).origin });
     await live.page.locator('#camera-start').click();
@@ -44,12 +53,18 @@ try {
     if (camera && (!sample.metrics.cameraActive || !['tracking', 'absent'].includes(sample.metrics.camera))) throw Error('Camera stopped during soak: ' + JSON.stringify(sample.metrics.cameraTransitions));
   }
   const final = await memorySample(live.browser, live.page, true);
-  const report = { durationSeconds: (performance.now() - start) / 1000, warmupSeconds: 60, cameraLocalOnly: camera, cameraInfo, gpu,
+  const report = { durationSeconds: (performance.now() - start) / 1000, warmupSeconds: 60, cameraLocalOnly: camera,
+    syntheticFixture: synthetic, executionMode: camera ? 'physical-camera' : 'headless-software-renderer',
+    inferenceRateMeasured: false, soakDurationEligible: seconds >= 1800, cameraInfo, gpu,
     baseline, final, heapGrowthBytes: final.heapBytes - baseline.heapBytes,
     privateGrowthBytes: final.privateBytes === null ? null : final.privateBytes - baseline.privateBytes,
     counts, errors, topologyCancelResizeCycles: cycle, automatedModelPrompts: 0,
-    cameraContinuous: !camera || samples.every(sample => sample.metrics.cameraActive && ['tracking', 'absent'].includes(sample.metrics.camera)), samples };
+    cameraContinuous: camera ? samples.every(sample => sample.metrics.cameraActive && ['tracking', 'absent'].includes(sample.metrics.camera)) : null,
+    privateMemoryGate: final.privateBytes === null || baseline.privateBytes === null ? 'unknown' : final.privateBytes - baseline.privateBytes < 100000000 ? 'passed' : 'failed', samples };
   writeFileSync('.runtime/live-soak.json', JSON.stringify(report, null, 2));
   console.log(JSON.stringify({ ...report, samples: samples.length }));
   if (errors.length || counts.unexpectedFrames || counts.nonLoopbackRequests || (report.privateGrowthBytes ?? 0) > 100000000) process.exitCode = 1;
-} finally { await client?.close(); await live.close(); }
+} finally {
+  if (synthetic && !live.page.isClosed()) await live.page.evaluate(() => clearInterval(window.fischSoakFixture)).catch(() => {});
+  await client?.close(); await live.close();
+}

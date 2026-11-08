@@ -49,6 +49,7 @@ export class ThreeRenderer implements RendererSink {
   private restores = 0;
   private orbit = new MotionPhase();
   count = 10000;
+  private submittedFrames = 0;
   reducedMotion = false;
   constructor(
     private canvas: HTMLCanvasElement | OffscreenCanvas,
@@ -121,6 +122,16 @@ export class ThreeRenderer implements RendererSink {
     this.material.uniforms.size.value = Number(state.pointSize);
     this.material.uniforms.brightness.value = Number(state.brightness);
     this.renderer.render(this.scene, this.camera);
+    this.submittedFrames++;
+  }
+  get renderSnapshot() {
+    let signature = 2166136261;
+    const stride = Math.max(3, Math.floor(this.count / 64) * 3);
+    for (let i = 0; i < this.count * 3; i += stride)
+      signature = Math.imul(signature ^ Math.round(this.positions[i] * 10000), 16777619);
+    for (const value of [this.material.uniforms.size.value, this.material.uniforms.brightness.value,
+      this.color.r, this.color.g, this.color.b]) signature = Math.imul(signature ^ Math.round(value * 10000), 16777619);
+    return { frame: this.submittedFrames, signature: signature >>> 0, contextLost: this.lost };
   }
   dispose() {
     this.canvas.removeEventListener('webglcontextlost', this.onLost as EventListener);

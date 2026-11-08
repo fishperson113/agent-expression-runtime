@@ -107,3 +107,26 @@ Linux gateway CI and merged as d0fa594. An initial merge auto-review denied miss
 head/CI evidence; after reading owner authorization and fresh completed job data,
 the protected retry succeeded. PR #23 was retargeted to main (10 aggregate files)
 and strengthened with owned process-group/pipe cleanup and a process-exit test.
+
+## Checkpoint 4 — attribution and synthetic stability tooling
+
+Added a 64-event camera-free trace separating received/admitted/rejected,
+scheduler applied/completed/cancelled, renderer frame submission and geometry
+hash change. The last two remain explicit proxies, not content relevance or
+human recognition scores. Trace includes only turn ordinal, numeric sequence,
+bounded code and times; no user text, credentials, images or raw tool payloads.
+Cancelled work loses its pending frame attribution.
+
+Opt-in synthetic mode exercises present/absent/stale/denied/error observations
+through the real aggregator; camera start is disabled and the UI clearly labels
+fixtures. Synthetic samples do not certify Face Landmarker throughput. Added
+Linux browser-private memory measurement from process smaps_rollup, retaining
+unknown/error instead of fabricating zero when unavailable.
+
+232 JS tests passed; build caught a nullable Vite test URL and was corrected.
+10-second apparatus check after 60-second warm-up passed with 702 observation
+frames, zero external requests/unexpected frames/page errors; private growth
+1.03 MB. It is explicitly ineligible for 30-minute acceptance. Run the final
+>=1800-second soak only on a stable final build. PR #23 merged as 44dcf3c after
+all current-head core/Windows/gateway/harness jobs passed. Model budget remains
+2/120; services remain policy-blocked. Deadline stays 22:41:03 UTC.
