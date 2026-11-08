@@ -108,3 +108,7 @@ Every row is one reviewable commit target, not permission to leave broken interm
 ### C01 completed
 
 Native Codex 0.167.0 called both probe tools and correctly read a red circle and random four-digit code from synthetic MCP image pixels. The first attempt hit tool approval because the probe lacked an explicit automatic read-only policy; adding read-only annotations and a per-probe auto policy made the authorized test pass. No hook trust was bypassed. Native prompt-context injection remains unverified; observe-first fallback is the initial supported path. Two probe contract tests and staged structural checks passed. Added `scripts/check-live-harness.mjs` for staged file/function/comment checks; Rust function lengths still require manual review. Probe output is ignored under `.runtime/live-preflight/`.
+
+### C02 completed
+
+Added strict observation v1 types/schema, named bounded signals and a pure latest-snapshot/event store. Store rejects wrong sessions, old sequence/timestamps and malformed events; independent cursors report history gaps without consuming hook/model reads. Stale snapshots replace pose/expression with unknown. Focused contract/regression tests: 17 passed; frontend build and core boundary passed. Runtime/gateway wiring follows in later commits.

@@ -34,5 +34,7 @@
   "dedupTtlMs": 60000,
   "admissionDeadlineMs": 500,
   "modelApiCalls": false,
+  "live": { "v": 1, "observationSchema": "live.schema.json", "lookMode": "synthetic-only", "eventHistory": 64,
+    "maxObservationAgeMs": 1500, "signals": ["agent.output", "user.head.yaw", "user.head.pitch", "user.position.x", "user.position.y", "user.expression.smile", "user.expression.browRaise", "user.expression.eyesClosed", "user.expression.mouthOpen", "user.mouthMoving"] },
   "assembly": { "parts": 24, "controlPoints": 12, "particles": 10000, "nodes": 8, "kinds": ["curve", "ellipsoid", "patch"] }
 }
