@@ -68,7 +68,8 @@ const inputSchema = {
 };
 function tools() {
   return { tools: [
-    { name: 'express', description: 'Choose a short particle expression. Read aer://instructions/v1. ACK is admission, not completion.', inputSchema: live ? liveInputSchema(inputSchema) : inputSchema },
+    { name: 'express', description: 'Choose a short particle expression. Read aer://instructions/v1. ACK is admission, not completion.',
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false }, inputSchema: live ? liveInputSchema(inputSchema) : inputSchema },
     { name: 'cancel_expression', description: 'Cancel body work and reset posture; keep the agent running.',
       inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
     ...(live ? liveToolDefinitions() : []),
