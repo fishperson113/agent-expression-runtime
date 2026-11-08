@@ -4,6 +4,7 @@ Generated from installed package manifests and locked Cargo metadata. Product-co
 
 | Ecosystem | Package | Version | Declared license |
 |---|---|---|---|
+| npm | @mediapipe/tasks-vision | 1.2.2 | Apache-2.0 |
 | npm | @tauri-apps/api | 2.12.4 | Apache-2.0 OR MIT |
 | npm | three | 0.184.0 | MIT |
 | crates.io | adler2 | 2.0.1 | 0BSD OR MIT OR Apache-2.0 |
@@ -21,6 +22,7 @@ Generated from installed package manifests and locked Cargo metadata. Product-co
 | crates.io | axum | 0.8.9 | MIT |
 | crates.io | axum-core | 0.5.6 | MIT |
 | crates.io | base64 | 0.21.7 | MIT OR Apache-2.0 |
+| crates.io | base64 | 0.22.1 | MIT OR Apache-2.0 |
 | crates.io | base64 | 0.23.1 | MIT OR Apache-2.0 |
 | crates.io | bit-set | 0.8.0 | Apache-2.0 OR MIT |
 | crates.io | bit-vec | 0.8.0 | Apache-2.0 OR MIT |
@@ -64,6 +66,7 @@ Generated from installed package manifests and locked Cargo metadata. Product-co
 | crates.io | darling | 0.24.1 | MIT |
 | crates.io | darling_core | 0.24.1 | MIT |
 | crates.io | darling_macro | 0.24.1 | MIT |
+| crates.io | data-encoding | 2.11.0 | MIT |
 | crates.io | dbus | 0.9.12 | Apache-2.0/MIT |
 | crates.io | defmt | 1.2.0 | MIT OR Apache-2.0 |
 | crates.io | defmt-macros | 1.2.0 | MIT OR Apache-2.0 |
@@ -236,6 +239,7 @@ Generated from installed package manifests and locked Cargo metadata. Product-co
 | crates.io | portable-atomic-util | 0.2.8 | Apache-2.0 OR MIT |
 | crates.io | potential_utf | 0.1.6 | Unicode-3.0 |
 | crates.io | powerfmt | 0.2.1 | MIT OR Apache-2.0 |
+| crates.io | ppv-lite86 | 0.2.21 | MIT OR Apache-2.0 |
 | crates.io | precomputed-hash | 0.1.1 | MIT |
 | crates.io | proc-macro-crate | 1.3.1 | MIT OR Apache-2.0 |
 | crates.io | proc-macro-crate | 2.0.2 | MIT OR Apache-2.0 |
@@ -247,6 +251,9 @@ Generated from installed package manifests and locked Cargo metadata. Product-co
 | crates.io | quote | 1.0.47 | MIT OR Apache-2.0 |
 | crates.io | r-efi | 5.3.0 | MIT OR Apache-2.0 OR LGPL-2.1-or-later |
 | crates.io | r-efi | 6.0.0 | MIT OR Apache-2.0 OR LGPL-2.1-or-later |
+| crates.io | rand | 0.9.5 | MIT OR Apache-2.0 |
+| crates.io | rand_chacha | 0.9.0 | MIT OR Apache-2.0 |
+| crates.io | rand_core | 0.9.5 | MIT OR Apache-2.0 |
 | crates.io | raw-window-handle | 0.6.2 | MIT OR Apache-2.0 OR Zlib |
 | crates.io | redox_syscall | 0.5.18 | MIT |
 | crates.io | redox_users | 0.5.3 | MIT |
@@ -284,6 +291,7 @@ Generated from installed package manifests and locked Cargo metadata. Product-co
 | crates.io | serialize-to-javascript | 0.1.2 | MIT OR Apache-2.0 |
 | crates.io | serialize-to-javascript-impl | 0.1.2 | MIT OR Apache-2.0 |
 | crates.io | servo_arc | 0.4.3 | MIT OR Apache-2.0 |
+| crates.io | sha1 | 0.10.7 | MIT OR Apache-2.0 |
 | crates.io | sha2 | 0.10.9 | MIT OR Apache-2.0 |
 | crates.io | shlex | 2.0.1 | MIT OR Apache-2.0 |
 | crates.io | simd-adler32 | 0.3.10 | MIT |
@@ -329,6 +337,7 @@ Generated from installed package manifests and locked Cargo metadata. Product-co
 | crates.io | tinyvec | 1.13.3 | Zlib OR Apache-2.0 OR MIT |
 | crates.io | tokio | 1.54.1 | MIT |
 | crates.io | tokio-macros | 2.7.2 | MIT |
+| crates.io | tokio-tungstenite | 0.29.0 | MIT |
 | crates.io | tokio-util | 0.7.20 | MIT |
 | crates.io | toml | 0.8.2 | MIT OR Apache-2.0 |
 | crates.io | toml | 1.2.0+spec-1.1.0 | MIT OR Apache-2.0 |
@@ -347,6 +356,7 @@ Generated from installed package manifests and locked Cargo metadata. Product-co
 | crates.io | tracing-core | 0.1.36 | MIT |
 | crates.io | tray-icon | 0.25.1 | MIT OR Apache-2.0 |
 | crates.io | try-lock | 0.2.5 | MIT |
+| crates.io | tungstenite | 0.29.0 | MIT OR Apache-2.0 |
 | crates.io | typeid | 1.0.3 | MIT OR Apache-2.0 |
 | crates.io | typenum | 1.20.1 | MIT OR Apache-2.0 |
 | crates.io | unicode-ident | 1.0.27 | (MIT OR Apache-2.0) AND Unicode-3.0 |
@@ -415,6 +425,8 @@ Generated from installed package manifests and locked Cargo metadata. Product-co
 | crates.io | x11-dl | 2.21.0 | MIT |
 | crates.io | yoke | 0.8.4 | Unicode-3.0 |
 | crates.io | yoke-derive | 0.8.4 | Unicode-3.0 |
+| crates.io | zerocopy | 0.8.55 | BSD-2-Clause OR Apache-2.0 OR MIT |
+| crates.io | zerocopy-derive | 0.8.55 | BSD-2-Clause OR Apache-2.0 OR MIT |
 | crates.io | zerofrom | 0.1.8 | Unicode-3.0 |
 | crates.io | zerofrom-derive | 0.1.8 | Unicode-3.0 |
 | crates.io | zerotrie | 0.2.5 | Unicode-3.0 |
