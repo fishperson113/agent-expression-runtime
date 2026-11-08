@@ -148,3 +148,7 @@ Integration inspection found two lifecycle hazards: epoch cancellation should pr
 ### C10a — acceptance preparation (bounded extra commit)
 
 Added browser re-pair after reload without replaying uncertain gestures, preserved the stopped UI state, and fixed explicit stale-camera propagation in both stores. Live now simulates the same 2,000 particles it draws instead of paying for the default 10,000 formation; legacy schedulers retain their default. Camera-free aggregate metrics are exposed for native acceptance. Ten focused JS tests, 16 Rust tests, build and boundary checks passed. This ten-file batch precedes acceptance tooling/soak so the harness remains bounded.
+
+### C10b — reproducible acceptance tooling
+
+Added MCP integration client, native-gateway acceptance script and bounded 30-minute soak runner with local-only camera opt-in, frame-egress counters, GC-normalized heap/private-process memory and repeated topology/cancel/resize cycles. Full JS suite passed cleanly: 218 tests / 39 files with one worker; 16 Rust tests passed in C10a. Corrected cold/warm and admission timing measurement: functional headless run recorded cold observe 78.7 ms, warm observe p95 5.3 ms and express p95 27.2 ms. Macro-after-cancel, reload, synthetic image/cooldown and zero script errors passed. Sanitized evidence is docs/evidence/live-acceptance.json. These software-rendered timings do not certify native GPU performance. Real-camera 30-minute soak starts next; no real camera image export or model prompts are permitted in it.
