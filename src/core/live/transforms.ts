@@ -15,6 +15,7 @@ export function transformMatrices(writes: TransformWrite[], parts: Part[]): (Liv
     values[write.target.prop] = write.value; grouped.set(write.target.part, values);
   }
   return ids.map((id, index) => {
+    if (index > 0 && id === 'body') return undefined;
     const values = grouped.get(id); if (!values) return undefined;
     const center = pivot(parts[index - 1]), rotation = [values.rotateX ?? 0, values.rotateY ?? 0, values.rotateZ ?? 0] as Vec3;
     const scales = [values.scaleX ?? 1, values.scaleY ?? 1, values.scaleZ ?? 1];
