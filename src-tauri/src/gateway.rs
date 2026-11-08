@@ -23,6 +23,8 @@ use std::{
 };
 use tokio::sync::{broadcast, oneshot, Semaphore};
 use uuid::Uuid;
+#[path = "live_gateway.rs"]
+pub(crate) mod live;
 type Bridge = Arc<dyn Fn(BridgeEvent) -> Result<(), String> + Send + Sync>;
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -60,6 +62,7 @@ pub struct Receipt {
 }
 #[derive(Clone)]
 pub struct Gateway {
+    pub(crate) live: live::LiveState,
     token: Arc<String>,
     pub address: Arc<Mutex<String>>,
     session: Arc<Mutex<Option<Session>>>,
@@ -105,6 +108,7 @@ impl Gateway {
     pub fn new() -> Self {
         let (events, _) = broadcast::channel(64);
         Self {
+            live: live::LiveState::default(),
             token: Arc::new(format!(
                 "{}{}",
                 Uuid::new_v4().simple(),
@@ -351,9 +355,13 @@ impl Gateway {
             .route("/v1/renderer/complete", post(renderer_complete))
             .route("/v1/renderer/feedback", post(renderer_feedback))
             .route("/v1/renderer/control-ack", post(renderer_control_ack))
+            .route("/v1/sessions/{id}/observe", get(live::observe))
+            .route("/v1/sessions/{id}/look", post(live::look))
+            .route("/v1/live/context", get(live::context))
             .layer(DefaultBodyLimit::max(32768))
             .layer(middleware::from_fn_with_state(self.clone(), authorize))
             .with_state(self.clone())
+            .merge(live::channel_router(self.clone()))
     }
     pub async fn serve(self) -> Result<(), String> {
         // Select a browser-safe dynamic port, independent of a machine's custom ephemeral range.

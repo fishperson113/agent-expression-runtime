@@ -3,16 +3,20 @@ import { mountLive, element } from './view';
 import { LiveBody } from './body';
 import { FaceObservations, type FaceSample } from './observation';
 import { VisionCamera } from './vision';
+import { LiveBridge } from './bridge';
 import type { LiveEventKind } from '../core/live/types';
 
 mountLive(element('app'));
 const body = new LiveBody(element<HTMLCanvasElement>('body'), text => { element('body-status').textContent = text; });
 const observations = new FaceObservations(crypto.randomUUID());
+const bridge = new LiveBridge(body, observations);
+Object.assign(window, { fischLive: { pair: (base: string, token: string) => bridge.connect(base, token) } });
 const recent: { type: LiveEventKind; at: number }[] = [];
 let sampleCount = 0, sampleAt = performance.now(), inferenceMs = 0, stopped = false;
 const camera = new VisionCamera(element<HTMLVideoElement>('camera'), sample, cameraStatus);
 
 function events(values: { type: LiveEventKind; at: number }[]) {
+  bridge.events(values);
   for (const event of values) { recent.unshift(event); body.event(event.type); }
   recent.splice(20);
   element('events').replaceChildren(...recent.map(event => { const item = document.createElement('li');
@@ -56,7 +60,7 @@ const timer = setInterval(() => {
 }, 500);
 function stop() {
   if (stopped) return; stopped = true;
-  camera.stop(); cameraStatus('stopped'); clearInterval(timer); body.dispose();
+  camera.stop(); cameraStatus('stopped'); clearInterval(timer); bridge.stop(); body.dispose();
   element<HTMLButtonElement>('camera-start').disabled = true; element('connection').textContent = 'Đã dừng phiên Live';
 }
 element('stop-all').onclick = stop;
