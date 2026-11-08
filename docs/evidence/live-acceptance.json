@@ -1,0 +1,29 @@
+{
+  "checks": "passed",
+  "nativeGateway": true,
+  "executionMode": "headless-software-renderer",
+  "realCameraUsed": false,
+  "image": {
+    "mimeType": "image/jpeg",
+    "encodedBytes": 9972,
+    "syntheticOnly": true
+  },
+  "observeColdMs": 78.7429000000011,
+  "observeP50Ms": 3.183600000000297,
+  "observeP95Ms": 5.305200000002515,
+  "expressP95Ms": 27.189699999998993,
+  "macroAfterCancel": true,
+  "browserReload": true,
+  "scriptErrors": 0,
+  "metrics": {
+    "frameP95": 48.600000001490116,
+    "meanFps": 47.852093529091896,
+    "particles": 2000,
+    "camera": "stopped",
+    "cameraSeq": 1,
+    "simulatedParticles": 2000
+  },
+  "baseline": "662ee6c",
+  "recordedDate": "2026-11-08",
+  "scope": "Local functional acceptance; software-rendered browser timings, not native GPU certification."
+}
