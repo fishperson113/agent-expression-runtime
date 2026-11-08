@@ -1,6 +1,6 @@
 # Fisch Live POC — implementation and acceptance plan
 
-Status: implementation active; C00 pushed before runtime changes.
+Status: bounded POC implementation and automated acceptance complete; manual/PRD gaps remain explicit below. C00 was pushed before runtime changes.
 Date: 2026-11-08 (Asia/Saigon). Baseline: `bbb2ede`, runtime `9863ba3`.
 Source: user-supplied PRD “Fisch Live POC: gương mặt có thị giác cho agent”, 2026-11-08.
 
@@ -164,3 +164,11 @@ The raw HD User Facing camera stayed live for 15 seconds without track events, w
 ### C10d — browser egress isolation
 
 The restarted native GPU run stayed tracking for several minutes at approximately 60 render FPS, but egress monitoring counted external requests. Inspection of the pinned SDK identified its odml.pa.googleapis.com logging endpoint; no evidence of camera image payloads was collected or exported. Interrupted that run rather than treating it as privacy acceptance. Added loopback-only CSP response headers to both documents and worker scripts in dev/preview, blocking vendor logging and other off-machine fetches; a browser test verifies main-thread and worker off-machine fetch are blocked. Egress counters distinguish explicit CSP-blocked attempts from unblocked requests. Privacy test and frontend build passed. The 30-minute acceptance run restarts on this policy-enforced build.
+
+### C11b — final acceptance and handoff
+
+Final policy-enforced native camera soak completed 1,801 seconds after 60 seconds warm-up: camera stayed active on GPU, 15 topology/cancel/resize cycles, 17,396 typed observations, zero unexpected frames, image deliveries, off-loopback requests or script errors. GC-normalized browser private growth was 37,306,368 bytes (<100 MB); JS heap growth 87,100 bytes. Sample mean FPS was 58.0–60.0 and rolling frame p95 17.1–29.4 ms: sustained <=20 ms is not certified. Vision stayed about 9–10 Hz, below the 24 Hz target. Camera/audio metadata: 640x480, zero audio tracks. Camera stopped during teardown. Sanitized aggregate evidence is [live-soak.json](evidence/live-soak.json); no real camera imagery was persisted or supplied to a model. The soak driver made no model prompts; a separate explicit synthetic sailboat Codex probe ran during the interval and produced an accepted six-part assembly (human recognition not assessed).
+
+Final regression on runtime commit 8dc646a: 221 JS tests / 41 files, 16 Rust tests, production build and architecture boundary passed. Final static-browser/gateway/MCP acceptance passed: warm observe p95 5.2 ms, express admission p95 29.0 ms, cold observe 78.8 ms, macro-after-cancel, reload, synthetic-only look and zero script errors. Headless software-rendered timings are functional evidence, not native GPU certification. Existing >500 kB Three.js bundle warning remains. Updated usage, architecture, validation and sanitized evidence in this bounded documentation batch.
+
+Delivered scope is camera-local observation + WebGL body + dedicated Codex/Herdr MCP session with observe-first, typed fallback and optional experimental output proxy. Remaining PRD/manual gates: observation accuracy >=8/10, human theme recognition >=6/10, distraction evaluation, native prompt-hook trust/context delivery and Vietnamese /voice. Deferred features: additive composition, condition-based/arbitrary-program reflexes and real-camera look. These are disclosed limits, not acceptance passes. No merge into main or global hook/config changes.
