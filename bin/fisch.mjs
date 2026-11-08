@@ -45,7 +45,9 @@ async function test() {
 }
 async function doctor() {
   const { paneDoctor } = await import('../integrations/herdr.mjs');
-  const checks = await paneDoctor();
+  const { inspectEnvironment } = await import('../scripts/start-session.mjs');
+  const checks = [...await inspectEnvironment(), ...await paneDoctor().then(panel =>
+    panel.map(check => ({ ...check, name: 'Panel (optional) / ' + check.name, optional: true })))];
   for (const check of checks) console.log(`${check.ok ? 'OK' : 'MISSING'} ${check.name}: ${check.detail}`);
   return checks.every(check => check.ok || check.optional) ? 0 : 1;
 }
