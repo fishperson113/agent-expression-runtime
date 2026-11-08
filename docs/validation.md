@@ -6,7 +6,8 @@ The current implementation includes pane attachment, native interaction hooks, c
 
 This run used managed Linux Cloud while the owner's computer was off. The stable browser/gateway source
 is 992d48c (merged into main as 74195ca); the final Node-only thread-selection
-correction is c0d63ce. The execution deadline and model
+correction is c0d63ce, followed by relay helper extraction 6ac50b7 (runtime
+main merge 9e79030). The execution deadline and model
 counter are preserved in [the Cloud ledger](live-cloud-run.md). The historical
 native results below remain separate.
 
@@ -17,12 +18,16 @@ native results below remain separate.
 | Illustrate/return/cancel | MCP/gateway/compiler/WebGL fixtures; restored facial geometry after wire reordering; stale gestures not replayed | Deterministic fixtures, not autonomous semantic choices |
 | Output rhythm | Official agent-message delta boundaries, stale/thread/tool noise tests, <=600 ms decay | Real output streaming still needs model-connected validation |
 | Synthetic observations | Present/absent/stale/denied/error, typed aggregator/bridge; no physical devices opened | Not Face Landmarker throughput or actual-person accuracy |
-| Regression | 247 JS tests / 48 files before the final Node-only thread-selection test; build/architecture and 16 shared Rust tests pass | Final count/results in dated evidence and ledger |
-| Warm/cold RPC | Cold observe 52.8 ms; warm observe p95 5.25 ms; expression admission p95 19.2 ms | Single headless functional sample; admission is not animation completion |
-| Stability/privacy | Final >=30-minute synthetic soak recorded separately | See dated evidence; no native camera/GPU certification |
+| Regression | 248 JS tests / 48 files, no skips; build/architecture/harness and 16 shared Rust tests/check pass | Final count/results in dated evidence and ledger |
+| Warm/cold RPC | Cold observe 46.4 ms; warm observe p95 8.83 ms; expression admission p95 51.9 ms | Single headless functional sample during build load; not a latency benchmark or animation completion |
+| Stability/privacy | 1,800.173 s + 60 s warm-up; GC private growth 8,130,560 bytes; zero page errors/unexpected frames/off-loopback browser requests | Stability/private-growth passed; sample FPS 34.88–54.90 and frame p95 31.5–44.7 ms miss sustained targets; no native certification |
 | Ordinary unseen model behavior | Ten frozen prompts, two passes and strict shared budget driver prepared | BLOCKED: Cloud policy denies chatgpt.com; 0 completed holdout turns |
 | Physical-camera inference | Model asset download denied at storage.googleapis.com | BLOCKED in Cloud; >=24 Hz remains unverified |
 | Native/manual | No new owner-PC camera, Windows GPU, Herdr or Vietnamese /voice run | Pending; Windows CI compilation/tests are not native usability acceptance |
+
+[Sanitized run evidence](evidence/cloud-live-run.json) retains both soaks, sample vectors,
+asset hashes, final checks and all stated limits. Real Codex app-server control-plane
+selection of two threads passed without requesting inference; that is not a model turn.
 
 Body-only, camera-off visual comparison: [historical sphere](evidence/cloud-live-before.png),
 [declared resting face](evidence/cloud-live-face.png), and [bird fixture](evidence/cloud-live-illustration.png).
