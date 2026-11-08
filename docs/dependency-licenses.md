@@ -7,6 +7,7 @@ Generated from installed package manifests and locked Cargo metadata. Product co
 | npm | @mediapipe/tasks-vision | 1.2.2 | Apache-2.0 |
 | npm | @tauri-apps/api | 2.12.4 | Apache-2.0 OR MIT |
 | npm | three | 0.184.0 | MIT |
+| npm | ws | 8.18.3 | MIT |
 | crates.io | adler2 | 2.0.1 | 0BSD OR MIT OR Apache-2.0 |
 | crates.io | aho-corasick | 1.1.5 | Unlicense OR MIT |
 | crates.io | alloc-no-stdlib | 3.0.0 | BSD-3-Clause |

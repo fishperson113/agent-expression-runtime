@@ -10,12 +10,14 @@ Working with an agent often means staring at scrolling text. Fisch explores a qu
 
 ## Prerequisites
 
-The current POC is Windows-first:
+For the browser POC:
 
 - Node.js 22.12+ and npm
-- Rust stable, Microsoft C++ Build Tools and WebView2
-- Herdr and Microsoft Edge
-- Codex CLI, already signed in
+- Rust stable and its platform compiler prerequisites
+- Chromium (`npx playwright install chromium` once), or Edge on Windows
+- Codex CLI with app-server/remote support, already signed in
+
+Herdr is optional for Live. The native Tauri app has additional platform prerequisites.
 
 ## Quick start
 
@@ -29,13 +31,13 @@ npm link
 fisch build
 ```
 
-Then, in a Herdr shell:
+Then, in a normal terminal:
 
 ```sh
 fisch live
 ```
 
-This opens the web workspace and a Codex tab together. Click **Bật camera** when you want local face tracking; the camera starts off. Real camera images stay on your machine. Talk to Codex in the new tab.
+This opens the particle face in a browser and Codex in your terminal. In Herdr, it uses an optional dedicated pane. Click **Bật camera** when you want local face tracking; the camera starts off. Real camera images stay on your machine. Talk to Codex normally.
 
 Prefer the terminal body? Keep Codex or Claude open in a neighboring Herdr pane and run:
 

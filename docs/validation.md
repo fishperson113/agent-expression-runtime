@@ -2,6 +2,47 @@
 
 The current implementation includes pane attachment, native interaction hooks, contextual planning, continuous presence, model-authored performances, adaptive Braille and prepared idle scenes. See [current behavior](expression-planner.md), [review remediation](review-progress.md) and [research/evidence limits](related-work.md#10-cập-nhật-braille-theo-thời-gian-và-idle-scene-tự-do). Test counts below are historical observations, not the current suite size or a fresh certification.
 
+## Cloud terminal/face development — 2026-11-08
+
+This run used managed Linux Cloud while the owner's computer was off. The stable browser/gateway source
+is 992d48c (merged into main as 74195ca); the final Node-only thread-selection
+correction is c0d63ce. The execution deadline and model
+counter are preserved in [the Cloud ledger](live-cloud-run.md). The historical
+native results below remain separate.
+
+| Gate | New Cloud evidence | Status/limit |
+|---|---|---|
+| No Herdr required | Real Codex CLI UI and paired browser launched with HERDR_* absent; discovery and owned cleanup regressions | Launch verified; successful real model turn blocked |
+| Resting face/lifecycle | Declared geometry, explicit role metadata, inspected body-only screenshots; working/replying and motion-off tests | Agent visual proxy; human perception pending |
+| Illustrate/return/cancel | MCP/gateway/compiler/WebGL fixtures; restored facial geometry after wire reordering; stale gestures not replayed | Deterministic fixtures, not autonomous semantic choices |
+| Output rhythm | Official agent-message delta boundaries, stale/thread/tool noise tests, <=600 ms decay | Real output streaming still needs model-connected validation |
+| Synthetic observations | Present/absent/stale/denied/error, typed aggregator/bridge; no physical devices opened | Not Face Landmarker throughput or actual-person accuracy |
+| Regression | 247 JS tests / 48 files before the final Node-only thread-selection test; build/architecture and 16 shared Rust tests pass | Final count/results in dated evidence and ledger |
+| Warm/cold RPC | Cold observe 52.8 ms; warm observe p95 5.25 ms; expression admission p95 19.2 ms | Single headless functional sample; admission is not animation completion |
+| Stability/privacy | Final >=30-minute synthetic soak recorded separately | See dated evidence; no native camera/GPU certification |
+| Ordinary unseen model behavior | Ten frozen prompts, two passes and strict shared budget driver prepared | BLOCKED: Cloud policy denies chatgpt.com; 0 completed holdout turns |
+| Physical-camera inference | Model asset download denied at storage.googleapis.com | BLOCKED in Cloud; >=24 Hz remains unverified |
+| Native/manual | No new owner-PC camera, Windows GPU, Herdr or Vietnamese /voice run | Pending; Windows CI compilation/tests are not native usability acceptance |
+
+Body-only, camera-off visual comparison: [historical sphere](evidence/cloud-live-before.png),
+[declared resting face](evidence/cloud-live-face.png), and [bird fixture](evidence/cloud-live-illustration.png).
+The illustration was deterministic, not model-authored. Restoring the face was
+also applied successfully; no page errors or active camera in the comparison.
+
+No claim is made that ordinary conversation semantic expressiveness is fixed:
+its decisive real-model gate is blocked. Explicitly separate attempted,
+rejected, admitted, applied, frame submission, frame/hash change proxy, relevance
+and semantic consistency. The holdout driver leaves visual meaning/relevance/
+consistency unscored rather than inventing them from transport success.
+
+Targets remain >=24 inference Hz, >=50 render FPS, confirmed-event reaction
+<150 ms (excluding debounce), output activity <250 ms with <=600 ms decay,
+>=30-minute stability with <100 MB GC-normalized retained private growth,
+actual-person observation accuracy >=8/10 and blinded human theme recognition
+>=6/10. Frame statistics are rolling 120-frame windows, sampled during the soak;
+they are not a global run percentile. Missed Cloud software-rendering targets
+remain misses. Preserve all existing native records and their limitations.
+
 ## Fisch Live feature-branch acceptance (2026-11-08)
 
 Implementation and per-commit evidence are tracked in [the Live plan](fisch-live-plan.md); usage/privacy and authorized scope are in [the Live guide](fisch-live.md). The later sections below retain their historical scope.

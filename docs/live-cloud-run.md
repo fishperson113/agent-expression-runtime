@@ -1,7 +1,8 @@
 # Fisch Live cloud execution — 2026-11-08
 
 T0: 2026-11-08 16:41:03 UTC. Hard deadline: 22:41:03 UTC.
-Real Fisch model test budget: 120 turns including retries/evaluation; used: 0.
+Real Fisch model test budget: 120 turns including retries/evaluation; used: 2.
+Completed real holdout turns: 0 (service policy blocked).
 Authoritative counter and transient reports: `.runtime/live-overnight/`.
 Owner's personal machine is off; all new evidence is cloud Linux only.
 
@@ -183,3 +184,44 @@ and semantic consistency remain unscored until actual reviewed model evidence.
 Only --describe was run; the network denial was not retried. Counter still 2/120,
 zero completed holdout turns. No inference or fake model result is counted as a
 passing conversation gate. PR #26 merged as 692332c after all jobs passed.
+
+## Checkpoint 8 — baseline complete; final verification
+
+PR #27 merged as c187f44; model tooling #28 as 8a9afad; XYZ diagnostic sampling
+#29 as c9b6364; reserved body-channel correction #30 as 74195ca. Every merge used
+current-head successful core/Windows/gateway/harness jobs and expected-head
+protection. The model driver remains unexecuted against real inference; its
+pure tests cover budget/deadline/lock, stale turns, transport loss and scoring.
+
+Baseline f7d91b7 completed 1,800.115 seconds after 60-second warm-up: zero page
+errors, unexpected frames, browser off-loopback/blocked requests; private growth
+10,571,776 bytes after GC. Rolling FPS 33.28–57.60 / p95 20.9–53.5 ms miss sustained
+targets. It is software-rendered/synthetic-only. No Face Landmarker inference.
+
+Review exposed X-only hash sampling and double application of the reserved body
+channel to a part also named body. Both got failing-then-passing pure tests.
+A historical source archive under .runtime was accidentally included by Vitest;
+moved it to /tmp and reran cleanly: 247 current tests / 48 files, no skips. Do not
+report the contaminated 466-pass/two-historical-skip run as current coverage.
+TypeScript/Vite build, architecture and 16 shared gateway Rust tests/check pass.
+
+Camera-off comparison from historical 3f7b911 to 992d48c shows sphere -> declared
+face -> deterministic bird illustration -> restored face, without page errors.
+A fresh 30-minute synthetic soak started on stable browser/gateway 992d48c. No
+browser-heavy tests, HMR or frontend changes during the soak. No screenshot is
+model-authored; visual review remains an agent proxy rather than human scoring.
+
+## Checkpoint 9 — terminal thread selection
+
+A Node-host review found output stayed pinned to the first thread after ordinary
+UI new/resume/fork. A red protocol replay preceded the fix: only the latest
+successful explicit UI selection changes tracking; failed/superseded responses,
+background notifications and old deltas do not. Relay callback and 15 focused
+launcher/model-budget/output tests pass. PR #31 passed current-head core/Windows/gateway/harness CI and merged as
+78a3ce8. This correction
+changes no code/assets in the running browser/gateway soak bundle.
+
+Next: complete stable soak; clean final regression and functional browser check;
+append sanitized evidence/acceptance, merge passing handoff docs, verify main and
+clean only this run's preserved branches/jobs. Counter remains 2/120, deadline
+22:41:03 UTC unchanged. No network-policy workaround or personal-machine access.
