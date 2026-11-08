@@ -25,3 +25,7 @@ Local presence, validated part performances and prepared idle scenes run without
 ## Development and evaluation
 
 `npm run dev` and `npm run tauri -- dev` are browser/desktop development entry points. `fisch evaluate` opens a separate browser reference evaluation workflow with its Rust/browser prerequisites. `fisch build` and `fisch test` are independent of pane attachment. Custom hosts can use the [HTTP/MCP protocol](integration.md).
+
+## Camera/WebGL Live mode
+
+`fisch live` is a separate browser-camera workflow: local MediaPipe observations/reflexes and a WebGL body, with observe/express/synthetic-look tools in a dedicated Codex pane. It preserves the existing pane workflow and original CLI session. It does not attach new tools to an already-running Codex process or run the secondary expression planner. See [Fisch Live](fisch-live.md) for prerequisites, keyboard controls, privacy, experimental output rhythm and measured acceptance.

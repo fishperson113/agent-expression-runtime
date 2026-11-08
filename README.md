@@ -4,6 +4,10 @@ A provider-independent, Windows-first Tauri + TypeScript runtime: a particle bod
 
 ![Browser sandbox](docs/evidence/browser-desktop.png)
 
+## Fisch Live POC
+
+Run `node bin/fisch.mjs live` from a Herdr shell beside a Codex pane (or choose the source with `live --agent <pane-id>`). Live opens a local camera/debug + particle WebGL browser workspace and a dedicated Codex pane with transient MCP settings, preserving the old session. Camera starts off; real pixels stay local. Codex uses observe/express and synthetic-only look; there is no secondary planner. The optional output-rhythm proxy is experimental/off by default. Voice and human perception remain unverified. See [Live setup, privacy, controls and acceptance](docs/fisch-live.md) and [the implementation plan](docs/fisch-live-plan.md). A built native gateway, installed dependencies and existing Codex login are required; the current machine has been prepared.
+
 ## Herdr quick start
 
 Link the checkout once with `npm link`. Keep Codex or Claude running in one Herdr pane. In the neighboring free pane, run:
@@ -67,7 +71,7 @@ Browser smoke test: start `npm run dev`, install Chromium with `npx playwright i
 
 ## Status and acceptance
 
-Documentation baseline: implementation commit `9863ba3` (2026-11-07). This documentation update describes that snapshot; recorded experiments retain their original scope and are not fresh acceptance runs.
+Legacy pane baseline: `9863ba3` (2026-11-07). The Fisch Live feature branch adds camera observations and direct Codex MCP control; see the Live plan and validation for its separate scope. Historical experiments retain their original limits.
 
 This is an initial POC implementation, **not a claim that M1–M3 or performance acceptance are complete**. See [validation](docs/validation.md), [architecture and known limits](docs/architecture.md), and [benchmark procedure](docs/benchmark.md).
 
