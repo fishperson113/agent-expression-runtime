@@ -1,7 +1,8 @@
 # Fisch Live cloud execution — 2026-11-08
 
 T0: 2026-11-08 16:41:03 UTC. Hard deadline: 22:41:03 UTC.
-Real Fisch model test budget: 120 turns including retries/evaluation; used: 0.
+Real Fisch model test budget: 120 turns including retries/evaluation; used: 2.
+Completed real holdout turns: 0 (service policy blocked).
 Authoritative counter and transient reports: `.runtime/live-overnight/`.
 Owner's personal machine is off; all new evidence is cloud Linux only.
 
@@ -183,3 +184,118 @@ and semantic consistency remain unscored until actual reviewed model evidence.
 Only --describe was run; the network denial was not retried. Counter still 2/120,
 zero completed holdout turns. No inference or fake model result is counted as a
 passing conversation gate. PR #26 merged as 692332c after all jobs passed.
+
+## Checkpoint 8 — baseline complete; final verification
+
+PR #27 merged as c187f44; model tooling #28 as 8a9afad; XYZ diagnostic sampling
+#29 as c9b6364; reserved body-channel correction #30 as 74195ca. Every merge used
+current-head successful core/Windows/gateway/harness jobs and expected-head
+protection. The model driver remains unexecuted against real inference; its
+pure tests cover budget/deadline/lock, stale turns, transport loss and scoring.
+
+Baseline f7d91b7 completed 1,800.115 seconds after 60-second warm-up: zero page
+errors, unexpected frames, browser off-loopback/blocked requests; private growth
+10,571,776 bytes after GC. Rolling FPS 33.28–57.60 / p95 20.9–53.5 ms miss sustained
+targets. It is software-rendered/synthetic-only. No Face Landmarker inference.
+
+Review exposed X-only hash sampling and double application of the reserved body
+channel to a part also named body. Both got failing-then-passing pure tests.
+A historical source archive under .runtime was accidentally included by Vitest;
+moved it to /tmp and reran cleanly: 247 current tests / 48 files, no skips. Do not
+report the contaminated 466-pass/two-historical-skip run as current coverage.
+TypeScript/Vite build, architecture and 16 shared gateway Rust tests/check pass.
+
+Camera-off comparison from historical 3f7b911 to 992d48c shows sphere -> declared
+face -> deterministic bird illustration -> restored face, without page errors.
+A fresh 30-minute synthetic soak started on stable browser/gateway 992d48c. No
+browser-heavy tests, HMR or frontend changes during the soak. No screenshot is
+model-authored; visual review remains an agent proxy rather than human scoring.
+
+## Checkpoint 9 — terminal thread selection
+
+A Node-host review found output stayed pinned to the first thread after ordinary
+UI new/resume/fork. A red protocol replay preceded the fix: only the latest
+successful explicit UI selection changes tracking; failed/superseded responses,
+background notifications and old deltas do not. Relay callback and 15 focused
+launcher/model-budget/output tests pass. PR #31 passed current-head core/Windows/gateway/harness CI and merged as
+78a3ce8. This correction
+changes no code/assets in the running browser/gateway soak bundle.
+
+Next: complete stable soak; clean final regression and functional browser check;
+append sanitized evidence/acceptance, merge passing handoff docs, verify main and
+clean only this run's preserved branches/jobs. Counter remains 2/120, deadline
+22:41:03 UTC unchanged. No network-policy workaround or personal-machine access.
+
+## Checkpoint 10 — physical function-size audit
+
+Manual review found the newly touched outer relay function at 51 physical lines;
+the existing heuristic checker did not catch the destructured signature span.
+Extracted named bounded-output handling, without behavior changes, line packing,
+exemptions or vendored rule edits. PR #32 is one file; 15 focused tests and current-head core/Windows/gateway/
+harness CI passed, merged as 9e79030.
+A supplementary TypeScript AST audit of all JS/TS changed since 3f7b911 reports
+224 touched functions, maximum 40 physical lines, zero violations. Rust touched
+functions were checked separately (maximum 18 lines). R10/R11 remain unsupported
+in Codex; these direct checks do not change that limitation.
+
+Ten completed runtime branches were deleted locally/remotely only after exact
+remote-head and main-ancestry verification, using atomic expected-ref deletion.
+Pre-existing branches were untouched. Relay-refactor and handoff branches remain
+until their passing PRs merge. Last confirmed passing runtime main: 78a3ce8.
+The running browser/gateway bundle remains 992d48c; production hashes unchanged.
+
+## Runtime PRs and decisions
+
+| PR | Independently reviewed increment |
+|---|---|
+| [22](https://github.com/fishperson113/agent-expression-runtime/pull/22) | Standalone gateway, optional desktop prerequisites |
+| [23](https://github.com/fishperson113/agent-expression-runtime/pull/23) | Herdr-independent terminal/stdin transport and actual delta boundaries |
+| [24](https://github.com/fishperson113/agent-expression-runtime/pull/24) | Declared resting face and semantic return; canonical wire-order identity |
+| [25](https://github.com/fishperson113/agent-expression-runtime/pull/25) | Bounded scene/application diagnostics and synthetic observations |
+| [26](https://github.com/fishperson113/agent-expression-runtime/pull/26) | Independent cleanup and cancelled-start lifecycle |
+| [27](https://github.com/fishperson113/agent-expression-runtime/pull/27) | Expired ownership release and no stale gesture replay |
+| [28](https://github.com/fishperson113/agent-expression-runtime/pull/28) | Frozen holdout, shared budget and bounded model-test driver; real inference blocked |
+| [29](https://github.com/fishperson113/agent-expression-runtime/pull/29) | XYZ frame signature instead of X-only proxy |
+| [30](https://github.com/fishperson113/agent-expression-runtime/pull/30) | Reserved body transform applies globally once |
+| [31](https://github.com/fishperson113/agent-expression-runtime/pull/31) | Explicit UI thread selection; no background-thread takeover |
+| [32](https://github.com/fishperson113/agent-expression-runtime/pull/32) | Relay helper extraction to honor physical function length |
+
+## Checkpoint 11 — final verification complete
+
+Final stable browser/gateway soak at 992d48c completed 1,800.173 seconds after
+60-second warm-up. GC-normalized private growth 8,130,560 bytes; heap growth
+768,876 bytes. Sixty rolling-window samples, 14 topology/cancel/resize cycles,
+18,595 typed observation frames; zero page errors, unexpected frames or observed
+browser off-loopback/blocked requests. No physical camera/audio track, no inference,
+no model prompts. SwiftShader FPS range 34.88–54.90; frame p95 range 31.5–44.7 ms:
+stability/private-growth gates pass, sustained performance targets remain missed.
+
+Final regression: 248 JS tests / 48 files, no skips. TypeScript/Vite build,
+architecture and strict harness pass; shared gateway locked Rust test/check pass
+(16 unique tests). Current-head Windows desktop/core/gateway CI passed before
+runtime merges. Functional real-gateway/MCP check passes macro-after-cancel,
+reload, invalid rejection, synthetic-only look/cooldown and camera-off, zero page
+errors. Cold observe 46.4 ms, warm observe p95 8.83 ms, admission p95 51.9 ms;
+this one functional sample overlapped a build, is not a latency benchmark, and
+admission is not animation completion. Early renderer samples are not soak data.
+
+Real Codex app-server control-plane selected two ephemeral threads in sequence
+through the authenticated relay; no turn/start or inference requested. This is
+protocol integration only, not successful model streaming. Model counter stays
+2/120, completed holdout turns 0. Network spec revision 1 remains restricted and
+enforced; chatgpt.com/storage.googleapis.com are absent, no available policy-edit
+tool. The decisive ordinary-conversation semantic gate is blocked, not fixed by
+fixture assertions. No additional paid plan or policy workaround was attempted.
+
+[Sanitized evidence](evidence/cloud-live-run.json) includes complete sample vectors,
+source/build hashes, before/after fixture comparison and explicit limits. Raw
+traces/budget stay ignored under .runtime/live-overnight. The authoritative hard
+deadline remains 22:41:03 UTC; verification finished early rather than filling
+remaining time with untestable semantic guesses. Owner-PC camera, Windows GPU,
+Herdr, Vietnamese /voice, distraction, >=8/10 real-person accuracy and >=6/10
+human recognition are pending. See the small local checklist in fisch-live.md.
+
+Eleven runtime branches have been removed only after main-ancestry/exact-ref
+verification. Only this handoff branch remains until its green PR merges; then
+verify main, remove it and leave no active owned test/browser/gateway/agent jobs.
+Pre-existing branches and global provider settings remain untouched.
