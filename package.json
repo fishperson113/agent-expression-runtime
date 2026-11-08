@@ -15,6 +15,7 @@
     "doctor": "node bin/fisch.mjs doctor"
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "1.2.2",
     "@tauri-apps/api": "2.12.4",
     "three": "0.184.0"
   },
