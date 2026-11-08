@@ -12,7 +12,7 @@ node bin/fisch.mjs live
 node bin/fisch.mjs live --agent <pane-id>
 ```
 
-Nếu đã `npm link`, có thể dùng `fisch live`. `--agent` chọn workspace nguồn; launcher mở một tab **Fisch Live** với phiên Codex riêng có MCP cấu hình tạm thời. Phiên cũ giữ nguyên. Một CLI đã chạy không được giả định là tự nạp MCP mới. Login hiện có được dùng lại; không cần API key mới. Không có planner phụ trong Live.
+Nếu đã `npm link`, có thể dùng `fisch live`. `--agent` chọn workspace nguồn; launcher mở một tab **Fisch Live** với phiên Codex riêng có MCP cấu hình tạm thời. Phiên cũ giữ nguyên. Một CLI đã chạy không được giả định là tự nạp MCP mới. Login hiện có được dùng lại; không cần API key mới. Cwd của project nguồn được giữ cho pane Codex mới; code/asset Fisch vẫn lấy từ checkout này. Không có planner phụ trong Live.
 
 Launcher mở Edge với trang Live và camera mặc định **tắt**. Chọn **Bật camera** để xử lý tại máy. Quan sát video/landmark ở bên trái, cơ thể ở bên phải. Tiếp tục gõ vào Codex trong tab Fisch Live. MCP có thể hỏi quyền tool lần đầu; cấp quyền theo ý bạn. Launcher không sửa global Codex/Herdr config hoặc bypass hook trust.
 
@@ -28,7 +28,7 @@ cargo build --locked --manifest-path src-tauri/Cargo.toml
 node scripts/prepare-live-assets.mjs
 ```
 
-Asset preparation lấy model Face Landmarker phiên bản cố định, kiểm tra SHA-256 và copy WASM của package đã pin. Asset nằm trong `public/live-assets/` (ignored), được phục vụ từ localhost; inference không tải video/ảnh lên CDN. Lần đầu tải model cần mạng. Build frontend bằng `npm run build` có cả `index.html` và `live.html`; launcher hiện dùng Vite local để phát triển, không phải production web hosting.
+Asset preparation lấy model Face Landmarker phiên bản cố định, kiểm tra SHA-256 và copy WASM của package đã pin. Asset nằm trong `public/live-assets/` (ignored), được phục vụ từ localhost; inference không tải video/ảnh lên CDN. Lần đầu tải model cần mạng. Build frontend bằng `npm run build` có cả `index.html` và `live.html`. Launcher tạo build mới và phục vụ bằng preview local để thay đổi code khi làm việc không tự reset camera qua HMR; đây không phải production web hosting công khai.
 
 ## Những gì có thể thử
 
@@ -43,9 +43,22 @@ Không có TTS hoặc STT riêng. `/voice` tiếng Việt chưa được nghiệ
 
 ## Quyền riêng tư của POC này
 
-Camera thật chỉ xử lý trong browser, không ghi hình, không thu mic và không lưu screenshot chứa camera. Chỉ world state có kiểu được gửi qua gateway cho Codex. `look` bị giới hạn **synthetic-only** cả ở tool contract và gateway/browser implementation. Ảnh tổng hợp có thể được Codex/provider nhận; ảnh camera thật không có đường upload được bật trong bản này.
+Camera thật chỉ xử lý trong browser, không ghi hình, không thu mic và không lưu screenshot chứa camera. Chỉ world state có kiểu được gửi qua gateway cho Codex. `look` bị giới hạn **synthetic-only** cả ở tool contract và gateway/browser implementation. Ảnh tổng hợp có thể được Codex/provider nhận; ảnh camera thật không có đường upload được bật trong bản này. CSP trên cả trang và Worker chỉ cho phép kết nối loopback, chặn cả endpoint logging có trong SDK MediaPipe đã pin. Cài asset qua Node là bước tải vào; camera inference không cần kết nối ngoài máy.
 
 Token đi trong environment, HTTP Authorization và message WebSocket đầu tiên, không nằm trong URL, command line, Git hay file cấu hình. Không xuất credential từ environment khi debug. Các artifact `.runtime/` là local/ignored; evidence trong Git chỉ gồm metadata đã lọc, không có ảnh mặt hoặc payload model/private prompt.
+
+## Delegate thị giác và khả năng phục hồi
+
+Live ưu tiên vision GPU. Một số probe trên máy AMD này kết thúc video track sau vài giây; probe camera thô vẫn ổn định, và các lượt GPU sau cũng có thể chạy ổn. Vì vậy không kết luận đây là lỗi driver phổ quát. Nếu video track của lượt GPU kết thúc bất ngờ, Live thử lại đúng một lần bằng CPU; UI hiển thị delegate đang dùng. Tắt camera bằng nút hoặc dừng phiên hủy cả recovery timer, không tự bật lại.
+
+Để chọn CPU từ đầu khi cần:
+
+```powershell
+$env:FISCH_VISION_DELEGATE = 'CPU'
+node bin/fisch.mjs live --agent <pane-id>
+```
+
+Probe ngắn ghi nhận khoảng 8–10 mẫu thị giác/giây trên máy này, chưa đạt mục tiêu 24 FPS. Render FPS được đo riêng; không dùng FPS camera danh nghĩa 30 để thay cho throughput inference. Số đo soak cuối cùng được ghi riêng trong validation.
 
 ## Hợp đồng Live
 
@@ -103,6 +116,6 @@ node scripts/live-soak.mjs --camera-local
 
 Chạy các bài browser tuần tự trên máy này. Preflight Codex native đã gọi observe/look và đọc đúng mã số ngẫu nhiên trong ảnh; phiên Herdr thật đã gọi observe/express/look. Nghiệm thu gateway/MCP bao phủ macro sau cancel, reload, invalid config, ảnh tổng hợp và cooldown. [Evidence chức năng](evidence/live-acceptance.json) ghi rõ cold/warm và headless software rendering; không dùng nó làm benchmark GPU native.
 
-Baseline nghiệm thu: 218 JS tests / 39 files, 16 Rust tests, build/boundary pass. Soak native đang chạy; kết quả và giới hạn cuối cùng sẽ được ghi ở [validation](validation.md). Human recognition 6/10, quan sát đúng 8/10, độ phân tâm và tiếng Việt qua mic chưa có nghiệm thu người dùng. Không tự coi compiler pass là bằng chứng biểu cảm dễ hiểu.
+Regression cuối: 221 JS tests / 41 files, 16 Rust tests pass. [Soak native 30 phút](evidence/live-soak.json) giữ camera liên tục, không có egress ngoài máy; private memory sau GC tăng 37,3 MB. FPS mẫu 58–60, frame p95 17,1–29,4 ms; chưa chứng nhận ngưỡng 20 ms xuyên suốt. Xem kết quả và giới hạn ở [validation](validation.md). Human recognition 6/10, quan sát đúng 8/10, độ phân tâm và tiếng Việt qua mic chưa có nghiệm thu người dùng. Không tự coi compiler pass là bằng chứng biểu cảm dễ hiểu.
 
 Xem [plan và ledger commit](fisch-live-plan.md) để biết các quyết định, giới hạn và thay đổi so với PRD.

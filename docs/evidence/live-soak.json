@@ -1,0 +1,51 @@
+{
+  "durationSeconds": 1801.0966946,
+  "warmupSeconds": 60,
+  "cameraLocalOnly": true,
+  "cameraInfo": {
+    "width": 640,
+    "height": 480,
+    "audioTracks": 0
+  },
+  "gpu": "ANGLE (AMD, AMD Radeon(TM) RX Vega 10 Graphics (0x000015D8) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "baseline": {
+    "heapBytes": 5190232,
+    "nodes": 348,
+    "documents": 1,
+    "privateBytes": 438419456,
+    "runnerRss": 162111488
+  },
+  "final": {
+    "heapBytes": 5277332,
+    "nodes": 356,
+    "documents": 1,
+    "privateBytes": 475725824,
+    "runnerRss": 163594240
+  },
+  "heapGrowthBytes": 87100,
+  "privateGrowthBytes": 37306368,
+  "counts": {
+    "observations": 17396,
+    "syntheticImages": 0,
+    "unexpectedFrames": 0,
+    "nonLoopbackRequests": 0,
+    "blockedExternalRequests": 0
+  },
+  "errors": [],
+  "topologyCancelResizeCycles": 15,
+  "automatedModelPrompts": 0,
+  "cameraContinuous": true,
+  "baselineCommit": "8dc646a",
+  "recordedDate": "2026-11-08",
+  "sampleCount": 59,
+  "frameP95MsRange": [
+    17.100000001490116,
+    29.400000005960464
+  ],
+  "meanFpsRange": [
+    58.027079303675045,
+    60.02701215542522
+  ],
+  "visionSampleRate": "approximately 9–10 Hz; below 24 Hz target",
+  "scope": "Native local-only camera soak. No saved camera imagery. automatedModelPrompts counts only the soak driver; one separate explicit synthetic Codex sailboat probe ran during this interval. No human observation-accuracy or theme-recognition certification."
+}
