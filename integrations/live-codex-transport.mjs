@@ -11,7 +11,7 @@ export function liveInstructions(message, instructions) {
   return { ...message, params };
 }
 
-export async function openCodexTransport({ host, args, cwd, env, instructions, onEvent = () => {} }) {
+export async function openCodexTransport({ host, args, cwd, env, instructions, onEvent = () => {}, onRequest = () => {} }) {
   const token = randomBytes(32).toString('hex'), expected = Buffer.from('Bearer ' + token);
   const server = createServer((_req, res) => { res.writeHead(404); res.end(); });
   const sockets = new WebSocketServer({ noServer: true, maxPayload: 1048576 });
@@ -51,7 +51,8 @@ export async function openCodexTransport({ host, args, cwd, env, instructions, o
     connection.on('message', bytes => {
       try {
         if (child.stdin.writableLength > 1048576) throw Error('relay_backpressure');
-        child.stdin.write(JSON.stringify(liveInstructions(JSON.parse(bytes.toString()), instructions)) + '\n');
+        const message = liveInstructions(JSON.parse(bytes.toString()), instructions);
+        onRequest(message); child.stdin.write(JSON.stringify(message) + '\n');
       }
       catch { void close(); }
     });

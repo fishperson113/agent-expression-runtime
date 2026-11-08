@@ -19,8 +19,9 @@ it('preserves existing thread instructions and adds Live context exactly once', 
 });
 it('authenticates the owned relay and carries stdio messages without copying credentials into arguments', async () => {
   const script = `let b='';process.stdin.on('data',c=>{b+=c;let n;while((n=b.indexOf('\\n'))>=0){let m=JSON.parse(b.slice(0,n));b=b.slice(n+1);process.stdout.write(JSON.stringify({id:m.id,result:{...m.params,pid:process.pid}})+'\\n')}})`;
+  const requests = [];
   const transport = await openCodexTransport({ host: { command: process.execPath, args: ['-e', script, '--'] }, args: [],
-    cwd: process.cwd(), env: process.env, instructions: 'Live instructions' });
+    cwd: process.cwd(), env: process.env, instructions: 'Live instructions', onRequest: message => requests.push(message.method) });
   let socket, pid;
   try {
     const rejected = new WebSocket(transport.url);
@@ -32,6 +33,7 @@ it('authenticates the owned relay and carries stdio messages without copying cre
     const [bytes] = await response;
     pid = JSON.parse(bytes.toString()).result.pid;
     expect(JSON.parse(bytes.toString()).result.developerInstructions).toContain('Live instructions');
+    expect(requests).toEqual(['thread/start']);
     expect(transport.url).not.toContain(transport.token);
   } finally { socket?.terminate(); await transport.close(); }
   expect(() => process.kill(pid, 0)).toThrow();
@@ -49,4 +51,27 @@ it('distinguishes actual assistant deltas from tool output and stale turns', () 
   expect(stream.sample(700).output).toBe(0);
   stream.accept({ method: 'turn/completed', params: { threadId: 't', turn: { id: 'a', status: 'completed' } } }, 710);
   expect(stream.sample(710).turn).toBe('idle');
+});
+it('switches output tracking only after the UI selects a thread successfully', () => {
+  const stream = new LiveOutput();
+  stream.accept({ method: 'turn/started', params: { threadId: 'old', turn: { id: 'a' } } }, 0);
+  stream.request({ id: 7, method: 'thread/start' });
+  stream.accept({ method: 'thread/started', params: { thread: { id: 'background' } } }, 1);
+  expect(stream.thread).toBe('old');
+  stream.accept({ id: 7, result: { thread: { id: 'new' } } }, 2);
+  expect(stream.sample(2).turn).toBe('idle');
+  stream.accept({ method: 'turn/started', params: { threadId: 'new', turn: { id: 'b' } } }, 3);
+  stream.accept({ method: 'item/agentMessage/delta', params: { threadId: 'old', turnId: 'a', delta: 'stale' } }, 4);
+  expect(stream.sample(4).output).toBe(0);
+  stream.accept({ method: 'item/agentMessage/delta', params: { threadId: 'new', turnId: 'b', delta: 'reply' } }, 5);
+  expect(stream.sample(5).output).toBeGreaterThan(0);
+  stream.request({ id: 8, method: 'thread/resume' });
+  stream.accept({ id: 8, error: { code: -1 } }, 6);
+  expect(stream.thread).toBe('new');
+  stream.request({ id: 9, method: 'thread/resume' });
+  stream.request({ id: 10, method: 'thread/fork' });
+  stream.accept({ id: 9, result: { thread: { id: 'superseded' } } }, 7);
+  expect(stream.thread).toBe('new');
+  stream.accept({ id: 10, result: { thread: { id: 'fork' } } }, 8);
+  expect(stream.thread).toBe('fork');
 });
