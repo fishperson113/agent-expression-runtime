@@ -289,6 +289,8 @@ export class Scheduler {
     this.formation.tick(now);
     this.state.particlePositions = this.formation.perform(this.state.presencePose.parts);
     this.state.particleGroups = this.formation.points ? this.formation.groups : undefined;
+    this.state.particleParts = this.formation.parts;
+    this.state.ownedProperties = [...this.owned];
     const dt = this.renderAt === undefined ? 0 : Math.max(0, Math.min(100, now - this.renderAt));
     this.renderAt = now;
     if (intent.mode !== 'off') this.renderTime += dt;

@@ -1,0 +1,10 @@
+{
+  "controls": [
+    { "type": "orient", "id": "attention", "part": "body", "toward": { "entity": "user" }, "maxDeg": 20, "smoothMs": 100 },
+    { "type": "reflex", "id": "arrival", "when": { "event": "user_arrived" },
+      "do": { "type": "pose", "target": { "part": "body", "prop": "y" }, "value": 0.12, "durationMs": 600 }, "cooldownMs": 10000 },
+    { "type": "reflex", "id": "departure", "when": { "event": "user_left" },
+      "do": { "type": "pose", "target": { "part": "body", "prop": "y" }, "value": -0.06, "durationMs": 700 }, "cooldownMs": 10000 }
+  ],
+  "poses": [], "lifetimeMs": 300000
+}

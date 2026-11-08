@@ -35,6 +35,7 @@ export class ParticleFormation {
   private performed?: Float32Array;
   private displayed?: Float32Array;
   constructor(readonly count = capability.assembly.particles) { this.groups = new Uint8Array(count); }
+  get parts() { return this.cloud?.parts ?? []; }
   private origin(weights: number[], seed: number) {
     this.primitives ??= shapeBuffers(this.count, seed);
     const points = new Float32Array(this.count * 3);
