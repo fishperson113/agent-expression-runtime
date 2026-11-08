@@ -2,8 +2,17 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 export function egressCounters(page) {
-  const counts = { observations: 0, syntheticImages: 0, unexpectedFrames: 0, nonLoopbackRequests: 0 };
-  page.on('request', request => { const url = new URL(request.url()); if (!['127.0.0.1', 'localhost'].includes(url.hostname) && !['data:', 'blob:'].includes(url.protocol)) counts.nonLoopbackRequests++; });
+  const counts = { observations: 0, syntheticImages: 0, unexpectedFrames: 0, nonLoopbackRequests: 0, blockedExternalRequests: 0 };
+  const external = new Set();
+  page.on('request', request => { const url = new URL(request.url()); if (!['127.0.0.1', 'localhost'].includes(url.hostname) && !['data:', 'blob:'].includes(url.protocol)) {
+    external.add(request); counts.nonLoopbackRequests++;
+  } });
+  page.on('requestfailed', request => {
+    if (external.delete(request) && request.failure()?.errorText.includes('BLOCKED_BY_CSP')) {
+      counts.nonLoopbackRequests--; counts.blockedExternalRequests++;
+    }
+  });
+  page.on('requestfinished', request => { external.delete(request); });
   page.on('websocket', socket => { if (!socket.url().includes('/v1/live/channel')) return; socket.on('framesent', frame => {
     try {
       const value = JSON.parse(String(frame.payload));
