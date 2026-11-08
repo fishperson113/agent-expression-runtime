@@ -12,7 +12,7 @@ Link the checkout once with `npm link`. Keep Codex or Claude running in one Herd
 fisch run
 ```
 
-Fisch displays its particle body inside that pane, discovers the existing agent in the same workspace, and subscribes to its lifecycle status events. Activity automatically drives the expression engine; the agent receives no extra prompt and calls no Fisch tool. It opens no browser and starts no new agent. Requires Node 22.12+ and Herdr. Missing npm dependencies are installed automatically.
+Fisch displays its particle body inside that pane, discovers the existing agent in the same workspace, and subscribes to its lifecycle status events. Activity automatically drives the expression engine; the agent receives no extra prompt and calls no Fisch tool. It opens no browser or new interactive agent; contextual planning uses a separate noninteractive provider process. Requires Node 22.12+ and Herdr. Missing npm dependencies are installed automatically.
 
 A background Codex/Claude process creates free-form expressions in response to actual user-message hooks, using its existing CLI login. Local attention stays visible while inference runs. A real interaction can also prepare model-authored idle scenes: the body later changes full form and may show a short caption inside its pane, with no model calls during idle, notifications or sounds. Scenes live in memory; a fresh launch without a prepared scene keeps the fallback body. Hook installation is opt-in: run `fisch hooks install codex` or `fisch hooks install claude` once; remove it with `fisch hooks uninstall`. Launch never edits provider or Herdr settings. **Codex also requires trusting the new hooks in `/hooks`.** The pane header and `fisch status` report whether real events arrived. API inference is optional. See [planner scope](docs/expression-planner.md) and [current behavior, research and limits](docs/related-work.md#10-cập-nhật-braille-theo-thời-gian-và-idle-scene-tự-do). Set `FISCH_PLANNER_BACKEND=off` to keep local reactions without inference.
 
@@ -67,9 +67,11 @@ Browser smoke test: start `npm run dev`, install Chromium with `npx playwright i
 
 ## Status and acceptance
 
+Documentation baseline: implementation commit `9863ba3` (2026-11-07). This documentation update describes that snapshot; recorded experiments retain their original scope and are not fresh acceptance runs.
+
 This is an initial POC implementation, **not a claim that M1–M3 or performance acceptance are complete**. See [validation](docs/validation.md), [architecture and known limits](docs/architecture.md), and [benchmark procedure](docs/benchmark.md).
 
-Interactive Claude-in-Herdr delivery, token overhead measurement, native pixel visual checks, human assessment of contextual expression, 20-minute memory soak and target-machine performance acceptance remain open. Native Claude hook payloads and planner inference have been exercised with synthetic fixtures. Direct model API mode is optional. Headless browser tests cannot certify Windows WebView/GPU behavior. The source SRS attachments are deliberately excluded from the public repository.
+Interactive Claude-in-Herdr delivery, token overhead measurement, native pixel visual checks, human assessment of contextual expression, 20-minute memory soak and target-machine performance acceptance remain open. Native Claude hook payloads have been exercised with real passing/failing commands, and a real Claude planner reaction compiled successfully; this does not certify interactive delivery in Herdr. Direct model API mode is optional. Headless browser tests cannot certify Windows WebView/GPU behavior. The source SRS attachments are deliberately excluded from the public repository.
 
 Product-code license remains undecided. This public repository is a source preview, not a completed OSS licensing release. Dependency licenses and the original generated icon remain separate; no license was silently inherited from another repository.
 

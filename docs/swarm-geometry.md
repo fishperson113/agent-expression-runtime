@@ -32,7 +32,7 @@ Optional per-part motion independently applies periodic translation and Euler ro
 {"pivot":[0,-0.7,0],"translate":[0,0.03,0],"rotate":[0,0,0.06],"periodMs":4000,"phase":0}
 ```
 
-Translation amplitudes are bounded to ±0.4, rotation amplitudes to ±0.6 radians, and periods to 1–10 seconds. Part motion continues after the assemble transition completes. Cancellation freezes it at the current pose. Ordinary working/idle status changes preserve admitted geometry when a composition repertoire is available.
+Translation amplitudes are bounded to ±0.4, rotation amplitudes to ±0.6 radians, and periods to 1–10 seconds. Part motion continues after the assemble transition completes. Cancellation freezes it at the current pose. Ordinary status changes do not select fixed shape presets. Prepared idle scenes can replace geometry locally during idle/done and restore the interaction program when activity resumes.
 
 Keep IDs, kinds, weights and curve point counts stable between consecutive poses. Declaration order is irrelevant. The engine reuses the particle-to-part mapping for that topology. Different topologies receive a deterministic spatial Morton-order assignment. Each particle retains its identity, and interrupted transitions start at its current geometry position. Primitive/assembly transitions share this path after the first assembly.
 
@@ -44,7 +44,7 @@ Spatial assignment is approximate, not globally optimal transport; paths can cro
 
 ## Planner and verification
 
-The planner receives a strict assembly schema and the actual triggering interaction event. It can invent coherent geometry rather than merely select named shapes, but relevance to the user and continuity take priority over novelty. It mixes assemblies with flow/posture nodes, preserves IDs between poses and can use independent part motion. Native inference has a 45-second deadline. Rendering and immediate local attention continue while inference runs. Idle never generates or rotates shapes; it holds the current form and settles its motion. See [interaction planning](expression-planner.md).
+The planner receives a strict assembly schema and the actual triggering interaction event. It can invent coherent geometry rather than merely select named shapes, but relevance to the user and continuity take priority over novelty. It mixes assemblies with flow/posture nodes, preserves IDs between poses and can use independent part motion. Native inference has a 45-second deadline. Rendering and immediate local attention continue while inference runs. Idle never requests model inference. Local presence and model-authored part performances continue; prepared idle scenes may change the full form and later restore the interaction geometry. Without prepared scenes the current form remains. There is no automatic 30-second hard freeze. See [interaction planning](expression-planner.md).
 
 `integrations/sculpture-examples.mjs` contains a seven-part peace-sign hand and a six-part bird with articulated wings as fixtures; neither is registered as a built-in shape. Actual WebGL screenshots are in `docs/evidence/composition-peace.png` and `composition-bird.png`. The independent Codex-generated example is `docs/evidence/generated-sculpture.json` and `composition-generated.png`.
 

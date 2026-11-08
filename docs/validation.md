@@ -1,6 +1,12 @@
-# Initial baseline validation record
+# Validation scope at implementation commit `9863ba3`
 
-This page records the original baseline. The current local review changes and live browser/CLI evidence are listed in [review remediation](review-progress.md) and [browser bridge smoke](evidence/browser-bridge-smoke.json).
+The current implementation includes pane attachment, native interaction hooks, contextual planning, continuous presence, model-authored performances, adaptive Braille and prepared idle scenes. See [current behavior](expression-planner.md), [review remediation](review-progress.md) and [research/evidence limits](related-work.md#10-cập-nhật-braille-theo-thời-gian-và-idle-scene-tự-do). Test counts below are historical observations, not the current suite size or a fresh certification.
+
+## Documentation reconciliation checks (2026-11-08)
+
+This docs-only update was checked against implementation commit `9863ba3`. Relative link paths, UTF-8, `git diff --check` and `npm run check:architecture` passed. `npm test` passed 194 of 195 tests; the launcher cleanup test timed out navigating to local Vite before reaching its synthetic host failure. Rerunning `npx vitest run tests/launcher.test.mjs --maxWorkers=1` passed all three launcher tests. This is not a clean single-run full-suite pass or a native visual/performance acceptance result. No runtime source was changed.
+
+## Historical initial baseline
 
 Date: 2026-11-05. Environment: Windows x64, Node v24.15.0, Rust 1.97.1, Chromium headless with SwiftShader. Native GPU/WebView performance hardware characterization has not been completed.
 
@@ -18,10 +24,10 @@ Date: 2026-11-05. Environment: Windows x64, Node v24.15.0, Rust 1.97.1, Chromium
 
 The browser smoke result in [evidence/browser-smoke.json](evidence/browser-smoke.json) contains a short rolling headless frame interval p95 around 31.9ms. It does not meet a ≤20ms interpretation and is not a native GPU benchmark. No production performance pass is claimed.
 
-## Milestones
+## Acceptance gaps at this snapshot
 
 - M1: substantial implementation and deterministic tests; visual pair matrix and full schema/template edge cases remain to be expanded.
-- M2 (SRS v0.3): local HTTP/SSE gateway, pairing, MCP/tool adapter, instruction bundle and TS helper implemented and tested with fake hosts. Not fully accepted: first real host and real agent demo are unselected. App does not need a model key. Optional direct API mode remains unimplemented.
+- M2 (SRS v0.3): local HTTP/SSE gateway, pairing, MCP/tool adapter, instruction bundle and TS helper implemented and tested with fake hosts. Not fully accepted: production host compatibility and human expression perception remain open. Windows Codex pane attachment and native planner inference have recorded evidence. The core needs no model key; the optional pane API planner is implemented separately from the gateway.
 - M3: Tauri Channels, bounds, Worker/fallback and basic recovery implemented. Native executable build is checked separately. Native visual/recovery matrix, actual overload responsiveness and 20-minute soak remain unverified.
 
-Default logs exclude prompt, token, AST and credential payloads. Screenshots show only generic scripted prompts. The source SRS attachment, local credentials, caches and build outputs are excluded from the public Git repository.
+Fisch does not persist raw planner messages; bounded redacted interaction text is sent to the selected inference provider. Reference replay capture is explicit opt-in. Default counters exclude prompt and credential payloads. Screenshots show only generic scripted prompts. The source SRS attachment, local credentials, caches and build outputs are excluded from the public Git repository.
