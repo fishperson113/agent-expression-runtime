@@ -11,7 +11,8 @@ export async function runTerminalCodex({ live, cwd, signal, spawnClient = spawn 
   const original = liveCodexArguments(liveRoot, cwd), config = original.slice(original.indexOf('-c'));
   const env = { ...process.env, AER_BASE_URL: live.base, AER_PAIRING_TOKEN: live.token, FISCH_LIVE: '1', FISCH_PLANNER_BACKEND: 'off' };
   const instructions = readFileSync(new URL('./live-instructions.md', import.meta.url), 'utf8');
-  const transport = await openCodexTransport({ host, args: config, cwd, env, instructions, onEvent: message => output.accept(message) });
+  const transport = await openCodexTransport({ host, args: config, cwd, env, instructions,
+    onEvent: message => output.accept(message), onRequest: message => output.request(message) });
   let child;
   const stop = () => { void stopChild(child).catch(() => {}); void transport.close().catch(() => {}); };
   signal.addEventListener('abort', stop, { once: true });

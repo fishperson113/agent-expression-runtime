@@ -1,6 +1,16 @@
 export class LiveOutput {
-  thread; turn; state = 'idle'; lastDelta = -Infinity; strength = 0;
+  thread; turn; selection; state = 'idle'; lastDelta = -Infinity; strength = 0;
+  request(message) {
+    if (message.id !== undefined && ['thread/start', 'thread/resume', 'thread/fork'].includes(message.method)) this.selection = message.id;
+  }
   accept(message, at = performance.now()) {
+    if (this.selection !== undefined && message.id === this.selection && ('result' in message || 'error' in message)) {
+      this.selection = undefined;
+      if (typeof message.result?.thread?.id === 'string') {
+        this.thread = message.result.thread.id; this.turn = undefined;
+        this.state = 'idle'; this.strength = 0; this.lastDelta = -Infinity;
+      }
+    }
     const { method, params = {} } = message;
     if (method === 'turn/started') {
       if (this.thread && params.threadId !== this.thread) return;
