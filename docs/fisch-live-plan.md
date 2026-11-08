@@ -120,3 +120,7 @@ Pinned tasks-vision 1.2.2; local WASM/model assets are prepared under ignored pu
 ### C04 completed and bounded syntax refinement
 
 Live commands use `{type: live, program: <legacy AST or null>, configuration: {controls, poses, lifetimeMs}}` inside the existing program envelope. A LiveCompiler wrapper stages configuration validation before the shared legacy compiler, preserving legacy behavior and total record bytes. Controls support bind, orient and event reflexes; this first bounded reflex action is a typed transform `pose`, not arbitrary nested geometry/macros. This explicit PRD deviation avoids recursive/competing shape schedulers and is advertised in capabilities; full geometry remains available to the agent through program/assemble. Replace-only composition remains as planned. Focused contract/compiler tests: eight passed; build and boundary checks passed.
+
+### C05 completed
+
+Added bounded channel compositor (reflex < binding < explicit pose), local user orientation, signal smoothing/neutral fallback, lease expiration, cooldown and topology invalidation. Default reflexes are JSON data. Shared geometry exposes part metadata and ownership; transform matrices use declared part centers and a reusable per-point scratch buffer. Deterministic compositor/geometry plus existing sculpture/shape tests: 15 passed; TypeScript and architecture checks passed. Browser integration and native visual checks follow in C06.

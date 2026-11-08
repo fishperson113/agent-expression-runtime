@@ -1,5 +1,7 @@
 import type { PresenceState } from '../core/runtime/presence';
 import { capability } from '../primitives/registry';
+import { livePoint } from '../core/live/transforms';
+const liveScratch: [number, number, number] = [0, 0, 0];
 export function sampleBody(shapes: Float32Array[], positions: Float32Array, count: number, state: PresenceState, now: number, orbitAngle: number, reducedMotion = false) {
     const t = now / 1000,
       amp = reducedMotion ? 0.08 : 1,
@@ -22,6 +24,10 @@ export function sampleBody(shapes: Float32Array[], positions: Float32Array, coun
       }
       if (state.particlePositions) {
         x = state.particlePositions[j]; y = state.particlePositions[j + 1]; z = state.particlePositions[j + 2];
+      }
+      if (state.liveMatrices) {
+        [x, y, z] = livePoint(x, y, z, state.liveMatrices[(state.particleGroups?.[i] ?? -1) + 1], liveScratch);
+        [x, y, z] = livePoint(x, y, z, state.liveMatrices[0], liveScratch);
       }
       const rx = x * cr - y * sr, ry = x * sr + y * cr;
       x = (rx * cy - z * sy) * breath + (pose?.x ?? 0) * motionAmp;
