@@ -12,6 +12,7 @@ export class LiveBridge {
   private sent = -1;
   private timer?: ReturnType<typeof setInterval>;
   private connected = false;
+  private stopped = false;
   constructor(private body: LiveBody, private observations: FaceObservations) {}
   async connect(base: string, token: string) {
     if (this.connection) throw Error('live_already_paired');
@@ -29,7 +30,7 @@ export class LiveBridge {
     const socket = this.socket = new WebSocket(url);
     socket.onopen = () => socket.send(JSON.stringify({ type: 'hello', token, sessionId: this.observations.snapshot.sessionId }));
     socket.onmessage = event => { void this.receive(JSON.parse(event.data)); };
-    socket.onclose = () => { this.connected = false; element('connection').textContent = 'Mất kết nối Live'; };
+    socket.onclose = () => { this.connected = false; if (!this.stopped) element('connection').textContent = 'Mất kết nối Live'; };
     socket.onerror = () => { element('fault').textContent = 'Không nối được gateway Live.'; };
     this.timer = setInterval(() => this.publish(), 100);
   }
@@ -61,5 +62,5 @@ export class LiveBridge {
       data: canvas.toDataURL('image/jpeg', 0.85).split(',')[1], width: canvas.width, height: canvas.height }));
     setTimeout(() => { indicator.hidden = true; }, 2000);
   }
-  stop() { clearInterval(this.timer); this.socket?.close(); this.connection?.dispose(); this.body.feedback = undefined; }
+  stop() { this.stopped = true; clearInterval(this.timer); this.socket?.close(); this.connection?.dispose(); this.body.feedback = undefined; }
 }
