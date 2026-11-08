@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { openLive, liveRoot } from '../integrations/live-launch.mjs';
+import { openLive, liveRoot, closeLiveResources } from '../integrations/live-launch.mjs';
 import { openModelClient, runModelTurn } from '../integrations/live-model-client.mjs';
 import { readModelBudget, reserveModelTurn } from '../integrations/live-model-budget.mjs';
 
@@ -53,7 +53,11 @@ export async function runHoldout() {
       }
     }
     return rows;
-  } finally { await client?.close(); await live.close(); }
+  } catch (error) {
+    writeFileSync(resolve(directory, 'holdout-report.json'), JSON.stringify({ status: 'failed',
+      errorCode: error.message.match(/^[a-z_]+/)?.[0] ?? 'model_test_failed', modelTurnsUsed: readModelBudget(budgetPath).used, rows }, null, 2));
+    throw error;
+  } finally { await closeLiveResources([() => client?.close(), () => live.close()]); }
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   if (process.argv.includes('--describe')) console.log(JSON.stringify({ prompts: prompts.map(item => item.id), passes: 2, requestedTurns: 20, budget: readModelBudget(budgetPath) }));
