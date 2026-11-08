@@ -27,3 +27,9 @@ it('uses tracking stability as quality, smooths expression, and clears state on 
   expect(validateObservation(observations.snapshot).user.present).toBe(false);
   expect(observations.snapshot.user.expression).toBe(null);
 });
+it('does not make old camera measurements fresh when the Codex turn changes', () => {
+  const observations = new FaceObservations('sample'); observations.update(sample(), 1000);
+  observations.turn('working', 5000);
+  expect(observations.snapshot.capturedAt).toBe(1000);
+  expect(observations.snapshot.turn).toBe('working');
+});

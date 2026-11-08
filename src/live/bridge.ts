@@ -3,6 +3,7 @@ import type { LiveBody } from './body';
 import type { FaceObservations } from './observation';
 import { element } from './view';
 import type { LiveEventKind } from '../core/live/types';
+import { unavailableUser } from '../core/live/types';
 
 export class LiveBridge {
   private connection?: HttpGatewayConnection;
@@ -16,7 +17,7 @@ export class LiveBridge {
     if (this.connection) throw Error('live_already_paired');
     this.connection = new HttpGatewayConnection(base, token);
     await this.connection.subscribe(event => {
-      if (event.kind === 'epoch') this.body.epoch(event.epoch, true);
+      if (event.kind === 'epoch') this.body.epoch(event.epoch, !!event.id);
       if (event.kind === 'closed') this.body.epoch(event.epoch, true);
       if (event.kind === 'expression') {
         const result = this.body.admit(event.record);
@@ -36,7 +37,10 @@ export class LiveBridge {
   private publish() {
     if (!this.connected || this.socket?.readyState !== WebSocket.OPEN || this.socket.bufferedAmount > 32768) return;
     if (this.sent === this.observations.snapshot.seq) return;
-    this.socket.send(JSON.stringify({ type: 'observation', snapshot: this.observations.snapshot, events: this.pending.splice(0) }));
+    const snapshot = this.observations.snapshot;
+    const outgoing = Date.now() - snapshot.capturedAt > 1500 ? { ...snapshot, capturedAt: Date.now(), camera: 'stale',
+      user: unavailableUser(), summary: 'Quan sát đã cũ; trạng thái người dùng chưa biết.' } : snapshot;
+    this.socket.send(JSON.stringify({ type: 'observation', snapshot: outgoing, events: this.pending.splice(0) }));
     this.sent = this.observations.snapshot.seq;
   }
   private async receive(message: any) {

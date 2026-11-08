@@ -12,8 +12,12 @@ const observations = new FaceObservations(crypto.randomUUID());
 const bridge = new LiveBridge(body, observations);
 Object.assign(window, { fischLive: { pair: (base: string, token: string) => bridge.connect(base, token),
   activity: (value: { turn: 'idle' | 'working' | 'waiting' | 'interrupted'; output: number; quality: string }) => {
-    body.output = value.output; events(observations.turn(value.turn, Date.now()));
+    body.output = value.output; body.activity(value.turn); events(observations.turn(value.turn, Date.now()));
     element('activity').textContent = `${value.turn} / nhịp chữ: ${value.quality}`;
+  }, event: (type: string) => {
+    const turn = type === 'user_message' ? 'working' : type === 'needs_user' ? 'waiting' : type === 'interrupted' ? 'interrupted' : 'idle';
+    body.activity(turn); events(observations.turn(turn, Date.now()));
+    if (type === 'interrupted') body.epoch(body.scheduler.epoch);
   } } });
 const recent: { type: LiveEventKind; at: number }[] = [];
 let sampleCount = 0, sampleAt = performance.now(), inferenceMs = 0, stopped = false;

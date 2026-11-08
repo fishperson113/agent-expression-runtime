@@ -81,6 +81,10 @@ export class LiveBody {
     else this.compiler.compiler.discardDefinitions();
   }
   observe(snapshot: Observation) { this.observation = snapshot; }
+  activity(activity: string) {
+    this.scheduler.state.presenceIntent = { ...this.scheduler.state.presenceIntent, activity,
+      mode: this.controls.mode };
+  }
   event(type: LiveEventKind) { const now = performance.now(); this.defaults.event(type, now); this.controls.event(type, now); }
   motion(mode: 'normal' | 'reduced' | 'off') {
     this.controls.mode = mode; this.defaults.mode = mode; this.renderer.reducedMotion = mode === 'reduced';
