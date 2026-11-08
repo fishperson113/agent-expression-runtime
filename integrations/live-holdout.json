@@ -1,0 +1,12 @@
+[
+  {"id":"h01","prompt":"Tôi vừa giải quyết được lỗi race condition đã làm mình mắc kẹt cả buổi. Cho tôi một câu động viên ngắn nhé."},
+  {"id":"h02","prompt":"Giải thích backpressure bằng một ví dụ đời thường, tối đa ba câu."},
+  {"id":"h03","prompt":"Bản deploy vừa bị rollback. Tôi hơi nản, nhưng muốn chọn bước tiếp theo bình tĩnh."},
+  {"id":"h04","prompt":"Một hàng đợi hữu hạn khác gì một hàng đợi vô hạn khi producer nhanh hơn consumer?"},
+  {"id":"h05","prompt":"Hãy giúp tôi hình dung quan hệ giữa cache, dữ liệu gốc và thao tác invalidation."},
+  {"id":"h06","prompt":"Tôi muốn giải thích cho đồng đội vì sao cancellation không đồng nghĩa với undo. Nói ngắn gọn và dễ hiểu."},
+  {"id":"h07","prompt":"Ý tưởng dùng một khóa toàn cục cho mọi tác vụ nghe đơn giản quá. Bạn thấy đánh đổi chính là gì?"},
+  {"id":"h08","prompt":"Tôi đọc nhầm kết quả benchmark rồi. Cảm ơn bạn đã chỉ ra; giờ nên kiểm tra lại điều gì đầu tiên?"},
+  {"id":"h09","prompt":"Hãy mô tả một quy trình review có chỗ dừng để con người quyết định trước khi phát hành."},
+  {"id":"h10","prompt":"Tạm gác việc minh họa chi tiết, tôi chỉ cần một câu nhắc nghỉ ngơi sau một phiên debug dài."}
+]
