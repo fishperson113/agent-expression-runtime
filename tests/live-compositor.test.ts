@@ -47,3 +47,10 @@ it('crossfades an expiring semantic channel back to its current lower layer', ()
   expect(composeWrites([lower, [{ target, value: 1.4, weight: 0.5 }]])[0].value).toBeCloseTo(0.9);
   expect(composeWrites([lower, [{ target, value: 1.4, weight: 0 }]])[0].value).toBeCloseTo(0.4);
 });
+
+it('applies the reserved body channel once even when an illustration has a part named body', () => {
+  const parts = [{ id: 'body', kind: 'ellipsoid' as const, center: [0, 0, 0] as [number, number, number], scale: [0.1, 0.1, 0.1] as [number, number, number] }];
+  const matrices = transformMatrices([{ target: { part: 'body', prop: 'x' }, value: 0.2 }], parts);
+  const local = livePoint(0.1, 0, 0, matrices[1]);
+  expect(livePoint(...local, matrices[0])[0]).toBeCloseTo(0.3);
+});
