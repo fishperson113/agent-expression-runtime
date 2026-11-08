@@ -1,5 +1,7 @@
 {
   "controls": [
+    { "type": "reflex", "id": "turn", "when": { "event": "turn_changed" },
+      "do": { "type": "pose", "target": { "part": "body", "prop": "y" }, "value": 0.04, "durationMs": 400 }, "cooldownMs": 1000 },
     { "type": "orient", "id": "attention", "part": "body", "toward": { "entity": "user" }, "maxDeg": 20, "smoothMs": 100 },
     { "type": "reflex", "id": "arrival", "when": { "event": "user_arrived" },
       "do": { "type": "pose", "target": { "part": "body", "prop": "y" }, "value": 0.12, "durationMs": 600 }, "cooldownMs": 10000 },

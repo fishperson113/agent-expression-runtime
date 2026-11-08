@@ -33,7 +33,7 @@ export class FaceObservations {
   }
   turn(turn: LiveTurn, at: number): Cue[] {
     if (turn === this.snapshot.turn) return [];
-    this.snapshot = { ...this.snapshot, turn, seq: this.snapshot.seq + 1, capturedAt: at };
+    this.snapshot = { ...this.snapshot, turn, seq: this.snapshot.seq + 1 };
     return [{ type: 'turn_changed', at }];
   }
   private expressions(scores: Record<string, number>, alpha: number): Expressions {

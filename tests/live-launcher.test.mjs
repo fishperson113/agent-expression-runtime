@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { liveCodexArguments } from '../scripts/live-codex.mjs';
-import { selectLiveSource } from '../scripts/live-session.mjs';
+import { selectLiveSource, liveControl } from '../scripts/live-session.mjs';
 import { assistantText, OutputActivity } from '../integrations/output-activity.mjs';
 import { createLivePane } from '../integrations/live-launch.mjs';
 
@@ -31,4 +31,11 @@ it('ignores TUI redraw/tool/spinner changes and decays approximate assistant act
   expect(activity.sample('• Xin chào', 100)).toBeGreaterThan(0);
   expect(activity.sample('• Xin chào', 700)).toBe(0);
   expect(activity.sample('• Xin chào\n• Ran npm test\n└ pass', 800)).toBe(0);
+});
+it('forwards only lifecycle type, never prompt text, to the browser', async () => {
+  const forwarded = [], handler = liveControl({ page: { evaluate: async (_callback, type) => forwarded.push(type) } }, () => {});
+  await handler({ method: 'event', args: { type: 'user_message', text: 'private words' } });
+  expect(forwarded).toEqual(['user_message']);
+  expect((await handler({ method: 'status' })).hookEvents).toBe(1);
+  expect((await handler({ method: 'event', args: { type: 'tool_text' } })).status).toBe('ignored');
 });

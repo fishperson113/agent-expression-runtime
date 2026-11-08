@@ -2,11 +2,22 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { herdrCall } from '../integrations/herdr.mjs';
 import { openLive, createLivePane } from '../integrations/live-launch.mjs';
 import { OutputActivity } from '../integrations/output-activity.mjs';
+import { openControl } from '../integrations/terminal-ipc.mjs';
 
 export function selectLiveSource(snapshot, requested) {
   const candidates = snapshot.agents.filter(agent => agent.agent === 'codex' && (!requested || agent.pane_id === requested));
   if (candidates.length !== 1) throw Object.assign(Error('Choose one existing Codex pane with fisch live --agent <pane-id>.'), { public: true });
   return candidates[0];
+}
+export function liveControl(live, stop) {
+  let delivered = 0;
+  return async message => {
+    if (message.method === 'stop') { stop(); return { status: 'stopped' }; }
+    if (message.method === 'status') return { status: 'live', lookMode: 'synthetic-only', hookEvents: delivered };
+    if (message.method !== 'event' || !['user_message', 'needs_user', 'interrupted', 'work_finished'].includes(message.args?.type)) return { status: 'ignored' };
+    await live.page.evaluate(type => window.fischLive.event(type), message.args.type); delivered++;
+    return { status: 'accepted' };
+  };
 }
 async function activityLoop(live, pane, call, signal, proxy) {
   const output = new OutputActivity(); let status = 'idle', tick = 0;
@@ -32,18 +43,19 @@ export async function runLiveSession({ agentPane, call = herdrCall, headless = f
   const abort = new AbortController(), stop = () => abort.abort();
   signal?.addEventListener('abort', stop, { once: true });
   process.once('SIGINT', stop); process.once('SIGTERM', stop);
-  let live;
+  let live, control;
   try {
     live = await openLive({ headless });
     live.page.once('close', stop); live.gateway.once('exit', stop);
     await live.page.exposeFunction('fischLiveStop', stop);
     const pane = launchCodex ? await createLivePane(call, source, live.base, live.token) : source;
+    control = await openControl(pane.pane_id, liveControl(live, stop));
     console.log(`Fisch Live ready. Codex pane: ${pane.pane_id}. Camera is off; look is synthetic-only.`);
     console.log('Type in the dedicated Codex pane. The previous session is unchanged. Close the browser or use Dừng toàn bộ to stop Live.');
     await activityLoop(live, pane, call, abort.signal, process.env.FISCH_LIVE_RHYTHM === 'proxy');
     return 0;
   } finally {
     stop(); process.removeListener('SIGINT', stop); process.removeListener('SIGTERM', stop);
-    signal?.removeEventListener('abort', stop); await live?.close();
+    signal?.removeEventListener('abort', stop); await control?.close(); await live?.close();
   }
 }
