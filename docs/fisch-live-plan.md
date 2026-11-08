@@ -1,6 +1,6 @@
 # Fisch Live POC — implementation and acceptance plan
 
-Status: planned; implementation starts only after this document is committed and pushed.
+Status: implementation active; C00 pushed before runtime changes.
 Date: 2026-11-08 (Asia/Saigon). Baseline: `bbb2ede`, runtime `9863ba3`.
 Source: user-supplied PRD “Fisch Live POC: gương mặt có thị giác cho agent”, 2026-11-08.
 
@@ -104,3 +104,7 @@ Every row is one reviewable commit target, not permission to leave broken interm
 - Preflight: toolchain, Git transport, Herdr pane access, native GPU/browser, authorized local camera acquisition and baseline suites passed as recorded above.
 - Awaiting after C00: actual hook context and synthetic MCP vision; full MediaPipe Worker GPU compatibility; accurate Herdr text rhythm; native soak and human expression perception.
 - No implementation changes or camera imagery are included in C00.
+
+### C01 completed
+
+Native Codex 0.167.0 called both probe tools and correctly read a red circle and random four-digit code from synthetic MCP image pixels. The first attempt hit tool approval because the probe lacked an explicit automatic read-only policy; adding read-only annotations and a per-probe auto policy made the authorized test pass. No hook trust was bypassed. Native prompt-context injection remains unverified; observe-first fallback is the initial supported path. Two probe contract tests and staged structural checks passed. Added `scripts/check-live-harness.mjs` for staged file/function/comment checks; Rust function lengths still require manual review. Probe output is ignored under `.runtime/live-preflight/`.
