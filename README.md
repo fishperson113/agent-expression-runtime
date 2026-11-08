@@ -6,7 +6,7 @@ Fisch turns agent activity into motion and lets Codex create expressions and ill
 
 ## Why Fisch?
 
-Working with an agent often means staring at scrolling text. Fisch explores a quieter, more expressive way to see what your agent is doingâ€”and give it a presence beside the conversation.
+Working with an agent often means staring at scrolling text. Fisch explores a quieter, more expressive way to see what your agent is doing and give it a presence beside the conversation.
 
 ## Prerequisites
 
@@ -35,7 +35,7 @@ Then, in a Herdr shell:
 fisch live
 ```
 
-This opens the web workspace and a Codex tab together. Click **Báº­t camera** when you want local face tracking; the camera starts off. Real camera images stay on your machine. Talk to Codex in the new tab.
+This opens the web workspace and a Codex tab together. Click **Bật camera** when you want local face tracking; the camera starts off. Real camera images stay on your machine. Talk to Codex in the new tab.
 
 Prefer the terminal body? Keep Codex or Claude open in a neighboring Herdr pane and run:
 
@@ -45,10 +45,10 @@ fisch run
 
 ## Learn more
 
-- [Live guide](docs/fisch-live.md) â€” camera, controls and privacy
-- [Panel guide](docs/multiplexer.md) â€” terminal workflow
-- [Contributing](docs/my-harness.md) â€” development and checks
-- [Architecture](docs/architecture.md) Â· [Validation](docs/validation.md) â€” technical details and POC limits
+- [Live guide](docs/fisch-live.md) - camera, controls and privacy
+- [Panel guide](docs/multiplexer.md) - terminal workflow
+- [Contributing](docs/my-harness.md) - development and checks
+- [Architecture](docs/architecture.md) | [Validation](docs/validation.md) - technical details and POC limits
 
 ## Community and license
 
