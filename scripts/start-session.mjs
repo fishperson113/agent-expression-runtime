@@ -7,10 +7,10 @@ import { resolve, dirname } from 'node:path';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 
-export const gatewayExecutable = (platform = process.platform) => {
+export const gatewayExecutable = (platform = process.platform, available = existsSync) => {
   const suffix = platform === 'win32' ? '.exe' : '';
   const standalone = resolve(root, 'src-tauri/target/debug/fisch-gateway' + suffix);
-  return existsSync(standalone) ? standalone : resolve(root, 'src-tauri/target/debug/agent-expression-runtime' + suffix);
+  return available(standalone) ? standalone : resolve(root, 'src-tauri/target/debug/agent-expression-runtime' + suffix);
 };
 
 export function codexArguments() {

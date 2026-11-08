@@ -46,9 +46,9 @@ it('passes transient MCP settings to Codex without storing credentials', () => {
   const adapter = JSON.parse(args.find(arg => arg.startsWith('mcp_servers.aer.args=')).split('=').slice(1).join('='));
   expect(adapter).toHaveLength(1);
   expect(existsSync(adapter[0])).toBe(true);
-  expect(gatewayExecutable('win32')).toMatch(/runtime\.exe$/);
-  expect(gatewayExecutable('linux')).toMatch(/runtime$/);
-  expect(gatewayExecutable('darwin')).toMatch(/runtime$/);
+  expect(gatewayExecutable('win32', () => true)).toMatch(/fisch-gateway\.exe$/);
+  expect(gatewayExecutable('linux', () => true)).toMatch(/fisch-gateway$/);
+  expect(gatewayExecutable('darwin', () => false)).toMatch(/runtime$/);
 });
 
 const native = existsSync(gatewayExecutable());
