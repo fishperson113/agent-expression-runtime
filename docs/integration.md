@@ -56,7 +56,7 @@ Configure your host to run `node <absolute-repo-path>/integrations/mcp-server.mj
 
 The host must actually load [instructions v1.1.0](../integrations/instructions-v1.md) into agent context. Merely exposing the resource cannot guarantee the client reads it. A standard sequential tool host can pause content generation even with fast ACK; only independent host dispatch meets simultaneous streaming intent. The fake-host integration test checks transport/IR equivalence and admission-only ACK, not a production agent-host compatibility matrix.
 
-The optional pane planner implements a Responses structured-output API backend in addition to native Codex/Claude processes. It is separate from this HTTP/MCP gateway; see [planner configuration](expression-planner.md). No license has been selected for product code; public source visibility is not yet a completed OSS licensing release.
+The optional pane planner implements a Responses structured-output API backend in addition to native Codex/Claude processes. It is separate from this HTTP/MCP gateway; see [planner configuration](expression-planner.md). Product code is MIT licensed; third-party components retain their own license terms (see dependency-licenses.md).
 
 ## Fisch Live extension
 

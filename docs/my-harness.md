@@ -3,7 +3,7 @@
 Fisch vendors [my-harness](https://github.com/fishperson113/my-harness) at
 commit `b3ca44e1a52e0fd01e06c20fed2e5005c41cda91`. The three files under
 `tools/my-harness/` are unmodified upstream copies. Their MIT license covers
-only that tooling; Fisch's product licensing remains undecided.
+the vendored tooling; Fisch product code is separately covered by the root MIT LICENSE.
 
 Requires Git and Python 3.8+. No Python packages or model credentials are needed.
 Run once from this checkout, using `py -3` instead of `python3` on Windows:
@@ -78,3 +78,23 @@ the vendored copies, and check both adapters plus the strict entry point.
 Keep README architecture/test commands and the product's known limits intact.
 To uninstall, remove only this project's hook entries and restore the previous
 local docs setting if desired; preserve unrelated hooks/configuration.
+
+## Development entry points
+
+README is the human-facing introduction and quick start. Keep implementation details, agent instructions, historical evidence and acceptance limits in docs/ or integrations/. Read [AGENTS.md](../AGENTS.md) and [architecture](architecture.md) before changing behavior. Contributions use the root [MIT License](../LICENSE); follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+After the README setup, npm run dev opens the browser sandbox and npm run tauri -- dev opens the desktop app. fisch live starts the complete web POC; fisch run keeps the terminal body workflow. See [Live controls/privacy](fisch-live.md) and [panel setup](multiplexer.md) for details.
+
+Validate changes with:
+
+```sh
+python scripts/check-harness.py
+npx playwright install chromium
+npm test
+npm run check:architecture
+npm run build
+cargo check --locked --manifest-path src-tauri/Cargo.toml
+cargo test --locked --manifest-path src-tauri/Cargo.toml
+```
+
+Windows browser tests use Edge; Linux CI installs Chromium before tests. Run graphical performance acceptance sequentially and keep real camera imagery out of artifacts. See [validation scope](validation.md) and [benchmark procedure](benchmark.md). Keep each PR within 10 files; use dependent small PRs for larger work without weakening the gate.
