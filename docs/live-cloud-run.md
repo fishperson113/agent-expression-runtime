@@ -164,3 +164,22 @@ is not replayed, then returns to the face with a new explicit request. Trace now
 includes a validated UUID epoch to distinguish reused sequence numbers across
 reconnections, never credentials or arbitrary caller text. Full regression and
 final static-build soak follow. Model counter remains 2/120, deadline unchanged.
+
+## Checkpoint 7 — frozen holdout and budget guards
+
+Final soak started on stable runtime f7d91b7 at approximately 17:16 UTC, with
+60-second warm-up then 1,800 seconds of synthetic observations and topology/
+cancel/resize cycles. No browser-heavy tests or frontend changes during the soak.
+At five minutes there are no script errors or off-loopback requests. SwiftShader
+samples around 40–44 FPS / p95 38–43 ms miss the performance targets; do not hide
+this behind the earlier short face-only sample.
+
+Frozen ten ordinary prompts, two passes, in integrations/live-holdout.json. An
+opt-in real app-server driver reserves every request before sending, shares the
+existing ignored counter, rejects concurrent writers, and enforces both 120 and
+22:41:03 UTC. Counter/deadline/lock and protocol-boundary tests pass. Admission,
+application and frame proxies are scored separately; relevance, visual meaning
+and semantic consistency remain unscored until actual reviewed model evidence.
+Only --describe was run; the network denial was not retried. Counter still 2/120,
+zero completed holdout turns. No inference or fake model result is counted as a
+passing conversation gate. PR #26 merged as 692332c after all jobs passed.
