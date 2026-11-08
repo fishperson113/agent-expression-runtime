@@ -2,7 +2,17 @@ import { signalValue } from './signals';
 import { channel, neutral, type LiveConfiguration, type Pose, type TransformTarget } from './control-types';
 import type { LiveEventKind, Observation } from './types';
 
-export type TransformWrite = { target: TransformTarget; value: number };
+export type TransformWrite = { target: TransformTarget; value: number; weight?: number };
+export function composeWrites(layers: TransformWrite[][]): TransformWrite[] {
+  const writes = new Map<string, TransformWrite>();
+  for (const layer of layers) for (const write of layer) {
+    const weight = Math.max(0, Math.min(1, write.weight ?? 1));
+    if (weight < 0.001) continue;
+    const key = channel(write.target), lower = writes.get(key)?.value ?? neutral(write.target.prop);
+    writes.set(key, { target: write.target, value: lower + (write.value - lower) * weight });
+  }
+  return [...writes.values()];
+}
 type TimedPose = { pose: Pose; at: number };
 export class LiveCompositor {
   private configuration?: LiveConfiguration;
@@ -52,11 +62,15 @@ export class LiveCompositor {
         const value = this.poseValue({ pose, at: this.installedAt }, now); if (value !== null) put(pose.target, value, 40);
       }
     }
+    const active = new Set(desired.keys());
     for (const [key, write] of this.writes) if (!desired.has(key)) put(write.target, neutral(write.target.prop), 160);
     for (const [key, aim] of desired) {
-      const rest = neutral(aim.target.prop), write = this.writes.get(key) ?? { target: aim.target, value: rest };
+      const rest = neutral(aim.target.prop), write: TransformWrite = this.writes.get(key) ?? { target: aim.target, value: rest };
       const value = blocked.has(key) ? rest : aim.value;
       write.value += (rest + (value - rest) * (this.mode === 'reduced' ? 0.08 : 1) - write.value) * (1 - Math.exp(-dt / aim.smoothMs));
+      const weight = active.has(key) && !blocked.has(key) ? 1 : 0;
+      write.weight = (write.weight ?? 0) + (weight - (write.weight ?? 0)) * (1 - Math.exp(-dt / 160));
+      if (!active.has(key) && write.weight < 0.001) { this.writes.delete(key); continue; }
       this.writes.set(key, write);
     }
     return [...this.writes.values()];

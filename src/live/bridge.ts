@@ -35,6 +35,11 @@ export class LiveBridge {
     this.timer = setInterval(() => this.publish(), 100);
   }
   events(events: { type: LiveEventKind; at: number }[]) { this.pending.push(...events); this.pending = this.pending.slice(-16); }
+  async cancel() {
+    this.body.epoch(crypto.randomUUID());
+    try { await this.connection?.revoke(); }
+    catch { element('fault').textContent = 'Đã dừng tại renderer; nối lại Live trước biểu đạt mới.'; }
+  }
   private publish() {
     if (!this.connected || this.socket?.readyState !== WebSocket.OPEN || this.socket.bufferedAmount > 32768) return;
     if (this.sent === this.observations.snapshot.seq) return;

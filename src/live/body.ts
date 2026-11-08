@@ -1,7 +1,7 @@
 import { ThreeRenderer } from '../adapters/three-renderer';
 import { Scheduler } from '../core/runtime/scheduler';
 import { LiveCompiler, referencedParts } from '../core/live/compiler';
-import { LiveCompositor } from '../core/live/compositor';
+import { LiveCompositor, composeWrites, type TransformWrite } from '../core/live/compositor';
 import { transformMatrices } from '../core/live/transforms';
 import { validateConfiguration } from '../core/live/control-validation';
 import defaults from '../../integrations/live-reflexes.json';
@@ -34,7 +34,7 @@ export class LiveBody {
     this.renderer = new ThreeRenderer(canvas, status); this.renderer.quality(2000);
     this.scheduler = new Scheduler({ now: () => performance.now() }, { apply: (state, now) => this.apply(state, now),
       dispose: () => this.renderer.dispose() }, { count: status }, (status, ir) => {
-        this.trace.record(ir.seq, status, performance.now()); this.feedback?.({ status, epoch: ir.epoch, seq: ir.seq });
+        this.trace.record(ir.seq, status, performance.now(), undefined, ir.epoch); this.feedback?.({ status, epoch: ir.epoch, seq: ir.seq });
       }, 2000);
     this.defaults.install(validateConfiguration(defaults), performance.now());
     this.restFace(0);
@@ -53,13 +53,14 @@ export class LiveBody {
     if (ids !== this.partIds) { this.partIds = ids; this.controls.topology(parts.map(part => part.id)); }
     if (time - this.defaultAt > 240000) { this.defaults.install(validateConfiguration(defaults), time); this.defaultAt = time; }
     const snapshot = this.observation && Date.now() - this.observation.capturedAt <= 1500 ? this.observation : null;
-    const blocked = this.blocked(state), writes = new Map(this.defaults.sample(time, snapshot, this.output, blocked).map(write => [write.target.part + ':' + write.target.prop, write]));
+    const blocked = this.blocked(state), face: TransformWrite[] = [];
     if (isFace(parts)) for (const write of faceWrites(this.faceActivity(time), this.output, this.controls.mode)) {
       const key = write.target.part + ':' + write.target.prop, from = this.faceBlend.get(key) ?? (write.target.prop.startsWith('scale') ? 1 : 0);
       const value = from + (write.value - from) * 0.18; this.faceBlend.set(key, value);
-      writes.set(key, { ...write, value });
+      face.push({ ...write, value });
     }
-    for (const write of this.controls.sample(time, snapshot, this.output, blocked)) writes.set(write.target.part + ':' + write.target.prop, write);
+    const layers = [this.defaults.sample(time, snapshot, this.output, blocked), face, this.controls.sample(time, snapshot, this.output, blocked)];
+    const writes = new Map(composeWrites(layers).map(write => [write.target.part + ':' + write.target.prop, write]));
     const rendered = { ...state, liveMatrices: transformMatrices([...writes.values()], parts) } as PresenceState;
     if (rendered.presencePose) {
       rendered.presencePose = { ...rendered.presencePose };
@@ -76,7 +77,7 @@ export class LiveBody {
   }
   admit(record: any) {
     const at = performance.now();
-    this.trace.record(record?.seq, 'received', at);
+    this.trace.record(record?.seq, 'received', at, undefined, record?.epoch);
     try {
       const compiled = record.kind === 'define' ? { program: this.compiler.compiler.prepareDefinition(record, at) } : this.compiler.compile(record, at);
       if (compiled.configuration) {
@@ -88,12 +89,12 @@ export class LiveBody {
       const result = this.scheduler.admit(compiled.program), accepted = ['accepted', 'state', 'defined'].includes(result);
       if (compiled.program.kind === 'define' && compiled.program.draft !== undefined) this.compiler.compiler.settleDefinition(compiled.program.draft, accepted);
       if (accepted && compiled.configuration) this.controls.install(compiled.configuration, at);
-      this.trace.record(record.seq, accepted ? 'admitted' : 'rejected', performance.now(), accepted ? undefined : result);
+      this.trace.record(record.seq, accepted ? 'admitted' : 'rejected', performance.now(), accepted ? undefined : result, record.epoch);
       this.status(accepted ? 'Biểu đạt đã được nhận.' : result);
       return { status: accepted ? 'accepted' : 'rejected', code: accepted ? undefined : result, latencyMs: performance.now() - at };
     } catch (error) {
       const code = error instanceof Error ? error.message : 'live_compile_failed';
-      this.trace.record(record?.seq, 'rejected', performance.now(), code);
+      this.trace.record(record?.seq, 'rejected', performance.now(), code, record?.epoch);
       return { status: 'rejected', code };
     }
   }
