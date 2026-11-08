@@ -130,3 +130,19 @@ frames, zero external requests/unexpected frames/page errors; private growth
 >=1800-second soak only on a stable final build. PR #23 merged as 44dcf3c after
 all current-head core/Windows/gateway/harness jobs passed. Model budget remains
 2/120; services remain policy-blocked. Deadline stays 22:41:03 UTC.
+
+## Checkpoint 5 — independent resource cleanup
+
+Red tests exposed missing independent cleanup and already-aborted startup
+handling. Live now attempts browser, gateway and static-server cleanup even if
+one fails; closure is idempotent and abort listeners are removed. Already-aborted
+runs open nothing. Real camera-off browser closure stops its owned gateway, with
+a native-gateway regression (the agent in that test is a deterministic host).
+Herdr discovery now uses the actual HERDR_SOCKET_PATH name, and doctor treats
+panel attachment as optional while checking terminal/browser dependencies.
+
+Four lifecycle tests and eight existing terminal/launcher tests pass. Native
+gateway/MCP acceptance script passed macro-after-cancel, invalid rejection,
+synthetic look/cooldown and browser reload with no script errors. This remains
+deterministic tool/renderer evidence, not model behavior. Face PR #24 merged as
+c0de611 after current-head core, Windows and gateway CI passed. No new model turns.

@@ -7,10 +7,17 @@ import { startGateway, stopChild } from '../scripts/start-session.mjs';
 import { prepareLiveAssets } from '../scripts/prepare-live-assets.mjs';
 
 export const liveRoot = fileURLToPath(new URL('../', import.meta.url));
+export async function closeLiveResources(actions) {
+  const results = await Promise.allSettled(actions.map(action => Promise.resolve().then(action)));
+  const failed = results.find(result => result.status === 'rejected');
+  if (failed) throw failed.reason;
+}
 export async function openLive({ headless = false, signal, inspect = () => {}, production = true, synthetic = false } = {}) {
+  if (signal?.aborted) throw Error('live_start_cancelled');
   try { await prepareLiveAssets(resolve(liveRoot, 'public/live-assets')); }
   catch { console.error('Camera assets unavailable. Live can run camera-off; prepare assets before enabling camera.'); }
   if (production) await build({ root: liveRoot });
+  if (signal?.aborted) throw Error('live_start_cancelled');
   const vite = production ? await preview({ root: liveRoot, preview: { host: '127.0.0.1', port: 0 } }) :
     await createServer({ root: liveRoot, server: { host: '127.0.0.1', port: 0 } });
   if (!production) await vite.listen();
@@ -19,6 +26,7 @@ export async function openLive({ headless = false, signal, inspect = () => {}, p
   let gateway, browser;
   try {
     gateway = startGateway(origin, token); const base = await gateway.ready;
+    if (signal?.aborted) throw Error('live_start_cancelled');
     browser = await chromium.launch({ headless, ...(process.platform === 'win32' ? { channel: 'msedge' } : {}),
       ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}),
       ...(headless ? { args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] } : {}) });
@@ -32,10 +40,17 @@ export async function openLive({ headless = false, signal, inspect = () => {}, p
     await page.evaluate(({ base, token }) => window.fischLive.pair(base, token), { base, token });
     await page.waitForFunction(() => document.getElementById('connection').textContent.includes('Đã nối'));
     page.on('domcontentloaded', () => { void pairReload(page, base, token); });
-    const close = async () => { await browser?.close(); await stopChild(gateway.child); await closeServer(); };
-    signal?.addEventListener('abort', () => { void close(); }, { once: true });
+    let closing;
+    const close = () => closing ??= closeLiveResources([() => browser?.close(), () => stopChild(gateway.child), closeServer])
+      .finally(() => signal?.removeEventListener('abort', onAbort));
+    const onAbort = () => { void close().catch(() => {}); };
+    signal?.addEventListener('abort', onAbort, { once: true });
+    if (signal?.aborted) { await close(); throw Error('live_start_cancelled'); }
     return { page, browser, base, token, close, gateway: gateway.child };
-  } catch (error) { await browser?.close(); if (gateway) await stopChild(gateway.child); await closeServer(); throw error; }
+  } catch (error) {
+    await closeLiveResources([() => browser?.close(), () => stopChild(gateway?.child), closeServer]).catch(() => {});
+    throw error;
+  }
 }
 async function pairReload(page, base, token) {
   try {
