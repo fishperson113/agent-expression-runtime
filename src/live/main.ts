@@ -9,12 +9,15 @@ import type { LiveEventKind } from '../core/live/types';
 mountLive(element('app'));
 const body = new LiveBody(element<HTMLCanvasElement>('body'), text => { element('body-status').textContent = text; });
 const observations = new FaceObservations(crypto.randomUUID());
+const cameraTransitions: { status: string; source: string; at: number }[] = [];
 const bridge = new LiveBridge(body, observations);
 Object.assign(window, { fischLive: { pair: (base: string, token: string) => bridge.connect(base, token),
   activity: (value: { turn: 'idle' | 'working' | 'waiting' | 'interrupted'; output: number; quality: string }) => {
     body.output = value.output; body.activity(value.turn); events(observations.turn(value.turn, Date.now()));
     element('activity').textContent = `${value.turn} / nhịp chữ: ${value.quality}`;
   }, metrics: () => ({ ...body.metrics, camera: observations.snapshot.camera, cameraSeq: observations.snapshot.seq,
+    cameraStatus: element('camera-status').textContent, cameraActive: !!element<HTMLVideoElement>('camera').srcObject,
+    cameraTransitions, stopped,
     simulatedParticles: body.scheduler.state.particlePositions?.length ? body.scheduler.state.particlePositions.length / 3 : 2000 }), event: (type: string) => {
     const turn = type === 'user_message' ? 'working' : type === 'needs_user' ? 'waiting' : type === 'interrupted' ? 'interrupted' : 'idle';
     body.activity(turn); events(observations.turn(turn, Date.now()));
@@ -22,7 +25,8 @@ Object.assign(window, { fischLive: { pair: (base: string, token: string) => brid
   } } });
 const recent: { type: LiveEventKind; at: number }[] = [];
 let sampleCount = 0, sampleAt = performance.now(), inferenceMs = 0, stopped = false;
-const camera = new VisionCamera(element<HTMLVideoElement>('camera'), sample, cameraStatus);
+const camera = new VisionCamera(element<HTMLVideoElement>('camera'), sample, cameraStatus,
+  new URLSearchParams(location.search).get('vision') === 'cpu' ? 'CPU' : 'GPU');
 
 function events(values: { type: LiveEventKind; at: number }[]) {
   bridge.events(values);
@@ -46,18 +50,19 @@ function drawLandmarks(value: FaceSample) {
   context.fillStyle = '#79e6d3';
   for (const point of value.landmarks) context.fillRect(point.x * 640, point.y * 480, 2, 2);
 }
-function cameraStatus(status: string) {
+function cameraStatus(status: string, source = 'vision') {
+  cameraTransitions.push({ status, source, at: Date.now() }); cameraTransitions.splice(0, Math.max(0, cameraTransitions.length - 20));
   const messages: Record<string, string> = { starting: 'Đang khởi tạo camera…', denied: 'Chưa có quyền camera', camera_failed: 'Không mở được camera',
-    vision_failed: 'Không chạy được thị giác', vision_timeout: 'Thị giác khởi tạo quá lâu', stopped: 'Camera đang tắt' };
-  element('camera-status').textContent = messages[status] ?? `Camera sẵn sàng / ${status.replace('ready-', '')}`;
-  const active = status === 'starting' || status.startsWith('ready-');
+    vision_failed: 'Không chạy được thị giác', vision_timeout: 'Thị giác khởi tạo quá lâu', stopped: 'Camera đang tắt', 'recovering-CPU': 'Đang chuyển thị giác sang CPU…' };
+  element('camera-status').textContent = messages[status] ?? (status.startsWith('ready-') ? `Camera sẵn sàng / ${status.replace('ready-', '')}` : `Camera lỗi: ${status}`);
+  const active = status === 'starting' || status.startsWith('ready-') || status === 'recovering-CPU';
   element<HTMLButtonElement>('camera-start').disabled = active;
   element<HTMLButtonElement>('camera-stop').disabled = !active;
   element('camera-placeholder').hidden = active;
-  if (!status.startsWith('ready-')) { observations.status(status === 'starting' ? 'starting' : status === 'denied' ? 'denied' : status === 'stopped' ? 'stopped' : 'error', Date.now()); body.observe(observations.snapshot); }
+  if (!status.startsWith('ready-')) { observations.status(status === 'starting' || status === 'recovering-CPU' ? 'starting' : status === 'denied' ? 'denied' : status === 'stopped' ? 'stopped' : 'error', Date.now()); body.observe(observations.snapshot); }
 }
 element('camera-start').onclick = () => { sampleCount = 0; sampleAt = performance.now(); inferenceMs = 0; void camera.start(); };
-element('camera-stop').onclick = () => { camera.stop(); cameraStatus('stopped'); };
+element('camera-stop').onclick = () => { camera.stop(); cameraStatus('stopped', 'button'); };
 element('cancel').onclick = () => body.epoch(body.scheduler.epoch);
 element<HTMLSelectElement>('motion').value = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'reduced' : 'normal';
 element('motion').onchange = () => body.motion(element<HTMLSelectElement>('motion').value as 'normal' | 'reduced' | 'off');
@@ -69,7 +74,7 @@ const timer = setInterval(() => {
 }, 500);
 function stop() {
   if (stopped) return; stopped = true;
-  camera.stop(); cameraStatus('stopped'); clearInterval(timer); bridge.stop(); body.dispose();
+  camera.stop(); cameraStatus('stopped', 'shutdown'); clearInterval(timer); bridge.stop(); body.dispose();
   element<HTMLButtonElement>('camera-start').disabled = true; element('connection').textContent = 'Đã dừng phiên Live';
   void (window as any).fischLiveStop?.();
 }

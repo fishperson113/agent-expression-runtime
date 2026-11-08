@@ -3,8 +3,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 import { codexCommand } from './start-session.mjs';
 
-export function liveCodexArguments(root) {
-  return ['--no-daemon', '--no-alt-screen', '-C', root,
+export function liveCodexArguments(root, workspace = root) {
+  return ['--no-daemon', '--no-alt-screen', '-C', workspace,
     '-c', 'mcp_servers.fisch_live.command=' + JSON.stringify(process.execPath.replaceAll('\\', '/')),
     '-c', 'mcp_servers.fisch_live.args=' + JSON.stringify([resolve(root, 'integrations/mcp-server.mjs').replaceAll('\\', '/')]),
     '-c', 'mcp_servers.fisch_live.env_vars=["AER_BASE_URL","AER_PAIRING_TOKEN","FISCH_LIVE"]',
@@ -12,10 +12,10 @@ export function liveCodexArguments(root) {
 }
 export async function startLiveCodex() {
   if (process.env.FISCH_LIVE !== '1' || !process.env.AER_BASE_URL || !process.env.AER_PAIRING_TOKEN) throw Error('Live environment is missing; launch with fisch live.');
-  const root = fileURLToPath(new URL('../', import.meta.url)), host = await codexCommand();
+  const root = fileURLToPath(new URL('../', import.meta.url)), host = await codexCommand(), workspace = process.env.FISCH_LIVE_WORKSPACE ?? root;
   return new Promise((resolve, reject) => {
-    const child = spawn(host.command, [...host.args, ...liveCodexArguments(root)], {
-      cwd: root, env: process.env, windowsHide: true, stdio: 'inherit' });
+    const child = spawn(host.command, [...host.args, ...liveCodexArguments(root, workspace)], {
+      cwd: workspace, env: process.env, windowsHide: true, stdio: 'inherit' });
     child.once('error', reject); child.once('exit', code => resolve(code ?? 1));
   });
 }
