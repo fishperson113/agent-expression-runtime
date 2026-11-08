@@ -18,10 +18,10 @@ it('preserves existing thread instructions and adds Live context exactly once', 
   expect(input.params.developerInstructions).toBe('Keep existing policy.');
 });
 it('authenticates the owned relay and carries stdio messages without copying credentials into arguments', async () => {
-  const script = `let b='';process.stdin.on('data',c=>{b+=c;let n;while((n=b.indexOf('\\n'))>=0){let m=JSON.parse(b.slice(0,n));b=b.slice(n+1);process.stdout.write(JSON.stringify({id:m.id,result:m.params})+'\\n')}})`;
+  const script = `let b='';process.stdin.on('data',c=>{b+=c;let n;while((n=b.indexOf('\\n'))>=0){let m=JSON.parse(b.slice(0,n));b=b.slice(n+1);process.stdout.write(JSON.stringify({id:m.id,result:{...m.params,pid:process.pid}})+'\\n')}})`;
   const transport = await openCodexTransport({ host: { command: process.execPath, args: ['-e', script, '--'] }, args: [],
     cwd: process.cwd(), env: process.env, instructions: 'Live instructions' });
-  let socket;
+  let socket, pid;
   try {
     const rejected = new WebSocket(transport.url);
     await expect(once(rejected, 'open')).rejects.toThrow('403');
@@ -30,9 +30,11 @@ it('authenticates the owned relay and carries stdio messages without copying cre
     const response = once(socket, 'message');
     socket.send(JSON.stringify({ id: 1, method: 'thread/start', params: { cwd: '/tmp/workspace' } }));
     const [bytes] = await response;
+    pid = JSON.parse(bytes.toString()).result.pid;
     expect(JSON.parse(bytes.toString()).result.developerInstructions).toContain('Live instructions');
     expect(transport.url).not.toContain(transport.token);
   } finally { socket?.terminate(); await transport.close(); }
+  expect(() => process.kill(pid, 0)).toThrow();
 });
 it('distinguishes actual assistant deltas from tool output and stale turns', () => {
   const stream = new LiveOutput();

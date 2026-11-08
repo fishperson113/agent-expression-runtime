@@ -28,9 +28,12 @@ export async function openCodexTransport({ host, args, cwd, env, instructions, o
     client?.terminate(); sockets.close(); server.close(); await stopChild(child);
   };
   function attach(connection) {
-    child = spawn(host.command, [...host.args, 'app-server', '--stdio', ...args], { cwd, env, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
+    child = spawn(host.command, [...host.args, 'app-server', '--stdio', ...args], { cwd, env, windowsHide: true,
+      detached: process.platform !== 'win32', stdio: ['pipe', 'pipe', 'pipe'] });
+    child.aerProcessGroup = process.platform !== 'win32';
     let buffer = '';
     child.stderr.resume();
+    child.stdin.on('error', () => { void close(); });
     child.stdout.on('data', chunk => {
       buffer += chunk;
       if (buffer.length > 1048576) { void close(); return; }
