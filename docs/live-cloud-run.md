@@ -146,3 +146,21 @@ gateway/MCP acceptance script passed macro-after-cancel, invalid rejection,
 synthetic look/cooldown and browser reload with no script errors. This remains
 deterministic tool/renderer evidence, not model behavior. Face PR #24 merged as
 c0de611 after current-head core, Windows and gateway CI passed. No new model turns.
+
+## Checkpoint 6 — control ownership and stale-work cancellation
+
+A falsifiable follow-up test reproduced neutral writes retaining channels after
+lease expiry. Added bounded weight fade and layer composition so local facial
+reflexes regain channels smoothly; no additive DSL or semantic planner added.
+Also found the UI cancel was renderer-local: it now quarantines old epochs
+immediately and revokes the controller through the authenticated gateway.
+Live MCP reports session changes without silently replaying an old gesture;
+a subsequent explicit request reconnects and restores accepted macro definitions.
+Legacy MCP reconnect behavior remains covered and unchanged.
+
+14 focused compositor/MCP/cancel tests pass. The real gateway/browser regression
+starts an eight-second morph, cancels through the UI, verifies the stale request
+is not replayed, then returns to the face with a new explicit request. Trace now
+includes a validated UUID epoch to distinguish reused sequence numbers across
+reconnections, never credentials or arbitrary caller text. Full regression and
+final static-build soak follow. Model counter remains 2/120, deadline unchanged.

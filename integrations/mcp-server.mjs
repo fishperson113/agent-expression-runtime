@@ -162,6 +162,7 @@ async function toolCall(params) {
     catch (error) {
       if (lifecycleErrors.includes(error.message)) {
         session = undefined; pendingDefinitions.clear();
+        if (live && params.name === 'express') throw Error('live_session_changed_request_not_replayed');
         result = await invoke(params);
       } else if (error.message === 'unknown_macro' && definitions.size) {
         await restore();

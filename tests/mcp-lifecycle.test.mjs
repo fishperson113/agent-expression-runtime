@@ -29,7 +29,7 @@ function response(state, request, input) {
     state.receipts.set(input.requestId, { status: 'rejected', code: error.code }); throw error;
   }
 }
-async function harness(work) {
+async function harness(work, live = false) {
   const state = { generation: 0, seq: 0, compiler: new Compiler(), session: undefined,
     receipts: new Map(), commands: [], uncertain: false };
   const server = createServer(async (req, res) => {
@@ -42,7 +42,7 @@ async function harness(work) {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const child = spawn(process.execPath, ['integrations/mcp-server.mjs'], {
     windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'],
-    env: { ...process.env, AER_BASE_URL: `http://127.0.0.1:${server.address().port}`, AER_PAIRING_TOKEN: token },
+    env: { ...process.env, AER_BASE_URL: `http://127.0.0.1:${server.address().port}`, AER_PAIRING_TOKEN: token, FISCH_LIVE: live ? '1' : '0' },
   });
   let buffer = '', next = 0;
   const pending = new Map();
@@ -80,6 +80,18 @@ it.each(['lease expiry', 'browser refresh', 'compiler reset'])('restores accepte
     expect(JSON.parse(result.content[0].text).status).toBe('accepted');
     expect(state.commands.filter(command => command.kind === 'define')).toHaveLength(2);
   });
+});
+it('does not silently replay Live gestures across a lost session, then permits a new explicit request', async () => {
+  await harness(async (state, call) => {
+    expect((await express(call, define)).isError).not.toBe(true);
+    state.session = undefined;
+    const blocked = await express(call, macro);
+    expect(blocked.isError).toBe(true);
+    expect(JSON.parse(blocked.content[0].text).code).toBe('live_session_changed_request_not_replayed');
+    expect(state.generation).toBe(1);
+    expect((await express(call, macro)).isError).not.toBe(true);
+    expect(state.generation).toBe(2);
+  }, true);
 });
 it('does not promote uncertain definitions into the reconnect journal', async () => {
   await harness(async (state, call) => {

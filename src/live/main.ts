@@ -12,9 +12,12 @@ const body = new LiveBody(element<HTMLCanvasElement>('body'), text => { element(
 const observations = new FaceObservations(crypto.randomUUID());
 const cameraTransitions: { status: string; source: string; at: number }[] = [];
 const bridge = new LiveBridge(body, observations);
+let lastActivity = 'idle';
 Object.assign(window, { fischLive: { pair: (base: string, token: string) => bridge.connect(base, token),
   activity: (value: { turn: 'idle' | 'working' | 'waiting' | 'interrupted'; output: number; quality: string }) => {
     if (stopped) return;
+    if (value.turn === 'interrupted' && lastActivity !== 'interrupted') void bridge.cancel();
+    lastActivity = value.turn;
     body.output = value.output; body.activity(value.turn); events(observations.turn(value.turn, Date.now()));
     element('activity').textContent = `${value.turn} / nhịp chữ: ${value.quality}`;
   }, fixture: (mode: string) => fixture(mode), metrics: () => ({ ...body.metrics, syntheticFixture: synthetic,
@@ -24,7 +27,7 @@ Object.assign(window, { fischLive: { pair: (base: string, token: string) => brid
     simulatedParticles: body.scheduler.state.particlePositions?.length ? body.scheduler.state.particlePositions.length / 3 : 2000 }), event: (type: string) => {
     const turn = type === 'user_message' ? 'working' : type === 'needs_user' ? 'waiting' : type === 'interrupted' ? 'interrupted' : 'idle';
     body.activity(turn); events(observations.turn(turn, Date.now()));
-    if (type === 'interrupted') body.epoch(body.scheduler.epoch);
+    if (type === 'interrupted') void bridge.cancel();
   } } });
 const recent: { type: LiveEventKind; at: number }[] = [];
 let sampleCount = 0, sampleAt = performance.now(), inferenceMs = 0, stopped = false;
@@ -80,7 +83,7 @@ if (synthetic) {
   element('camera-status').textContent = 'Dữ liệu tổng hợp / không camera';
 }
 element('camera-stop').onclick = () => { camera.stop(); cameraStatus('stopped', 'button'); };
-element('cancel').onclick = () => body.epoch(body.scheduler.epoch);
+element('cancel').onclick = () => { void bridge.cancel(); };
 element<HTMLSelectElement>('motion').value = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'reduced' : 'normal';
 element('motion').onchange = () => body.motion(element<HTMLSelectElement>('motion').value as 'normal' | 'reduced' | 'off');
 body.motion(element<HTMLSelectElement>('motion').value as 'normal' | 'reduced');

@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { LiveCompositor } from '../src/core/live/compositor';
+import { LiveCompositor, composeWrites } from '../src/core/live/compositor';
 import { validateConfiguration } from '../src/core/live/control-validation';
 import { transformMatrices, livePoint } from '../src/core/live/transforms';
 
@@ -31,4 +31,19 @@ it('scales around declared geometry center without accumulating drift or changin
   expect(livePoint(1.1, 0, 0, matrices[1])[0]).toBeCloseTo(1.2);
   expect(livePoint(1.1, 0, 0, matrices[0])[0]).toBe(1.1);
   expect(parts[0].center).toEqual([1, 0, 0]);
+});
+
+it('releases ownership after a semantic lease so lower facial reflexes can resume smoothly', () => {
+  const compositor = new LiveCompositor(); compositor.install(configuration(), 0); compositor.topology(['chosen']);
+  for (let at = 0; at < 1000; at += 20) compositor.sample(at, null, 1);
+  for (let at = 1000; at < 4000; at += 20) compositor.sample(at, null, 1);
+  expect(compositor.sample(4000, null, 1)).toEqual([]);
+});
+
+it('crossfades an expiring semantic channel back to its current lower layer', () => {
+  const target = { part: 'mouth', prop: 'scaleY' as const };
+  const lower = [{ target, value: 0.4 }];
+  expect(composeWrites([lower, [{ target, value: 1.4, weight: 1 }]])[0].value).toBeCloseTo(1.4);
+  expect(composeWrites([lower, [{ target, value: 1.4, weight: 0.5 }]])[0].value).toBeCloseTo(0.9);
+  expect(composeWrites([lower, [{ target, value: 1.4, weight: 0 }]])[0].value).toBeCloseTo(0.4);
 });
