@@ -4,15 +4,15 @@ Fisch Live là trang web local gồm camera debug và cơ thể hạt WebGL, dù
 
 ## Khởi chạy trên máy Windows đã chuẩn bị
 
-Trong checkout trên nhánh `codex/fisch-live`, mở Herdr và giữ một Codex pane trong workspace. Ở một shell pane cùng workspace:
+Trong một shell của Herdr, chạy đúng một lệnh:
 
 ```sh
-node bin/fisch.mjs live
-# Nếu có nhiều pane Codex:
-node bin/fisch.mjs live --agent <pane-id>
+fisch live
 ```
 
-Nếu đã `npm link`, có thể dùng `fisch live`. `--agent` chọn workspace nguồn; launcher mở một tab **Fisch Live** với phiên Codex riêng có MCP cấu hình tạm thời. Phiên cũ giữ nguyên. Một CLI đã chạy không được giả định là tự nạp MCP mới. Login hiện có được dùng lại; không cần API key mới. Cwd của project nguồn được giữ cho pane Codex mới; code/asset Fisch vẫn lấy từ checkout này. Không có planner phụ trong Live.
+Lệnh tự chuẩn bị asset/build, bật gateway, mở browser và tab **Fisch Live** với Codex + MCP cấu hình tạm thời. Không cần mở Codex trước, chọn pane ID hay truyền tham số. Workspace lấy từ shell đang gọi; khi không có pane trong environment thì dùng pane Herdr đang focus. Phiên Codex cũ nếu có giữ nguyên. Login hiện có được dùng lại; không cần API key mới. Không có planner phụ trong Live.
+
+Trên máy này `fisch` đã có sẵn trên PATH. Với checkout mới, chạy `npm link` một lần sau các bước chuẩn bị bên dưới; sau đó luôn dùng `fisch live`. `fisch run` vẫn mở bản trong panel. Tùy chọn `--agent` chỉ dành cho debug/chọn workspace nguồn tường minh, không cần trong luồng thường ngày.
 
 Launcher mở Edge với trang Live và camera mặc định **tắt**. Chọn **Bật camera** để xử lý tại máy. Quan sát video/landmark ở bên trái, cơ thể ở bên phải. Tiếp tục gõ vào Codex trong tab Fisch Live. MCP có thể hỏi quyền tool lần đầu; cấp quyền theo ý bạn. Launcher không sửa global Codex/Herdr config hoặc bypass hook trust.
 
