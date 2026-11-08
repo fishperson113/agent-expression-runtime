@@ -112,3 +112,7 @@ Native Codex 0.167.0 called both probe tools and correctly read a red circle and
 ### C02 completed
 
 Added strict observation v1 types/schema, named bounded signals and a pure latest-snapshot/event store. Store rejects wrong sessions, old sequence/timestamps and malformed events; independent cursors report history gaps without consuming hook/model reads. Stale snapshots replace pose/expression with unknown. Focused contract/regression tests: 17 passed; frontend build and core boundary passed. Runtime/gateway wiring follows in later commits.
+
+### C03 completed
+
+Pinned tasks-vision 1.2.2; local WASM/model assets are prepared under ignored public/live-assets, with model SHA-256 verification. Module-worker loader is fetched locally into a temporary blob to avoid Vite importing public scripts. Native authorized camera probe returned 478 landmarks with GPU delegate (51 samples, approximately 10 Hz; mean measured inference 165 ms in this short run). The >=24 FPS vision target is not met on this probe; keep latest-frame/drop-backlog policy and report/tune at integration. No camera pixels were saved or uploaded. Five observation/contract tests and TypeScript/build/boundary checks passed. Worker stop closes stream/bitmaps and denied/stopped status invalidates observations.
