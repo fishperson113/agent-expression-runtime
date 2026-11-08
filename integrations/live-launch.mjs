@@ -7,7 +7,7 @@ import { startGateway, stopChild } from '../scripts/start-session.mjs';
 import { prepareLiveAssets } from '../scripts/prepare-live-assets.mjs';
 
 export const liveRoot = fileURLToPath(new URL('../', import.meta.url));
-export async function openLive({ headless = false, signal } = {}) {
+export async function openLive({ headless = false, signal, inspect = () => {} } = {}) {
   await prepareLiveAssets(resolve(liveRoot, 'public/live-assets'));
   const vite = await createServer({ root: liveRoot, server: { host: '127.0.0.1', port: 0 } }); await vite.listen();
   const origin = vite.resolvedUrls.local[0].replace(/\/$/, ''), token = randomBytes(32).toString('hex');
@@ -17,6 +17,7 @@ export async function openLive({ headless = false, signal } = {}) {
     browser = await chromium.launch({ headless, ...(process.platform === 'win32' ? { channel: 'msedge' } : {}),
       ...(headless ? { args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] } : {}) });
     const page = await browser.newPage({ viewport: { width: 1360, height: 950 } });
+    inspect(page);
     await page.goto(origin + '/live.html', { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForFunction(() => !!window.fischLive);
     await page.evaluate(({ base, token }) => window.fischLive.pair(base, token), { base, token });
