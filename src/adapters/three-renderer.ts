@@ -4,6 +4,7 @@ import { MotionPhase } from './motion-phase';
 import { capability } from '../primitives/registry';
 import { sampleBody } from './body-geometry';
 import { TargetBoids } from '../core/geometry/boids';
+import { particleSignature } from './particle-signature';
 import { shapeBuffers } from '../core/geometry/primitives';
 export { shapeBuffers } from '../core/geometry/primitives';
 export function frameBody(positions: Float32Array, count: number, camera: THREE.PerspectiveCamera, grow = 1) {
@@ -125,13 +126,9 @@ export class ThreeRenderer implements RendererSink {
     this.submittedFrames++;
   }
   get renderSnapshot() {
-    let signature = 2166136261;
-    const stride = Math.max(3, Math.floor(this.count / 64) * 3);
-    for (let i = 0; i < this.count * 3; i += stride)
-      signature = Math.imul(signature ^ Math.round(this.positions[i] * 10000), 16777619);
-    for (const value of [this.material.uniforms.size.value, this.material.uniforms.brightness.value,
-      this.color.r, this.color.g, this.color.b]) signature = Math.imul(signature ^ Math.round(value * 10000), 16777619);
-    return { frame: this.submittedFrames, signature: signature >>> 0, contextLost: this.lost };
+    const signature = particleSignature(this.positions, this.count, [this.material.uniforms.size.value,
+      this.material.uniforms.brightness.value, this.color.r, this.color.g, this.color.b]);
+    return { frame: this.submittedFrames, signature, contextLost: this.lost };
   }
   dispose() {
     this.canvas.removeEventListener('webglcontextlost', this.onLost as EventListener);
