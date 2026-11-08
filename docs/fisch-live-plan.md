@@ -124,3 +124,7 @@ Live commands use `{type: live, program: <legacy AST or null>, configuration: {c
 ### C05 completed
 
 Added bounded channel compositor (reflex < binding < explicit pose), local user orientation, signal smoothing/neutral fallback, lease expiration, cooldown and topology invalidation. Default reflexes are JSON data. Shared geometry exposes part metadata and ownership; transform matrices use declared part centers and a reusable per-point scratch buffer. Deterministic compositor/geometry plus existing sculpture/shape tests: 15 passed; TypeScript and architecture checks passed. Browser integration and native visual checks follow in C06.
+
+### C06 completed
+
+Added separate live.html with camera/debug and WebGL body, explicit camera start/stop (no audio), reduced/off motion, stop-all, keyboard skip/focus, labels and responsive 375px layout. Reused shared compiler/scheduler/ThreeRenderer at 2,000 drawn particles; no secondary planner. Native Edge page had no script errors and no camera track until explicitly started; camera-off screenshot visually inspected locally. Browser keyboard/reduced-motion/stop/mobile test passed. Build and boundary passed. Early 0.5-second startup FPS is not steady-state performance acceptance. Initial browser test required the installed Edge channel because bundled Chromium is absent; test now uses Edge on Windows. UI search matched operations/status guidance; no marketing layout or external font/CDN added.
