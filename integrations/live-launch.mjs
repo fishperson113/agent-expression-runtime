@@ -8,7 +8,8 @@ import { prepareLiveAssets } from '../scripts/prepare-live-assets.mjs';
 
 export const liveRoot = fileURLToPath(new URL('../', import.meta.url));
 export async function openLive({ headless = false, signal, inspect = () => {}, production = true } = {}) {
-  await prepareLiveAssets(resolve(liveRoot, 'public/live-assets'));
+  try { await prepareLiveAssets(resolve(liveRoot, 'public/live-assets')); }
+  catch { console.error('Camera assets unavailable. Live can run camera-off; prepare assets before enabling camera.'); }
   if (production) await build({ root: liveRoot });
   const vite = production ? await preview({ root: liveRoot, preview: { host: '127.0.0.1', port: 0 } }) :
     await createServer({ root: liveRoot, server: { host: '127.0.0.1', port: 0 } });
@@ -19,6 +20,7 @@ export async function openLive({ headless = false, signal, inspect = () => {}, p
   try {
     gateway = startGateway(origin, token); const base = await gateway.ready;
     browser = await chromium.launch({ headless, ...(process.platform === 'win32' ? { channel: 'msedge' } : {}),
+      ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}),
       ...(headless ? { args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] } : {}) });
     const page = await browser.newPage({ viewport: { width: 1360, height: 950 } });
     inspect(page);
