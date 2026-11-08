@@ -1,10 +1,10 @@
 # External agent integration · protocol v1
 
-This is the primary integration mode introduced by SRS v0.3. The desktop runtime never calls a model. Your agent keeps its conversation, model/provider credentials and content stream. It sends only expressions and lifecycle commands to the local runtime.
+This is the custom-host HTTP/MCP integration introduced by SRS v0.3; the default user workflow is Herdr pane attachment. The desktop runtime never calls a model. Your agent keeps its conversation, model/provider credentials and content stream. It sends only expressions and lifecycle commands to the local runtime.
 
 ## Pair a host
 
-For the supported Codex workflow, run **`fisch run`** from the repository root. It starts and pairs the browser renderer and opens Codex with the MCP adapter configured for that invocation. Follow [the one-command guide](browser-and-hosts.md). The protocol examples below are for developers integrating their own hosts; they are not required launcher steps.
+For the default Codex/Claude workflow, run **`fisch run`** in a free Herdr pane beside the existing agent. It renders in that pane, discovers the agent and subscribes to lifecycle events. Native message hooks are installed explicitly; no browser or new interactive agent is launched. Follow [the one-command guide](browser-and-hosts.md). The protocol examples below are for developers integrating their own hosts; they are not required launcher steps.
 
 Run the Tauri desktop application. The external-agent panel shows its ephemeral `http://127.0.0.1:<port>` address. Click **Show pairing details** and copy the token into your host's environment as `AER_PAIRING_TOKEN`, with the address in `AER_BASE_URL`. The credential is generated on every app launch, kept in memory, never written into a model prompt, URL, replay or application log. Click again to hide it. **Release controller** closes the active session; restarting the app rotates the token.
 
@@ -56,4 +56,4 @@ Configure your host to run `node <absolute-repo-path>/integrations/mcp-server.mj
 
 The host must actually load [instructions v1.1.0](../integrations/instructions-v1.md) into agent context. Merely exposing the resource cannot guarantee the client reads it. A standard sequential tool host can pause content generation even with fast ACK; only independent host dispatch meets simultaneous streaming intent. The fake-host integration test checks transport/IR equivalence and admission-only ACK, not a production agent-host compatibility matrix.
 
-Direct OpenAI-compatible API mode is optional and is not implemented. No license has been selected for product code; public source visibility is not yet a completed OSS licensing release.
+The optional pane planner implements a Responses structured-output API backend in addition to native Codex/Claude processes. It is separate from this HTTP/MCP gateway; see [planner configuration](expression-planner.md). No license has been selected for product code; public source visibility is not yet a completed OSS licensing release.
