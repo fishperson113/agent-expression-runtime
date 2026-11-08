@@ -81,3 +81,29 @@ Counter 2/120: one timeout plus one conservatively counted queued /quit input
 during TUI smoke (interrupted, no successful model reply). No model holdout run.
 Cloud proxy explicitly returns 403 for chatgpt.com; do not retry around policy.
 Next: readable face, declared controls, scene/application trace and visual tests.
+
+## Checkpoint 3 — visible face and restoration
+
+Added declared curve/ellipsoid face geometry with explicit role metadata and
+data-defined lifecycle controls. No prompt/keyword-to-shape mapping. Face gestures
+and illustrations remain agent-authored via existing bounded DSL; return_to_face
+restores declared geometry and clears semantic controls. Initial static face is
+compiled/rendered before starting its frame loop, including reduced/off mode.
+
+Red/green: missing face module first; then a wire-order regression reproduced a
+real browser failure. Gateway serialization reordered object keys: rendering
+restored the facial geometry but identity detection did not activate its controls.
+Canonical structural comparison now handles wire ordering, with a failing-then-
+passing test. MCP -> gateway -> compiler -> WebGL screenshots show idle, working,
+replying, waiting, a bird fixture and restored face. Images visually inspected;
+zero page errors. Short restored sample ~60 FPS, p95 ~17 ms is software rendering
+only, not a sustained performance certificate. No model-authored semantic result
+is claimed: these are explicit deterministic fixtures.
+
+Eight focused face/browser/tool tests pass, including motion-off pixel freeze,
+camera-off rendering and control behavior. A broader regression is next. Actual
+model gate remains blocked (2/120 used). PR #22 passed detailed core, Windows and
+Linux gateway CI and merged as d0fa594. An initial merge auto-review denied missing
+head/CI evidence; after reading owner authorization and fresh completed job data,
+the protected retry succeeded. PR #23 was retargeted to main (10 aggregate files)
+and strengthened with owned process-group/pipe cleanup and a process-exit test.

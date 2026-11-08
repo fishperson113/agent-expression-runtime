@@ -3,6 +3,14 @@ import { readFileSync } from 'node:fs';
 const schema = JSON.parse(readFileSync(new URL('../src/contracts/live-control.schema.json', import.meta.url), 'utf8'));
 const observationSchema = JSON.parse(readFileSync(new URL('../src/contracts/live.schema.json', import.meta.url), 'utf8'));
 const capabilities = JSON.parse(readFileSync(new URL('../src/contracts/capabilities.json', import.meta.url), 'utf8')).live;
+const face = JSON.parse(readFileSync(new URL('../src/core/live/face.json', import.meta.url), 'utf8'));
+export function restingFaceExpression() {
+  return { type: 'live', program: { type: 'parallel', children: [
+    { type: 'assemble', parts: structuredClone(face.parts), durationMs: 600 },
+    { type: 'flow', field: 'pulse', strength: 0, durationMs: 600 },
+    { type: 'style', pointSize: 1.8, brightness: 0.85, dispersion: 0, durationMs: 600 },
+  ] }, configuration: { controls: [], poses: [], lifetimeMs: 60000 } };
+}
 export function liveInputSchema(legacy) {
   const copy = structuredClone(legacy), renamed = JSON.parse(JSON.stringify(schema).replaceAll('#/$defs/', '#/$defs/live_'));
   Object.assign(copy.$defs, Object.fromEntries(Object.entries(renamed.$defs).map(([key, value]) => ['live_' + key, value])));
@@ -11,12 +19,14 @@ export function liveInputSchema(legacy) {
 }
 export function liveToolDefinitions() {
   const annotations = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
-  return [{ name: 'observe', description: 'Read current local face observations and events since your last read. Call at the start of every turn; stale/unknown is not absence. No image.', annotations,
+  return [{ name: 'return_to_face', description: 'Restore the declared resting face after an illustration, clearing semantic controls. For face gestures use express with live poses targeting eye_left, eye_right, brow_left, brow_right or mouth; choose bounded transforms yourself.',
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false }, inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
+  { name: 'observe', description: 'Read current local face observations and events since your last read. Call at the start of every turn; stale/unknown is not absence. No image.', annotations,
     inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'look', description: 'Look at a SYNTHETIC visual fixture only. Camera pixels are never sent. Visible reason, five-second cooldown.', annotations,
     inputSchema: { type: 'object', properties: { reason: { type: 'string', minLength: 1, maxLength: 120 } }, required: ['reason'], additionalProperties: false } }];
 }
-export function liveResource() { return { capabilities, observationSchema, controlSchema: schema }; }
+export function liveResource() { return { capabilities, observationSchema, controlSchema: schema, restingFace: face }; }
 export function createLiveTools(request, currentSession, resetSession = () => {}) {
   let cursor = 0, sessionId;
   return async (name, args = {}) => {

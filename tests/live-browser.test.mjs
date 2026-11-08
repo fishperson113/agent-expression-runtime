@@ -21,3 +21,27 @@ it('opens a keyboard-accessible Live page without camera capture and preserves r
     expect(await page.locator('#connection').textContent()).toBe('Đã dừng phiên Live');
   } finally { await browser?.close(); await server.close(); }
 }, 45000);
+
+it('draws a facial resting body, changes declared features on activity and freezes motion-off', async () => {
+  const server = await createServer({ server: { host: '127.0.0.1', port: 0 } }); await server.listen();
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true, ...(process.platform === 'win32' ? { channel: 'msedge' } : {}),
+      args: ['--enable-webgl', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+    const page = await browser.newPage();
+    await page.goto(server.resolvedUrls.local[0] + 'live.html');
+    await page.waitForFunction(() => window.fischLive?.metrics().scene === 'face');
+    const metrics = await page.evaluate(() => window.fischLive.metrics());
+    expect(metrics.parts).toContain('mouth'); expect(metrics.parts).toContain('eye_left');
+    const canvas = page.locator('#body'), idle = await canvas.screenshot();
+    await page.evaluate(() => window.fischLive.activity({ turn: 'working', output: 0, quality: 'fixture' }));
+    await page.waitForTimeout(450);
+    expect((await canvas.screenshot()).equals(idle)).toBe(false);
+    await page.locator('#motion').selectOption('off');
+    const frozen = await canvas.screenshot();
+    await page.evaluate(() => window.fischLive.activity({ turn: 'working', output: 1, quality: 'fixture' }));
+    await page.waitForTimeout(450);
+    expect((await canvas.screenshot()).equals(frozen)).toBe(true);
+    expect(await page.locator('video').evaluate(video => video.srcObject)).toBe(null);
+  } finally { await browser?.close(); await server.close(); }
+}, 45000);

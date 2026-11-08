@@ -13,6 +13,7 @@ const cameraTransitions: { status: string; source: string; at: number }[] = [];
 const bridge = new LiveBridge(body, observations);
 Object.assign(window, { fischLive: { pair: (base: string, token: string) => bridge.connect(base, token),
   activity: (value: { turn: 'idle' | 'working' | 'waiting' | 'interrupted'; output: number; quality: string }) => {
+    if (stopped) return;
     body.output = value.output; body.activity(value.turn); events(observations.turn(value.turn, Date.now()));
     element('activity').textContent = `${value.turn} / nhịp chữ: ${value.quality}`;
   }, metrics: () => ({ ...body.metrics, camera: observations.snapshot.camera, cameraSeq: observations.snapshot.seq,

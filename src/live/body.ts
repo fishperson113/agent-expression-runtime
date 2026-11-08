@@ -8,6 +8,7 @@ import defaults from '../../integrations/live-reflexes.json';
 import type { BodyState } from '../core/ports';
 import type { PresenceState } from '../core/runtime/presence';
 import type { Observation, LiveEventKind } from '../core/live/types';
+import { faceProgram, faceWrites, isFace } from '../core/live/face';
 
 export class LiveBody {
   readonly renderer: ThreeRenderer;
@@ -22,6 +23,8 @@ export class LiveBody {
   private frameId = 0;
   private samples: number[] = [];
   private previous = performance.now();
+  private activityState = 'idle';
+  private faceBlend = new Map<string, number>();
   output = 0;
   feedback?: (event: { epoch: string; seq: number; status: string }) => void;
   constructor(private canvas: HTMLCanvasElement, private status: (text: string) => void) {
@@ -29,6 +32,7 @@ export class LiveBody {
     this.scheduler = new Scheduler({ now: () => performance.now() }, { apply: (state, now) => this.apply(state, now),
       dispose: () => this.renderer.dispose() }, { count: status }, (status, ir) => this.feedback?.({ status, epoch: ir.epoch, seq: ir.seq }), 2000);
     this.defaults.install(validateConfiguration(defaults), performance.now());
+    this.restFace(0);
     this.resize = new ResizeObserver(() => this.size()); this.resize.observe(canvas); this.size();
     this.frame();
   }
@@ -45,6 +49,11 @@ export class LiveBody {
     if (time - this.defaultAt > 240000) { this.defaults.install(validateConfiguration(defaults), time); this.defaultAt = time; }
     const snapshot = this.observation && Date.now() - this.observation.capturedAt <= 1500 ? this.observation : null;
     const blocked = this.blocked(state), writes = new Map(this.defaults.sample(time, snapshot, this.output, blocked).map(write => [write.target.part + ':' + write.target.prop, write]));
+    if (isFace(parts)) for (const write of faceWrites(this.output > 0.01 ? 'replying' : this.activityState, this.output, this.controls.mode)) {
+      const key = write.target.part + ':' + write.target.prop, from = this.faceBlend.get(key) ?? (write.target.prop.startsWith('scale') ? 1 : 0);
+      const value = from + (write.value - from) * 0.18; this.faceBlend.set(key, value);
+      writes.set(key, { ...write, value });
+    }
     for (const write of this.controls.sample(time, snapshot, this.output, blocked)) writes.set(write.target.part + ':' + write.target.prop, write);
     const rendered = { ...state, liveMatrices: transformMatrices([...writes.values()], parts) } as PresenceState;
     if (rendered.presencePose) {
@@ -79,9 +88,17 @@ export class LiveBody {
     this.controls.reset(); this.scheduler.cancel(epoch);
     if (reset) { this.compiler.compiler.reset(); this.partIds = ''; }
     else this.compiler.compiler.discardDefinitions();
+    this.restFace(this.controls.mode === 'off' ? 0 : 600);
+  }
+  private restFace(durationMs: number) {
+    const record = { v: 1, epoch: this.scheduler.epoch, seq: 0, kind: 'program', track: 'body', policy: 'replace', body: faceProgram(durationMs) };
+    this.scheduler.admit(this.compiler.compile(record, performance.now()).program);
+    this.faceBlend.clear();
+    this.scheduler.tick();
   }
   observe(snapshot: Observation) { this.observation = snapshot; }
   activity(activity: string) {
+    this.activityState = activity;
     this.scheduler.state.presenceIntent = { ...this.scheduler.state.presenceIntent, activity,
       mode: this.controls.mode };
   }
@@ -91,6 +108,8 @@ export class LiveBody {
     this.scheduler.state.presenceIntent = { activity: 'idle', mode };
   }
   get metrics() { const sorted = [...this.samples].sort((a, b) => a - b); const p95 = sorted[Math.floor(sorted.length * 0.95)] ?? 0;
-    return { frameP95: p95, meanFps: 1000 / (this.samples.reduce((sum, value) => sum + value, 0) / Math.max(1, this.samples.length)), particles: this.renderer.count }; }
+    return { scene: isFace(this.scheduler.state.particleParts ?? []) ? 'face' : this.scheduler.state.shape,
+      parts: this.scheduler.state.particleParts?.map(part => part.id) ?? [],
+      frameP95: p95, meanFps: 1000 / (this.samples.reduce((sum, value) => sum + value, 0) / Math.max(1, this.samples.length)), particles: this.renderer.count }; }
   dispose() { cancelAnimationFrame(this.frameId); this.resize.disconnect(); this.scheduler.dispose(); }
 }
