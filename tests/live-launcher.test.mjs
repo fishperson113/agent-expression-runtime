@@ -19,8 +19,10 @@ it('injects pairing values only into a new pane environment and preserves the ol
     if (method === 'session.snapshot') return { snapshot: { panes: [{ pane_id: 'new-pane', tab_id: 'new' }] } };
     return {};
   };
-  await createLivePane(call, { pane_id: 'old-pane', workspace_id: 'workspace' }, 'http://127.0.0.1:1234', 'private');
+  await createLivePane(call, { pane_id: 'old-pane', workspace_id: 'workspace', cwd: 'C:/workspace/user-project' }, 'http://127.0.0.1:1234', 'private');
   expect(calls[0].params.env.AER_PAIRING_TOKEN).toBe('private');
+  expect(calls[0].params.cwd).toBe('C:/workspace/user-project');
+  expect(calls[0].params.env.FISCH_LIVE_WORKSPACE).toBe('C:/workspace/user-project');
   expect(calls.at(-1).params.text).not.toContain('private');
   expect(calls.at(-1).params.pane_id).toBe('new-pane');
 });

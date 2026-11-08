@@ -10,7 +10,7 @@ export class VisionCamera {
   private callback = 0;
   private timeout?: ReturnType<typeof setTimeout>;
   constructor(private video: HTMLVideoElement, private receive: (sample: FaceSample) => void,
-    private status: (status: string) => void) {}
+    private status: (status: string) => void, private delegate: 'GPU' | 'CPU' = 'GPU') {}
   async start() {
     this.stop(); const generation = ++this.generation; this.active = true;
     this.status('starting');
@@ -19,11 +19,11 @@ export class VisionCamera {
       this.worker.onmessage = event => this.message(event.data, generation);
       this.worker.onerror = () => this.fail('vision_failed');
       this.timeout = setTimeout(() => this.fail('vision_timeout'), 20000);
-      this.worker.postMessage({ type: 'init' });
+      this.worker.postMessage({ type: 'init', delegate: this.delegate });
       const stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
       if (!this.active || generation !== this.generation) { stream.getTracks().forEach(track => track.stop()); return; }
       this.stream = stream; this.video.srcObject = stream;
-      stream.getVideoTracks()[0].onended = () => this.fail('stopped');
+      stream.getVideoTracks()[0].onended = () => this.ended();
       await this.video.play(); this.schedule(generation);
     } catch (error) { if (generation === this.generation) this.fail(error instanceof DOMException && error.name === 'NotAllowedError' ? 'denied' : 'camera_failed'); }
   }
@@ -31,7 +31,7 @@ export class VisionCamera {
     if (generation !== this.generation || !this.active) return;
     if (data.type === 'ready') { this.ready = true; clearTimeout(this.timeout); this.status('ready-' + data.delegate); }
     if (data.type === 'sample') { this.busy = false; this.receive(data.sample); }
-    if (data.type === 'error') this.fail('vision_failed');
+    if (data.type === 'error') this.fail('vision_failed: ' + String(data.code).slice(0, 180));
   }
   private schedule(generation: number) {
     if (!this.active || generation !== this.generation) return;
@@ -47,6 +47,13 @@ export class VisionCamera {
     });
   }
   private fail(code: string) { this.stop(); this.status(code); }
+  private ended() {
+    const fallback = this.active && this.delegate === 'GPU'; this.stop();
+    if (!fallback) { this.status('stopped'); return; }
+    this.delegate = 'CPU'; this.status('recovering-CPU');
+    const generation = this.generation;
+    this.timeout = setTimeout(() => { if (this.generation === generation) void this.start(); }, 500);
+  }
   stop() {
     this.active = false; this.ready = false; this.busy = false; this.generation++;
     clearTimeout(this.timeout); this.video.cancelVideoFrameCallback(this.callback);
