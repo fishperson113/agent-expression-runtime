@@ -11,6 +11,26 @@ export function liveInstructions(message, instructions) {
   return { ...message, params };
 }
 
+function relayOutput(child, connection, onEvent, close) {
+  let buffer = '';
+  child.stderr.resume();
+  child.stdin.on('error', () => { void close(); });
+  child.stdout.on('data', chunk => {
+    buffer += chunk;
+    if (buffer.length > 1048576) { void close(); return; }
+    let newline;
+    while ((newline = buffer.indexOf('\n')) >= 0) {
+      const line = buffer.slice(0, newline); buffer = buffer.slice(newline + 1);
+      try {
+        if (connection.bufferedAmount > 1048576) throw Error('relay_backpressure');
+        const message = JSON.parse(line); onEvent(message);
+        if (connection.readyState === WebSocket.OPEN) connection.send(line);
+      }
+      catch { void close(); return; }
+    }
+  });
+}
+
 export async function openCodexTransport({ host, args, cwd, env, instructions, onEvent = () => {}, onRequest = () => {} }) {
   const token = randomBytes(32).toString('hex'), expected = Buffer.from('Bearer ' + token);
   const server = createServer((_req, res) => { res.writeHead(404); res.end(); });
@@ -31,23 +51,7 @@ export async function openCodexTransport({ host, args, cwd, env, instructions, o
     child = spawn(host.command, [...host.args, 'app-server', '--stdio', ...args], { cwd, env, windowsHide: true,
       detached: process.platform !== 'win32', stdio: ['pipe', 'pipe', 'pipe'] });
     child.aerProcessGroup = process.platform !== 'win32';
-    let buffer = '';
-    child.stderr.resume();
-    child.stdin.on('error', () => { void close(); });
-    child.stdout.on('data', chunk => {
-      buffer += chunk;
-      if (buffer.length > 1048576) { void close(); return; }
-      let newline;
-      while ((newline = buffer.indexOf('\n')) >= 0) {
-        const line = buffer.slice(0, newline); buffer = buffer.slice(newline + 1);
-        try {
-          if (connection.bufferedAmount > 1048576) throw Error('relay_backpressure');
-          const message = JSON.parse(line); onEvent(message);
-          if (connection.readyState === WebSocket.OPEN) connection.send(line);
-        }
-        catch { void close(); return; }
-      }
-    });
+    relayOutput(child, connection, onEvent, close);
     connection.on('message', bytes => {
       try {
         if (child.stdin.writableLength > 1048576) throw Error('relay_backpressure');
