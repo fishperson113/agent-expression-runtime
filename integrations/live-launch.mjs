@@ -21,10 +21,17 @@ export async function openLive({ headless = false, signal } = {}) {
     await page.waitForFunction(() => !!window.fischLive);
     await page.evaluate(({ base, token }) => window.fischLive.pair(base, token), { base, token });
     await page.waitForFunction(() => document.getElementById('connection').textContent.includes('Đã nối'));
+    page.on('domcontentloaded', () => { void pairReload(page, base, token); });
     const close = async () => { await browser?.close(); await stopChild(gateway.child); await vite.close(); };
     signal?.addEventListener('abort', () => { void close(); }, { once: true });
     return { page, browser, base, token, close, gateway: gateway.child };
   } catch (error) { await browser?.close(); if (gateway) await stopChild(gateway.child); await vite.close(); throw error; }
+}
+async function pairReload(page, base, token) {
+  try {
+    await page.waitForFunction(() => !!window.fischLive);
+    await page.evaluate(({ base, token }) => window.fischLive.pair(base, token), { base, token });
+  } catch { if (!page.isClosed()) console.error('Live browser re-pair failed; restart fisch live.'); }
 }
 export async function createLivePane(call, source, base, token) {
   const created = await call('tab.create', { workspace_id: source.workspace_id, cwd: liveRoot,

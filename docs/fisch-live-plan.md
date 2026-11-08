@@ -144,3 +144,7 @@ Native launcher opened a separate Fisch Live Herdr tab (observed pane w4:pM) wit
 ### C09a — lifecycle hardening (bounded extra commit)
 
 Integration inspection found two lifecycle hazards: epoch cancellation should preserve committed macros, and a turn change must not freshen old camera measurements. Fixed both before soak. Added Live private IPC delivery for already-installed/trusted native hooks, forwarding only event type (never prompt text) to the browser. Herdr activity now drives presence activity; a data-defined turn cue supplements local camera reflexes. Native hook delivery still requires real trust verification; context injection remains the observe-first fallback. Eleven targeted tests, build/boundary and structural checks passed. This additional nine-file batch keeps the original C10 acceptance batch within the harness limit.
+
+### C10a — acceptance preparation (bounded extra commit)
+
+Added browser re-pair after reload without replaying uncertain gestures, preserved the stopped UI state, and fixed explicit stale-camera propagation in both stores. Live now simulates the same 2,000 particles it draws instead of paying for the default 10,000 formation; legacy schedulers retain their default. Camera-free aggregate metrics are exposed for native acceptance. Ten focused JS tests, 16 Rust tests, build and boundary checks passed. This ten-file batch precedes acceptance tooling/soak so the harness remains bounded.

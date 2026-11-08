@@ -30,3 +30,10 @@ fn look_rejects_camera_payloads_and_bad_image_dimensions() {
     assert!(!receive(&state, json!({"type":"look_result","id":"x","synthetic":false,"mimeType":"image/jpeg","data":"/9j/","width":480,"height":360})));
     assert!(!receive(&state, json!({"type":"look_result","id":"x","synthetic":true,"mimeType":"image/jpeg","data":"/9j/","width":999,"height":360})));
 }
+#[test]
+fn recent_transport_does_not_turn_stale_measurements_fresh() {
+    let mut store = observation::Observations::default(); let mut value = snapshot(1, 1000);
+    value["camera"] = json!("stale");
+    assert!(store.ingest(value, vec![], "test", 1000));
+    assert_eq!(store.read(0, 1000)["stale"], true);
+}

@@ -57,7 +57,7 @@ export class ObservationStore {
   read(cursor: number, now: number): ObservationRead {
     if (!Number.isSafeInteger(cursor) || cursor < 0 || cursor > this.next) throw Error('live_cursor');
     const ageMs = this.snapshot ? Math.max(0, now - this.snapshot.capturedAt) : null;
-    const stale = ageMs === null || ageMs > this.maxAgeMs;
+    const stale = ageMs === null || ageMs > this.maxAgeMs || this.snapshot?.camera === 'stale';
     const snapshot = this.snapshot ? structuredClone(this.snapshot) : null;
     if (snapshot && stale) { snapshot.camera = 'stale'; snapshot.user = unavailableUser(); snapshot.summary = 'Quan sát đã cũ; chưa biết trạng thái người dùng.'; }
     return { snapshot, receivedAt: this.receivedAt, ageMs, stale, events: this.events.filter(event => event.id > cursor),
