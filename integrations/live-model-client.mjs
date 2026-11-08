@@ -9,6 +9,7 @@ import { liveRoot } from './live-launch.mjs';
 
 function protocol(socket) {
   let id = 0; const pending = new Map(), events = new EventEmitter();
+  socket.on('error', () => {});
   socket.on('message', bytes => {
     const message = JSON.parse(bytes.toString());
     if (message.method && message.id !== undefined) {
@@ -19,7 +20,8 @@ function protocol(socket) {
     if (entry) { clearTimeout(entry.timer); pending.delete(message.id); message.error ? entry.reject(Error('app_server_request_failed')) : entry.resolve(message.result); }
     else events.emit('notification', message);
   });
-  socket.on('close', () => { for (const item of pending.values()) { clearTimeout(item.timer); item.reject(Error('app_server_closed')); } pending.clear(); });
+  socket.on('close', () => { for (const item of pending.values()) { clearTimeout(item.timer); item.reject(Error('app_server_closed')); }
+    pending.clear(); events.emit('closed'); });
   const call = (method, params) => new Promise((resolve, reject) => {
     if (pending.size >= 8) return reject(Error('model_test_rpc_full'));
     const next = ++id, timer = setTimeout(() => { pending.delete(next); reject(Error('app_server_timeout')); }, 30000);
@@ -50,15 +52,17 @@ export async function runModelTurn(client, threadId, text, timeoutMs = 90000) {
     const p = message.params;
     if (p?.threadId !== threadId) return;
     if (message.method === 'turn/started') turnId = p.turn.id;
-    if (message.method === 'item/completed' && p.item?.type === 'mcpToolCall') {
+    if (message.method === 'item/completed' && p.turnId === turnId && p.item?.type === 'mcpToolCall') {
       if (tools.length < 64) tools.push(p.item); else truncated = true;
     }
     if (message.method === 'turn/completed' && p.turn.id === turnId) settled.resolve({ status: p.turn.status, tools, truncated });
   };
   client.events.on('notification', receive);
+  const disconnected = () => settled.reject(Error('app_server_closed'));
+  client.events.once('closed', disconnected);
   const timer = setTimeout(() => { if (turnId) void client.call('turn/interrupt', { threadId, turnId }).catch(() => {}); settled.reject(Error('model_turn_timeout')); }, timeoutMs);
   try {
     await client.call('turn/start', { threadId, input: [{ type: 'text', text, text_elements: [] }] });
     return await done;
-  } finally { clearTimeout(timer); client.events.removeListener('notification', receive); }
+  } finally { clearTimeout(timer); client.events.removeListener('notification', receive); client.events.removeListener('closed', disconnected); }
 }

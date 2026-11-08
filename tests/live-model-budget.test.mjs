@@ -20,6 +20,11 @@ it('counts a turn before sending and refuses the next turn without resetting the
   expect(() => reserveModelTurn(path, 'retry', Date.parse('2026-11-08T18:01:00Z'))).toThrow('budget_exhausted');
   expect(JSON.parse(readFileSync(path)).used).toBe(120);
 });
+it('ends a model test promptly on transport loss and removes its listeners', async () => {
+  const events = new EventEmitter(), client = { events, call: async () => queueMicrotask(() => events.emit('closed')) };
+  await expect(runModelTurn(client, 't', 'synthetic prompt', 10000)).rejects.toThrow('app_server_closed');
+  expect(events.listenerCount('notification')).toBe(0); expect(events.listenerCount('closed')).toBe(0);
+});
 it('does not score ACKs as application or visual meaning and correlates epochs', () => {
   const turn = { status: 'completed', tools: [{ server: 'fisch_live', tool: 'express', result: { content: [{ type: 'text', text: '{"status":"accepted","seq":1,"epoch":"current"}' }] } }] };
   const result = scoreContract(turn, { diagnostics: { events: [{ seq: 1, epoch: 'old', phase: 'applied' }] } });
