@@ -229,37 +229,50 @@ Explicit `fisch live --agent <pane>` retains the legacy Herdr adapter; its camer
 reflexes work, but agent-triggered camera reactions are unavailable there and the
 control stays disabled. No keystrokes are injected into an unrelated agent.
 
-Camera starts off. Expand the observation controls and enable camera reactions
-only if wanted. Stable typed geometric events may then start a Codex turn using
-the official standalone `toolOutput` mechanism. No image, landmark array or audio
-is sent by this path. Existing MCP observations/privacy controls still apply.
-Events coalesce for 750ms after local debounce, expire after five seconds, and
-start at most once every 15 seconds/four times per minute. Unchanging input and
-idle timers do not start inference. A reaction has a 30-second watchdog.
+Camera starts off. Reactions also default off and remain unavailable without an
+explicit, separately configured data-only observer and an existing approved budget
+ledger. Native Codex conversation keeps its user-initiated turns and MCP tools;
+camera events never create Native turns or `toolOutput` notices. The retired
+camera-polling API always reports disabled/stopped.
 
-User turns have priority: only a Fisch-owned reaction may be interrupted. Pending
-user input waits for confirmed cancellation; after ten seconds without certainty,
-an explicit error says that input was not sent and must be retried. No silent
-replay occurs. Stop, camera opt-out, Cancel, reload and thread selection invalidate
-pending reactions. A lost/uncertain model request pauses automatic reactions.
-Existing permissions are preserved; the event instructions restrict the model to
-Fisch observation/expression tools, rather than granting a new security policy.
+When opted in, the observer receives a bounded typed window: up to four observations
+and eight events, including structured hand landmarks when available, with summaries
+removed. It receives no camera images, audio, chat/code history, tools or MCP access.
+Its fixed Responses request uses `tools:[]`, `tool_choice:none` and `store:false`;
+the host validates declarative JSON decisions before admission. Instructions alone
+are not the capability boundary. See [configuration and privacy](reactive-provider.md).
 
-Protocol reference: https://learn.chatgpt.com/docs/app-server . Installed Codex
-0.167.0 schema confirms `TurnStartParams.toolOutput` / `TurnToolOutput`.
-Deterministic tests and camera-off visual checks are separate from real-camera,
-native-GPU performance and model-expression acceptance; do not treat them as the
-same certification. Native verification details are recorded in the PR.
+Eligible semantic events coalesce for a finite 750 ms, expire after five seconds,
+and dispatch at most four times per rolling minute with a 15-second cooldown.
+Compatible new frames remain valid; changed presence, track dependencies, user
+intent or a new semantic event revoke old authority. The browser semantic deadline
+is five seconds from request creation. The separate 30-second transport watchdog
+limits a hanging provider; it does not extend the action lease. Slow-loop liveness
+under changing scenes needs its own evaluation, not a claim inferred from local FPS.
 
+User input crosses the browser intent/revocation barrier before Native forwarding.
+It does not wait for provider cancellation. Successful correlated Native turn ACKs
+establish steering ownership even before the started notification. Failed or stale
+ACKs cannot revive a turn. Barrier/browser failure returns an explicit error rather
+than silently replaying input. Unknown observer transport pauses new observer work;
+stop, camera opt-out, Cancel, reload and thread changes revoke old apply rights.
 
-Verification for the reactive increment: 28 focused relay/reactivity tests pass.
-Linux CI on `c53c335` passed 293 JavaScript tests (4 skipped), production build,
-architecture and browser smoke. Windows browser-under-Vitest attempts timed out;
-standalone camera-off screenshot rendering succeeded, so no full Windows-browser
-pass is claimed. One real `gpt-6.1-sol` synthetic event turn started/completed and
-successfully called `observe`, with zero approval requests or camera/audio/image
-capture. It chose no `express` call: model-authored reaction animation remains an
-open acceptance check. Conservative cumulative model-test usage is 97/120.
+Deterministic and synthetic browser evidence distinguishes decision admission,
+scheduler application and frame-change proxies. A proxy does not prove semantic
+relevance, physical camera latency, native-GPU performance or human enjoyment.
+A short diagnostic capture is also not evidence of an entire 20-minute session.
+
+### Historical shared-thread experiment (retired)
+
+At `c53c335`, the earlier camera path used standalone `toolOutput`; 28 focused
+relay/reactivity tests and Linux CI passed 293 JavaScript tests (four skipped).
+Windows browser-under-Vitest attempts timed out; standalone camera-off rendering
+succeeded. One real synthetic `gpt-6.1-sol` event turn returned `observe`, without
+`express`. That result proves neither the new isolated observer nor expressive
+animation quality. Its recorded 97/120 budget snapshot is historical, not a current
+remaining allowance. Reconcile the approved cumulative ledger before any real call;
+never reset it or infer provider access from a Codex login. The original unrelated
+output's provenance remains unresolved, and PR #51 stays draft.
 
 ### Liên kết chuyển động bàn tay
 
