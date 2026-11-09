@@ -57,7 +57,9 @@ Live ưu tiên vision GPU. Một số probe trong lượt Windows/AMD lịch s�
 
 Nếu GPU báo rõ SwiftShader (dựng hình bằng phần mềm), Live chọn CPU cho thị giác ngay từ đầu; probe Cloud tổng hợp đo CPU nhanh hơn đường GPU software. UI vẫn ghi delegate thực tế. GPU native hoặc không đọc được metadata vẫn giữ lựa chọn GPU và cơ chế fallback hiện có. Đây không phải chứng nhận đạt 24 Hz hay accuracy người thật.
 
-Bằng chứng Cloud: probe cũ khoảng 13,09 Hz dùng nguồn giả mặc định 20 FPS. Probe mới cấu hình nguồn 30 FPS đạt 14,25 mẫu/giây trên CPU, vẫn chưa đạt 24 Hz; soak quan sát tổng hợp 30 phút pass bộ nhớ/ổn định nhưng FPS/frame-time liên tục chưa đạt. Xem [kết quả và giới hạn](validation.md#final-cloud-performance-verification--2026-11-09).
+Bằng chứng Cloud mới dùng camera giả không có khuôn mặt, nguồn danh nghĩa 30 FPS, CPU vision và 2.000 hạt: median inference 14,61 → 22,91 Hz, median render 34,06 → 30,87 FPS. Hai soak 30 phút đều pass ổn định/bộ nhớ; đây là đánh đổi tài nguyên trên GPU phần mềm, chưa đạt các mục tiêu 24 Hz / 50 FPS. Xem [số đo đầy đủ](validation.md#vision-pacing-and-reflex-envelope--2026-11-09).
+
+Worker chỉ xử lý một frame mỗi lúc và bỏ backlog. Khi inference xong, Live lấy ngay frame mới nhất đã có từ callback video thay vì chờ callback sau; không xử lý lại cùng media timestamp. Reflex giữ đường cong pose và fade quyền điều khiển, bỏ lớp lọc giá trị trùng lặp. Probe camera-off mặc định cải thiện p95 226,9 → 168,8 ms, vẫn chưa đạt 150 ms; pose kiểm thử lớn hơn đạt 141,6 ms trong mẫu nhỏ, không thay cho nghiệm thu mặc định/native.
 
 Để chọn CPU từ đầu khi cần:
 

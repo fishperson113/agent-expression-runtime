@@ -54,3 +54,20 @@ it('applies the reserved body channel once even when an illustration has a part 
   const local = livePoint(0.1, 0, 0, matrices[1]);
   expect(livePoint(...local, matrices[0])[0]).toBeCloseTo(0.3);
 });
+
+it('follows an authored reflex envelope without a second value filter while preserving ownership fade', () => {
+  const c = new LiveCompositor(), target = { part: 'body', prop: 'y' } as const;
+  c.install(validateConfiguration({ lifetimeMs: 2000, poses: [], controls: [{ type: 'reflex', id: 'pulse',
+    when: { event: 'user_arrived' }, do: { type: 'pose', target, value: 0.3, durationMs: 600 }, cooldownMs: 1000 }] }), 0);
+  c.sample(0, null, 0); c.event('user_arrived', 0);
+  expect(c.sample(0, null, 0)[0].value).toBe(0);
+  const rising = c.sample(60, null, 0)[0];
+  expect(rising.value).toBeCloseTo(0.3 * Math.sin(Math.PI / 10) ** 2);
+  expect(rising.weight).toBeGreaterThan(0); expect(rising.weight).toBeLessThan(1);
+  expect(c.sample(300, null, 0)[0].value).toBeCloseTo(0.3);
+  c.mode = 'reduced'; expect(c.sample(300, null, 0)[0].value).toBeCloseTo(0.024);
+  c.mode = 'off'; expect(c.sample(500, null, 0)[0].value).toBeCloseTo(0.024);
+  c.mode = 'normal'; c.sample(600, null, 0);
+  for (let at = 620; at <= 2400; at += 20) c.sample(at, null, 0);
+  expect(c.sample(2400, null, 0)).toEqual([]);
+});

@@ -1,0 +1,1510 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-09",
+  "baselineRuntime": "8704ecc",
+  "candidateRuntime": "2ec30c8",
+  "budget": {
+    "reserved": 53,
+    "limit": 120,
+    "deadlineUtc": "2026-11-09T06:17:35.373Z"
+  },
+  "environment": "Cloud Linux / headless Chromium SwiftShader / real Face Landmarker CPU / fake no-face camera only",
+  "privacy": {
+    "physicalCamera": false,
+    "audioCapture": false,
+    "pixelsPersisted": false,
+    "modelCallsForProbes": 0
+  },
+  "visionMethod": {
+    "configuredSourceFps": 30,
+    "resolution": [
+      640,
+      480
+    ],
+    "particles": 2000,
+    "warmupSeconds": 10,
+    "windowSeconds": 20,
+    "order": [
+      "baseline-1",
+      "candidate-1",
+      "baseline-2",
+      "candidate-2"
+    ],
+    "limits": "Separate repeated windows; source nominal rate is not inference throughput. Ordinary motion on; no confidence/model/quality changes."
+  },
+  "visionRuns": [
+    {
+      "variant": "baseline",
+      "repeat": 1,
+      "samples": 283,
+      "hz": 14.15,
+      "inferenceMs": {
+        "mean": 48.26819787990605,
+        "p50": 49.30000000074506,
+        "p95": 74.09999999962747,
+        "min": 20.90000000037253,
+        "max": 96.90000000037253
+      },
+      "postMessageToResultMs": {
+        "mean": 49.962897526435945,
+        "p50": 50.80000000074506,
+        "p95": 75.40000000037253,
+        "min": 21.199999999254942,
+        "max": 97.5
+      },
+      "resultToNextPostIdleMs": {
+        "mean": 20.68303886931982,
+        "p50": 16.5,
+        "p95": 53.20000000111759,
+        "min": 0.5,
+        "max": 63.90000000037253
+      },
+      "counts": {
+        "observations": 296,
+        "syntheticImages": 0,
+        "unexpectedFrames": 0,
+        "nonLoopbackRequests": 0,
+        "blockedExternalRequests": 0
+      },
+      "errors": 0
+    },
+    {
+      "variant": "candidate",
+      "repeat": 1,
+      "samples": 456,
+      "hz": 22.8,
+      "inferenceMs": {
+        "mean": 37.96666666667239,
+        "p50": 34.40000000037253,
+        "p95": 65.5,
+        "min": 11,
+        "max": 101.20000000111759
+      },
+      "postMessageToResultMs": {
+        "mean": 40.416447368417785,
+        "p50": 39.90000000037253,
+        "p95": 67.80000000074506,
+        "min": 11.199999999254942,
+        "max": 101.5
+      },
+      "resultToNextPostIdleMs": {
+        "mean": 3.4214912280644567,
+        "p50": 0.5,
+        "p95": 21.09999999962747,
+        "min": 0,
+        "max": 45.600000001490116
+      },
+      "counts": {
+        "observations": 300,
+        "syntheticImages": 0,
+        "unexpectedFrames": 0,
+        "nonLoopbackRequests": 0,
+        "blockedExternalRequests": 0
+      },
+      "errors": 0
+    },
+    {
+      "variant": "baseline",
+      "repeat": 2,
+      "samples": 281,
+      "hz": 14.05,
+      "inferenceMs": {
+        "mean": 48.05124555164252,
+        "p50": 50,
+        "p95": 73.19999999925494,
+        "min": 16,
+        "max": 99.39999999850988
+      },
+      "postMessageToResultMs": {
+        "mean": 49.555516014220295,
+        "p50": 50.90000000037253,
+        "p95": 75.5,
+        "min": 16.200000001117587,
+        "max": 99.60000000149012
+      },
+      "resultToNextPostIdleMs": {
+        "mean": 21.620640569409602,
+        "p50": 17,
+        "p95": 54.90000000037253,
+        "min": 0.599999999627471,
+        "max": 65
+      },
+      "counts": {
+        "observations": 299,
+        "syntheticImages": 0,
+        "unexpectedFrames": 0,
+        "nonLoopbackRequests": 0,
+        "blockedExternalRequests": 0
+      },
+      "errors": 0
+    },
+    {
+      "variant": "candidate",
+      "repeat": 2,
+      "samples": 467,
+      "hz": 23.35,
+      "inferenceMs": {
+        "mean": 37.81177730195033,
+        "p50": 35.40000000037253,
+        "p95": 65.70000000111759,
+        "min": 11,
+        "max": 81.80000000074506
+      },
+      "postMessageToResultMs": {
+        "mean": 39.992077087756144,
+        "p50": 37.59999999962747,
+        "p95": 66.90000000037253,
+        "min": 11.299999998882413,
+        "max": 86.29999999888241
+      },
+      "resultToNextPostIdleMs": {
+        "mean": 2.920985010741737,
+        "p50": 0.5,
+        "p95": 15.900000000372529,
+        "min": 0,
+        "max": 43.80000000074506
+      },
+      "counts": {
+        "observations": 299,
+        "syntheticImages": 0,
+        "unexpectedFrames": 0,
+        "nonLoopbackRequests": 0,
+        "blockedExternalRequests": 0
+      },
+      "errors": 0
+    }
+  ],
+  "reflexMethod": {
+    "trialsEach": 10,
+    "order": [
+      "candidate",
+      "baseline"
+    ],
+    "poseBodyY": 0.3,
+    "poseDurationMs": 600,
+    "observationHz": 24,
+    "criterion": "same >2px green-weighted rendered centroid shift; >2.1s continuous absence before each trial; debounce excluded, readback overhead included; no persisted pixels",
+    "p95Estimator": "sorted[floor(n*0.95)] (maximum for n=10)",
+    "limits": "Bounded software render-buffer proxy, not physical/human/native acceptance. Preliminary series resets declared control cooldown only; default-layer cooldown may carry between trials. Controlled page-reset series below is authoritative."
+  },
+  "soakMethod": {
+    "secondsEach": 1800,
+    "warmupSecondsEach": 60,
+    "windowSeconds": 30,
+    "order": [
+      "baseline",
+      "candidate"
+    ],
+    "geometry": "2000 particles; initial bird, alternating peace/bird with cancel and 1100/1360x950 resize every 120 seconds",
+    "rateMeasurement": "cameraSeq deltas / elapsed with idle turn and absent camera status throughout; nominal track FPS is not inference throughput",
+    "renderMeasurement": "mean FPS and frame p95 from the last 120 render intervals at each sample",
+    "memoryMeasurement": "sum browser-process Private_*; page GC before baseline/final; collected before camera stop",
+    "limits": "Independent sequential Cloud software-GPU runs, fake no-face source. Not physical/human/native acceptance."
+  },
+  "soaks": {
+    "baseline": {
+      "durationSeconds": 1800.231009455,
+      "warmupSeconds": 60,
+      "cameraInfo": {
+        "width": 640,
+        "height": 480,
+        "frameRate": 30,
+        "audioTracks": 0
+      },
+      "gpu": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "topologyCancelResizeCycles": 15,
+      "cameraContinuous": true,
+      "cameraStoppedAtTeardown": true,
+      "privateGrowthBytes": 19615744,
+      "heapGrowthBytes": 1962604,
+      "privateMemoryGate": "passed",
+      "counts": {
+        "observations": 18388,
+        "syntheticImages": 0,
+        "unexpectedFrames": 0,
+        "nonLoopbackRequests": 0,
+        "blockedExternalRequests": 0
+      },
+      "errors": 0,
+      "browserPrivateBeforeBytes": 437825536,
+      "browserPrivateAfterBytes": 457441280,
+      "summary": {
+        "inferenceHzMinMedianMax": [
+          13.642083895688335,
+          14.613652937416298,
+          16.707205254143847
+        ],
+        "renderFpsMinMedianMax": [
+          30.945381401819834,
+          34.058554788607964,
+          44.854782641186624
+        ],
+        "rollingFrameP95MinMaxMs": [
+          38.100000001490116,
+          51
+        ]
+      },
+      "elapsedSeconds": [
+        30.005,
+        60.065,
+        90.119,
+        120.222,
+        150.362,
+        180.413,
+        210.484,
+        240.526,
+        270.63,
+        300.685,
+        330.754,
+        360.803,
+        390.905,
+        420.963,
+        451.023,
+        481.073,
+        511.188,
+        541.253,
+        571.304,
+        601.339,
+        631.468,
+        661.504,
+        691.562,
+        721.61,
+        751.722,
+        781.788,
+        811.831,
+        841.884,
+        871.996,
+        902.06,
+        932.102,
+        962.156,
+        992.276,
+        1022.322,
+        1052.367,
+        1082.403,
+        1112.509,
+        1142.579,
+        1172.652,
+        1202.699,
+        1232.808,
+        1262.862,
+        1292.91,
+        1322.959,
+        1353.066,
+        1383.102,
+        1413.153,
+        1443.196,
+        1473.292,
+        1503.332,
+        1533.398,
+        1563.453,
+        1593.552,
+        1623.619,
+        1653.691,
+        1683.765,
+        1713.869,
+        1743.916,
+        1774.015,
+        1800.0
+      ],
+      "inferenceHz": [
+        13.731,
+        13.806,
+        13.642,
+        13.72,
+        16.025,
+        16.04,
+        16.029,
+        16.31,
+        14.184,
+        13.974,
+        14.301,
+        13.744,
+        15.614,
+        16.002,
+        16.101,
+        16.107,
+        13.747,
+        14.003,
+        14.442,
+        14.017,
+        16.363,
+        15.947,
+        16.368,
+        16.274,
+        14.181,
+        14.036,
+        13.947,
+        13.709,
+        16.173,
+        16.665,
+        16.41,
+        16.271,
+        13.978,
+        14.012,
+        14.145,
+        13.983,
+        16.243,
+        16.162,
+        16.294,
+        16.707,
+        14.647,
+        14.307,
+        14.544,
+        14.177,
+        16.608,
+        16.181,
+        16.405,
+        16.21,
+        14.72,
+        14.581,
+        14.235,
+        14.274,
+        16.578,
+        16.397,
+        16.095,
+        15.695,
+        14.383,
+        14.244,
+        13.821,
+        14.239
+      ],
+      "renderFps": [
+        32.509,
+        33.235,
+        31.309,
+        30.945,
+        42.496,
+        42.758,
+        43.753,
+        43.611,
+        31.883,
+        32.715,
+        33.493,
+        31.813,
+        41.886,
+        41.458,
+        43.515,
+        43.916,
+        31.635,
+        32.461,
+        32.983,
+        33.08,
+        43.235,
+        42.656,
+        42.194,
+        43.453,
+        32.418,
+        33.039,
+        33.551,
+        32.998,
+        42.889,
+        43.727,
+        43.022,
+        44.113,
+        32.598,
+        34.104,
+        32.507,
+        31.202,
+        43.026,
+        42.938,
+        43.5,
+        44.307,
+        32.63,
+        32.517,
+        32.479,
+        33.435,
+        43.489,
+        43.789,
+        44.855,
+        44.139,
+        35.058,
+        33.272,
+        32.973,
+        33.21,
+        43.148,
+        43.398,
+        44.626,
+        44.831,
+        34.014,
+        32.996,
+        33.756,
+        33.448
+      ],
+      "rollingFrameP95Ms": [
+        47,
+        46.6,
+        50.2,
+        51,
+        41.5,
+        39.7,
+        39.2,
+        39,
+        49.3,
+        47.4,
+        47.9,
+        49.3,
+        39.2,
+        41.8,
+        40.3,
+        40.8,
+        49.8,
+        47.3,
+        47.2,
+        48.4,
+        40.6,
+        39,
+        41.7,
+        41.7,
+        49.1,
+        47.2,
+        47,
+        46.3,
+        41,
+        39.6,
+        42.8,
+        40.3,
+        47.2,
+        46.6,
+        46.4,
+        50,
+        39.6,
+        38.7,
+        40.6,
+        41.5,
+        49.6,
+        48.8,
+        50.2,
+        45.6,
+        39.3,
+        38.5,
+        38.1,
+        38.8,
+        45.6,
+        47.9,
+        45.4,
+        48.3,
+        40.5,
+        39.4,
+        39.9,
+        42.6,
+        48,
+        46.5,
+        45.1,
+        46.8
+      ]
+    },
+    "candidate": {
+      "durationSeconds": 1800.2337274719998,
+      "warmupSeconds": 60,
+      "cameraInfo": {
+        "width": 640,
+        "height": 480,
+        "frameRate": 30,
+        "audioTracks": 0
+      },
+      "gpu": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "topologyCancelResizeCycles": 15,
+      "cameraContinuous": true,
+      "cameraStoppedAtTeardown": true,
+      "privateGrowthBytes": -14077952,
+      "heapGrowthBytes": -198608,
+      "privateMemoryGate": "passed",
+      "counts": {
+        "observations": 18596,
+        "syntheticImages": 0,
+        "unexpectedFrames": 0,
+        "nonLoopbackRequests": 0,
+        "blockedExternalRequests": 0
+      },
+      "errors": 0,
+      "browserPrivateBeforeBytes": 474304512,
+      "browserPrivateAfterBytes": 460226560,
+      "summary": {
+        "inferenceHzMinMedianMax": [
+          21.3432794708035,
+          22.905251727700627,
+          23.991328002341795
+        ],
+        "renderFpsMinMedianMax": [
+          26.690985119784642,
+          30.867089040150994,
+          40.83438255009166
+        ],
+        "rollingFrameP95MinMaxMs": [
+          39.29999999888241,
+          58.29999999888241
+        ]
+      },
+      "elapsedSeconds": [
+        30.005,
+        60.046,
+        90.122,
+        120.212,
+        150.349,
+        180.401,
+        210.459,
+        240.51,
+        270.629,
+        300.665,
+        330.715,
+        360.748,
+        390.893,
+        420.931,
+        450.979,
+        481.039,
+        511.151,
+        541.207,
+        571.248,
+        601.318,
+        631.436,
+        661.497,
+        691.533,
+        721.568,
+        751.693,
+        781.732,
+        811.797,
+        841.845,
+        871.947,
+        902.005,
+        932.036,
+        962.101,
+        992.193,
+        1022.269,
+        1052.333,
+        1082.4,
+        1112.496,
+        1142.533,
+        1172.599,
+        1202.633,
+        1232.725,
+        1262.772,
+        1292.829,
+        1322.868,
+        1352.965,
+        1383.026,
+        1413.071,
+        1443.129,
+        1473.221,
+        1503.272,
+        1533.335,
+        1563.41,
+        1593.502,
+        1623.541,
+        1653.593,
+        1683.625,
+        1713.754,
+        1743.8,
+        1773.843,
+        1800.0
+      ],
+      "inferenceHz": [
+        22.096,
+        22.27,
+        22.676,
+        22.532,
+        23.792,
+        23.991,
+        23.754,
+        23.693,
+        23.108,
+        22.107,
+        21.763,
+        21.343,
+        23.587,
+        22.904,
+        23.063,
+        23.088,
+        22.051,
+        21.893,
+        21.704,
+        21.782,
+        23.54,
+        22.454,
+        22.906,
+        23.472,
+        22.307,
+        22.47,
+        22.086,
+        21.931,
+        23.687,
+        23.222,
+        23.342,
+        23.915,
+        21.833,
+        21.778,
+        21.919,
+        21.719,
+        23.259,
+        23.338,
+        23.947,
+        23.273,
+        21.767,
+        22.133,
+        21.859,
+        21.871,
+        23.291,
+        23.785,
+        23.598,
+        23.222,
+        23.86,
+        22.295,
+        22.353,
+        22.877,
+        23.86,
+        23.902,
+        23.826,
+        23.841,
+        23.465,
+        22.932,
+        22.135,
+        21.677
+      ],
+      "renderFps": [
+        29.183,
+        30.674,
+        29.999,
+        30.657,
+        39.894,
+        39.04,
+        40.328,
+        40.388,
+        29.859,
+        29.658,
+        30.512,
+        30.691,
+        38.596,
+        39.866,
+        37.136,
+        39.752,
+        29.996,
+        30.289,
+        26.691,
+        29.806,
+        39.23,
+        40.746,
+        40.037,
+        38.262,
+        29.587,
+        29.969,
+        30.315,
+        30.374,
+        39.88,
+        39.304,
+        39.302,
+        39.98,
+        30.189,
+        29.875,
+        30.163,
+        30.268,
+        39.936,
+        39.544,
+        40.704,
+        38.655,
+        30.993,
+        30.742,
+        29.854,
+        29.127,
+        39.182,
+        40.811,
+        40.259,
+        38.447,
+        30.558,
+        29.886,
+        30.373,
+        31.11,
+        40.019,
+        40.834,
+        39.27,
+        39.813,
+        30.258,
+        29.424,
+        30.485,
+        30.676
+      ],
+      "rollingFrameP95Ms": [
+        55.2,
+        48.7,
+        49.2,
+        49.6,
+        41.8,
+        43.8,
+        44.2,
+        41.5,
+        49.9,
+        50.2,
+        49.9,
+        48.8,
+        45.1,
+        42.7,
+        44.5,
+        43.6,
+        50.4,
+        50.8,
+        58.3,
+        49.3,
+        49.5,
+        43.6,
+        43.5,
+        43.5,
+        51.2,
+        50.8,
+        53.1,
+        51.3,
+        42.3,
+        43.2,
+        43.8,
+        44.7,
+        47.4,
+        51.1,
+        49.1,
+        51.3,
+        43.4,
+        43.8,
+        42.7,
+        45.7,
+        49.6,
+        49.7,
+        50.9,
+        51,
+        43.6,
+        39.3,
+        41.7,
+        45.6,
+        50.9,
+        51.8,
+        49.8,
+        49.2,
+        43.6,
+        43.2,
+        42.1,
+        42.6,
+        48.6,
+        49.6,
+        48.5,
+        49.7
+      ]
+    }
+  },
+  "preliminaryReflex": {
+    "baseline": {
+      "confirmedToCentroidMs": [
+        159.5,
+        157.7000000011176,
+        160.59999999962747,
+        186.40000000037253,
+        149.80000000074506,
+        177.19999999925494,
+        166.39999999850988,
+        199,
+        168.19999999925494,
+        190.89999999850988
+      ],
+      "preEventJitterPixels": [
+        0.7309647246634086,
+        0.8188495461378693,
+        0.5912948389131145,
+        0.838352025264669,
+        0.35480926248732203,
+        1.0774624008609237,
+        0.4659211742062723,
+        0.37518213450837834,
+        0.7287114542448307,
+        0.45737207373409206
+      ],
+      "centroidShiftPixels": [
+        2.245295325986149,
+        2.1513455123531458,
+        2.206461994202556,
+        2.5774273267649335,
+        2.1915449059024468,
+        3.0873438214476323,
+        2.2911906588358875,
+        3.180758977679602,
+        3.2822655943004406,
+        2.7672290765692367
+      ],
+      "cameraUsed": false
+    },
+    "candidate": {
+      "confirmedToCentroidMs": [
+        129.59999999962747,
+        107.69999999925494,
+        125.20000000111759,
+        173.59999999962747,
+        125.09999999962747,
+        122,
+        141.09999999962747,
+        129.30000000074506,
+        123.59999999962747,
+        141.7999999988824
+      ],
+      "preEventJitterPixels": [
+        0.6581712495081433,
+        0.8294561637729316,
+        0.48998742020245345,
+        0.8525725663527055,
+        0.5644323398161077,
+        0.9593139462111822,
+        0.7053325307111038,
+        0.3484287997156912,
+        0.9592315791514352,
+        0.2811436398245064
+      ],
+      "centroidShiftPixels": [
+        2.977741943217353,
+        2.023241477842163,
+        2.0781364966842375,
+        3.0658609322025256,
+        2.5450649805488013,
+        2.14492126036356,
+        2.695654325074912,
+        2.701259784701591,
+        3.4650583887634525,
+        3.472351781761205
+      ],
+      "cameraUsed": false
+    }
+  },
+  "controlledReflexMethod": {
+    "trialsEach": 10,
+    "freshPageEachTrial": true,
+    "freshMcpClientEachDeclaredTrial": true,
+    "cameraUsed": false,
+    "defaultArrivalPose": {
+      "bodyY": 0.12,
+      "durationMs": 600
+    },
+    "declaredPose": {
+      "bodyY": 0.3,
+      "durationMs": 600
+    },
+    "observationHz": 24,
+    "absentWarmupMs": 2100,
+    "criterion": "same >2px green-weighted rendered centroid shift; debounce excluded, readback included; pixels never persisted",
+    "order": [
+      "baseline-default",
+      "candidate-default",
+      "candidate-declared",
+      "baseline-declared"
+    ],
+    "medianEstimator": "ordinary median",
+    "p95Estimator": "sorted[floor(n*0.95)], conservative maximum for 10 trials",
+    "reloadSafety": "Initial stale-client request was rejected, not replayed. Probe now initializes a fresh MCP client after every reload; product quarantine unchanged."
+  },
+  "controlledReflex": {
+    "default": {
+      "baseline": {
+        "medianMs": 216.19999999925494,
+        "sampledP95Ms": 226.89999999850988,
+        "trials": [
+          {
+            "confirmedEventToCentroidChangeMs": 196.09999999962747,
+            "centroidDeltaPixels": 2.1310556051348897,
+            "maxPreEventJitterPixels": 0.2979359310770633,
+            "observedFrames": 54,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 201.30000000074506,
+            "centroidDeltaPixels": 2.093707448998913,
+            "maxPreEventJitterPixels": 0.26815192742566296,
+            "observedFrames": 53,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 223.89999999850988,
+            "centroidDeltaPixels": 2.424928780191607,
+            "maxPreEventJitterPixels": 0.22876875835174815,
+            "observedFrames": 56,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 204.90000000037253,
+            "centroidDeltaPixels": 2.3747560574583417,
+            "maxPreEventJitterPixels": 0.1988894744800973,
+            "observedFrames": 54,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 225,
+            "centroidDeltaPixels": 2.816957580677979,
+            "maxPreEventJitterPixels": 0.19714452093677437,
+            "observedFrames": 57,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 224.69999999925494,
+            "centroidDeltaPixels": 2.8864571801892396,
+            "maxPreEventJitterPixels": 0.1826928126331211,
+            "observedFrames": 53,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 226.09999999962747,
+            "centroidDeltaPixels": 2.8243009121571276,
+            "maxPreEventJitterPixels": 0.18930335567657153,
+            "observedFrames": 52,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 208.5,
+            "centroidDeltaPixels": 2.34965655365977,
+            "maxPreEventJitterPixels": 0.19700169264268652,
+            "observedFrames": 53,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 204.19999999925494,
+            "centroidDeltaPixels": 2.243669918054792,
+            "maxPreEventJitterPixels": 0.17875885271948277,
+            "observedFrames": 55,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 226.89999999850988,
+            "centroidDeltaPixels": 2.765877759809598,
+            "maxPreEventJitterPixels": 0.23094393855831186,
+            "observedFrames": 54,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          }
+        ]
+      },
+      "candidate": {
+        "medianMs": 160.09999999962747,
+        "sampledP95Ms": 168.80000000074506,
+        "trials": [
+          {
+            "confirmedEventToCentroidChangeMs": 166.09999999962747,
+            "centroidDeltaPixels": 2.3711092351732077,
+            "maxPreEventJitterPixels": 0.18191431621474408,
+            "observedFrames": 49,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 166.69999999925494,
+            "centroidDeltaPixels": 2.078827614665812,
+            "maxPreEventJitterPixels": 0.3804225976323323,
+            "observedFrames": 53,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 159.59999999962747,
+            "centroidDeltaPixels": 2.3528054813846495,
+            "maxPreEventJitterPixels": 0.2580139619170154,
+            "observedFrames": 53,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 157.30000000074506,
+            "centroidDeltaPixels": 2.1113800547254016,
+            "maxPreEventJitterPixels": 0.21031567251961292,
+            "observedFrames": 53,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 153.90000000037253,
+            "centroidDeltaPixels": 2.41216589658913,
+            "maxPreEventJitterPixels": 0.20906420998238673,
+            "observedFrames": 53,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 155.89999999850988,
+            "centroidDeltaPixels": 2.2890999522952313,
+            "maxPreEventJitterPixels": 0.20317252941299557,
+            "observedFrames": 51,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 168.80000000074506,
+            "centroidDeltaPixels": 2.2661693174736968,
+            "maxPreEventJitterPixels": 0.22922237554874414,
+            "observedFrames": 53,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 160.59999999962747,
+            "centroidDeltaPixels": 2.437210307511009,
+            "maxPreEventJitterPixels": 0.20290017234887614,
+            "observedFrames": 53,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 163.40000000037253,
+            "centroidDeltaPixels": 2.4192760668107667,
+            "maxPreEventJitterPixels": 0.24064986985928272,
+            "observedFrames": 53,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 144,
+            "centroidDeltaPixels": 2.034068836836269,
+            "maxPreEventJitterPixels": 0.19965605673527875,
+            "observedFrames": 51,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          }
+        ]
+      }
+    },
+    "declared": {
+      "baseline": {
+        "medianMs": 179.09999999962747,
+        "sampledP95Ms": 209,
+        "trials": [
+          {
+            "confirmedEventToCentroidChangeMs": 173.59999999962747,
+            "centroidDeltaPixels": 2.1478249852775946,
+            "maxPreEventJitterPixels": 0.33708097221108346,
+            "observedFrames": 47,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 181.7999999988824,
+            "centroidDeltaPixels": 3.812752967805153,
+            "maxPreEventJitterPixels": 0.6325216920219532,
+            "observedFrames": 53,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 164.19999999925494,
+            "centroidDeltaPixels": 2.411881411380932,
+            "maxPreEventJitterPixels": 0.6057153225820002,
+            "observedFrames": 51,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 176.40000000037253,
+            "centroidDeltaPixels": 3.42893418545691,
+            "maxPreEventJitterPixels": 0.4266232934464824,
+            "observedFrames": 52,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 189.2000000011176,
+            "centroidDeltaPixels": 3.936330249367444,
+            "maxPreEventJitterPixels": 0.6623340258658175,
+            "observedFrames": 51,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 170.09999999962747,
+            "centroidDeltaPixels": 2.7081726869982106,
+            "maxPreEventJitterPixels": 0.59651426794386,
+            "observedFrames": 53,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 186.90000000037253,
+            "centroidDeltaPixels": 2.8927465993373005,
+            "maxPreEventJitterPixels": 0.4716734908987803,
+            "observedFrames": 56,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 157.90000000037253,
+            "centroidDeltaPixels": 2.1611205834549025,
+            "maxPreEventJitterPixels": 0.6454617340866378,
+            "observedFrames": 51,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 187.59999999962747,
+            "centroidDeltaPixels": 3.3457390256002952,
+            "maxPreEventJitterPixels": 0.7121758226915347,
+            "observedFrames": 53,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 209,
+            "centroidDeltaPixels": 5.346444398685691,
+            "maxPreEventJitterPixels": 0.5603667325010235,
+            "observedFrames": 59,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          }
+        ]
+      },
+      "candidate": {
+        "medianMs": 130.20000000018626,
+        "sampledP95Ms": 141.59999999962747,
+        "trials": [
+          {
+            "confirmedEventToCentroidChangeMs": 131.10000000149012,
+            "centroidDeltaPixels": 2.8213328981314305,
+            "maxPreEventJitterPixels": 0.41798814559618336,
+            "observedFrames": 48,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 129.2999999988824,
+            "centroidDeltaPixels": 2.4231767503521553,
+            "maxPreEventJitterPixels": 0.699781945642286,
+            "observedFrames": 53,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 118.59999999962747,
+            "centroidDeltaPixels": 2.3457544267747608,
+            "maxPreEventJitterPixels": 0.6438656332146593,
+            "observedFrames": 52,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 123.30000000074506,
+            "centroidDeltaPixels": 2.521036673235301,
+            "maxPreEventJitterPixels": 0.46091793949508997,
+            "observedFrames": 51,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 141.59999999962747,
+            "centroidDeltaPixels": 3.4041145671612867,
+            "maxPreEventJitterPixels": 0.5671069509482436,
+            "observedFrames": 48,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 127.39999999850988,
+            "centroidDeltaPixels": 2.354501818407215,
+            "maxPreEventJitterPixels": 0.5883696657099051,
+            "observedFrames": 51,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 134.40000000037253,
+            "centroidDeltaPixels": 2.740307289775785,
+            "maxPreEventJitterPixels": 0.4723982180566395,
+            "observedFrames": 51,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 137.90000000037253,
+            "centroidDeltaPixels": 3.7975349952780277,
+            "maxPreEventJitterPixels": 0.6873844111136691,
+            "observedFrames": 53,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 138.09999999962747,
+            "centroidDeltaPixels": 3.484424345307417,
+            "maxPreEventJitterPixels": 0.4415668695677937,
+            "observedFrames": 48,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          },
+          {
+            "confirmedEventToCentroidChangeMs": 124.59999999962747,
+            "centroidDeltaPixels": 2.2186695507139973,
+            "maxPreEventJitterPixels": 0.6970839818576167,
+            "observedFrames": 50,
+            "cameraUsed": false,
+            "validNoiseFloor": true
+          }
+        ]
+      }
+    }
+  },
+  "finalLifecycleGuard": "After the immutable 2ec30c8 soak bundle, retired-worker errors additionally check generation. This affects only the stop/restart error path; covered by a dedicated regression test.",
+  "sourceSha256": {
+    "src/live/vision.ts": "6d7cb637db7016bdefaf72b88da407fbe7c4b1a4d0f0da28e06bd75f5a79a4b9",
+    "src/core/live/compositor.ts": "63888590c02e4728587e34ff06752fd549e20666268b20181326830ee6da1139",
+    "scripts/live-reflex-latency.mjs": "cf12871abfb99ba95bb86f69e116dc489e935472cb03bf75baa028ea3826efe2"
+  },
+  "cpuDiagnostic": {
+    "windowSeconds": 20,
+    "samples": 450,
+    "inferenceMs": {
+      "mean": 40.351333333419426,
+      "p50": 38.30000000074506,
+      "p95": 71.10000000149012,
+      "min": 11.900000000372529,
+      "max": 90.5
+    },
+    "postMessageToResultMs": {
+      "mean": 42.443111111074685,
+      "p50": 41.69999999925494,
+      "p95": 72.69999999925494,
+      "min": 12,
+      "max": 120.79999999888241
+    },
+    "resultToNextPostIdleMs": {
+      "mean": 2.339111111147536,
+      "p50": 0.5,
+      "p95": 13.300000000745058,
+      "min": 0.09999999962747097,
+      "max": 37.59999999962747
+    },
+    "counts": {
+      "observations": 301,
+      "syntheticImages": 0,
+      "unexpectedFrames": 0,
+      "nonLoopbackRequests": 0,
+      "blockedExternalRequests": 0
+    },
+    "errors": [],
+    "cpuProfile": {
+      "mode": "diagnostic Vite dev modules, main-thread sampling plus whole-process CPU delta; not acceptance timing",
+      "windowSeconds": 20.127885,
+      "topSelfMs": [
+        {
+          "name": "(idle)",
+          "module": "runtime/dependency",
+          "ms": 16849.583999999704
+        },
+        {
+          "name": "(program)",
+          "module": "runtime/dependency",
+          "ms": 863.5770000000007
+        },
+        {
+          "name": "flock",
+          "module": "/src/core/geometry/boids.ts",
+          "ms": 562.1649999999997
+        },
+        {
+          "name": "createImageBitmap",
+          "module": "runtime/dependency",
+          "ms": 555.3360000000002
+        },
+        {
+          "name": "(garbage collector)",
+          "module": "runtime/dependency",
+          "ms": 409.0919999999998
+        },
+        {
+          "name": "integrate",
+          "module": "/src/core/geometry/boids.ts",
+          "ms": 222.56699999999998
+        },
+        {
+          "name": "sampleBody",
+          "module": "/src/adapters/body-geometry.ts",
+          "ms": 169.7709999999999
+        },
+        {
+          "name": "apply",
+          "module": "/src/core/geometry/boids.ts",
+          "ms": 87.62500000000001
+        },
+        {
+          "name": "tick",
+          "module": "/src/core/geometry/morph.ts",
+          "ms": 45.67400000000001
+        },
+        {
+          "name": "(anonymous)",
+          "module": "runtime/dependency",
+          "ms": 44.656
+        },
+        {
+          "name": "clear",
+          "module": "runtime/dependency",
+          "ms": 27.382999999999996
+        },
+        {
+          "name": "bufferSubData",
+          "module": "runtime/dependency",
+          "ms": 22.486
+        },
+        {
+          "name": "apply",
+          "module": "/src/live/body.ts",
+          "ms": 21.023000000000003
+        },
+        {
+          "name": "apply",
+          "module": "/src/adapters/three-renderer.ts",
+          "ms": 20.292
+        },
+        {
+          "name": "sample",
+          "module": "/src/live/main.ts",
+          "ms": 16.765
+        }
+      ],
+      "processCpuSeconds": {
+        "browser": 0.22999999999999998,
+        "renderer": 7.680000000000001,
+        "GPU": 72.08,
+        "network.mojom.NetworkService": 0.04000000000000001,
+        "storage.mojom.StorageService": 0,
+        "video_capture.mojom.VideoCaptureService": 0.18000000000000002
+      },
+      "cgroupCpuDelta": {
+        "usage_usec": 80455564,
+        "user_usec": 76459500,
+        "system_usec": 3996064,
+        "nice_usec": 0,
+        "nr_periods": 202,
+        "nr_throttled": 202,
+        "throttled_usec": 13658524,
+        "nr_bursts": 0,
+        "burst_usec": 0
+      },
+      "cpuMax": "400000 100000",
+      "driPresent": false
+    },
+    "scope": "Extra diagnostic, Vite dev modules with bird geometry; not a production acceptance sample. GPU CPU delta covers shared graphics/media pipeline, not a per-operation attribution."
+  },
+  "inputFormatExperiments": {
+    "scope": "20 s each after 10 s warm-up, fake 640x480 no-face input at nominal 30 FPS; same model/confidence/particle count, no model calls. Experimental code isolated under /tmp and not shipped.",
+    "order": [
+      "worker-cpu-copy",
+      "retained-bitmap-control",
+      "direct-video-cpu-copy"
+    ],
+    "variants": [
+      {
+        "variant": "worker-cpu-copy",
+        "samples": 282,
+        "hz": 14.1,
+        "inferenceMs": {
+          "mean": 66.2723404255874,
+          "p50": 65.59999999962747,
+          "p95": 90.69999999925494,
+          "min": 33.5,
+          "max": 110.30000000074506
+        },
+        "postMessageToResultMs": {
+          "mean": 68.8312056737932,
+          "p50": 68.40000000037253,
+          "p95": 93.20000000111759,
+          "min": 36,
+          "max": 119
+        },
+        "resultToNextPostIdleMs": {
+          "mean": 2.0063829786864154,
+          "p50": 0.5,
+          "p95": 6.5,
+          "min": 0.19999999925494194,
+          "max": 25.5
+        },
+        "errors": 0,
+        "counts": {
+          "observations": 299,
+          "syntheticImages": 0,
+          "unexpectedFrames": 0,
+          "nonLoopbackRequests": 0,
+          "blockedExternalRequests": 0
+        },
+        "shipped": false
+      },
+      {
+        "variant": "retained-bitmap-control",
+        "samples": 461,
+        "hz": 23.05,
+        "inferenceMs": {
+          "mean": 37.60130151851737,
+          "p50": 33.30000000074506,
+          "p95": 67,
+          "min": 12.199999999254942,
+          "max": 88
+        },
+        "postMessageToResultMs": {
+          "mean": 40.2707158351911,
+          "p50": 39.09999999962747,
+          "p95": 69.40000000037253,
+          "min": 12.599999999627471,
+          "max": 88.70000000111759
+        },
+        "resultToNextPostIdleMs": {
+          "mean": 3.1123644251077396,
+          "p50": 0.5,
+          "p95": 17.59999999962747,
+          "min": 0.09999999962747097,
+          "max": 38.5
+        },
+        "errors": 0,
+        "counts": {
+          "observations": 299,
+          "syntheticImages": 0,
+          "unexpectedFrames": 0,
+          "nonLoopbackRequests": 0,
+          "blockedExternalRequests": 0
+        },
+        "shipped": true
+      },
+      {
+        "variant": "direct-video-cpu-copy",
+        "samples": 298,
+        "hz": 14.9,
+        "inferenceMs": {
+          "mean": 40.7503355704873,
+          "p50": 41.59999999962747,
+          "p95": 68.30000000074506,
+          "min": 15.299999998882413,
+          "max": 94.89999999850988
+        },
+        "postMessageToResultMs": {
+          "mean": 44.46275167782235,
+          "p50": 45.19999999925494,
+          "p95": 69.90000000037253,
+          "min": 21.299999998882413,
+          "max": 96.80000000074506
+        },
+        "resultToNextPostIdleMs": {
+          "mean": 22.673825503383206,
+          "p50": 21.199999999254942,
+          "p95": 41.80000000074506,
+          "min": 5.900000000372529,
+          "max": 52.80000000074506
+        },
+        "errors": 0,
+        "counts": {
+          "observations": 297,
+          "syntheticImages": 0,
+          "unexpectedFrames": 0,
+          "nonLoopbackRequests": 0,
+          "blockedExternalRequests": 0
+        },
+        "shipped": false
+      }
+    ]
+  },
+  "validation": {
+    "jsTests": 261,
+    "jsTestFiles": 50,
+    "typecheckBuild": "passed",
+    "architecture": "passed",
+    "controlledLatencyTrials": 40,
+    "hardHarnessRules": "passed; R9 evidence-size warning disclosed, not suppressed",
+    "R10_R11": "unknown/unsupported in Codex"
+  }
+}
