@@ -84,3 +84,16 @@ it('generates unique blind codes without exposing prompt IDs or presentation ord
   expect(new Set(codes).size).toBe(20);
   expect(codes.every(code => /^V-[A-F0-9]{8}$/.test(code))).toBe(true);
 });
+
+it('marks a scoring kit incomplete until all recordings finish and keeps the key outside it', async () => {
+  const { writeScoringPack } = await import('../integrations/live-holdout-video.mjs');
+  const directory = mkdtempSync(join(tmpdir(), 'fisch-scoring-')); directories.push(directory);
+  const codes = ['V-ABCDEF12', 'V-12345678'];
+  writeScoringPack(directory, codes);
+  expect(readFileSync(join(directory, 'blind/index.html'), 'utf8')).toContain('BỘ CHƯA HOÀN TẤT');
+  const sheet = readFileSync(join(directory, 'blind/scoring.csv'), 'utf8');
+  expect(sheet).toContain('theme_guess,emotion_guess'); expect(sheet).not.toMatch(/h01|prompt|pass/);
+  writeScoringPack(directory, codes, true);
+  expect(readFileSync(join(directory, 'blind/index.html'), 'utf8')).not.toContain('BỘ CHƯA HOÀN TẤT');
+  expect(() => readFileSync(join(directory, 'blind/answer-key.json'))).toThrow();
+});

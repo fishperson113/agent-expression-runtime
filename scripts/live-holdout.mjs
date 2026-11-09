@@ -48,9 +48,11 @@ export async function runHoldout() {
   const initial = readModelBudget(budgetPath);
   if (Date.now() >= Date.parse(initial.deadline) || initial.used >= initial.limit) throw Error('Model test deadline or budget exhausted');
   mkdirSync(directory, { recursive: true });
+  const runDirectory = resolve(directory, 'video-' + new Date().toISOString().replace(/[:.]/g, '-'));
+  mkdirSync(runDirectory);
   const live = await openLive({ headless: true, synthetic: true }); let client;
   const rows = [], codes = blindCodes(20);
-  writeScoringPack(directory, codes);
+  writeScoringPack(runDirectory, codes, false);
   try {
     client = await openModelClient(live);
     for (let pass = 1; pass <= 2; pass++) {
@@ -58,24 +60,25 @@ export async function runHoldout() {
       const threadId = result.thread.id; client.focus(threadId);
       for (const prompt of prompts) {
         const budget = reserveModelTurn(budgetPath, `holdout-${prompt.id}-pass-${pass}`);
-        const capture = holdoutCapture(live.page, directory, `holdout-${prompt.id}-pass-${pass}`);
-        mkdirSync(resolve(directory, 'private'), { recursive: true });
+        const capture = holdoutCapture(live.page, runDirectory, `holdout-${prompt.id}-pass-${pass}`);
+        mkdirSync(resolve(runDirectory, 'private'), { recursive: true });
         const code = codes[rows.length], started = await startBodyVideo(live.page); let firstTool;
         const turn = await runModelTurn(client, threadId, prompt.prompt, Math.max(1, Math.min(90000, Date.parse(budget.deadline) - Date.now())), item => { capture.capture(item); if (item.server === 'fisch_live' && ['express', 'return_to_face'].includes(item.tool)) firstTool ??= Date.now(); });
-        writeFileSync(resolve(directory, 'private', code + '.json'), JSON.stringify({ id: prompt.id, pass, status: turn.status, started, firstTool }, null, 2));
+        writeFileSync(resolve(runDirectory, 'private', code + '.json'), JSON.stringify({ id: prompt.id, pass, status: turn.status, started, firstTool }, null, 2));
         await live.page.waitForTimeout(10500);
-        const video = await finishBodyVideo(live.page, directory, code, started, firstTool, turn.status === 'completed');
+        const video = await finishBodyVideo(live.page, runDirectory, code, started, firstTool, turn.status === 'completed');
         if (turn.status !== 'completed') throw Error('model_turn_failed');
         const activeEvidence = await capture.finish();
         await live.page.waitForTimeout(600);
         const metrics = await live.page.evaluate(() => window.fischLive.metrics());
-        await live.page.locator('#body').screenshot({ path: resolve(directory, `holdout-${prompt.id}-pass-${pass}.png`) });
+        await live.page.locator('#body').screenshot({ path: resolve(runDirectory, `holdout-${prompt.id}-pass-${pass}.png`) });
         rows.push({ id: prompt.id, pass, ...scoreContract(turn, metrics), activeEvidence, video });
-        writeFileSync(resolve(directory, 'answer-key.json'), JSON.stringify(rows.map(row => ({ code: row.video.code, id: row.id, pass: row.pass, prompt: prompts.find(p => p.id === row.id).prompt })), null, 2));
-        writeFileSync(resolve(directory, 'holdout-report.json'), JSON.stringify({ environment: 'Cloud Linux / headless software rendering / synthetic camera',
+        writeFileSync(resolve(runDirectory, 'answer-key.json'), JSON.stringify(rows.map(row => ({ code: row.video.code, id: row.id, pass: row.pass, prompt: prompts.find(p => p.id === row.id).prompt })), null, 2));
+        writeFileSync(resolve(directory, 'holdout-report.json'), JSON.stringify({ environment: 'Cloud Linux / headless software rendering / synthetic camera', videoRun: runDirectory.split(/[\\/]/).at(-1),
           modelTurnsUsed: readModelBudget(budgetPath).used, humanRecognition: 'pending', rows }, null, 2));
       }
     }
+    writeScoringPack(runDirectory, codes, true);
     return rows;
   } catch (error) {
     writeFileSync(resolve(directory, 'holdout-report.json'), JSON.stringify({ status: 'failed',
