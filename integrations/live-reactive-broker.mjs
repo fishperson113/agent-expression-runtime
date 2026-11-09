@@ -76,8 +76,9 @@ export class LiveReactiveBroker {
     if (pending && (message.result || message.error)) {
       this.pending.delete(message.id);
       if (['thread/start', 'thread/resume', 'thread/fork'].includes(pending.method) && message.result?.thread?.id) this.turns.clear();
-      const turn = message.result?.turn?.id;
-      if (pending.method === 'turn/start' && turn && !this.completed.has(turn)) this.trackTurn(turn);
+      const turn = message.result?.turn;
+      if (pending.method === 'turn/start' && !message.error && turn?.status === 'inProgress' &&
+        pending.threadId === this.output.thread && turn.id === this.output.turn && !this.completed.has(turn.id)) this.trackTurn(turn.id);
     }
     if (method === 'turn/started' && params.threadId === this.output.thread && params.turn?.id && !this.completed.has(params.turn.id)) this.trackTurn(params.turn.id);
     if (method === 'turn/completed' && params.turn?.id) {
