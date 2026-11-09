@@ -91,3 +91,26 @@ it('shows a large Fisch panel beside a narrower camera and activity panel with c
     expect(errors).toEqual([]);
   } finally { await browser?.close(); await server.close(); }
 }, 45000);
+
+it('fills wide windows without an unused strip and keeps the 2:1 panels', async () => {
+  const server = await createServer({ server: { host: '127.0.0.1', port: 0 } }); await server.listen(); let browser;
+  try {
+    browser = await chromium.launch({ headless: true, ...(process.platform === 'win32' ? { channel: 'msedge' } : {}),
+      args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+    const page = await browser.newPage();
+    const errors = []; page.on('pageerror', error => errors.push(error.message));
+    await page.goto(server.resolvedUrls.local[0] + 'live.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => Boolean(window.fischLive));
+    for (const width of [1833, 2560]) {
+      await page.setViewportSize({ width, height: 1080 });
+      const left = await page.locator('.body-panel').boundingBox(), right = await page.locator('.camera-panel').boundingBox();
+      expect(left.x).toBe(24); expect(Math.abs(width - right.x - right.width - 24)).toBeLessThan(1);
+      expect(left.width / right.width).toBeCloseTo(2, 1);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    }
+    await page.setViewportSize({ width: 375, height: 812 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    expect(await page.locator('video').evaluate(video => video.srcObject)).toBe(null);
+    expect(errors).toEqual([]);
+  } finally { await browser?.close(); await server.close(); }
+}, 45000);

@@ -8,6 +8,9 @@ import { startGateway, stopChild } from '../scripts/start-session.mjs';
 import { prepareLiveRuntime } from '../scripts/prepare-live.mjs';
 
 export const liveRoot = fileURLToPath(new URL('../', import.meta.url));
+export function livePageOptions(headless = false) {
+  return { viewport: headless ? { width: 1360, height: 950 } : null };
+}
 export async function closeLiveResources(actions) {
   const results = await Promise.allSettled(actions.map(action => Promise.resolve().then(action)));
   const failed = results.find(result => result.status === 'rejected');
@@ -27,7 +30,7 @@ export async function openLive({ hands, assets, headless = false, signal, inspec
     gateway = startGateway(origin, token); const base = await gateway.ready;
     if (signal?.aborted) throw Error('live_start_cancelled');
     browser = await launchLiveBrowser(headless);
-    const page = await browser.newPage({ viewport: { width: 1360, height: 950 } });
+    const page = await browser.newPage(livePageOptions(headless));
     inspect(page);
     const query = new URLSearchParams();
     if (process.env.FISCH_VISION_DELEGATE === 'CPU') query.set('vision', 'cpu');
