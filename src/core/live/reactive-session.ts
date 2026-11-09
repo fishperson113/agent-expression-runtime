@@ -13,7 +13,7 @@ function frozen<T>(value: T): T {
   if (value && typeof value === 'object') { for (const child of Object.values(value)) frozen(child); Object.freeze(value); }
   return value;
 }
-type Transport = { id: string; request: ReactiveRequest; delivered: boolean; done: Promise<DecisionResult>;
+type Transport = { id: string; request: ReactiveRequest; generation: number; authorized: boolean; delivered: boolean; done: Promise<DecisionResult>;
   resolve: (value: unknown) => void; reject: () => void };
 
 /** Pure coordinator. It never contacts a provider or writes to a renderer directly. */
@@ -141,14 +141,24 @@ export class ReactiveSession {
       try { this.options.admit(compiled, owner); }
       catch (error) { this.guard.revoke(); throw error; }
     });
-    this.transport = { id: request.requestId, request, delivered: false, resolve, reject, done };
+    this.transport = { id: request.requestId, request, generation, authorized: false, delivered: false, resolve, reject, done };
+  }
+  authorize(id: string): boolean {
+    this.tick(); const transport = this.transport;
+    if (!transport || transport.id !== id || transport.delivered || transport.authorized || transport.generation !== this.guard.generation ||
+      !this.enabled || !this.available || !this.healthy() || this.userBusy || !this.options.canAdmit()) return false;
+    const request = transport.request, state = this.readCurrent();
+    if (this.options.now() >= request.deadline || state.sessionId !== request.sessionId || state.epoch !== request.epoch ||
+      state.intentRevision !== request.intentRevision || state.presenceRevision !== request.presenceRevision ||
+      !request.requiredTrackIds.every(track => state.trackIds.includes(track))) return false;
+    transport.authorized = true; this.lastReason = 'authorized'; return true;
   }
   async deliver(id: string, data: unknown): Promise<DecisionResult | null> { return this.settle(id, data, false); }
   async fail(id: string): Promise<DecisionResult | null> { return this.settle(id, undefined, true); }
   private async settle(id: string, data: unknown, failed: boolean): Promise<DecisionResult | null> {
     this.tick(); const transport = this.transport;
     if (!transport || transport.id !== id || transport.delivered) return null;
-    transport.delivered = true; failed ? transport.reject() : transport.resolve(data);
+    transport.delivered = true; failed ? transport.reject() : transport.resolve(transport.authorized || data === null ? data : null);
     const result = await transport.done;
     if (this.transport === transport) this.transport = undefined;
     this.uncertain ||= result.reason === 'transport_unknown'; this.lastReason = result.reason;
@@ -156,7 +166,7 @@ export class ReactiveSession {
   }
   status() {
     return { available: this.available, enabled: this.enabled, userBusy: this.userBusy, sourceValid: this.sourceValid,
-      pending: this.pending.size, transport: this.transport?.id ?? null, owner: this.guard.owner?.actionId ?? null,
+      pending: this.pending.size, transport: this.transport?.id ?? null, authorized: this.transport?.authorized ?? false, owner: this.guard.owner?.actionId ?? null,
       uncertain: this.uncertain, dispatches: this.count, reason: this.lastReason };
   }
 }

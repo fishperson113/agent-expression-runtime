@@ -21,7 +21,7 @@ function fixture() {
   session.configure(true); session.enable(true); observe();
   return { session, admitted, cancelled, observe, advance, now: () => now, wall: () => wall,
     epoch: (value: string) => { epoch = value; }, block: () => { canAdmit = false; },
-    rollback: () => { now -= 10; }, launch: (tracks: string[] = []) => { observe(true, 'user_arrived', tracks); advance(750); observe(true, undefined, tracks); return session.takeRequest()!; } };
+    rollback: () => { now -= 10; }, launch: (tracks: string[] = [], authorized = true) => { observe(true, 'user_arrived', tracks); advance(750); observe(true, undefined, tracks); const next = session.takeRequest()!; if (authorized) expect(session.authorize(next.request.requestId)).toBe(true); return next; } };
 }
 const express = (request: ReactiveRequest) => ({ schemaVersion: 1, requestId: request.requestId,
   decisionId: `d${request.requestId}`, mode: 'express', validUntil: request.deadline, action: { actionId: `a${request.requestId}`, body: { type: 'wait', durationMs: 100 } } });
@@ -78,7 +78,7 @@ it('counts all dispatches in the rolling minute including observe and failed par
   for (let turn = 0; turn < 4; turn++) {
     if (turn) { f.advance(14250); f.observe(); }
     f.observe(true, 'expression_changed'); f.advance(750); f.observe(); const next = f.session.takeRequest()!;
-    expect(next).toBeTruthy(); await f.session.deliver(next.request.requestId, turn === 1 ? 'invalid text' : observeDecision(next.request));
+    expect(next).toBeTruthy(); expect(f.session.authorize(next.request.requestId)).toBe(true); await f.session.deliver(next.request.requestId, turn === 1 ? 'invalid text' : observeDecision(next.request));
   }
   f.advance(14249); f.observe(true, 'expression_changed'); f.advance(750); f.observe(); expect(f.session.takeRequest()).toBeNull();
   f.advance(1); f.observe(); expect(f.session.takeRequest()).not.toBeNull();
@@ -111,8 +111,40 @@ it('fails closed at the lifetime receipt limit and never reopens it with reset',
   for (let turn = 0; turn < 256; turn++) {
     if (turn) { f.advance(14250); f.observe(); }
     f.observe(true, 'expression_changed'); f.advance(750); f.observe(); const next = f.session.takeRequest()!;
-    expect(next).toBeTruthy(); expect((await f.session.deliver(next.request.requestId, observeDecision(next.request)))?.reason).toBe('observed');
+    expect(next).toBeTruthy(); expect(f.session.authorize(next.request.requestId)).toBe(true); expect((await f.session.deliver(next.request.requestId, observeDecision(next.request)))?.reason).toBe('observed');
   }
   f.session.reset(); f.advance(15000); f.observe(true, 'expression_changed'); f.advance(750); f.observe();
   expect(f.session.status().dispatches).toBe(256); expect(f.session.takeRequest()).toBeNull();
+});
+
+it('authorizes dispatch once and rejects preflight after revocation without a provider-side effect', async () => {
+  const before = fixture(), blocked = before.launch([], false).request;
+  before.advance(10); before.observe(false, 'user_left');
+  let dispatches = 0;
+  if (before.session.authorize(blocked.requestId)) dispatches++;
+  expect(dispatches).toBe(0); expect(before.session.status().transport).toBe(blocked.requestId);
+  expect((await before.session.deliver(blocked.requestId, null))?.reason).toBe('revoked');
+  const after = fixture(), active = after.launch([], false).request;
+  expect(after.session.authorize('wrong_id')).toBe(false); expect(after.session.authorize(active.requestId)).toBe(true);
+  dispatches++; expect(after.session.authorize(active.requestId)).toBe(false);
+  after.advance(10); after.observe(false, 'user_left');
+  expect((await after.session.deliver(active.requestId, express(active)))?.reason).toBe('revoked');
+  expect(dispatches).toBe(1); expect(after.admitted).toEqual([]);
+});
+it('rejects unauthorized decisions and permits null preflight cleanup without leaving a transport slot', async () => {
+  const f = fixture(), { request } = f.launch([], false);
+  expect((await f.session.deliver(request.requestId, express(request)))?.reason).toBe('invalid_decision');
+  expect(f.admitted).toEqual([]); expect(f.session.status().transport).toBeNull();
+  expect(f.session.authorize(request.requestId)).toBe(false);
+  const g = fixture(), pending = g.launch([], false).request;
+  expect((await g.session.deliver(pending.requestId, null))?.reason).toBe('invalid_decision');
+  expect(g.session.status().transport).toBeNull(); expect(g.session.status().uncertain).toBe(false);
+});
+it('checks user intent and final admission permission again before dispatch authorization', async () => {
+  for (const revoke of [(f: ReturnType<typeof fixture>) => f.session.userIntent(), (f: ReturnType<typeof fixture>) => f.session.enable(false),
+    (f: ReturnType<typeof fixture>) => f.block(), (f: ReturnType<typeof fixture>) => f.session.setUserBusy(true)]) {
+    const f = fixture(), { request } = f.launch([], false); revoke(f);
+    expect(f.session.authorize(request.requestId)).toBe(false); await f.session.deliver(request.requestId, null);
+    expect(f.admitted).toEqual([]);
+  }
 });
