@@ -5,7 +5,11 @@ export const causalRevocationReasons = ['enabled', 'disabled', 'unavailable', 'r
   'clock_discontinuity', 'capture_discontinuity', 'invalid_observation', 'invalid_events', 'invalid_request_id'] as const;
 export type CausalRef = { sessionId: string; seq: number };
 export type CausalOrigin = 'native' | 'reactive' | 'ambient';
+export type ProviderReceipt = { requestId: string; modelConfigHash: string; promptHash: string; requestHash: string;
+  responseHash: string | null; outcome: 'completed' | 'invalid_response' | 'http_error' | 'transport_unknown';
+  durationMs: number | null; usage: 'unknown' | { input_tokens: number; output_tokens: number; total_tokens: number } };
 export type CausalPayloads = {
+  provider_receipt: ProviderReceipt;
   observation: Observation;
   event: { sessionId: string; observationSeq: number; seq: number; type: LiveEventKind; at: number };
   request: { request: ReactiveRequest; observationRefs: CausalRef[]; eventRefs: CausalRef[] };

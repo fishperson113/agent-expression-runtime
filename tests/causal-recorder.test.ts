@@ -97,3 +97,21 @@ it('clears the private buffer when an injected clock throws and exports only fix
   expect(() => f.recorder.snapshot()).not.toThrow(); expect(f.recorder.status()?.ended).toBe('clock_invalid');
   expect(f.recorder.snapshot().records).toEqual([]); expect(JSON.stringify(f.recorder.snapshot())).not.toContain('PRIVATE');
 });
+it('strictly projects provider receipts with a known request parent and rejects all raw or malformed fields', () => {
+  const receipt = { requestId: 'request', modelConfigHash: 'a'.repeat(64), promptHash: 'b'.repeat(64), requestHash: 'c'.repeat(64),
+    responseHash: null, outcome: 'transport_unknown' as const, durationMs: null, usage: 'unknown' as const };
+  const f = setup(); f.recorder.start(begin); f.recorder.append('observation', observation());
+  f.recorder.append('event', { sessionId: 'session', observationSeq: 1, seq: 1, type: 'user_arrived', at: 10000 });
+  f.recorder.append('request', request()); expect(f.recorder.append('provider_receipt', receipt)).toBe(true);
+  expect(f.recorder.snapshot().records.at(-1)?.payload).toEqual(receipt); expect(f.recorder.status()?.incomplete).toBe(false);
+  const valid = { ...receipt, outcome: 'completed' as const, responseHash: 'd'.repeat(64), durationMs: 12.5,
+    usage: { input_tokens: 10, output_tokens: 2, total_tokens: 12 } };
+  expect(f.recorder.append('provider_receipt', valid)).toBe(true);
+  for (const value of [{ ...receipt, raw: 'PRIVATE' }, { ...receipt, modelConfigHash: 'secret model' }, { ...receipt, responseHash: 'bad' },
+    { ...receipt, durationMs: Infinity }, { ...receipt, usage: { ...valid.usage, hidden: 'PRIVATE' } },
+    { ...receipt, usage: { ...valid.usage, total_tokens: 0.5 } }, { ...receipt, outcome: 'PRIVATE' }])
+    expect(f.recorder.append('provider_receipt', value as any)).toBe(false);
+  expect(JSON.stringify(f.recorder.snapshot())).not.toMatch(/PRIVATE|secret model|"raw"/);
+  const g = setup(); g.recorder.start(begin); expect(g.recorder.append('provider_receipt', receipt)).toBe(true);
+  expect(g.recorder.status()?.reasons).toEqual(['missing_parent']);
+});
