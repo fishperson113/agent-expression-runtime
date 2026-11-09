@@ -63,6 +63,7 @@ export async function openCodexTransport({ host, args, cwd, env, instructions, o
       detached: process.platform !== 'win32', stdio: ['pipe', 'pipe', 'pipe'] });
     child.aerProcessGroup = process.platform !== 'win32';
     relayOutput(child, connection, async message => {
+      await rpc.observe(message);
       const outgoing = rpc.accept(message);
       if (outgoing === false) return false;
       await onEvent(outgoing); return outgoing;
@@ -79,24 +80,54 @@ export async function openCodexTransport({ host, args, cwd, env, instructions, o
     child.once('error', () => { void close(); }); child.once('exit', () => { void close(); });
   }
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
-  return { url: 'ws://127.0.0.1:' + server.address().port, token, close, reject: (message, error) => {
+  return transportControls(rpc, () => client, 'ws://127.0.0.1:' + server.address().port, token, close, onEvent, onRequest);
+}
+
+function transportControls(rpc, getClient, url, token, close, onEvent, onRequest) {
+  return { url: url, token, close, reject: (message, error) => {
+    if (rpc.rejectOwned(message, error)) return;
+    const client = getClient();
     if (client?.readyState === WebSocket.OPEN && message.id !== undefined) client.send(JSON.stringify({ id: message.id, error }));
-  }, request: (method, params) => rpc.request(method, params), forward: message => rpc.client(message) };
+  }, request: (method, params) => rpc.request(method, params),
+    submitUser: (params, guard, discard) => rpc.request('turn/start', params, { guard, observe: onEvent, discard,
+      dispatch: message => { if (!guard()) throw Error('chat_session_changed'); if (onRequest(message) !== false) rpc.forward(message); } }),
+    forward: message => rpc.forward(message) };
 }
 
 export class LiveRequests {
-  pending = new Map(); escaped = new Map(); serial = 0;
+  pending = new Map(); escaped = new Map(); owned = new WeakMap(); serial = 0;
   prefix = 'fisch:' + randomBytes(16).toString('hex') + ':';
   constructor(write) { this.write = write; }
-  request(method, params) {
+  request(method, params, options = {}) {
     if (this.pending.size >= 8) return Promise.reject(Error('relay_request_limit'));
     const id = this.prefix + ++this.serial;
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => { this.pending.delete(id); reject(Error('relay_request_timeout')); }, 10000);
-      this.pending.set(id, { resolve, reject, timer });
-      try { this.write({ id, method, params }); }
-      catch (error) { clearTimeout(timer); this.pending.delete(id); reject(error); }
+      const timer = setTimeout(() => this.fail(id, Error('relay_request_timeout')), 10000);
+      this.pending.set(id, { resolve, reject, timer, observe: options.observe, discard: options.discard, sent: false });
+      const message = { id, method, params };
+      if (options.dispatch) this.owned.set(message, options.guard);
+      try { (options.dispatch ?? this.write)(message); }
+      catch (error) { this.fail(id, error); }
     });
+  }
+  observe(message) {
+    if (!message.method) return this.pending.get(message.id)?.observe?.(message);
+  }
+  forward(message) {
+    if (!this.owned.has(message)) return this.client(message);
+    if (!this.pending.has(message.id) || !this.owned.get(message)()) throw Error('chat_session_changed');
+    this.write(message); this.pending.get(message.id).sent = true;
+  }
+  fail(id, error) {
+    const pending = this.pending.get(id);
+    if (!pending) return;
+    clearTimeout(pending.timer); this.pending.delete(id); error.uncertain = pending.sent;
+    pending.discard?.(id); pending.reject(error);
+  }
+  rejectOwned(message, error) {
+    if (!this.owned.has(message)) return false;
+    this.fail(message.id, Error(error.message));
+    return true;
   }
   client(message) {
     if (message.method && typeof message.id === 'string' && message.id.startsWith(this.prefix)) {
@@ -119,7 +150,7 @@ export class LiveRequests {
     return message;
   }
   close() {
-    for (const pending of this.pending.values()) { clearTimeout(pending.timer); pending.reject(Error('relay_closed')); }
+    for (const id of this.pending.keys()) this.fail(id, Error('relay_closed'));
     this.pending.clear(); this.escaped.clear();
   }
 }

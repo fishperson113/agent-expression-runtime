@@ -28,9 +28,49 @@ function logActivity(text: string) {
     return item;
   }));
 }
+type ChatSnapshot = { generation: number; revision: number; available: boolean; canSend: boolean; canCancel: boolean;
+  pending: boolean; stopping: boolean; waiting: boolean; error: string;
+  messages: { id: string; turn: string; role: string; text: string; status: string; truncated: boolean }[] };
+let chatState: ChatSnapshot | undefined, chatSignature = '', chatSubmitting = false;
+function showChat(value: ChatSnapshot) {
+  chatState = value;
+  const signature = JSON.stringify([value.revision, value.canSend, value.canCancel, value.waiting, value.available, chatSubmitting]);
+  if (signature === chatSignature || stopped) return;
+  chatSignature = signature;
+  const list = element('chat-messages'), bottom = list.scrollTop + list.clientHeight >= list.scrollHeight - 40;
+  const existing = new Map([...list.children].map(node => [(node as HTMLElement).dataset.key, node]));
+  const nodes = value.messages.map(message => {
+    const key = message.turn + ':' + message.id, item = existing.get(key) ?? document.createElement('li');
+    (item as HTMLElement).dataset.key = key; (item as HTMLElement).dataset.role = message.role;
+    const text = (message.role === 'user' ? 'Bạn: ' : 'Fisch: ') + message.text +
+      (message.truncated ? '\n[Đã rút gọn phần hiển thị]' : '') + (message.status === 'interrupted' ? '\n[Đã ngắt]' : message.status === 'failed' ? '\n[Lượt bị lỗi]' : '');
+    if (item.textContent !== text) item.textContent = text;
+    return item;
+  });
+  list.replaceChildren(...nodes); if (bottom) list.scrollTop = list.scrollHeight;
+  element<HTMLTextAreaElement>('chat-input').disabled = !value.available;
+  element<HTMLButtonElement>('chat-send').disabled = !value.canSend || chatSubmitting;
+  element<HTMLButtonElement>('chat-stop').disabled = !value.canCancel;
+  element('chat-status').textContent = value.error || (value.waiting ? 'Codex cần bạn xác nhận trong terminal.' :
+    value.stopping ? 'Đang dừng trả lời…' : value.pending || chatSubmitting ? 'Đang gửi…' : !value.available ? 'Chat cần phiên terminal Live kết nối.' :
+      !value.canSend ? 'Fisch đang phản hồi. Bạn có thể dừng trả lời.' : 'Fisch đang ở đây. Bạn có thể nhắn khi cần.');
+}
+async function chatAction(action: 'send' | 'cancel') {
+  if (!chatState || stopped || (action === 'send' && (chatSubmitting || !chatState.canSend))) return;
+  const input = element<HTMLTextAreaElement>('chat-input'), text = input.value, generation = chatState.generation;
+  if (action === 'send' && !text.trim()) return;
+  chatSubmitting = action === 'send'; showChat(chatState);
+  try {
+    await (window as any).fischLiveChat({ action, text, generation });
+    if (action === 'send' && input.value === text && chatState.generation === generation) input.value = '';
+  } catch (error) { element('chat-status').textContent = error instanceof Error ? error.message : 'Không gửi được. Kiểm tra terminal.'; }
+  finally { chatSubmitting = false; chatSignature = ''; }
+}
+element<HTMLFormElement>('chat-form').onsubmit = event => { event.preventDefault(); void chatAction('send'); };
+element('chat-stop').onclick = () => { void chatAction('cancel'); };
 Object.assign(window, { fischLive: { pair: (base: string, token: string) => bridge.connect(base, token),
   selectThread: () => { hands.reset(); semanticGeneration++; semanticEvents.length = 0; logActivity('Đã chọn phiên Codex.'); return bridge.cancel(); },
-  logActivity,
+  logActivity, chat: showChat,
   reactivity: () => ({ sessionId: observations.snapshot.sessionId + ':' + semanticGeneration, enabled: element<HTMLInputElement>('enable-reactivity').checked, stopped,
     camera: observations.snapshot.camera, capturedAt: observations.snapshot.capturedAt, events: [...semanticEvents] }),
   activity: (value: { turn: 'idle' | 'working' | 'waiting' | 'interrupted'; output: number; quality: string }) => {
@@ -141,6 +181,8 @@ const timer = setInterval(() => {
 }, 500);
 function stop() {
   if (stopped) return; logActivity('Đã dừng phiên Live.'); stopped = true; semanticEvents.length = 0;
+  element<HTMLTextAreaElement>('chat-input').disabled = true;
+  element<HTMLButtonElement>('chat-send').disabled = true; element<HTMLButtonElement>('chat-stop').disabled = true;
   camera.stop(); hands.reset(); cameraStatus('stopped', 'shutdown'); clearInterval(timer); bridge.stop(); body.dispose();
   element<HTMLButtonElement>('camera-start').disabled = true; element('connection').textContent = 'Đã dừng phiên Live';
   void (window as any).fischLiveStop?.();

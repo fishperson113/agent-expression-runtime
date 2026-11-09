@@ -55,7 +55,7 @@ export class LiveReactivity {
     const generation = ++this.generation;
     this.log('Requesting Codex reaction to local typed events.');
     const text = 'Fisch local camera observation, not a user request. These are debounced geometric estimates, not emotions or intent. ' +
-      'No image or audio was sent. Use only Fisch observe/express tools for a brief optional visual reaction, or do nothing. ' +
+      'No image or audio was sent. Use only Fisch observe/express tools for a brief coordinated visual response to a fresh meaningful event. A short natural text response is welcome when useful; do not ask the user to type to keep interacting. Deliberately do nothing for stale, duplicate, or unsupported events, or when there is no useful response. ' +
       'Do not run commands, edit files, contact anyone, or take other actions. User input takes priority. Events: ' + JSON.stringify(events);
     void this.request('turn/start', { threadId: this.thread, input: [], toolOutput: { name: 'fisch_local_observation', output: text } })
       .then(message => this.started(message, generation)).catch(() => {

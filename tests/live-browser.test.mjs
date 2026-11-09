@@ -1,3 +1,4 @@
+import { bindLiveChat } from '../integrations/live-chat.mjs';
 import { expect, it } from 'vitest';
 import { createServer } from 'vite';
 import { chromium } from '@playwright/test';
@@ -111,6 +112,43 @@ it('fills wide windows without an unused strip and keeps the 2:1 panels', async 
     await page.setViewportSize({ width: 375, height: 812 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     expect(await page.locator('video').evaluate(video => video.srcObject)).toBe(null);
+    expect(errors).toEqual([]);
+  } finally { await browser?.close(); await server.close(); }
+}, 45000);
+
+it('renders bounded chat text safely, submits only on demand, preserves drafts on rejection and rejects iframe calls', async () => {
+  const server = await createServer({ server: { host: '127.0.0.1', port: 0 } }); await server.listen(); let browser;
+  try {
+    browser = await chromium.launch({ headless: true, ...(process.platform === 'win32' ? { channel: 'msedge' } : {}),
+      args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+    const page = await browser.newPage(); const errors = [], inputs = []; let fail = false;
+    page.on('pageerror', error => errors.push(error.message));
+    await page.goto(server.resolvedUrls.local[0] + 'live.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => Boolean(window.fischLive));
+    expect(await page.locator('#chat-send').isDisabled()).toBe(true);
+    await bindLiveChat(page, { send: async value => { if (fail) throw Error('fixture rejection'); inputs.push(value); return { status: 'accepted' }; } });
+    const state = { generation: 4, revision: 1, available: true, canSend: true, canCancel: false, pending: false,
+      stopping: false, waiting: false, error: '', messages: [{ id: 'a', turn: 't', role: 'assistant', text: '<img src=x onerror=alert(1)>', status: 'completed', truncated: false }] };
+    await page.evaluate(value => window.fischLive.chat(value), state);
+    expect(await page.locator('#chat-messages img').count()).toBe(0);
+    expect(await page.locator('#chat-messages').textContent()).toContain('<img'); expect(inputs).toEqual([]);
+    await page.locator('#chat-input').fill('Hello Fisch'); await page.locator('#chat-send').click();
+    await expect.poll(() => page.locator('#chat-input').inputValue()).toBe('');
+    expect(inputs).toEqual([{ action: 'send', text: 'Hello Fisch', generation: 4 }]);
+    await page.evaluate(value => window.fischLive.chat(value), { ...state, revision: 2 }); fail = true;
+    await page.locator('#chat-input').fill('Keep this draft'); await page.locator('#chat-send').click();
+    await expect.poll(() => page.locator('#chat-status').textContent()).toContain('fixture rejection');
+    expect(await page.locator('#chat-input').inputValue()).toBe('Keep this draft');
+    const denied = await page.evaluate(async () => {
+      const frame = document.createElement('iframe'); document.body.append(frame);
+      try { await frame.contentWindow.fischLiveChat({ action: 'send', text: 'bad', generation: 4 }); return false; }
+      catch { return true; } finally { frame.remove(); }
+    });
+    expect(denied).toBe(true); expect(inputs).toHaveLength(1);
+    await page.setViewportSize({ width: 375, height: 812 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    expect(await page.locator('video').evaluate(video => video.srcObject)).toBe(null);
+    await page.locator('#stop-all').click(); expect(await page.locator('#chat-input').isDisabled()).toBe(true);
     expect(errors).toEqual([]);
   } finally { await browser?.close(); await server.close(); }
 }, 45000);
