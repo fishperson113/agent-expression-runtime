@@ -50,7 +50,7 @@ Không có TTS hoặc STT riêng. `/voice` tiếng Việt chưa được nghiệ
 
 ## Quyền riêng tư của POC này
 
-Camera thật chỉ xử lý trong browser, không ghi hình, không thu mic và không lưu screenshot chứa camera. Chỉ world state có kiểu được gửi qua gateway cho Codex. `look` bị giới hạn **synthetic-only** cả ở tool contract và gateway/browser implementation. Ảnh tổng hợp có thể được Codex/provider nhận; ảnh camera thật không có đường upload được bật trong bản này. CSP trên cả trang và Worker chỉ cho phép kết nối loopback, chặn cả endpoint logging có trong SDK MediaPipe đã pin. Cài asset qua Node là bước tải vào; camera inference không cần kết nối ngoài máy.
+Camera thật chỉ xử lý trong browser, không ghi hình, không thu mic và không lưu screenshot chứa camera. MCP `observe` có thể trả world state có kiểu cho Codex khi tool được gọi. Phản ứng camera tự động dùng bộ quyết định riêng, mặc định tắt; khi được cấu hình và bạn bật điều khiển, một cửa sổ quan sát có kiểu được gửi tới provider đã chọn, không được thêm vào thread coding của Codex. Cửa sổ này có thể gồm tọa độ tay có cấu trúc khi theo dõi tay được bật; không gửi ảnh hoặc âm thanh. `look` bị giới hạn **synthetic-only** cả ở tool contract và gateway/browser implementation. Ảnh tổng hợp có thể được Codex/provider nhận; ảnh camera thật không có đường upload được bật trong bản này. CSP trên cả trang và Worker chỉ cho phép kết nối loopback, chặn cả endpoint logging có trong SDK MediaPipe đã pin. Cài asset qua Node là bước tải vào; camera inference không cần kết nối ngoài máy.
 
 Token đi trong environment, HTTP Authorization và message WebSocket đầu tiên, không nằm trong URL, command line, Git hay file cấu hình. Không xuất credential từ environment khi debug. Các artifact `.runtime/` là local/ignored; evidence trong Git chỉ gồm metadata đã lọc, không có ảnh mặt hoặc payload model/private prompt.
 
@@ -262,37 +262,59 @@ Explicit `fisch live --agent <pane>` retains the legacy Herdr adapter; its camer
 reflexes work, but agent-triggered camera reactions are unavailable there and the
 control stays disabled. No keystrokes are injected into an unrelated agent.
 
-Camera starts off. Expand the observation controls and enable camera reactions
-only if wanted. Stable typed geometric events may then start a Codex turn using
-the official standalone `toolOutput` mechanism. No image, landmark array or audio
-is sent by this path. Existing MCP observations/privacy controls still apply.
+Camera starts off. Automatic camera reactions additionally require a separately
+configured data-only provider and an existing approved budget ledger; otherwise
+the control stays unavailable. See [provider setup and privacy](reactive-provider.md).
+After explicit browser opt-in, stable typed geometric events can produce a frozen
+observation window for that provider. Observation summaries are stripped; typed
+coordinates, including structured hand observations when available, may remain.
+No image or audio is sent. This path never adds camera events, model decisions or
+`toolOutput` messages to the selected Native coding thread. Explicit native MCP
+`observe` calls remain available and are a separate path.
+
+Typed hand reactions use this same isolated provider after explicit hand-tracking
+and reaction opt-in. The versioned event gate and semantic read-sets preserve
+hand context; the agent still authors the effect. See [hand events](hand-event-gate.md)
+and [synthetic opportunity diagnostics](reactive-opportunities.md) for scope and measurements.
+
 Events coalesce for 750ms after local debounce, expire after five seconds, and
-start at most once every 15 seconds/four times per minute. Unchanging input and
-idle timers do not start inference. A reaction has a 30-second watchdog.
+start at most once every 15 seconds/four times per minute. The causal request has
+its own five-second deadline and consume-once authorization. Unchanging input and
+idle timers do not start inference. A separate 30-second provider watchdog aborts
+only the provider request and marks its transport uncertain; it does not extend
+the request's execution authority or interrupt a Native Codex turn.
 
-User turns have priority: only a Fisch-owned reaction may be interrupted. Pending
-user input waits for confirmed cancellation; after ten seconds without certainty,
-an explicit error says that input was not sent and must be retried. No silent
-replay occurs. Stop, camera opt-out, Cancel, reload and thread selection invalidate
-pending reactions. A lost/uncertain model request pauses automatic reactions.
-Existing permissions are preserved; the event instructions restrict the model to
-Fisch observation/expression tools, rather than granting a new security policy.
+User input first awaits the browser's revocation barrier, then its original Native
+RPC is forwarded unchanged. It does not wait for provider cancellation to settle.
+A failed or timed-out browser evaluation permanently closes that broker's
+controlled-input path and returns an explicit RPC error; late resolution never
+silently forwards or replays the input. Stop, camera opt-out, Cancel, reload,
+thread selection and new user intent invalidate pending reaction authority. An
+unknown provider transport pauses automatic requests while ordinary Native input
+remains independent, provided the browser barrier is healthy.
 
-Protocol reference: https://learn.chatgpt.com/docs/app-server . Installed Codex
-0.167.0 schema confirms `TurnStartParams.toolOutput` / `TurnToolOutput`.
-Deterministic tests and camera-off visual checks are separate from real-camera,
-native-GPU performance and model-expression acceptance; do not treat them as the
-same certification. Native verification details are recorded in the PR.
+The separate provider receives no chat history or coding-thread identifier and
+has no MCP/process/tool executor: requests use `tools=[]`, `tool_choice=none` and
+a strict data-only decision schema. The browser causal host and shared compiler
+still validate and admit any returned expression. Metadata-only provider receipts
+are optional diagnostics, not evidence that an expression executed or that an
+unknown request was cancelled. Deterministic tests and camera-off visual checks
+do not establish real-camera accuracy, native-GPU performance, semantic quality
+or enjoyment. The old Native `TurnStartParams.toolOutput` route is not wired into
+current `fisch live`.
 
 
-Verification for the reactive increment: 28 focused relay/reactivity tests pass.
+Historical verification of the superseded shared-thread increment: 28 focused
+relay/reactivity tests passed. These results do not certify the current isolated
+provider route.
 Linux CI on `c53c335` passed 293 JavaScript tests (4 skipped), production build,
 architecture and browser smoke. Windows browser-under-Vitest attempts timed out;
 standalone camera-off screenshot rendering succeeded, so no full Windows-browser
 pass is claimed. One real `gpt-6.1-sol` synthetic event turn started/completed and
 successfully called `observe`, with zero approval requests or camera/audio/image
 capture. It chose no `express` call: model-authored reaction animation remains an
-open acceptance check. Conservative cumulative model-test usage is 97/120.
+open acceptance check. That historical checkpoint reported 97/120 model-test
+uses; reconcile the current approved ledger before any new model call.
 
 ### Liên kết chuyển động bàn tay
 

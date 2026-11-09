@@ -69,7 +69,8 @@ denial pauses automatic dispatch instead of retrying every poll. Returned data
 never becomes a native chat message or app-server turn. Queue, request receipts,
 native pending IDs and completed-turn history are bounded and held only in
 memory. Close invalidates late callbacks, aborts active transport and rejects
-queued unsent input. Wiring and live acceptance remain separate work.
+queued unsent input. Live terminal wiring uses this broker; these integration
+checks do not establish real-provider semantic acceptance.
 
 Every broker page evaluation has a 10-second bound (tests can inject a shorter
 positive timeout), with at most four outstanding waits. Any browser error or

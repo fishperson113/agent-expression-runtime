@@ -100,3 +100,51 @@ missing gateway cannot silently skip those acceptance checks. These checks do
 not establish atomic visible execution, a real 20-minute human session, native
 GPU performance, camera accuracy or enjoyment. The guided deck and blind human
 evaluation remain separate protocols.
+
+## Finding co-creation in the Live interface
+
+The body panel has a collapsed **Cùng sáng tạo** entry. Enter an idea and, if
+useful, a short optional goal; copy a create or remix request and paste it into
+the current Codex terminal. Undo, return to the first saved version and explicit
+recovery have their own copy actions. Copying does not send a turn, invoke a
+model or modify the body. If clipboard access fails, select and copy the displayed
+request manually. Ideas, goals and generated request text stay in ephemeral DOM
+state; selecting a different Codex thread clears them.
+
+Codex discovers `playground_state` and `playground_edit` through the same Live MCP
+configuration as ordinary expression tools. The interface shows a redacted
+projection of actual tool lifecycle events from the selected thread and turn:
+working, saved revision/history count, interrupted or uncertain. It reads only
+the fixed operation enum from tool arguments and bounded result metadata; it
+never forwards scene geometry, goals or other arguments to that projection.
+“Saved” describes the committed journal, not the current pixels: an ordinary
+temporary expression can still change the visible body. Interrupted or uncertain
+work needs a fresh state read; recovery explicitly revokes old ownership and clears history. An
+ACK-only Native turn can establish projection ownership through the host’s
+correlated turn/start response; it cannot establish a saved creation. A gateway
+admission ACK correlated to the owning session, epoch and sequence also does
+not establish completion: the actual tool result must confirm both body and
+baseline completed before the journal is shown as saved.
+
+The launcher-route test replaces Native Codex and its app-server with a named
+scripted test double. It preserves CLI dispatch, Live launcher, authenticated
+terminal relay, configured MCP discovery, actual MCP process, Rust gateway and
+browser. Scripted choices are supplied by the test, so this establishes transport,
+application and recovery behavior; it does not establish that a real model
+understands arbitrary requests or that a person enjoys a 10–20 minute session.
+No real camera, microphone or model is used by these tests. Human evaluation
+remains pending. Any real-model verification must use reconciled usage within
+the existing authorized model budget.
+
+After building the standalone gateway and installing Chromium, Linux/Cloud can
+reproduce the optional scripted 10-minute route soak with:
+
+```sh
+FISCH_PLAYGROUND_REQUIRE_GATEWAY=1 FISCH_PLAYGROUND_ROUTE_SOAK_MS=600000 npx vitest run --maxWorkers=1 --disableConsoleIntercept tests/playground-route.test.mjs
+```
+
+A 120-second stillness window sends no Native turns between its before/after
+state reads; browser-only checks monitor saved part identity, an empty scheduler
+queue and camera-off state. Repeated remixes then check actual tool completion,
+UI revision and rendered part IDs. Final state must have no pending work or recovery requirement. The summary contains elapsed
+time and counts only; it does not log scenes, goals, prompts or credentials.
