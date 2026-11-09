@@ -346,3 +346,57 @@ browser had eight infrastructure failures and is not claimed as passing. Locked
 gateway Rust tests passed (16/16), frontend TypeScript/Vite build, architecture,
 strict my-harness and whitespace checks passed. The existing large-bundle warning
 remains. R10/R11 transcript verification remains unsupported in Codex.
+
+## Checkpoint 13 — authenticated inference and thread handoff investigation
+
+Owner completed the official device authorization; CLI reported successful login.
+At 00:37 UTC the frozen 20-turn holdout resumed with the same 120-turn cap and
+06:17:35 UTC deadline. All 20 model turns completed. Pass 1 admitted/applied all
+ten expressions; pass 2 rejected all ten. This is a failure, not semantic success.
+Two counted diagnostic turns reproduced `controller_active` on the new thread:
+the previous thread's MCP controller still owns the paired renderer. Used 26/120.
+
+Before further runtime changes, the bounded correction is: await renderer/controller
+cancellation only after a successful explicit UI thread selection, before forwarding
+its response; preserve failed/superseded/background selection behavior and single
+controller protection. Apply the same handshake to the real model-test client.
+Add stale-selection and asynchronous-order regression evidence. Also retain only
+bounded fixed rejection codes and up to four body-only captures per turn 150 ms
+after tool completion; final-turn screenshots can miss short gestures. No raw tool
+payloads, user text or camera pixels are written by these diagnostics. Re-run the
+unchanged frozen prompts after the correction, without resetting the shared count.
+
+The two-turn diagnostic failed before the handoff correction (second thread:
+`controller_active`) and passed after it (both admitted/applied with changed-frame
+proxies). Fresh unchanged holdout then completed 20/20 model turns: 20 expression
+attempts, 20 admitted, 20 applied, 20 frame submissions and 20 changed-frame proxies;
+zero rejected calls or truncated histories. Twenty body-only active captures were
+written with zero capture failures. Used 48/120; deadline unchanged. Synthetic
+prompts, camera off, no owner-PC access. The first failed holdout is preserved
+separately under ignored .runtime rather than relabeled as a pass.
+
+Sample active frames were visually inspected by the agent and show facial feature
+and pose changes; this is neither blinded human recognition nor proof of conceptual
+relevance. The driver deliberately keeps visual effectiveness, content relevance
+and semantic consistency null. The automated ordinary-conversation tool/application
+path now has successful model evidence in both fresh threads. Human meaning,
+perceived variety/distraction, physical-camera accuracy, Windows GPU/Herdr and
+Vietnamese voice gates remain open. Earlier software-rendering/vision performance
+misses remain misses; no new sustained rendering or physical-camera claim is made.
+
+The official Face Landmarker asset now downloads through the inherited Cloud proxy
+and matches pinned SHA-256 `64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff`.
+This establishes asset availability, not camera inference throughput. No TLS,
+credential, network/security policy or global provider configuration was changed
+apart from the owner-authorized official Codex login.
+
+Validation for this bounded correction: 251 JavaScript tests / 48 files pass;
+TypeScript/Vite build, architecture, strict harness and whitespace pass. The seven
+budget/protocol/capture tests also pass after rejecting missing diagnostic codes.
+AST physical-line audit covers all nine touched JS/TS modules, maximum 35 lines per
+function. Real-gateway functional acceptance was rerun alone after build completion:
+cold observe 33.63 ms, warm observe p95 4.10 ms, express admission p95 16.28 ms;
+macro-after-cancel, invalid rejection, synthetic look cooldown and reload passed,
+zero script errors and camera off. These are functional samples, not completion
+latency, a sustained performance benchmark or native GPU acceptance. No Rust code
+changed; prior locked gateway build and 16 shared Rust tests remain applicable.

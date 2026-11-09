@@ -7,7 +7,7 @@ import { LiveOutput } from './live-output.mjs';
 import { liveRoot } from './live-launch.mjs';
 
 export async function runTerminalCodex({ live, cwd, signal, spawnClient = spawn }) {
-  const host = await codexCommand(), output = new LiveOutput();
+  const host = await codexCommand(), output = new LiveOutput(() => live.page.evaluate(() => window.fischLive.selectThread()));
   const original = liveCodexArguments(liveRoot, cwd), config = original.slice(original.indexOf('-c'));
   const env = { ...process.env, AER_BASE_URL: live.base, AER_PAIRING_TOKEN: live.token, FISCH_LIVE: '1', FISCH_PLANNER_BACKEND: 'off' };
   const instructions = readFileSync(new URL('./live-instructions.md', import.meta.url), 'utf8');

@@ -30,10 +30,10 @@ function protocol(socket) {
   return { call, events };
 }
 export async function openModelClient(live) {
-  const output = new LiveOutput(), host = await codexCommand(), original = liveCodexArguments(liveRoot);
+  const output = new LiveOutput(() => live.page.evaluate(() => window.fischLive.selectThread())), host = await codexCommand(), original = liveCodexArguments(liveRoot);
   const transport = await openCodexTransport({ host, args: original.slice(original.indexOf('-c')), cwd: liveRoot,
     env: { ...process.env, AER_BASE_URL: live.base, AER_PAIRING_TOKEN: live.token, FISCH_LIVE: '1', FISCH_PLANNER_BACKEND: 'off' },
-    instructions: readFileSync(new URL('./live-instructions.md', import.meta.url), 'utf8'), onEvent: message => output.accept(message) });
+    instructions: readFileSync(new URL('./live-instructions.md', import.meta.url), 'utf8'), onEvent: message => output.accept(message), onRequest: message => output.request(message) });
   const socket = new WebSocket(transport.url, { headers: { Authorization: 'Bearer ' + transport.token } });
   const timer = setInterval(() => { if (!live.page.isClosed()) void live.page.evaluate(value => window.fischLive.activity(value), output.sample()).catch(() => {}); }, 100);
   try {
@@ -44,7 +44,7 @@ export async function openModelClient(live) {
       close: async () => { clearInterval(timer); socket.terminate(); await transport.close(); } };
   } catch (error) { clearInterval(timer); socket.terminate(); await transport.close(); throw error; }
 }
-export async function runModelTurn(client, threadId, text, timeoutMs = 90000) {
+export async function runModelTurn(client, threadId, text, timeoutMs = 90000, onTool = () => {}) {
   const tools = []; let settled, turnId, truncated = false;
   const done = new Promise((resolve, reject) => { settled = { resolve, reject }; });
   void done.catch(() => {});
@@ -53,7 +53,7 @@ export async function runModelTurn(client, threadId, text, timeoutMs = 90000) {
     if (p?.threadId !== threadId) return;
     if (message.method === 'turn/started') turnId = p.turn.id;
     if (message.method === 'item/completed' && p.turnId === turnId && p.item?.type === 'mcpToolCall') {
-      if (tools.length < 64) tools.push(p.item); else truncated = true;
+      if (tools.length < 64) { tools.push(p.item); onTool(p.item); } else truncated = true;
     }
     if (message.method === 'turn/completed' && p.turn.id === turnId) settled.resolve({ status: p.turn.status, tools, truncated });
   };

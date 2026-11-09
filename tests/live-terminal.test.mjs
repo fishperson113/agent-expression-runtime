@@ -53,7 +53,7 @@ it('distinguishes actual assistant deltas from tool output and stale turns', () 
   expect(stream.sample(710).turn).toBe('idle');
 });
 it('switches output tracking only after the UI selects a thread successfully', () => {
-  const stream = new LiveOutput();
+  const selected = [], stream = new LiveOutput(thread => selected.push(thread));
   stream.accept({ method: 'turn/started', params: { threadId: 'old', turn: { id: 'a' } } }, 0);
   stream.request({ id: 7, method: 'thread/start' });
   stream.accept({ method: 'thread/started', params: { thread: { id: 'background' } } }, 1);
@@ -74,4 +74,21 @@ it('switches output tracking only after the UI selects a thread successfully', (
   expect(stream.thread).toBe('new');
   stream.accept({ id: 10, result: { thread: { id: 'fork' } } }, 8);
   expect(stream.thread).toBe('fork');
+  expect(selected).toEqual(['new', 'fork']);
+});
+it('waits for controller handoff before forwarding selection and following events', async () => {
+  const script = `process.stdin.on('data',()=>process.stdout.write('{"id":1,"result":{"thread":{"id":"new"}}}\\n{"method":"following"}\\n'))`;
+  let release, entered;
+  const blocked = new Promise(resolve => { release = resolve; }), started = new Promise(resolve => { entered = resolve; });
+  const transport = await openCodexTransport({ host: { command: process.execPath, args: ['-e', script, '--'] }, args: [],
+    cwd: process.cwd(), env: process.env, instructions: '', onEvent: async message => { if (message.id === 1) { entered(); await blocked; } } });
+  const socket = new WebSocket(transport.url, { headers: { Authorization: 'Bearer ' + transport.token } }), messages = [];
+  try {
+    await once(socket, 'open'); socket.on('message', bytes => messages.push(JSON.parse(bytes.toString())));
+    socket.send('{"id":1,"method":"thread/start","params":{}}'); await started;
+    expect(messages).toEqual([]);
+    const received = once(socket, 'message'); release(); await received;
+    await new Promise(resolve => setImmediate(resolve));
+    expect(messages.map(message => message.id ?? message.method)).toEqual([1, 'following']);
+  } finally { release(); socket.terminate(); await transport.close(); }
 });
