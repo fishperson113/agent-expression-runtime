@@ -400,3 +400,28 @@ macro-after-cancel, invalid rejection, synthetic look cooldown and reload passed
 zero script errors and camera off. These are functional samples, not completion
 latency, a sustained performance benchmark or native GPU acceptance. No Rust code
 changed; prior locked gateway build and 16 shared Rust tests remain applicable.
+
+
+## Checkpoint 14 — sanitized authenticated evidence and handoff
+
+PR #35 merged as d7bf017 after all current-head core, Windows desktop, Linux
+gateway and change-budget checks passed. One additional counted real-model
+preflight called observe/look and read a random synthetic image code correctly;
+shape/color were also checked. The preflight's local adapter selected installed
+Linux Chromium instead of the original Windows Edge fixture; the tracked
+preflight script was not changed. No native hook trust was bypassed.
+
+Total usage is 49/120 (including all historical failures and diagnostic/retest
+turns); hard deadline remains 2026-11-09 06:17:35 UTC. No further model work is
+needed to establish the automated application path. Full sanitized per-turn
+results, before/after controller evidence, functional samples and explicit limits
+are in [cloud-authenticated-model.json](evidence/cloud-authenticated-model.json).
+Selected active screenshots are body-only and synthetic/camera-off; the other
+transient captures, counter and traces stay ignored. No personal-machine action,
+real-camera/microphone capture, credential export or policy workaround occurred.
+
+Human recognition/relevance/consistency/distraction, physical-camera accuracy and
+throughput, Windows GPU/Herdr, native hook delivery/trust and Vietnamese /voice
+remain pending. Previous software-rendering and vision target misses remain.
+The successful holdout establishes autonomous ordinary-conversation expression
+attempts/application in this bounded synthetic run, not full PRD acceptance.

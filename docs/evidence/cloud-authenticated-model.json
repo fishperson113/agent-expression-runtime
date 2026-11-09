@@ -1,0 +1,106 @@
+{
+  "date": "2026-11-09",
+  "runtimeSource": "ce03da9",
+  "environment": "Cloud Linux, Chromium headless, SwiftShader; synthetic observations, camera off",
+  "modelBudget": {
+    "limit": 120,
+    "used": 49,
+    "usedAfterHoldout": 48,
+    "deadline": "2026-11-09T06:17:35.373Z"
+  },
+  "baseline": {
+    "completedTurns": 20,
+    "admitted": 10,
+    "rejected": 10
+  },
+  "controllerReproducer": {
+    "before": [
+      {
+        "pass": 1,
+        "admitted": 1,
+        "rejectionCodes": []
+      },
+      {
+        "pass": 2,
+        "admitted": 0,
+        "rejectionCodes": [
+          "controller_active"
+        ]
+      }
+    ],
+    "after": [
+      {
+        "pass": 1,
+        "admitted": 1,
+        "applied": 1
+      },
+      {
+        "pass": 2,
+        "admitted": 1,
+        "applied": 1
+      }
+    ]
+  },
+  "visionProbe": {
+    "syntheticOnly": true,
+    "tools": [
+      "look",
+      "observe"
+    ],
+    "randomDigitsCorrect": true,
+    "shapeAndColorAgentChecked": true,
+    "nativeHookInjection": "not tested",
+    "cameraUpload": false
+  },
+  "functionalAcceptance": {
+    "checks": "passed",
+    "executionMode": "headless-software-renderer",
+    "realCameraUsed": false,
+    "observeColdMs": 33.62857299999996,
+    "observeP50Ms": 1.8822620000000825,
+    "observeP95Ms": 4.102781999999934,
+    "expressP95Ms": 16.281310000000303,
+    "macroAfterCancel": true,
+    "browserReload": true,
+    "scriptErrors": 0
+  },
+  "regression": {
+    "jsPassed": 251,
+    "jsFiles": 48,
+    "build": "pass",
+    "architecture": "pass",
+    "strictHarness": "pass",
+    "physicalFunctionMaxLines": 35
+  },
+  "limits": [
+    "Frames and geometry signatures are application proxies, not semantic scores.",
+    "Active captures are 150ms after tool completion; not animation completion.",
+    "Only selected body-only active samples are tracked; all 20 transient captures stay ignored.",
+    "Human recognition, relevance, semantic consistency and distraction remain pending.",
+    "Physical-camera accuracy/throughput, Windows GPU/Herdr and Vietnamese voice remain pending.",
+    "Previous sustained software-rendering and vision performance misses remain; this run is not a new soak.",
+    "R10/R11 transcript verification remains unsupported in Codex."
+  ],
+  "holdoutRows": [
+    {"id":"h01","pass":1,"turnStatus":"completed","attempted":1,"rejected":0,"admitted":1,"applied":1,"frameSubmitted":1,"frameChangedProxy":1,"contractValidity":1,"rejectionCodes":[],"toolHistoryTruncated":false,"visualEffectiveness":null,"contentRelevance":null,"semanticConsistency":null,"activeCaptures":1,"failedCaptures":0},
+    {"id":"h02","pass":1,"turnStatus":"completed","attempted":1,"rejected":0,"admitted":1,"applied":1,"frameSubmitted":1,"frameChangedProxy":1,"contractValidity":1,"rejectionCodes":[],"toolHistoryTruncated":false,"visualEffectiveness":null,"contentRelevance":null,"semanticConsistency":null,"activeCaptures":1,"failedCaptures":0},
+    {"id":"h03","pass":1,"turnStatus":"completed","attempted":1,"rejected":0,"admitted":1,"applied":1,"frameSubmitted":1,"frameChangedProxy":1,"contractValidity":1,"rejectionCodes":[],"toolHistoryTruncated":false,"visualEffectiveness":null,"contentRelevance":null,"semanticConsistency":null,"activeCaptures":1,"failedCaptures":0},
+    {"id":"h04","pass":1,"turnStatus":"completed","attempted":1,"rejected":0,"admitted":1,"applied":1,"frameSubmitted":1,"frameChangedProxy":1,"contractValidity":1,"rejectionCodes":[],"toolHistoryTruncated":false,"visualEffectiveness":null,"contentRelevance":null,"semanticConsistency":null,"activeCaptures":1,"failedCaptures":0},
+    {"id":"h05","pass":1,"turnStatus":"completed","attempted":1,"rejected":0,"admitted":1,"applied":1,"frameSubmitted":1,"frameChangedProxy":1,"contractValidity":1,"rejectionCodes":[],"toolHistoryTruncated":false,"visualEffectiveness":null,"contentRelevance":null,"semanticConsistency":null,"activeCaptures":1,"failedCaptures":0},
+    {"id":"h06","pass":1,"turnStatus":"completed","attempted":1,"rejected":0,"admitted":1,"applied":1,"frameSubmitted":1,"frameChangedProxy":1,"contractValidity":1,"rejectionCodes":[],"toolHistoryTruncated":false,"visualEffectiveness":null,"contentRelevance":null,"semanticConsistency":null,"activeCaptures":1,"failedCaptures":0},
+    {"id":"h07","pass":1,"turnStatus":"completed","attempted":1,"rejected":0,"admitted":1,"applied":1,"frameSubmitted":1,"frameChangedProxy":1,"contractValidity":1,"rejectionCodes":[],"toolHistoryTruncated":false,"visualEffectiveness":null,"contentRelevance":null,"semanticConsistency":null,"activeCaptures":1,"failedCaptures":0},
+    {"id":"h08","pass":1,"turnStatus":"completed","attempted":1,"rejected":0,"admitted":1,"applied":1,"frameSubmitted":1,"frameChangedProxy":1,"contractValidity":1,"rejectionCodes":[],"toolHistoryTruncated":false,"visualEffectiveness":null,"contentRelevance":null,"semanticConsistency":null,"activeCaptures":1,"failedCaptures":0},
+    {"id":"h09","pass":1,"turnStatus":"completed","attempted":1,"rejected":0,"admitted":1,"applied":1,"frameSubmitted":1,"frameChangedProxy":1,"contractValidity":1,"rejectionCodes":[],"toolHistoryTruncated":false,"visualEffectiveness":null,"contentRelevance":null,"semanticConsistency":null,"activeCaptures":1,"failedCaptures":0},
+    {"id":"h10","pass":1,"turnStatus":"completed","attempted":1,"rejected":0,"admitted":1,"applied":1,"frameSubmitted":1,"frameChangedProxy":1,"contractValidity":1,"rejectionCodes":[],"toolHistoryTruncated":false,"visualEffectiveness":null,"contentRelevance":null,"semanticConsistency":null,"activeCaptures":1,"failedCaptures":0},
+    {"id":"h01","pass":2,"turnStatus":"completed","attempted":1,"rejected":0,"admitted":1,"applied":1,"frameSubmitted":1,"frameChangedProxy":1,"contractValidity":1,"rejectionCodes":[],"toolHistoryTruncated":false,"visualEffectiveness":null,"contentRelevance":null,"semanticConsistency":null,"activeCaptures":1,"failedCaptures":0},
+    {"id":"h02","pass":2,"turnStatus":"completed","attempted":1,"rejected":0,"admitted":1,"applied":1,"frameSubmitted":1,"frameChangedProxy":1,"contractValidity":1,"rejectionCodes":[],"toolHistoryTruncated":false,"visualEffectiveness":null,"contentRelevance":null,"semanticConsistency":null,"activeCaptures":1,"failedCaptures":0},
+    {"id":"h03","pass":2,"turnStatus":"completed","attempted":1,"rejected":0,"admitted":1,"applied":1,"frameSubmitted":1,"frameChangedProxy":1,"contractValidity":1,"rejectionCodes":[],"toolHistoryTruncated":false,"visualEffectiveness":null,"contentRelevance":null,"semanticConsistency":null,"activeCaptures":1,"failedCaptures":0},
+    {"id":"h04","pass":2,"turnStatus":"completed","attempted":1,"rejected":0,"admitted":1,"applied":1,"frameSubmitted":1,"frameChangedProxy":1,"contractValidity":1,"rejectionCodes":[],"toolHistoryTruncated":false,"visualEffectiveness":null,"contentRelevance":null,"semanticConsistency":null,"activeCaptures":1,"failedCaptures":0},
+    {"id":"h05","pass":2,"turnStatus":"completed","attempted":1,"rejected":0,"admitted":1,"applied":1,"frameSubmitted":1,"frameChangedProxy":1,"contractValidity":1,"rejectionCodes":[],"toolHistoryTruncated":false,"visualEffectiveness":null,"contentRelevance":null,"semanticConsistency":null,"activeCaptures":1,"failedCaptures":0},
+    {"id":"h06","pass":2,"turnStatus":"completed","attempted":1,"rejected":0,"admitted":1,"applied":1,"frameSubmitted":1,"frameChangedProxy":1,"contractValidity":1,"rejectionCodes":[],"toolHistoryTruncated":false,"visualEffectiveness":null,"contentRelevance":null,"semanticConsistency":null,"activeCaptures":1,"failedCaptures":0},
+    {"id":"h07","pass":2,"turnStatus":"completed","attempted":1,"rejected":0,"admitted":1,"applied":1,"frameSubmitted":1,"frameChangedProxy":1,"contractValidity":1,"rejectionCodes":[],"toolHistoryTruncated":false,"visualEffectiveness":null,"contentRelevance":null,"semanticConsistency":null,"activeCaptures":1,"failedCaptures":0},
+    {"id":"h08","pass":2,"turnStatus":"completed","attempted":1,"rejected":0,"admitted":1,"applied":1,"frameSubmitted":1,"frameChangedProxy":1,"contractValidity":1,"rejectionCodes":[],"toolHistoryTruncated":false,"visualEffectiveness":null,"contentRelevance":null,"semanticConsistency":null,"activeCaptures":1,"failedCaptures":0},
+    {"id":"h09","pass":2,"turnStatus":"completed","attempted":1,"rejected":0,"admitted":1,"applied":1,"frameSubmitted":1,"frameChangedProxy":1,"contractValidity":1,"rejectionCodes":[],"toolHistoryTruncated":false,"visualEffectiveness":null,"contentRelevance":null,"semanticConsistency":null,"activeCaptures":1,"failedCaptures":0},
+    {"id":"h10","pass":2,"turnStatus":"completed","attempted":1,"rejected":0,"admitted":1,"applied":1,"frameSubmitted":1,"frameChangedProxy":1,"contractValidity":1,"rejectionCodes":[],"toolHistoryTruncated":false,"visualEffectiveness":null,"contentRelevance":null,"semanticConsistency":null,"activeCaptures":1,"failedCaptures":0}
+  ]
+}
