@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { setTimeout as delay } from 'node:timers/promises';
 import { openLive } from '../integrations/live-launch.mjs';
 import { memorySample, egressCounters } from '../integrations/live-measure.mjs';
+import { runSoakSampling } from '../integrations/live-soak-sampling.mjs';
 import { liveTestClient, toolValue } from '../integrations/live-test-client.mjs';
 import { birdParts, peaceParts, sculptureProgram } from '../integrations/sculpture-examples.mjs';
 
@@ -38,9 +39,9 @@ try {
     return info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : 'unknown'; });
   const baseline = await memorySample(live.browser, live.page, true), start = performance.now();
   mkdirSync('.runtime', { recursive: true }); console.log(JSON.stringify({ soak: 'started', seconds, cameraLocalOnly: camera, baseline }));
-  while (performance.now() - start < seconds * 1000) {
-    await delay(Math.min(30000, seconds * 1000 - (performance.now() - start)));
-    const elapsedSeconds = (performance.now() - start) / 1000;
+  const sampling = await runSoakSampling({ start, durationMs: seconds * 1000, intervalMs: 30000,
+    now: () => performance.now(), wait: delay }, async elapsedMs => {
+    const elapsedSeconds = elapsedMs / 1000;
     const sample = { elapsedSeconds, memory: await memorySample(live.browser, live.page),
       metrics: await live.page.evaluate(() => window.fischLive.metrics()), vision: await live.page.locator('#vision-metrics').textContent() };
     toolValue(await client.tool('observe'));
@@ -51,11 +52,12 @@ try {
     }
     samples.push(sample); writeFileSync('.runtime/live-soak.progress.json', JSON.stringify({ elapsedSeconds, sample, counts, errors }, null, 2));
     if (camera && (!sample.metrics.cameraActive || !['tracking', 'absent'].includes(sample.metrics.camera))) throw Error('Camera stopped during soak: ' + JSON.stringify(sample.metrics.cameraTransitions));
-  }
+  });
   const final = await memorySample(live.browser, live.page, true);
-  const report = { durationSeconds: (performance.now() - start) / 1000, warmupSeconds: 60, cameraLocalOnly: camera,
+  const report = { durationSeconds: (performance.now() - start) / 1000, requestedDurationSeconds: seconds,
+    sampledDurationSeconds: sampling.sampledDurationMs / 1000, warmupSeconds: 60, cameraLocalOnly: camera,
     syntheticFixture: synthetic, executionMode: camera ? 'physical-camera' : 'headless-software-renderer',
-    inferenceRateMeasured: false, soakDurationEligible: seconds >= 1800, cameraInfo, gpu,
+    inferenceRateMeasured: false, soakDurationEligible: seconds >= 1800 && sampling.sampledDurationMs >= seconds * 1000, cameraInfo, gpu,
     baseline, final, heapGrowthBytes: final.heapBytes - baseline.heapBytes,
     privateGrowthBytes: final.privateBytes === null ? null : final.privateBytes - baseline.privateBytes,
     counts, errors, topologyCancelResizeCycles: cycle, automatedModelPrompts: 0,
