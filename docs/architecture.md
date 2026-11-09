@@ -30,8 +30,28 @@ Known limits: template validation uses context-sensitive representative values, 
 
 The Rust browser gateway adds an origin/host-checked WebSocket with first-message token auth, one observation connection, bounded snapshot/events and one synthetic look request. HTTP/MCP keep their existing admission semantics. Observe reads are independent of the mutation queue; context reads do not consume model events. Real camera images cannot be delivered by this authorized build.
 
-The terminal host connects the existing Codex UI through an authenticated, single-client loopback relay to official app-server stdio. Pairing and relay credentials stay in inherited environment, never command arguments or URLs. Thread instructions are appended; no global provider settings are changed. Only assistant-message deltas drive output activity; tool output never implies replying. The optional Herdr adapter still creates a dedicated pane with transient MCP environment and source-project cwd; an already-running CLI is not assumed to hot-load it. Live serves a freshly built static bundle locally to avoid HMR resetting the camera during coding. The original session remains. Existing trusted native hooks can forward event type through private pane IPC; prompt-context injection is not natively accepted yet, so observe-first is the fallback. No secondary expression planner or old idle-scene director runs in Live. Detailed ownership, budgets, privacy and limits are in [the Live guide](fisch-live.md).
+The terminal host connects the existing Codex UI through an authenticated, single-client loopback relay to official app-server stdio. Pairing and relay credentials stay in inherited environment, never command arguments or URLs. Thread instructions are appended; no global provider settings are changed. Only assistant-message deltas drive output activity; tool output never implies replying. The optional Herdr adapter still creates a dedicated pane with transient MCP environment and source-project cwd; an already-running CLI is not assumed to hot-load it. Live serves a freshly built static bundle locally to avoid HMR resetting the camera during coding. The original session remains. Existing trusted native hooks can forward event type through private pane IPC; prompt-context injection is not natively accepted yet, so observe-first is the fallback. No old idle-scene director runs in Live. Camera-triggered inference uses a separate, explicitly configured data-only Responses observer; it never creates a turn on the native coding thread. The observer receives only a bounded typed observation window, no coding history, tools or MCP capability. It defaults off without its own provider configuration and approved budget. Both native child environments exclude FISCH_REACTIVE_* settings and keys. Detailed ownership, budgets, privacy and limits are in [the Live guide](fisch-live.md).
 
 Live initializes a declared particle face using the same bounded assembly compiler. Role metadata applies only to that exact geometry, not arbitrary names. Data-defined lifecycle face controls remain local; semantic poses/illustrations stay agent-authored. Expired semantic channels fade ownership back to lower layers. UI cancel quarantines old epochs and revokes authority; Live MCP never silently replays a gesture across session loss. A bounded trace distinguishes admission, scheduler application and frame/hash proxies without user text or images. Synthetic observation mode is opt-in and labeled. See [Cloud execution/remaining gates](live-cloud-run.md).
 
 The standalone fisch-gateway binary shares gateway code/tests with the Tauri app, compiling with --no-default-features. Desktop remains the default Cargo feature, with its existing prerequisites. This separates browser Live from desktop UI packages without weakening transport authentication, budgets or origin policy.
+
+## Reactive terminal boundary
+
+The terminal host uses LiveReactiveBroker to pull browser-authorized requests,
+run the unprivileged observer independently and return JSON decisions to the
+causal host. Native conversation keeps its existing Live instructions and
+observe/express tools; it does not receive camera-event toolOutput notices or
+automatic turn/start requests. Separate observation inference intentionally
+trades shared conversational context for an enforceable absence of coding
+capabilities and history in reactive requests. It makes no claim to explain
+the original unrelated output's exact source. PR #51 remains outside autonomous
+semantic acceptance until integrated replay/live behavior is evaluated.
+
+Every controlled native input awaits the browser intent/revocation barrier
+before forwarding. Provider transport cancellation never delays native input.
+The broker retains the bounded browser/transport failure behavior documented
+in [the observer contract](reactive-provider.md). Closing Live disposes the
+broker, native client and owned relay. Deterministic integration tests use an
+authenticated real relay, fake app-server/native client and injected provider;
+they do not establish actual model, camera or human-quality acceptance.
