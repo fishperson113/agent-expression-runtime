@@ -96,3 +96,15 @@ it('does not claim attention channels when the user position is unavailable', ()
   for (let at = 200; at <= 1800; at += 20) c.sample(at, null, 0);
   expect(c.sample(1800, null, 0)).toEqual([]);
 });
+it('releases configuration and reflexes while easing existing writes back to lower layers', () => {
+  const c = new LiveCompositor(); c.install(configuration(), 0); c.topology(['chosen']);
+  for (let at = 0; at <= 400; at += 20) c.sample(at, null, 1);
+  const before = { ...c.sample(400, null, 1)[0] };
+  c.release(); c.event('user_arrived', 400);
+  expect(c.sample(400, null, 0)[0]).toEqual(before);
+  const releasing = c.sample(420, null, 1)[0];
+  expect(releasing.value).toBeLessThan(before.value); expect(releasing.value).toBeGreaterThan(1);
+  expect(releasing.weight).toBeLessThan(before.weight!); expect(releasing.weight).toBeGreaterThan(0);
+  for (let at = 440; at <= 2400; at += 20) c.sample(at, null, 1);
+  expect(c.sample(2400, null, 1)).toEqual([]);
+});

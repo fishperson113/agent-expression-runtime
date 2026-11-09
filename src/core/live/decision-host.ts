@@ -5,7 +5,10 @@ import type { DecisionAdmission, DecisionResult, ReactiveAdapter, ReactiveReques
 const id = (value: unknown): value is string => typeof value === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(value);
 const time = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0;
 function freezeRequest(value: ReactiveRequest): ReactiveRequest {
-  strictObject(value, ['schemaVersion', 'sessionId', 'epoch', 'requestId', 'intentRevision', 'deadline', 'requiredTrackIds']);
+  const fields = ['schemaVersion', 'sessionId', 'epoch', 'requestId', 'intentRevision', 'deadline', 'requiredTrackIds'];
+  if (Object.hasOwn(value, 'presenceRevision')) fields.push('presenceRevision');
+  strictObject(value, fields);
+  if (Object.hasOwn(value, 'presenceRevision') && (!Number.isSafeInteger(value.presenceRevision) || value.presenceRevision! < 0)) throw Error('request');
   if (value.schemaVersion !== 1 || ![value.sessionId, value.epoch, value.requestId].every(id) ||
     !Number.isSafeInteger(value.intentRevision) || value.intentRevision < 0 || !time(value.deadline) ||
     !Array.isArray(value.requiredTrackIds) || value.requiredTrackIds.length > 16 ||
@@ -23,7 +26,7 @@ function decision(value: unknown, request: ReactiveRequest) {
   return object;
 }
 
-/** Offline track-membership read-set only; no production provider/renderer is connected.
+/** Offline track-membership and optional presence-revision read-set; no production provider/renderer is connected.
  * A host retains at most 256 receipts for its lifetime; capacity requires a new host.
  * Admission is synchronous. Execution-time leases and per-tick validation belong to the caller. */
 export class ReactiveDecisionHost {
@@ -44,6 +47,7 @@ export class ReactiveDecisionHost {
     const state = this.read(), now = this.now();
     return generation === this.generation && time(now) && now < until && now < request.deadline &&
       state.sessionId === request.sessionId && state.epoch === request.epoch && state.intentRevision === request.intentRevision &&
+      (request.presenceRevision === undefined || state.presenceRevision === request.presenceRevision) &&
       request.requiredTrackIds.every(track => state.trackIds.includes(track));
   }
   async run(value: ReactiveRequest, adapter: ReactiveAdapter, admit: DecisionAdmission): Promise<DecisionResult> {
