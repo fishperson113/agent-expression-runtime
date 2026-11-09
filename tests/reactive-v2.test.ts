@@ -74,3 +74,26 @@ it('rejects null critical history, unknown selected axes, duplicates and unsafe 
   }
   const g = fixture(); expect((await g.run()).reason).toBe('accepted'); expect((await g.run()).reason).toBe('duplicate');
 });
+it('validates delayed responses after await and rejects model-authored lease authority', async () => {
+  for (const mutate of [
+    (f: ReturnType<typeof fixture>) => f.clock(5001),
+    (f: ReturnType<typeof fixture>) => { f.state.semanticSnapshot = { ...f.state.semanticSnapshot!, handIdentity: 3 }; },
+  ]) {
+    const f = fixture(); let finish!: (value: unknown) => void;
+    const pending = f.host.run(f.request, { decide: () => new Promise(resolve => { finish = resolve; }) }, () => { throw Error('unsafe_admission'); });
+    mutate(f); finish(f.output()); expect((await pending).reason).toBe('stale');
+  }
+  const f = fixture(); expect((await f.run({ ...f.output(), executionValidUntil: 99999 })).reason).toBe('invalid_decision');
+  const g = fixture(); expect((await g.run({ ...g.output(), mode: 'observe', action: null })).reason).toBe('observed');
+  expect(g.guard.owner).toBeUndefined();
+});
+it('does not accept a revoked generation between compile and synchronous acquisition', async () => {
+  const f = fixture(), generation = f.guard.generation;
+  const compiler = { compile: () => { f.guard.revoke(); return { program: { kind: 'program', duration: 500 } }; } };
+  const host = new ReactiveDecisionHost(() => f.state, () => 4900, compiler as never);
+  const result = await host.run(f.request, { decide: async () => f.output() }, (_, owner) => {
+    if (!f.guard.acquire(f.request, owner, generation)) throw Error('revoked');
+  });
+  expect(result.reason).toBe('admission_failed'); expect(result.executionValidUntil).toBeUndefined();
+  expect(f.guard.owner).toBeUndefined();
+});
