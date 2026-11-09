@@ -27,19 +27,24 @@ function face(present: boolean, phase: number): FaceSample {
 function replay() {
   const observations = new FaceObservations('qa-synthetic-9011');
   observations.status('stopped', 0);
-  const events: string[] = [];
+  const events: string[] = [], statuses: string[] = [];
   for (let at = 100; at <= 1_200_000; at += 100) {
     const phase = Math.floor(at / 10_000);
     events.push(...observations.update(face(phase % 3 !== 0, phase), at).map(event => event.type));
     if (at % 60_000 === 0) {
-      observations.status(['stopped', 'denied', 'error'][phase % 3] as 'stopped' | 'denied' | 'error', at);
+      observations.update(face(true, phase), at);
+      expect(observations.snapshot.user.expression).not.toBeNull();
+      expect(observations.snapshot.user.head).not.toBeNull();
+      expect(observations.snapshot.user.position).not.toBeNull();
+      const status = (['stopped', 'denied', 'error'] as const)[Math.floor(at / 60_000) % 3];
+      observations.status(status, at); statuses.push(status);
       expect(observations.snapshot.user.present).toBe(false);
       expect(observations.snapshot.user.expression).toBeNull();
       expect(observations.snapshot.user.head).toBeNull();
       expect(observations.snapshot.user.position).toBeNull();
     }
   }
-  return { events, snapshot: observations.snapshot };
+  return { events, statuses, snapshot: observations.snapshot };
 }
 
 it('Q04: twenty virtual minutes reproduce dropout/recovery without retained private measurements', () => {
@@ -47,6 +52,7 @@ it('Q04: twenty virtual minutes reproduce dropout/recovery without retained priv
   expect(first).toEqual(second);
   expect(first.events).toContain('user_arrived');
   expect(first.events).toContain('user_left');
+  expect(new Set(first.statuses)).toEqual(new Set(['stopped', 'denied', 'error']));
   expect(first.events.length).toBeLessThan(1000);
   expect(first.snapshot.capturedAt).toBe(1_200_000);
   expect(first.snapshot.user.expression).toBeNull();
