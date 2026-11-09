@@ -1,10 +1,11 @@
+import { existsSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
-import { createServer, preview, build } from 'vite';
+import { createServer, preview } from 'vite';
 import { chromium } from '@playwright/test';
 import { startGateway, stopChild } from '../scripts/start-session.mjs';
-import { prepareLiveAssets } from '../scripts/prepare-live-assets.mjs';
+import { prepareLiveRuntime } from '../scripts/prepare-live.mjs';
 
 export const liveRoot = fileURLToPath(new URL('../', import.meta.url));
 export async function closeLiveResources(actions) {
@@ -12,11 +13,9 @@ export async function closeLiveResources(actions) {
   const failed = results.find(result => result.status === 'rejected');
   if (failed) throw failed.reason;
 }
-export async function openLive({ headless = false, signal, inspect = () => {}, production = true, synthetic = false } = {}) {
+export async function openLive({ hands, assets, headless = false, signal, inspect = () => {}, production = true, synthetic = false } = {}) {
   if (signal?.aborted) throw Error('live_start_cancelled');
-  try { await prepareLiveAssets(resolve(liveRoot, 'public/live-assets')); }
-  catch { console.error('Camera assets unavailable. Live can run camera-off; prepare assets before enabling camera.'); }
-  if (production) await build({ root: liveRoot });
+  await prepareLiveRuntime({ hands, assets, production, signal });
   if (signal?.aborted) throw Error('live_start_cancelled');
   const vite = production ? await preview({ root: liveRoot, preview: { host: '127.0.0.1', port: 0 } }) :
     await createServer({ root: liveRoot, server: { host: '127.0.0.1', port: 0 } });
@@ -27,9 +26,7 @@ export async function openLive({ headless = false, signal, inspect = () => {}, p
   try {
     gateway = startGateway(origin, token); const base = await gateway.ready;
     if (signal?.aborted) throw Error('live_start_cancelled');
-    browser = await chromium.launch({ headless, ...(process.platform === 'win32' ? { channel: 'msedge' } : {}),
-      ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}),
-      ...(headless ? { args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] } : {}) });
+    browser = await launchLiveBrowser(headless);
     const page = await browser.newPage({ viewport: { width: 1360, height: 950 } });
     inspect(page);
     const query = new URLSearchParams();
@@ -72,4 +69,15 @@ export async function createLivePane(call, source, base, token) {
     : `'${process.execPath.replaceAll("'", "'\\''")}' '${path.replaceAll("'", "'\\''")}'`;
   await call('pane.send_input', { pane_id: pane.pane_id, text: command, keys: ['enter'] });
   return pane;
+}
+
+async function launchLiveBrowser(headless) {
+  const options = { headless, ...(headless ? { args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] } : {}) };
+  const system = ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome'].filter(existsSync);
+  const candidates = process.env.CHROME_PATH ? [{ executablePath: process.env.CHROME_PATH }] :
+    [{ channel: 'msedge' }, { channel: 'chrome' }, ...system.map(executablePath => ({ executablePath })), {}];
+  for (const candidate of candidates) {
+    try { return await chromium.launch({ ...options, ...candidate }); } catch { /* Try an installed browser; never install one implicitly. */ }
+  }
+  throw Error('No supported browser could start. Install Edge/Chrome or run npx playwright install chromium, or check CHROME_PATH; then retry fisch live.');
 }

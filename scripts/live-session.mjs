@@ -55,7 +55,7 @@ async function activityLoop(live, pane, call, signal, proxy) {
     await delay(100, undefined, { signal }).catch(() => {});
   }
 }
-export async function runLiveSession({ agentPane, call = herdrCall, headless = false, signal, launchCodex = true, runHost = runTerminalCodex, open = openLive } = {}) {
+export async function runLiveSession({ hands, assets, agentPane, call = herdrCall, headless = false, signal, launchCodex = true, runHost = runTerminalCodex, open = openLive } = {}) {
   if (signal?.aborted) return 130;
   const host = await selectLiveHost({ call, agentPane });
   const abort = new AbortController(), stop = () => abort.abort();
@@ -63,7 +63,7 @@ export async function runLiveSession({ agentPane, call = herdrCall, headless = f
   process.once('SIGINT', stop); process.once('SIGTERM', stop);
   let live, control;
   try {
-    live = await open({ headless, signal: abort.signal });
+    live = await open({ headless, signal: abort.signal, hands, assets });
     live.page.once('close', stop); live.gateway.once('exit', stop);
     await live.page.exposeFunction('fischLiveStop', stop);
     if (abort.signal.aborted) return 130;

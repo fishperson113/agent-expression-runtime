@@ -9,7 +9,7 @@ const usage = `Fisch ${version} — a particle body for your agent
 Usage: fisch <command>
 
   run        Show the body; automatically react through Codex/Claude prompt hooks
-  live       Open the local body and Codex in this terminal (Herdr optional)
+  live [--hands] [--no-assets]  Prepare and open the local body and Codex in this terminal (Herdr optional)
   status     Inspect the body attached to this agent pane
   express    Debug: send a JSON AST to the attached body
   cancel     Cancel expressions and reset posture
@@ -32,8 +32,17 @@ async function evaluate() {
   return runEvaluation();
 }
 async function live(options) {
-  const { runLiveSession } = await import('../scripts/live-session.mjs');
-  return runLiveSession(options);
+  const abort = new AbortController(), stop = () => abort.abort();
+  process.once('SIGINT', stop); process.once('SIGTERM', stop);
+  try {
+    const { ensureLiveDependencies } = await import('../scripts/prepare-live.mjs');
+    await ensureLiveDependencies({ signal: abort.signal });
+    const { runLiveSession } = await import('../scripts/live-session.mjs');
+    return await runLiveSession({ ...options, signal: abort.signal });
+  } catch (error) {
+    if (abort.signal.aborted) return 130;
+    error.public = true; throw error;
+  } finally { process.removeListener('SIGINT', stop); process.removeListener('SIGTERM', stop); }
 }
 async function build() {
   const { prepareSession } = await import('../scripts/start-session.mjs');
@@ -78,10 +87,22 @@ export async function dispatch(args, handlers = { run, live, build, test, evalua
   if (['express', 'status', 'cancel', 'stop'].includes(args[0])) return control(args);
   if (args[0] === 'hooks') return (handlers.hooks ?? hooks)(args.slice(1));
   if (args.length === 3 && args[0] === 'run' && args[1] === '--agent') return handlers.run({ agentPane: args[2] });
-  if (args.length === 3 && args[0] === 'live' && args[1] === '--agent') return handlers.live({ agentPane: args[2] });
+  if (args[0] === 'live') return handlers.live(parseLiveOptions(args.slice(1)));
   if (args.length !== 1 || !Object.hasOwn(handlers, args[0]))
     throw Object.assign(Error('Unknown command or option. Run fisch --help.'), { public: true });
   return await handlers[args[0]]() ?? 0;
+}
+
+export function parseLiveOptions(args) {
+  const options = {};
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--hands' && options.hands === undefined) options.hands = true;
+    else if (args[i] === '--no-assets' && options.assets === undefined) options.assets = false;
+    else if (args[i] === '--agent' && !options.agentPane && args[i + 1] && !args[i + 1].startsWith('--')) options.agentPane = args[++i];
+    else throw Object.assign(Error('Use fisch live [--hands] [--no-assets] [--agent pane].'), { public: true });
+  }
+  if (options.hands && options.assets === false) throw Object.assign(Error('--hands needs assets; remove --no-assets.'), { public: true });
+  return options;
 }
 
 async function control(args) {

@@ -23,16 +23,19 @@ Launcher mở Edge/Chromium với trang Live và camera mặc định **tắt**.
 Cần Node 22.12+, npm, Rust stable cùng compiler nền tảng, browser và Codex CLI đã login. Đường terminal kiểm tra với CLI 0.167.0-alpha.4; bản khác cần xác minh tương thích. Gateway browser không cần GTK/WebKit/Tauri UI:
 
 ```sh
-npm ci
 npm link
-fisch build
-# Linux/macOS hoặc chưa có Chromium Playwright:
-npx playwright install chromium
-# Tùy chọn cho camera, cần mạng ở bước tải model:
-node scripts/prepare-live-assets.mjs
+fisch live
+# Optional hand model, still off until enabled in the browser:
+fisch live --hands
+# Skip vision downloads for this launch:
+fisch live --no-assets
 ```
 
-Asset preparation lấy model Face Landmarker phiên bản cố định, kiểm tra SHA-256 và copy WASM của package đã pin. Asset nằm trong `public/live-assets/` (ignored), được phục vụ từ localhost; inference không tải video/ảnh lên CDN. Lần đầu tải model cần mạng. Build frontend bằng `npm run build` có cả `index.html` và `live.html`. Launcher tạo build mới và phục vụ bằng preview local để thay đổi code khi làm việc không tự reset camera qua HMR; đây không phải production web hosting công khai.
+Live prepares locked checkout-local npm dependencies before importing them, builds the standalone Rust gateway without Tauri UI dependencies, and prepares the static frontend. First launch can download npm packages, Cargo crates and the pinned face model; progress identifies each step. It never installs Rust, browsers, Codex, global hooks or security settings. An installed Edge/Chrome is reused; alternatively install browser binaries once with `npx playwright install chromium`. Concurrent setup is rejected with a retry hint; Ctrl+C cancels downloads and owned build processes. Missing prerequisites produce a retryable error; use `fisch doctor` to inspect them.
+
+Successful builds are cached in `.runtime/live-setup/` by input and output content. Source, lockfile, asset or output changes invalidate the relevant build; unchanged launches skip compilation. A failed build is not marked ready. Assets are resolved from the installed checkout even when launched in another project. Model downloads come from `storage.googleapis.com`, are bounded to 20 MB and verified against pinned SHA-256 hashes before atomic replacement. Cached models are reused; corrupt models are retried. Network/model failure keeps Live usable camera-off, with a retry hint. `--no-assets` skips preparation, not existing local assets. `FISCH_PREPARE_HANDS=1` remains supported; the CLI flag is the simpler equivalent.
+
+Downloading assets never enables camera or hand tracking. Use the browser controls when wanted; real images remain local. Hand observations are input for agent-authored expressions, not a fixed gesture-to-animation mapping. The static bundle avoids HMR resetting camera state. This remains localhost-only POC hosting.
 
 ## Những gì có thể thử
 
