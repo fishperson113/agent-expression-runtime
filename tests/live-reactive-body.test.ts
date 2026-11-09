@@ -122,3 +122,20 @@ it('validates reactive part references before cancelling or mutating the ambient
   expect(f.body.metrics.reactiveOwner).toBeNull(); expect(JSON.stringify(f.body.scheduler.state)).toBe(before); expect(events).toEqual([]);
   f.body.dispose();
 });
+it('rejects nonfinite perception before rendering and recovers on the next valid frame', () => {
+  const f = setup(), renderer = vi.spyOn(f.body.renderer, 'apply');
+  const sample = { landmarks: Array.from({ length: 478 }, () => ({ x: NaN, y: 0.5, z: 0 })), scores: {}, matrix: [], durationMs: 0, delegate: 'fixture' };
+  f.source.update(sample, Date.now());
+  expect(Number.isNaN(f.source.snapshot.user.position!.x)).toBe(true);
+  f.body.observe(f.source.snapshot); f.session.observe(f.source.snapshot, []);
+  expect(f.session.status().sourceValid).toBe(false);
+  f.advance(16); f.frame();
+  const bad = renderer.mock.calls.at(-1)![0] as any;
+  const invalid = (state: any) => state.liveMatrices.flatMap((m: Float64Array | undefined) => m ? [...m] : []).filter((n: number) => !Number.isFinite(n)).length;
+  expect(invalid(bad)).toBe(0);
+  f.source.update({ ...sample, landmarks: sample.landmarks.map(() => ({ x: 0.5, y: 0.5, z: 0 })) }, Date.now());
+  f.body.observe(f.source.snapshot); f.session.observe(f.source.snapshot, []); f.advance(16); f.frame();
+  expect(f.session.status().sourceValid).toBe(true);
+  expect(invalid(renderer.mock.calls.at(-1)![0])).toBe(0);
+  f.body.dispose();
+});

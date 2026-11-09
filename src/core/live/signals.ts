@@ -15,10 +15,11 @@ export function signalValue(name: LiveSignal, snapshot: Observation | null, outp
   if (name === 'hand.primary.position.x' || name === 'hand.primary.position.y') return handPosition(name, snapshot);
   if (!snapshot || snapshot.camera !== 'tracking' || !snapshot.user.present) return null;
   const user = snapshot.user;
-  if (name === 'user.mouthMoving') return user.mouthMoving === null ? null : Number(user.mouthMoving);
+  if (name === 'user.mouthMoving') return typeof user.mouthMoving === 'boolean' ? Number(user.mouthMoving) : null;
   const [, group, field] = name.split('.') as ['user', 'head' | 'position' | 'expression', string];
   const value = user[group] as Record<string, number> | null;
-  return value?.[field] ?? null;
+  const coordinate = value?.[field], [min, max] = liveSignals[name];
+  return typeof coordinate === 'number' && Number.isFinite(coordinate) ? Math.max(min, Math.min(max, coordinate)) : null;
 }
 
 function handPosition(name: 'hand.primary.position.x' | 'hand.primary.position.y', snapshot: Observation | null): number | null {

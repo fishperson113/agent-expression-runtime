@@ -57,7 +57,9 @@ export class LiveCompositor {
     const dt = this.previous === undefined ? 16 : Math.max(0, Math.min(100, now - this.previous)); this.previous = now;
     if (this.mode === 'off') return [...this.writes.values()];
     const desired = new Map<string, { target: TransformTarget; value: number; smoothMs: number }>();
-    const put = (target: TransformTarget, value: number, smoothMs = 100) => desired.set(channel(target), { target, value, smoothMs });
+    const put = (target: TransformTarget, value: number, smoothMs = 100) => {
+      if (Number.isFinite(value) && Number.isFinite(smoothMs) && smoothMs >= 0) desired.set(channel(target), { target, value, smoothMs });
+    };
     if (this.configuration && now - this.installedAt <= this.configuration.lifetimeMs) {
       // The reflex envelope already eases its value; ownership still crossfades below.
       if (this.reflex) { const value = this.poseValue(this.reflex, now); if (value !== null) put(this.reflex.pose.target, value, 0); }
@@ -88,10 +90,10 @@ export class LiveCompositor {
       }
       if (item.type === 'orient') {
         const position = snapshot?.camera === 'tracking' && snapshot.user.present ? snapshot.user.position : null;
-        if (!position) continue;
+        if (!position || !Number.isFinite(position.x) || !Number.isFinite(position.y)) continue;
         const max = item.maxDeg * Math.PI / 180;
-        put({ part: item.part, prop: 'rotateY' }, (position?.x ?? 0) * max, item.smoothMs);
-        put({ part: item.part, prop: 'rotateX' }, -(position?.y ?? 0) * max, item.smoothMs);
+        put({ part: item.part, prop: 'rotateY' }, Math.max(-1, Math.min(1, position.x)) * max, item.smoothMs);
+        put({ part: item.part, prop: 'rotateX' }, -Math.max(-1, Math.min(1, position.y)) * max, item.smoothMs);
       }
     }
   }
