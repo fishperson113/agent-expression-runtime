@@ -299,3 +299,50 @@ Eleven runtime branches have been removed only after main-ancestry/exact-ref
 verification. Only this handoff branch remains until its green PR merges; then
 verify main, remove it and leave no active owned test/browser/gateway/agent jobs.
 Pre-existing branches and global provider settings remain untouched.
+
+
+## Checkpoint 12 — fresh Cloud network and authentication recheck (2026-11-09)
+
+Resumed at approximately 00:17 UTC on main `0833ae6`. New bounded deadline:
+2026-11-09 06:17:35 UTC. Historical usage 2/120 was carried forward; current
+usage is 4/120 including one failed holdout turn and one diagnostic inference.
+The prior transient counter was not in the fresh snapshot, so its two historical
+entries were reconstructed from this ledger without resetting the total.
+
+Fresh environment configuration observations are current, spec/observed revision
+1 match, and unrestricted network policy is enforced. An ordinary inherited-proxy
+HTTPS request to chatgpt.com returned HTTP 200. The previous destination-policy
+blocker is cleared for that host. No networking, security or credential settings
+were changed. GitHub authentication and fetch worked; checkout advanced cleanly
+to main. Gateway-only locked Cargo build and npm ci succeeded (npm uses the
+workspace cache because the default home cache is not writable in the sandbox).
+
+Codex login status and app-server account/read report ChatGPT login; model/list
+returns a default model. These are account metadata, not inference authentication
+proof. Initial holdout startup failed before any turn because sandboxed CLI could
+not open its standard home SQLite state. An approved outer-executor run reached
+the first frozen h01 prompt, but the model turn failed with no Fisch tool calls.
+The driver stopped immediately, with zero completed holdout turns.
+
+One bounded diagnostic inference established error code `unauthorized`: the
+access token could not be refreshed because the session had logged out or signed
+into another account; the service explicitly requests sign-in again. No further
+model retries, credential copying, re-login or provider configuration changes were
+attempted. Required next step: reauthenticate Codex ChatGPT access for the Cloud
+environment through its supported login/credential setup, then launch a fresh
+Cloud task and verify one counted inference before resuming the frozen holdout.
+Do not paste tokens in chat. Network access alone does not restore this session.
+
+Current holdout evidence: h01/pass 1 failed; attempted/admitted/applied/frame
+counts all zero, content relevance and visual/semantic scores remain unknown.
+The failed h01 screenshot is body-only, synthetic/camera-off, and stays ignored
+under .runtime/live-overnight. No physical camera, microphone or owner Windows
+machine was used. Previously missed render/vision targets and manual gates remain
+open; no runtime change or new soak is justified by this authentication failure.
+
+Fresh validation: 248/248 JavaScript tests across 48 files passed after installing
+Playwright Chromium in a workspace-owned cache; the initial run without that
+browser had eight infrastructure failures and is not claimed as passing. Locked
+gateway Rust tests passed (16/16), frontend TypeScript/Vite build, architecture,
+strict my-harness and whitespace checks passed. The existing large-bundle warning
+remains. R10/R11 transcript verification remains unsupported in Codex.
