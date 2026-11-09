@@ -77,3 +77,22 @@ fn tracked_hands_require_unique_ids_and_visible_primary_reference() {
     value["hands"]["entities"] = json!([]); value["hands"]["trackingState"] = json!("lost");
     assert!(observation::validate(&value, "test", 1000));
 }
+
+#[test]
+fn observation_json_preserves_finite_landmark_bits() {
+    let numbers = [0.09523809523809523_f64, 0.19047619047619047, 0.38095238095238093,
+        0.9523809523809523, -0.23809523809523814, f64::MIN_POSITIVE, f64::from_bits(1)];
+    for number in numbers {
+        let mut value = snapshot(1, 1000);
+        value["hands"] = json!({"v":1,"trackingState":"tracked","coordinateSpace":"image-normalized",
+            "landmarkSchema":"mediapipe-hand-21","zMeaning":"wrist-relative-image-width","mirrored":false,
+            "sourceWidth":640,"sourceHeight":480,"entities":[{"detectionId":0,"handedness":"Left","confidence":0.9,
+                "landmarks":vec![json!({"x":number,"y":0.5,"z":-0.1});21]}]});
+        let decoded: Value = serde_json::from_str(&value.to_string()).unwrap();
+        let mut store = observation::Observations::default();
+        assert!(store.ingest(decoded, vec![], "test", 1000));
+        let encoded = store.read(0, 1000).to_string();
+        let returned: Value = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(returned["snapshot"]["hands"]["entities"][0]["landmarks"][0]["x"].as_f64().unwrap().to_bits(), number.to_bits());
+    }
+}
