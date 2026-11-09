@@ -3,16 +3,16 @@ const allowed = new Set(['user_arrived', 'user_left', 'looked_away', 'looked_bac
 export class LiveReactivity {
   pending = new Map(); seen = -1; enabled = false; session; thread; active;
   starting = false; uncertain = false; interrupting = false; queued = []; userRequests = new Map(); userTurns = new Set(); reactionThread; completedTurn; revoked = false;
-  lastStart = -Infinity; starts = []; changedAt = 0; closed = false; queuedAt = 0; generation = 0; selectionId; completed = new Set();
-  constructor({ output, request, forward, reject = () => {}, log = () => {}, now = () => Date.now() }) {
-    Object.assign(this, { output, request, forward, reject, log, now });
+  lastStart = -Infinity; starts = []; changedAt = 0; closed = false; terminal; queuedAt = 0; generation = 0; selectionId; completed = new Set();
+  constructor({ output, request, forward, reject = () => {}, log = () => {}, now, wallNow = now ?? (() => Date.now()) }) {
+    Object.assign(this, { output, request, forward, reject, log, now: now ?? (() => performance.now()), wallNow });
   }
   reset() { this.pending.clear(); this.seen = -1; }
   async sample(value) {
     if (this.closed || !value) return;
     if (this.queued.length && this.now() - this.queuedAt >= 10000) this.failQueued();
-    if ((this.starting || this.active) && this.now() - this.lastStart >= 30000) this.yield();
-    const now = this.now(), enabled = value?.enabled && !value.stopped;
+    if ((this.starting || this.active) && this.now() - this.lastStart >= 30000) this.timeout();
+    const now = this.now(), wallNow = this.wallNow(), enabled = value?.enabled && !value.stopped;
     if (!enabled || value.sessionId !== this.session || this.output.thread !== this.thread || !this.enabled) {
       if (!enabled || value.sessionId !== this.session || this.output.thread !== this.thread) this.yield();
       if (this.output.thread !== this.thread) this.userTurns.clear();
@@ -22,17 +22,23 @@ export class LiveReactivity {
       if (!enabled) this.yield();
       return;
     }
-    if (!['tracking', 'absent'].includes(value.camera) || now - value.capturedAt > 1500) {
+    if (!['tracking', 'absent'].includes(value.camera) || !this.fresh(value.capturedAt, wallNow, 1500)) {
       this.pending.clear(); this.baseline(value); this.yield(); return;
     }
     for (const event of (value.events ?? []).slice(-20)) {
       if (!Number.isSafeInteger(event.seq) || event.seq <= this.seen) continue;
       this.seen = event.seq;
-      if (!allowed.has(event.type) || now - event.at > 5000 || event.at > now) continue;
-      this.pending.set(this.key(event.type), event); this.changedAt = now;
+      if (!allowed.has(event.type) || !this.fresh(event.at, wallNow, 5000)) continue;
+      if (!this.pending.size) this.changedAt = now;
+      this.pending.set(this.key(event.type), event);
     }
-    for (const [key, event] of this.pending) if (now - event.at > 5000) this.pending.delete(key);
+    for (const [key, event] of this.pending) if (!this.fresh(event.at, wallNow, 5000)) this.pending.delete(key);
     if (this.canStart(now)) this.start(now);
+  }
+  fresh(at, now, ttl) { return Number.isFinite(at) && at <= now && now - at <= ttl; }
+  timeout() {
+    if (!this.terminal) { this.terminal = 'timedOut'; this.log('Reactive deadline expired; awaiting transport completion.'); }
+    this.yield();
   }
   baseline(value) {
     const sequences = (value?.events ?? []).slice(-20).map(event => event.seq).filter(Number.isSafeInteger);
@@ -51,7 +57,7 @@ export class LiveReactivity {
   }
   start(now) {
     const events = [...this.pending.values()].map(event => ({ type: event.type, at: event.at }));
-    this.pending.clear(); this.starting = true; this.reactionThread = this.thread; this.completedTurn = undefined; this.revoked = false; this.lastStart = now; this.starts.push(now);
+    this.pending.clear(); this.starting = true; this.reactionThread = this.thread; this.completedTurn = undefined; this.terminal = undefined; this.revoked = false; this.lastStart = now; this.starts.push(now);
     const generation = ++this.generation;
     this.log('Requesting Codex reaction to local typed events.');
     const text = 'Fisch local camera observation, not a user request. These are debounced geometric estimates, not emotions or intent. ' +
@@ -104,7 +110,7 @@ export class LiveReactivity {
       const threadId = this.userRequests.get(message.id); this.userRequests.delete(message.id);
       if (threadId === this.output.thread && message.result?.turn?.id && !this.completed.has(message.result.turn.id)) this.userTurns.add(message.result.turn.id);
     }
-    if (method === 'turn/started' && params.threadId === this.reactionThread && (this.starting || this.uncertain) && !this.active) {
+    if (method === 'turn/started' && !this.completed.has(params.turn?.id) && params.threadId === this.reactionThread && (this.starting || this.uncertain) && !this.active) {
       this.active = { threadId: params.threadId, turnId: params.turn?.id };
       if (this.revoked || this.queued.length || !this.enabled) this.yield();
     }
