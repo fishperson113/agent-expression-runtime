@@ -1,8 +1,11 @@
 # Fisch Live trên Windows: chạy, cập nhật và nghiệm thu
 
-Audit ngày 09/11/2026 trên source `56dbffc`. Tài liệu cho PowerShell/native Windows;
+Audit ban đầu ngày 09/11/2026 trên source `56dbffc`; phần khởi chạy/restart đã
+được cập nhật qua PR #93 và #97. Tài liệu cho PowerShell/native Windows;
 không phải bằng chứng đã chạy trên máy Windows của Dương. Phiên audit chỉ đọc
 source, contract tests và help của Codex trên Linux; không mở camera/mic hoặc gọi model.
+
+Thử nhanh: [kịch bản kiểm tra buổi sáng](live-morning-check.md).
 
 ## Chuẩn bị và kiểm tra không gọi model
 
@@ -43,15 +46,33 @@ hoặc SDK cần xử lý theo hướng dẫn Rust, không cài lại Fisch đ�
 đang ở `main`, không có thay đổi local. Thay đường dẫn bằng checkout thật:
 Chưa có checkout thì dùng [Quick start](../README.md#quick-start) để clone và link lần đầu.
 
+<!-- live-update-commands:start -->
 ```powershell
 $FischCheckout = 'C:\src\agent-expression-runtime'
-Set-Location $FischCheckout
-if (git status --porcelain) { throw 'Giữ lại thay đổi local trước khi cập nhật.' }
-if ((git branch --show-current) -ne 'main') { throw 'Kiểm tra branch trước; không tự reset hoặc đổi branch.' }
+Set-Location -LiteralPath $FischCheckout -ErrorAction Stop
+$Root = git rev-parse --show-toplevel
+if ($LASTEXITCODE -ne 0) { throw 'Không đọc được Git root; dừng cập nhật.' }
+if ([IO.Path]::GetFullPath($Root) -ne (Get-Location).Path) { throw 'Chọn đúng thư mục gốc checkout Fisch.' }
+$Changes = git status --porcelain --untracked-files=all
+if ($LASTEXITCODE -ne 0) { throw 'Không kiểm tra được thay đổi local; dừng cập nhật.' }
+if ($Changes) { throw 'Giữ lại thay đổi local trước khi cập nhật; không tự stash/reset.' }
+$Branch = git symbolic-ref --quiet --short HEAD
+if ($LASTEXITCODE -ne 0 -or $Branch -ne 'main') { throw 'Cần checkout main có sẵn; không tự đổi branch.' }
+$Upstream = git rev-parse --abbrev-ref --symbolic-full-name '@{u}'
+if ($LASTEXITCODE -ne 0 -or $Upstream -ne 'origin/main') { throw 'Kiểm tra upstream; không tự sửa cấu hình Git.' }
 git pull --ff-only
-if ($LASTEXITCODE -ne 0) { throw 'Git chưa cập nhật xong; giữ nguyên checkout để kiểm tra.' }
+if ($LASTEXITCODE -ne 0) { throw 'Chưa fast-forward được; giữ nguyên checkout để kiểm tra.' }
+git rev-parse --short HEAD
+if ($LASTEXITCODE -ne 0) { throw 'Không đọc được commit vừa cập nhật.' }
+```
+<!-- live-update-commands:end -->
+
+Chỉ sau khi khối trên hoàn tất mới link và kiểm tra CLI:
+
+```powershell
 npm.cmd link
 if ($LASTEXITCODE -ne 0) { throw 'npm link chưa thành công; dùng node/bin fallback bên dưới.' }
+node .\bin\fisch.mjs --version
 node .\bin\fisch.mjs doctor
 ```
 
