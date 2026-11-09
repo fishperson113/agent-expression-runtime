@@ -15,7 +15,8 @@ const observerMessages = {
 type Observer = keyof typeof observerMessages;
 const css = `.fisch-live-setup{min-width:0;margin:8px 0;padding:8px;border:1px solid var(--line,#34404a);border-radius:8px}
 .fisch-live-setup p,.fisch-live-setup li{font-size:12px;line-height:1.5;overflow-wrap:anywhere;margin:6px 0}
-.fisch-live-setup summary{cursor:pointer;font-weight:600;outline-offset:4px}.fisch-live-setup ol{padding-left:20px}`;
+.fisch-live-setup summary{cursor:pointer;font-weight:600;outline-offset:4px}.fisch-live-setup ol{padding-left:20px}
+#stop-all{position:fixed;right:16px;bottom:16px;z-index:5;box-shadow:0 0 0 4px var(--bg,#080e14)}`;
 
 function projection(value: unknown): { native?: Native; observer: Observer } {
   try {

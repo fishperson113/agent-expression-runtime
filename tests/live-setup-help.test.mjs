@@ -37,6 +37,16 @@ it('separates gateway, selected Native session and configured observer without e
     expect(await panel.textContent()).toContain('không tự bật observer');
     expect(await page.locator('video').evaluate(node => node.srcObject)).toBeNull();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    for (const viewport of [{ width: 375, height: 812 }, { width: 1440, height: 900 }]) {
+      await page.setViewportSize(viewport); await page.evaluate(() => scrollTo(0, 0));
+      const stop = await page.locator('#stop-all').boundingBox();
+      expect(stop.y).toBeGreaterThanOrEqual(0); expect(stop.y + stop.height).toBeLessThanOrEqual(viewport.height);
+      expect(await page.evaluate(() => {
+        const button = document.querySelector('#stop-all'), rect = button.getBoundingClientRect();
+        return document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2) === button;
+      })).toBe(true);
+      await page.locator('#stop-all').focus(); expect(await page.locator('#stop-all').evaluate(node => node === document.activeElement)).toBe(true);
+    }
   } finally { await page.close(); }
 }, 45000);
 it('rejects hostile data without getters or private content and avoids repeated announcements', async () => {
