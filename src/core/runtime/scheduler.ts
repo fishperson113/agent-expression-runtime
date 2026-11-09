@@ -68,8 +68,8 @@ export class Scheduler {
   get busy() {
     return !!this.active;
   }
-  cancel(epoch: string) {
-    this.tick();
+  cancel(epoch: string, advance = true) {
+    if (advance) this.tick();
     this.formation.freeze(this.clock.now());
     if (this.active) this.feedback?.('cancelled', this.active.ir);
     for (const ir of this.queue) this.feedback?.('cancelled', ir);

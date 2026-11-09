@@ -325,3 +325,31 @@ describe('scheduler', () => {
     expect(r.codes).toContain('expired');
   });
 });
+it('cancels revoked work without advancing active or queued programs or rendering another frame', () => {
+  let now = 0, renders = 0;
+  const feedback: { status: string; seq: number }[] = [];
+  const c = new Compiler(), s = new Scheduler({ now: () => now }, { apply: () => { renders++; }, dispose() {} },
+    { count() {} }, (status, ir) => feedback.push({ status, seq: ir.seq }));
+  s.cancel('e');
+  s.admit(c.compile(program({ type: 'shapeQuality', grow: 2, durationMs: 1000 }, 7), 0));
+  now = 500; s.tick(); const displayed = Number(s.state.grow);
+  s.admit(c.compile(program({ type: 'style', color: '#ff0000', durationMs: 1000 }, 8, { policy: 'append' }), 500));
+  feedback.length = 0; renders = 0; now = 1500;
+  s.cancel('e', false);
+  expect(renders).toBe(0); expect(s.state.grow).toBe(displayed);
+  expect(feedback).toEqual([{ status: 'cancelled', seq: 7 }, { status: 'cancelled', seq: 8 }]);
+  expect(s.busy).toBe(false); expect(s.queueDepth).toBe(0); expect(s.epoch).toBe('e');
+  now = 1625; s.tick(); expect(s.state.grow).toBeGreaterThan(1); expect(s.state.grow).toBeLessThan(displayed);
+  now = 1750; s.tick(); expect(s.state.grow).toBeCloseTo(1); expect(s.state.color).not.toBe('#ff0000');
+  expect(s.admit(c.compile(program({ type: 'wait', durationMs: 100 }, 1), now))).toBe('accepted');
+});
+it('preserves the default cancel behavior of sampling the final displayed state first', () => {
+  let now = 0, renders = 0;
+  const feedback: string[] = [];
+  const c = new Compiler(), s = new Scheduler({ now: () => now }, { apply: () => { renders++; }, dispose() {} },
+    { count() {} }, status => feedback.push(status));
+  s.cancel('e'); s.admit(c.compile(program({ type: 'shapeQuality', grow: 2, durationMs: 1000 }), 0));
+  renders = 0; feedback.length = 0; now = 500; s.cancel('next');
+  expect(renders).toBe(1); expect(feedback).toEqual(['applied', 'cancelled']);
+  expect(s.state.grow).toBeGreaterThan(1); expect(s.epoch).toBe('next');
+});
