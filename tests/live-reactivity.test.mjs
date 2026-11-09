@@ -215,3 +215,44 @@ it('bounds an owned semantic turn to thirty seconds without interrupting user wo
   expect(f.sent).toHaveLength(2);
 });
 
+it('dispatches a continuous event burst after a finite window using its newest cue', async () => {
+  const f = fixture(); await f.sample();
+  for (let seq = 1; seq <= 100; seq++) {
+    await f.sample([f.event(seq === 100 ? 'user_left' : 'user_arrived', seq)]);
+    if (seq < 100) f.advance(7);
+  }
+  expect(f.sent).toHaveLength(0);
+  f.advance(57); await f.sample();
+  expect(f.sent).toHaveLength(1);
+  expect(f.sent[0].params.toolOutput.output).toContain('user_left');
+  expect(f.sent[0].params.toolOutput.output).not.toContain('user_arrived');
+});
+it('uses a monotonic deadline despite wall-clock rollback and retains transport isolation', async () => {
+  const f = fixture(); let wall = 100000;
+  f.controller.wallNow = () => wall;
+  const sample = events => f.sample(events, { capturedAt: wall });
+  await sample([]); await sample([{ type: 'user_arrived', seq: 1, at: wall }]);
+  f.advance(750); await sample([]); await settle(f);
+  wall -= 3600000; f.advance(30000); await sample([]);
+  expect(f.controller.terminal).toBe('timedOut');
+  expect(f.controller.revoked).toBe(true);
+  expect(f.sent[1].method).toBe('turn/interrupt');
+  f.advance(20000); await sample([{ type: 'user_left', seq: 2, at: wall }]);
+  f.advance(750); await sample([]);
+  expect(f.sent.filter(value => value.method === 'turn/start')).toHaveLength(1);
+  complete(f); expect(f.controller.terminal).toBe('timedOut');
+});
+it('rejects malformed and future timestamps without starting a reaction', async () => {
+  const f = fixture(); await f.sample();
+  await f.sample([{ type: 'user_arrived', seq: 1, at: NaN }]);
+  await f.sample([{ type: 'user_arrived', seq: 2, at: 200000 }]);
+  await f.sample([f.event('user_arrived', 3)], { capturedAt: Infinity });
+  f.advance(750); await f.sample(); expect(f.sent).toEqual([]);
+});
+it('never resurrects a completed turn from duplicated late transport notifications', async () => {
+  const f = fixture(); await launch(f); await settle(f); complete(f);
+  f.controller.uncertain = true;
+  f.controller.event({ method: 'turn/started', params: { threadId: 't', turn: { id: 'r' } } });
+  expect(f.controller.active).toBeUndefined();
+  expect(f.sent).toHaveLength(1);
+});
