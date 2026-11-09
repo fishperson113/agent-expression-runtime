@@ -56,7 +56,8 @@ export class LiveCompositor {
     const desired = new Map<string, { target: TransformTarget; value: number; smoothMs: number }>();
     const put = (target: TransformTarget, value: number, smoothMs = 100) => desired.set(channel(target), { target, value, smoothMs });
     if (this.configuration && now - this.installedAt <= this.configuration.lifetimeMs) {
-      if (this.reflex) { const value = this.poseValue(this.reflex, now); if (value !== null) put(this.reflex.pose.target, value); }
+      // The reflex envelope already eases its value; ownership still crossfades below.
+      if (this.reflex) { const value = this.poseValue(this.reflex, now); if (value !== null) put(this.reflex.pose.target, value, 0); }
       this.bindings(snapshot, output, put);
       for (const pose of this.configuration.poses) {
         const value = this.poseValue({ pose, at: this.installedAt }, now); if (value !== null) put(pose.target, value, 40);
@@ -67,7 +68,8 @@ export class LiveCompositor {
     for (const [key, aim] of desired) {
       const rest = neutral(aim.target.prop), write: TransformWrite = this.writes.get(key) ?? { target: aim.target, value: rest };
       const value = blocked.has(key) ? rest : aim.value;
-      write.value += (rest + (value - rest) * (this.mode === 'reduced' ? 0.08 : 1) - write.value) * (1 - Math.exp(-dt / aim.smoothMs));
+      const smoothing = aim.smoothMs === 0 ? 1 : 1 - Math.exp(-dt / aim.smoothMs);
+      write.value += (rest + (value - rest) * (this.mode === 'reduced' ? 0.08 : 1) - write.value) * smoothing;
       const weight = active.has(key) && !blocked.has(key) ? 1 : 0;
       write.weight = (write.weight ?? 0) + (weight - (write.weight ?? 0)) * (1 - Math.exp(-dt / 160));
       if (!active.has(key) && write.weight < 0.001) { this.writes.delete(key); continue; }
