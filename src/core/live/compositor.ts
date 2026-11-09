@@ -27,6 +27,7 @@ export class LiveCompositor {
     this.configuration = structuredClone(configuration); this.installedAt = at;
     this.cooldown.clear(); this.reflex = undefined;
   }
+  release() { this.configuration = undefined; this.cooldown.clear(); this.reflex = undefined; }
   reset() { this.configuration = undefined; this.writes.clear(); this.cooldown.clear(); this.reflex = undefined; }
   topology(ids: string[]) {
     this.parts = new Set(ids);
