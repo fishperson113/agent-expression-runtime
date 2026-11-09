@@ -26,6 +26,9 @@ network tools and emotion/identity inference are outside the reactive capability
 
 ## Baseline and module map
 
+Historical inventory at the design baseline SHA above. This table is preserved as
+the starting point; the phase-two status below records subsequent implementation.
+
 | Area | Existing implementation | Gap / planned increment |
 |---|---|---|
 | Perception | `src/live/vision.worker.ts`, observation adapter | Hand summaries exist; structured landmarks discarded before bridge |
@@ -157,6 +160,79 @@ Either decision model could later gate ambiguous structured events with version,
 TTL and abstain semantics, never own world-state truth or enter the local fast path.
 Evaluate precision/recall, negative-minute false triggers, p95 latency and stale rate
 on a frozen split before integration. No such model benchmark has run here.
+
+## Phase-two implementation status — 2026-11-09
+
+Inspected snapshot: main `eef7ed9d930ac8539ef26e588ee2bca70be49212`.
+The original requirement tables and baseline inventory remain the design contract;
+this update distinguishes implemented boundaries from remaining acceptance work.
+Code/test references identify implementation and regression coverage, not fresh
+production-model, hardware, performance or human-quality verification.
+
+The separate observer is a stateless, data-only Responses request with `store=false`,
+`tools=[]` and `tool_choice=none`. It receives a bounded validated observation
+window with summaries removed, not Native conversation history or a coding thread.
+Returned data must pass the existing finite DSL compiler and browser admission
+barriers. This boundary adds no model-selected command, filesystem, network or MCP
+tool capability and uses no natural-language keyword-to-effect table.
+
+The provider factory defaults off. Explicit dedicated backend/model/endpoint
+configuration and the absolute path to an **existing approved cumulative budget
+ledger** are required. Startup validates expiry/capacity; an atomic reservation
+rechecks the same ledger before each request. It never creates or resets a ledger,
+extends its deadline or grants additional turns. Missing authorization, exhausted
+budget and transport uncertainty do not become free retries. This document records
+no new remote agent model requests and does not assert that a usable ledger or
+provider credential is currently available.
+
+The browser uses a **five-second semantic request deadline** and action validity
+bounded by that deadline. Its execution lease can expire and revoke before the
+Node broker's separate **30-second transport watchdog**. The watchdog concerns
+unsettled transport, abort and uncertainty; it does not extend scene authority or
+prove that provider processing/cost stopped. The broker also bounds browser calls
+to ten seconds and fails closed on browser unavailability.
+
+| Requirements | Implemented boundary and regression references | Remaining scope / acceptance |
+|---|---|---|
+| OBS-01, OBS-02 | Versioned optional hand fields survive TS/Rust validation; finite 21-point geometry, handedness/confidence and source/relative-z semantics. `tests/live-observation.test.ts`, Rust `live_gateway_tests.rs`. | Real perception quality is separate from serialization correctness. |
+| OBS-03 | Conservative geometric `HandTracker`, bounded short-loss continuity, primary-hand hysteresis and hand signals; `tests/live-hand-tracker.test.ts`, `tests/live-hand-signals.test.ts`. | Identity through crossing/occlusion is not established; general rotation/crop/calibration metadata remains incomplete. |
+| CLK-01 | Injected browser monotonic clock drives coalescing, deadlines and leases; broker transport timers are separate. `tests/reactive-session.test.ts`. | Existing observation freshness still uses wall-clock `capturedAt`; the generic clock-origin/mapping contract is not fully implemented. |
+| CAU-01, CAU-02 | Requests bind session/epoch/request ID, intent/presence revisions, deadline and required tracks. Compatible frames remain admissible. Broker freezes and compares the complete outer/window request before authorization. `tests/live-decision.test.ts`, `tests/reactive-session.test.ts`, `tests/live-reactive-broker.test.mjs`. | This is a specific track-membership/presence read-set, not generic field-level `basedOn/readSet`, controller/config/prompt hashes or a complete common envelope. |
+| CAU-03, ACT-02 | Consume-once dispatch authorization, revocable execution leases, per-tick checks and no-advance scheduler cancellation; owner-scoped cancellation precedes the next scheduler tick. `tests/reactive-lease.test.ts`, `tests/live-reactive-body.test.ts`, `tests/live-reactive-browser.test.mjs`, `tests/core.test.ts`. | General multi-channel ownership/blending and full revoke-scope contracts are not certified. Seek/source-clock behavior needs the full replay integration. |
+| SCH-01, SCH-02, SCH-03 | Finite 750 ms coalescing, bounded history/receipts, one transport slot/owner, 15 s cooldown and four starts in a rolling minute. Browser revocation retains unresolved transport; Node watchdog/unknown outcomes block further dispatch. `tests/reactive-session.test.ts`, `tests/live-reactive-broker.test.mjs`. | No claim of a general orphan registry, provider settlement proof or optimal tuning. Browser capacity requires an explicit reconciled lifecycle restart. |
+| ACT-01, PRI-02 | Fixed tool-free provider request, strict bounded output and shared compiler validation; complete request binding and final browser preflight. `tests/reactive-provider.test.mjs`, `tests/live-reactive-broker.test.mjs`, `tests/live-reactive-body.test.ts`. | Provider deployment/access approval and actual semantic behavior remain unverified; these tests are not privacy acceptance for every launch/runtime. |
+| USR-01 | `LiveBody.admit` crosses `prepareUserMutation` before compilation. Configuration leases survive IR completion; non-avatar user geometry remains protected until explicit return/reset. `tests/live-reactive-body.test.ts`. | Voice/chat deduplication and every future co-create mutation must continue through the shared barrier; no new voice frontend exists. Terminal broker integration remains pending PR #74 at this snapshot. |
+| REC-01, CAU-01 | `SceneTrace` records bounded `native/reactive/ambient` attribution plus validated request/decision/action IDs. Native lifecycle receipts alone reach the gateway, even when local epoch/sequence values collide. `tests/live-trace.test.ts`, `tests/live-reactive-body.test.ts`. | This is a bounded lifecycle/frame-hash proxy, not the full manifest/observations/events/execution/trajectory recorder, durable audit, retention or write-failure recovery contract. |
+| REP-01, REP-02, DAT-01 | Engineering replay/experience fixtures and licensed public-video decode provide separate local evidence inputs; see `docs/public-video-replay.md`, `tests/experience-replay.test.ts`, `tests/public-video-replay.test.mjs`. | Full deterministic production controller replay, VFR/seek integration, frozen subject-separated annotated evaluation and model re-evaluation remain separate work. IPN HandS integrity discrepancy is not resolved by another licensed fixture. |
+| PRI-01, EVAL-01, BUD-01 | Camera and reactive provider remain opt-in; browser source/visibility/stop hooks revoke reactive authority. Budget factory tests cover default-off, expired/exhausted ledgers and atomic final reservation. `tests/live-reactive-browser.test.mjs`, `tests/live-reactive-provider.test.mjs`. | No physical-device, live-production-model, sustained UX or human-naturalness acceptance. Recorder/retention proposals above remain unapproved and unimplemented. |
+
+Implementation milestones represented in this snapshot:
+
+- [PR #64](https://github.com/fishperson113/agent-expression-runtime/pull/64): execution leases, `reactive-lease.ts`, compositor release and lease regressions.
+- [PR #66](https://github.com/fishperson113/agent-expression-runtime/pull/66): stateless data-only adapter and strict request/output boundary.
+- [PR #67](https://github.com/fishperson113/agent-expression-runtime/pull/67): scheduler cancellation without advancing a revoked program one last time.
+- [PR #68](https://github.com/fishperson113/agent-expression-runtime/pull/68): bounded Node/browser broker and user-input revocation barrier.
+- [PR #69](https://github.com/fishperson113/agent-expression-runtime/pull/69): browser coordinator, finite gating and consume-once dispatch authority.
+- [PR #70](https://github.com/fishperson113/agent-expression-runtime/pull/70): browser body/main/bridge wiring, user geometry ownership, legacy-path quarantine, preflight part checks and lifecycle provenance.
+- [PR #71](https://github.com/fishperson113/agent-expression-runtime/pull/71): explicit opt-in factory using the existing approved ledger and dedicated environment filtering.
+- [PR #73](https://github.com/fishperson113/agent-expression-runtime/pull/73): full outer/window request binding before provider authorization.
+
+The old browser `reactivity()` polling API is removed at this snapshot, preventing
+the legacy polling integration from starting automatic camera turns in Native.
+`LiveReactivity` remains legacy code, not the new observer's authority mechanism.
+[PR #74](https://github.com/fishperson113/agent-expression-runtime/pull/74), reviewed
+as pending at head `e1a8cd8c337f0d3c22750dd7241f8e13e6afcf22`, proposes replacing
+terminal camera routing with `LiveReactiveBroker`, stripping dedicated observer
+configuration/credentials from both Native child environments, and awaiting the
+browser user-mutation barrier before forwarding controlled Native input. It is
+**not included** in the inspected main SHA and is not a merge/rollout claim.
+
+The historical autonomous Vnstock/Python content still has **unknown provenance**.
+[PR #51](https://github.com/fishperson113/agent-expression-runtime/pull/51) remains
+open/draft at `0120aa1120c7f8a98f05ec66f776e8985aef7d98` when checked for this update.
+Removing the legacy camera entry point and introducing an isolated observer does
+not retroactively explain that output or establish autonomous-quality acceptance.
+No full envelope, recorder, live-model, human or naturalness gate is marked done.
 
 ## Sources
 
