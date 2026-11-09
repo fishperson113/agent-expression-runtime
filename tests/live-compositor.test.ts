@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
 import { LiveCompositor, composeWrites } from '../src/core/live/compositor';
+import { signalValue } from '../src/core/live/signals';
 import { validateConfiguration } from '../src/core/live/control-validation';
 import { transformMatrices, livePoint } from '../src/core/live/transforms';
 
@@ -107,4 +108,21 @@ it('releases configuration and reflexes while easing existing writes back to low
   expect(releasing.weight).toBeLessThan(before.weight!); expect(releasing.weight).toBeGreaterThan(0);
   for (let at = 440; at <= 2400; at += 20) c.sample(at, null, 1);
   expect(c.sample(2400, null, 1)).toEqual([]);
+});
+
+it('rejects nonfinite observation signals and pose values without poisoning later valid writes', () => {
+  const c = new LiveCompositor(), snapshot = { camera: 'tracking', user: { present: true, position: { x: NaN, y: Infinity }, head: { yaw: NaN } } } as any;
+  const config = validateConfiguration({ lifetimeMs: 2000, poses: [], controls: [
+    { type: 'orient', id: 'attention', part: 'body', toward: { entity: 'user' }, maxDeg: 20, smoothMs: 100 },
+    { type: 'bind', id: 'follow', signal: 'user.head.yaw', target: { part: 'body', prop: 'x' }, gain: 0.01, offset: 0, clamp: [-0.4, 0.4], smoothMs: 40 },
+  ] });
+  expect(signalValue('user.head.yaw', snapshot)).toBeNull();
+  c.install(config, 0); expect(c.sample(0, snapshot, 0).every(write => Number.isFinite(write.value))).toBe(true);
+  snapshot.user.position = { x: 20, y: -20 }; snapshot.user.head.yaw = 20;
+  const valid = c.sample(100, snapshot, 0);
+  expect(valid.every(write => Number.isFinite(write.value))).toBe(true);
+  expect(valid.filter(write => write.target.prop.startsWith('rotate')).every(write => Math.abs(write.value) <= 20 * Math.PI / 180)).toBe(true);
+  c.install({ controls: [], lifetimeMs: 2000, poses: [{ type: 'pose', target: { part: 'body', prop: 'x' }, value: NaN, durationMs: 600 }] }, 100);
+  expect(c.sample(300, null, 0).every(write => Number.isFinite(write.value))).toBe(true);
+  c.install(config, 300); expect(c.sample(400, snapshot, 0).every(write => Number.isFinite(write.value))).toBe(true);
 });

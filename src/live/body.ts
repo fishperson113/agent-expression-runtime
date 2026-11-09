@@ -3,6 +3,7 @@ import { Scheduler } from '../core/runtime/scheduler';
 import { LiveCompiler, referencedParts } from '../core/live/compiler';
 import { LiveCompositor, composeWrites, type TransformWrite } from '../core/live/compositor';
 import { transformMatrices } from '../core/live/transforms';
+import { validateObservation } from '../core/live/observation';
 import { validateConfiguration } from '../core/live/control-validation';
 import defaults from '../../integrations/live-reflexes.json';
 import type { BodyState } from '../core/ports';
@@ -173,7 +174,10 @@ export class LiveBody {
     this.faceBlend.clear();
     this.scheduler.tick();
   }
-  observe(snapshot: Observation) { this.observation = snapshot; }
+  observe(snapshot: Observation) {
+    try { this.observation = validateObservation(snapshot); }
+    catch { this.observation = null; }
+  }
   activity(activity: string) {
     this.trace.activity(activity);
     if (activity === 'working' && this.activityState !== 'working') this.attentionUntil = performance.now() + 250;
