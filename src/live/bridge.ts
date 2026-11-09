@@ -2,13 +2,13 @@ import { HttpGatewayConnection } from '../adapters/http-gateway-client';
 import type { LiveBody } from './body';
 import type { FaceObservations } from './observation';
 import { element } from './view';
-import type { LiveEventKind } from '../core/live/types';
+import type { LiveSourceEvent } from '../core/live/types';
 import { unavailableUser } from '../core/live/types';
 
 export class LiveBridge {
   private connection?: HttpGatewayConnection;
   private socket?: WebSocket;
-  private pending: { type: LiveEventKind; at: number }[] = [];
+  private pending: LiveSourceEvent[] = [];
   private sent = -1;
   private timer?: ReturnType<typeof setInterval>;
   private connected = false;
@@ -34,7 +34,7 @@ export class LiveBridge {
     socket.onerror = () => { element('fault').textContent = 'Không nối được gateway Live.'; };
     this.timer = setInterval(() => this.publish(), 100);
   }
-  events(events: { type: LiveEventKind; at: number }[]) { this.pending.push(...events); this.pending = this.pending.slice(-16); }
+  events(events: LiveSourceEvent[]) { this.pending.push(...events); this.pending = this.pending.slice(-16); }
   async cancel() {
     this.resetReactive(); this.body.epoch(crypto.randomUUID());
     try { await this.connection?.revoke(); }

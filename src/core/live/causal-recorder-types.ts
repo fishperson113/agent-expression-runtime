@@ -1,4 +1,4 @@
-import type { Observation, LiveEventKind } from './types';
+import type { Observation, LiveSourceEvent } from './types';
 import type { DecisionReason, ReactiveRequest } from './decision-types';
 export const causalRevocationReasons = ['enabled', 'disabled', 'unavailable', 'reset', 'session_changed', 'epoch_changed', 'presence_changed', 'semantic_changed', 'hand_changed',
   'user_intent', 'user_busy', 'intent_changed', 'deadline', 'source_expired', 'track_lost', 'expired', 'revoked', 'source_unavailable',
@@ -11,7 +11,7 @@ export type ProviderReceipt = { requestId: string; modelConfigHash: string; prom
 export type CausalPayloads = {
   provider_receipt: ProviderReceipt;
   observation: Observation;
-  event: { sessionId: string; observationSeq: number; seq: number; type: LiveEventKind; at: number };
+  event: LiveSourceEvent & { sessionId: string; observationSeq: number; seq: number };
   request: { request: ReactiveRequest; observationRefs: CausalRef[]; eventRefs: CausalRef[] };
   authorization: { requestId: string; allowed: boolean; reason: 'authorized' | 'denied' | 'revoked' | 'stale' | 'unavailable' };
   decision: { requestId: string; reason: DecisionReason; decisionId?: string; actionId?: string; mode?: 'observe' | 'express'; validUntil?: number };

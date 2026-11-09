@@ -1,8 +1,9 @@
 import { expect, it } from 'vitest';
 import Ajv from 'ajv';
 import schema from '../src/contracts/live.schema.json';
-import { validateObservation, ObservationStore } from '../src/core/live/observation';
-import { unavailableUser, type Observation } from '../src/core/live/types';
+import { validateObservation, validateSourceEvent, eventKinds, ObservationStore } from '../src/core/live/observation';
+import { unavailableUser, type Observation, type HandWireEvent } from '../src/core/live/types';
+import { CausalRecorder } from '../src/core/live/causal-recorder';
 import { signalValue } from '../src/core/live/signals';
 
 export function observation(seq = 1, capturedAt = 1000): Observation {
@@ -37,4 +38,38 @@ it('turns stale values into unknown and resets session/cursor atomically', () =>
 it('keeps explicitly stale measurements stale even with a recent transport timestamp', () => {
   const store = new ObservationStore(); store.ingest({ ...observation(), camera: 'stale' }, [], 1000);
   expect(store.read(0, 1000).stale).toBe(true);
+});
+
+const handEvent = (): HandWireEvent => ({ type: 'hand_motion_started', at: 1000, eventVersion: 1, trackId: 'hand_1_1', sourceSeq: 77,
+  observationSeq: 12, evidenceStartSeq: 10, stateRevision: 3, sourceGeneration: 1 });
+it('preserves versioned hand evidence and keeps delivery cursor distinct from source sequence', () => {
+  const store = new ObservationStore(), hand = handEvent();
+  store.ingest(observation(12), [{ type: 'user_arrived', at: 1000 }, hand], 1000);
+  expect(store.read(1, 1000).events).toEqual([{ ...hand, id: 2 }]);
+  (store.read(1, 1000).events[0] as HandWireEvent).trackId = 'read_mutation';
+  hand.trackId = 'changed'; expect(store.read(1, 1000).events[0]).toMatchObject({ trackId: 'hand_1_1', sourceSeq: 77, id: 2 });
+  expect(() => store.ingest(observation(13), [handEvent()], 1000)).toThrow('live_event_sequence');
+  store.ingest(observation(13), [{ ...handEvent(), sourceSeq: 78, observationSeq: 13 }], 1000);
+  expect(store.read(2, 1000).events[0].id).toBe(3); expect(eventKinds).not.toContain('hand_motion_started');
+});
+it('fails closed on unknown hand schemas, incomplete evidence, source rollback and future frame claims', () => {
+  for (const patch of [{ eventVersion: 2 }, { trackId: 'bad id' }, { evidenceStartSeq: 13 }, { sourceSeq: NaN }, { stateRevision: -1 },
+    { sourceGeneration: 0.5 }, { pixels: 'private' }]) expect(() => validateSourceEvent({ ...handEvent(), ...patch })).toThrow();
+  const missing = { ...handEvent() } as any; delete missing.sourceSeq; expect(() => validateSourceEvent(missing)).toThrow();
+  const getter = Object.defineProperty({}, 'type', { get: () => { throw Error('getter must not run'); }, enumerable: true });
+  expect(() => validateSourceEvent(getter)).toThrow('live_event');
+  expect(() => new ObservationStore().ingest(observation(11), [handEvent()], 1000)).toThrow('live_hand_event');
+  expect(validateSourceEvent({ type: 'user_arrived', at: 1000 })).toEqual({ type: 'user_arrived', at: 1000 });
+  expect(validateSourceEvent({ type: 'user_arrived', at: 1000, sourceSeq: 70 })).toMatchObject({ sourceSeq: 70 });
+});
+it('records the complete hand wire evidence and flags evidence originating before consent without backfill', () => {
+  const recorder = new CausalRecorder({ now: () => 0, wallNow: () => 1000, epoch: () => 'epoch' });
+  const event = { ...handEvent(), sessionId: 'test', seq: 77 };
+  recorder.start({ runId: 'hand', mode: 'synthetic' }); recorder.append('observation', observation(12));
+  expect(recorder.append('event', event)).toBe(true); expect(recorder.status()?.reasons).toContain('missing_parent');
+  expect(recorder.snapshot().records[1].payload).toEqual(event);
+  recorder.clear(); recorder.start({ runId: 'full', mode: 'synthetic' });
+  recorder.append('observation', observation(10)); recorder.append('observation', observation(12)); recorder.append('event', event);
+  expect(recorder.status()?.incomplete).toBe(false);
+  expect(recorder.append('event', { ...event, eventVersion: 2 } as any)).toBe(false);
 });

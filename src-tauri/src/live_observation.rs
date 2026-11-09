@@ -65,14 +65,35 @@ fn track_id(id: &str) -> bool {
 pub fn event_type(value: &Value) -> bool {
     ["user_arrived", "user_left", "looked_away", "looked_back", "expression_changed", "mouth_started", "mouth_stopped", "turn_changed"].iter().any(|kind| value == kind)
 }
+fn hand_event_type(value: &Value) -> bool {
+    ["hand_appeared", "hand_lost", "hand_motion_started", "hand_motion_stopped"].iter().any(|kind| value == kind)
+}
+fn source_event(value: &Value, now: u64, snapshot_seq: u64) -> bool {
+    let hand = hand_event_type(&value["type"]);
+    let mut fields = if hand { vec!["type", "at", "eventVersion", "trackId", "sourceSeq", "observationSeq", "evidenceStartSeq", "stateRevision", "sourceGeneration"] } else { vec!["type", "at"] };
+    if !hand && value.get("sourceSeq").is_some() { fields.push("sourceSeq"); }
+    if !keys(value, &fields) || !number(&value["at"], 0., 9007199254740991.) || (value["at"].as_f64().unwrap_or(f64::INFINITY) - now as f64).abs() > 5000. { return false; }
+    if value.get("sourceSeq").is_some() && !value["sourceSeq"].as_u64().is_some_and(|seq| seq <= 9007199254740991) { return false; }
+    if !hand { return event_type(&value["type"]); }
+    value["eventVersion"] == 1 && value["trackId"].as_str().is_some_and(|id| !id.is_empty() && id.len() <= 64 && id.bytes().all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-'))
+        && ["observationSeq", "evidenceStartSeq", "stateRevision", "sourceGeneration"].iter().all(|key| value[*key].as_u64().is_some_and(|seq| seq <= 9007199254740991))
+        && value["evidenceStartSeq"].as_u64() <= value["observationSeq"].as_u64() && value["observationSeq"].as_u64().unwrap() <= snapshot_seq
+}
 #[derive(Default)]
-pub struct Observations { pub snapshot: Option<Value>, pub received_at: Option<u64>, pub events: VecDeque<Value>, pub cursor: u64 }
+pub struct Observations { pub snapshot: Option<Value>, pub received_at: Option<u64>, pub events: VecDeque<Value>, pub cursor: u64, pub source_seq: Option<u64> }
 impl Observations {
     pub fn ingest(&mut self, value: Value, events: Vec<Value>, session: &str, now: u64) -> bool {
         if !validate(&value, session, now) || events.len() > 16 || self.snapshot.as_ref().is_some_and(|old| old["seq"].as_u64() >= value["seq"].as_u64()) { return false; }
-        if events.iter().any(|event| !keys(event, &["type", "at"]) || !event_type(&event["type"]) || !event["at"].as_u64().is_some_and(|at| at.abs_diff(now) <= 5000)) { return false; }
+        let mut source_seq = self.source_seq;
+        for event in &events {
+            if !source_event(event, now, value["seq"].as_u64().unwrap()) { return false; }
+            if let Some(seq) = event["sourceSeq"].as_u64() {
+                if source_seq.is_some_and(|previous| seq <= previous) { return false; } source_seq = Some(seq);
+            }
+        }
+        self.source_seq = source_seq;
         self.snapshot = Some(value); self.received_at = Some(now);
-        for event in events { self.cursor += 1; self.events.push_back(json!({"id":self.cursor,"type":event["type"],"at":event["at"]})); }
+        for mut event in events { self.cursor += 1; event["id"] = json!(self.cursor); self.events.push_back(event); }
         while self.events.len() > 64 { self.events.pop_front(); }
         true
     }
@@ -84,5 +105,37 @@ impl Observations {
             if stale { value.as_object_mut().unwrap().remove("hands"); value["camera"] = json!("stale"); value["user"] = json!({"present":false,"quality":{"score":0,"basis":"unavailable"},"position":null,"head":null,"facingScreen":null,"expression":null,"mouthMoving":null}); }
         }
         json!({"snapshot":snapshot,"receivedAt":self.received_at,"ageMs":age,"stale":stale,"events":self.events.iter().filter(|event| event["id"].as_u64().unwrap_or(0)>cursor).collect::<Vec<_>>(),"cursor":self.cursor,"gap":self.events.front().is_some_and(|event| cursor.saturating_add(1)<event["id"].as_u64().unwrap_or(0))})
+    }
+}
+
+#[cfg(test)]
+mod hand_event_tests {
+    use super::*;
+    fn snapshot(seq: u64) -> Value {
+        json!({"v":1,"sessionId":"test","seq":seq,"capturedAt":1000,"camera":"absent","turn":"idle","summary":"",
+            "user":{"present":false,"quality":{"score":0,"basis":"unavailable"},"position":null,"head":null,"facingScreen":null,"expression":null,"mouthMoving":null}})
+    }
+    fn hand() -> Value {
+        json!({"type":"hand_motion_started","at":1000,"eventVersion":1,"trackId":"hand_1_1","sourceSeq":77,
+            "observationSeq":12,"evidenceStartSeq":10,"stateRevision":3,"sourceGeneration":1})
+    }
+    #[test]
+    fn hand_metadata_survives_with_independent_delivery_cursor() {
+        let mut store = Observations::default(); let expected = hand();
+        assert!(store.ingest(snapshot(12), vec![json!({"type":"user_arrived","at":1000}), expected.clone()], "test", 1000));
+        let read = store.read(1, 1000); let event = &read["events"][0];
+        for (key, value) in expected.as_object().unwrap() { assert_eq!(&event[key], value); }
+        assert_eq!(event["id"], 2); assert_eq!(event["sourceSeq"], 77);
+        assert!(!store.ingest(snapshot(13), vec![hand()], "test", 1000)); assert_eq!(store.cursor, 2);
+    }
+    #[test]
+    fn malformed_hand_versions_evidence_and_unknown_fields_fail_closed() {
+        for (field, invalid) in [("eventVersion", json!(2)), ("trackId", json!("bad id")), ("evidenceStartSeq", json!(13)),
+            ("observationSeq", json!(14)), ("stateRevision", json!(-1)), ("sourceGeneration", json!(1.5)), ("sourceSeq", json!(9007199254740992u64)), ("pixels", json!("forbidden"))] {
+            let mut event = hand(); event[field] = invalid;
+            assert!(!Observations::default().ingest(snapshot(12), vec![event], "test", 1000));
+        }
+        let mut missing = hand(); missing.as_object_mut().unwrap().remove("sourceSeq");
+        assert!(!Observations::default().ingest(snapshot(12), vec![missing], "test", 1000));
     }
 }

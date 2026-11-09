@@ -1,4 +1,4 @@
-import { unavailableUser, type Observation, type LiveEvent, type LiveEventKind, type ObservationRead } from './types';
+import { unavailableUser, type Observation, type LiveEvent, type LiveEventKind, type LiveSourceEvent, type HandEventKind, type ObservationRead } from './types';
 
 export const eventKinds: LiveEventKind[] = ['user_arrived', 'user_left', 'looked_away', 'looked_back',
   'expression_changed', 'mouth_started', 'mouth_stopped', 'turn_changed'];
@@ -74,24 +74,55 @@ export function validateObservation(value: unknown): Observation {
   return structuredClone(object) as Observation;
 }
 
+export const handEventKinds: HandEventKind[] = ['hand_appeared', 'hand_lost', 'hand_motion_started', 'hand_motion_stopped'];
+export function validateSourceEvent(value: unknown): LiveSourceEvent {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error('live_event');
+  const prototype = Object.getPrototypeOf(value), descriptors = Object.getOwnPropertyDescriptors(value);
+  if ((prototype !== Object.prototype && prototype !== null) || Object.getOwnPropertySymbols(value).length ||
+    Object.values(descriptors).some(field => !('value' in field) || !field.enumerable)) throw Error('live_event');
+  const hand = handEventKinds.includes(descriptors.type?.value);
+  const fields = hand ? ['type', 'at', 'eventVersion', 'trackId', 'sourceSeq', 'observationSeq', 'evidenceStartSeq', 'stateRevision', 'sourceGeneration'] :
+    ['type', 'at', ...(Object.hasOwn(value, 'sourceSeq') ? ['sourceSeq'] : [])];
+  const event = strictObject(value, fields);
+  if (!fields.every(key => Object.hasOwn(event, key))) throw Error('live_event');
+  finite(event.at, 0, Number.MAX_SAFE_INTEGER);
+  if (hand) {
+    if (event.eventVersion !== 1 || typeof event.trackId !== 'string' || !/^[a-zA-Z0-9_-]{1,64}$/.test(event.trackId)) throw Error('live_hand_event');
+    for (const key of ['sourceSeq', 'observationSeq', 'evidenceStartSeq', 'stateRevision', 'sourceGeneration']) {
+      finite(event[key], 0, Number.MAX_SAFE_INTEGER); if (!Number.isSafeInteger(event[key])) throw Error('live_hand_event');
+    }
+    if (event.evidenceStartSeq > event.observationSeq) throw Error('live_hand_event');
+  } else {
+    if (!eventKinds.includes(event.type)) throw Error('live_event');
+    if ('sourceSeq' in event && !Number.isSafeInteger(finite(event.sourceSeq, 0, Number.MAX_SAFE_INTEGER))) throw Error('live_event');
+  }
+  return structuredClone(event) as LiveSourceEvent;
+}
+
 export class ObservationStore {
   private snapshot: Observation | null = null;
   private receivedAt: number | null = null;
   private events: LiveEvent[] = [];
   private next = 0;
+  private sourceSeq = -1;
   constructor(private maxAgeMs = 1500, private capacity = 64) {}
-  ingest(value: unknown, events: { type: LiveEventKind; at: number }[], now: number) {
+  ingest(value: unknown, events: LiveSourceEvent[], now: number) {
     const snapshot = validateObservation(value);
     if (this.snapshot && snapshot.sessionId !== this.snapshot.sessionId) throw Error('live_wrong_session');
     if (this.snapshot && snapshot.seq <= this.snapshot.seq) throw Error('live_stale_sequence');
     if (Math.abs(now - snapshot.capturedAt) > this.maxAgeMs) throw Error('live_expired');
     if (!Array.isArray(events) || events.length > 16) throw Error('live_event_budget');
-    for (const event of events) {
-      strictObject(event, ['type', 'at']);
-      if (!eventKinds.includes(event.type) || !Number.isFinite(event.at) || Math.abs(now - event.at) > 5000) throw Error('live_event');
-    }
+    let sourceSeq = this.sourceSeq;
+    const validated = events.map(value => {
+      const event = validateSourceEvent(value);
+      if (Math.abs(now - event.at) > 5000) throw Error('live_event');
+      if ('observationSeq' in event && event.observationSeq > snapshot.seq) throw Error('live_hand_event');
+      if (event.sourceSeq !== undefined) { if (event.sourceSeq <= sourceSeq) throw Error('live_event_sequence'); sourceSeq = event.sourceSeq; }
+      return event;
+    });
+    this.sourceSeq = sourceSeq;
     this.snapshot = snapshot; this.receivedAt = now;
-    for (const event of events) this.events.push({ ...event, id: ++this.next });
+    for (const event of validated) this.events.push({ ...event, id: ++this.next });
     this.events = this.events.slice(-this.capacity);
   }
   read(cursor: number, now: number): ObservationRead {
@@ -100,8 +131,8 @@ export class ObservationStore {
     const stale = ageMs === null || ageMs > this.maxAgeMs || this.snapshot?.camera === 'stale';
     const snapshot = this.snapshot ? structuredClone(this.snapshot) : null;
     if (snapshot && stale) { delete snapshot.hands; snapshot.camera = 'stale'; snapshot.user = unavailableUser(); snapshot.summary = 'Quan sát đã cũ; chưa biết trạng thái người dùng.'; }
-    return { snapshot, receivedAt: this.receivedAt, ageMs, stale, events: this.events.filter(event => event.id > cursor),
+    return { snapshot, receivedAt: this.receivedAt, ageMs, stale, events: this.events.filter(event => event.id > cursor).map(event => structuredClone(event)),
       cursor: this.next, gap: this.events.length > 0 && cursor < this.events[0].id - 1 };
   }
-  reset() { this.snapshot = null; this.receivedAt = null; this.events = []; this.next = 0; }
+  reset() { this.snapshot = null; this.receivedAt = null; this.events = []; this.next = 0; this.sourceSeq = -1; }
 }

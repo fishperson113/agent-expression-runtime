@@ -17,7 +17,13 @@ export type Observation = {
 };
 export type LiveEventKind = 'user_arrived' | 'user_left' | 'looked_away' | 'looked_back' |
   'expression_changed' | 'mouth_started' | 'mouth_stopped' | 'turn_changed';
-export type LiveEvent = { id: number; type: LiveEventKind; at: number };
+export type HandEventKind = 'hand_appeared' | 'hand_lost' | 'hand_motion_started' | 'hand_motion_stopped';
+export type HandEventMetadata = { eventVersion: 1; trackId: string; sourceSeq: number; observationSeq: number;
+  evidenceStartSeq: number; stateRevision: number; sourceGeneration: number };
+export type HandWireEvent = HandEventMetadata & { type: HandEventKind; at: number };
+export type LiveSourceEvent = { type: LiveEventKind; at: number; sourceSeq?: number } | HandWireEvent;
+// id is a delivery cursor; sourceSeq identifies the producer event independently.
+export type LiveEvent = LiveSourceEvent & { id: number };
 export type ObservationRead = { snapshot: Observation | null; receivedAt: number | null;
   ageMs: number | null; stale: boolean; events: LiveEvent[]; cursor: number; gap: boolean };
 
