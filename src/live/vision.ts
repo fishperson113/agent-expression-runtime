@@ -6,6 +6,7 @@ export class VisionCamera {
   private active = false;
   private busy = false;
   private ready = false;
+  private actualDelegate?: 'GPU' | 'CPU';
   private generation = 0;
   private callback = 0;
   private timeout?: ReturnType<typeof setTimeout>;
@@ -29,7 +30,7 @@ export class VisionCamera {
   }
   private message(data: any, generation: number) {
     if (generation !== this.generation || !this.active) return;
-    if (data.type === 'ready') { this.ready = true; clearTimeout(this.timeout); this.status('ready-' + data.delegate); }
+    if (data.type === 'ready') { this.actualDelegate = data.delegate; this.ready = true; clearTimeout(this.timeout); this.status('ready-' + data.delegate); }
     if (data.type === 'sample') { this.busy = false; this.receive(data.sample); }
     if (data.type === 'error') this.fail('vision_failed: ' + String(data.code).slice(0, 180));
   }
@@ -48,14 +49,14 @@ export class VisionCamera {
   }
   private fail(code: string) { this.stop(); this.status(code); }
   private ended() {
-    const fallback = this.active && this.delegate === 'GPU'; this.stop();
+    const fallback = this.active && (this.actualDelegate ?? this.delegate) === 'GPU'; this.stop();
     if (!fallback) { this.status('stopped'); return; }
     this.delegate = 'CPU'; this.status('recovering-CPU');
     const generation = this.generation;
     this.timeout = setTimeout(() => { if (this.generation === generation) void this.start(); }, 500);
   }
   stop() {
-    this.active = false; this.ready = false; this.busy = false; this.generation++;
+    this.active = false; this.ready = false; this.busy = false; this.actualDelegate = undefined; this.generation++;
     clearTimeout(this.timeout); this.video.cancelVideoFrameCallback(this.callback);
     this.stream?.getTracks().forEach(track => { track.onended = null; track.stop(); });
     this.stream = undefined; this.video.srcObject = null;

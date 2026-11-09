@@ -30,6 +30,11 @@ it('labels opt-in synthetic observations and handles present, stale, denied and 
     await page.goto(server.resolvedUrls!.local[0] + 'live.html?fixture=synthetic');
     await page.waitForFunction(() => !!(window as any).fischLive);
     expect(await page.locator('#camera-start').isDisabled()).toBe(true);
+    const markerAlpha = () => page.locator('#landmarks').evaluate(canvas => (canvas as HTMLCanvasElement).getContext('2d')!.getImageData(320, 240, 1, 1).data[3]);
+    await page.evaluate(() => (window as any).fischLive.fixture('present'));
+    expect(await markerAlpha()).toBeGreaterThan(0);
+    await page.evaluate(() => (window as any).fischLive.fixture('absent'));
+    expect(await markerAlpha()).toBe(0);
     for (const mode of ['present', 'absent', 'denied', 'error', 'stale']) {
       await page.evaluate(mode => (window as any).fischLive.fixture(mode), mode);
       expect(await page.evaluate(() => (window as any).fischLive.metrics().cameraActive)).toBe(false);

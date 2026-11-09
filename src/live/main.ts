@@ -5,6 +5,7 @@ import { FaceObservations, type FaceSample } from './observation';
 import { VisionCamera } from './vision';
 import { LiveBridge } from './bridge';
 import type { LiveEventKind } from '../core/live/types';
+import { drawLandmarkOverlay } from './landmark-overlay';
 
 mountLive(element('app'));
 const synthetic = new URLSearchParams(location.search).get('fixture') === 'synthetic';
@@ -51,11 +52,7 @@ function sample(value: FaceSample) {
   drawLandmarks(value);
 }
 function drawLandmarks(value: FaceSample) {
-  const canvas = element<HTMLCanvasElement>('landmarks'), context = canvas.getContext('2d')!;
-  canvas.width = 640; canvas.height = 480;
-  if (!element<HTMLInputElement>('show-landmarks').checked) return;
-  context.fillStyle = '#79e6d3';
-  for (const point of value.landmarks) context.fillRect(point.x * 640, point.y * 480, 2, 2);
+  drawLandmarkOverlay(element<HTMLCanvasElement>('landmarks'), value.landmarks, element<HTMLInputElement>('show-landmarks').checked);
 }
 function fixture(mode: string) {
   if (!synthetic || stopped || !['present', 'absent', 'denied', 'error', 'stale'].includes(mode)) throw Error('synthetic_fixture_unavailable');

@@ -433,3 +433,47 @@ was selected and the owned CLI/browser/gateway were closed without sending a
 model prompt. This startup reservation is conservatively retained as turn 50.
 Successful TUI inference remains pending project trust review/authorization; it is
 not inferred from the separate app-server holdout. No folder trust was granted.
+
+## Checkpoint 15 — resumed baseline and bounded performance hypothesis
+
+Main 4aef763 completed 1,800.228 seconds plus 60-second warm-up, 60 samples,
+15 topology/cancel/resize cycles and 18,605 typed synthetic observations. Zero
+page errors, unexpected frames or browser off-loopback/blocked requests. GC private
+growth 8,073,216 bytes and heap growth 820,560 bytes pass the retained-memory gate.
+FPS 39.55–60.01 and rolling p95 16.8–42.5 ms still miss sustained targets.
+
+Short isolated face and bird profiles each rendered about 60 FPS at 2,000 particles;
+main-thread script time was 2.37/2.81 seconds per 20-second sample. Real Face
+Landmarker on Chromium's fake no-face video device measured CPU 12.85 Hz / render
+35.08 FPS versus GPU SwiftShader 5.60 Hz / render 24.17 FPS. Both miss 24 Hz; these
+are detector-only synthetic probes, not physical tracking/accuracy acceptance.
+Both had zero audio tracks, persisted pixels, browser egress or page errors.
+
+Before dependent changes: prefer the measured CPU path only when the GPU renderer
+explicitly identifies SwiftShader, retaining GPU for native/unknown renderers and
+honoring explicit CPU. Release the temporary capability-query context. Avoid
+reallocating the 640x480 landmark canvas on every observation and batch its marker
+submission while preserving coordinates, clearing and visibility. Add resource/
+pixel regressions, compare against this baseline, then run the final stable soak.
+No lower resolution/particle count, altered thresholds, model routing or security
+change is part of this correction. Model count stays 50/120; deadline unchanged.
+
+The batch-path experiment was rejected before delivery: on the same overlapping
+478-landmark fixture it reduced draw submissions but worsened the short sample
+from 42.44 to 23.40 FPS. Final code keeps fillRect marker semantics and removes only
+repeated canvas allocation. Paired 20-second samples: 976 resizes -> 0; draw count
+unchanged at 233,264; FPS 42.44 -> 50.96, rolling p95 39.8 -> 35.9 ms. This is short,
+instrumented software evidence, not sustained/native acceptance.
+
+With SwiftShader detection, the normal GPU-requested path now reports actual CPU:
+12.60 Hz vs the prior 5.60 Hz GPU software sample; still below 24 Hz. Zero browser
+egress/page errors/audio tracks/persisted pixels. Recovery also now consults the
+worker's actual delegate instead of mistaking selected CPU for GPU; a failing
+ended-track test preceded the fix and preserves explicit manual-restart preference.
+255 tests / 49 files, build, architecture and strict harness pass. Browser synthetic
+pixels verify markers appear and clear; AST audit maximum 24 physical function
+lines across all eight touched TS modules. Final stable soak follows this change.
+Isolated final gateway/browser functional check also passes macro-after-cancel,
+invalid rejection, synthetic look/cooldown and reload with zero page errors and
+camera off. Cold observe 45.14 ms, warm p95 4.52 ms, admission p95 24.38 ms;
+these remain functional samples, not animation completion or sustained latency.
