@@ -28,6 +28,7 @@ export class LiveBody {
   private activityState = 'idle';
   private attentionUntil = 0;
   private faceBlend = new Map<string, number>();
+  private faceAt = performance.now();
   output = 0;
   feedback?: (event: { epoch: string; seq: number; status: string }) => void;
   constructor(private canvas: HTMLCanvasElement, private status: (text: string) => void) {
@@ -54,9 +55,10 @@ export class LiveBody {
     if (time - this.defaultAt > 240000) { this.defaults.install(validateConfiguration(defaults), time); this.defaultAt = time; }
     const snapshot = this.observation && Date.now() - this.observation.capturedAt <= 1500 ? this.observation : null;
     const blocked = this.blocked(state), face: TransformWrite[] = [];
-    if (isFace(parts)) for (const write of faceWrites(this.faceActivity(time), this.output, this.controls.mode)) {
+    const smoothing = 1 - Math.exp(-Math.min(100, Math.max(0, time - this.faceAt)) / 84); this.faceAt = time;
+    if (isFace(parts)) for (const write of faceWrites(this.faceActivity(time), this.output, this.controls.mode, time)) {
       const key = write.target.part + ':' + write.target.prop, from = this.faceBlend.get(key) ?? (write.target.prop.startsWith('scale') ? 1 : 0);
-      const value = from + (write.value - from) * 0.18; this.faceBlend.set(key, value);
+      const value = from + (write.value - from) * smoothing; this.faceBlend.set(key, value);
       face.push({ ...write, value });
     }
     const layers = [this.defaults.sample(time, snapshot, this.output, blocked), face, this.controls.sample(time, snapshot, this.output, blocked)];

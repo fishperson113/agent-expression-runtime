@@ -8,7 +8,7 @@ export type TransformTarget = { part: string; prop: TransformProperty };
 export type Binding = { type: 'bind'; id: string; signal: LiveSignal; target: TransformTarget;
   gain: number; offset: number; clamp: [number, number]; smoothMs: number };
 export type Orient = { type: 'orient'; id: string; part: string; toward: { entity: 'user' }; maxDeg: number; smoothMs: number };
-export type Pose = { type: 'pose'; target: TransformTarget; value: number; durationMs: number };
+export type Pose = { type: 'pose'; target: TransformTarget; value: number; durationMs: number; delayMs?: number; attackMs?: number; releaseMs?: number };
 export type Reflex = { type: 'reflex'; id: string; when: { event: LiveEventKind }; do: Pose;
   cooldownMs: number };
 export type LiveControl = Binding | Orient | Reflex;

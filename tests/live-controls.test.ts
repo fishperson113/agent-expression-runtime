@@ -1,3 +1,4 @@
+import { faceWrites } from '../src/core/live/face';
 import { expect, it } from 'vitest';
 import { LiveCompiler } from '../src/core/live/compiler';
 import { validateConfiguration } from '../src/core/live/control-validation';
@@ -18,4 +19,25 @@ it('compiles the complete Live command before installation and preserves legacy 
   expect(result.program.kind).toBe('program'); expect(result.configuration?.controls).toHaveLength(1);
   expect(() => compiler.compile({ ...envelope, body: { type: 'live', program: { type: 'wait', durationMs: -1 }, configuration: config() } }, 0)).toThrow();
   expect(compiler.compile({ ...envelope, body: { type: 'wait', durationMs: 10 } }, 0).configuration).toBeUndefined();
+});
+
+it('accepts staged nonoverlapping beats and rejects ambiguous or unbounded timing', () => {
+  const pose = { type: 'pose', target: { part: 'body', prop: 'rotateZ' }, value: 0.2, durationMs: 600, attackMs: 100, releaseMs: 200 };
+  const make = (poses: unknown[]) => ({ controls: [], poses, lifetimeMs: 2000 });
+  expect(validateConfiguration(make([pose, { ...pose, delayMs: 600, value: -0.1 }])).poses).toHaveLength(2);
+  expect(() => validateConfiguration(make([pose, { ...pose, delayMs: 599 }]))).toThrow('live_property_conflict');
+  for (const patch of [{ delayMs: -1 }, { delayMs: 0.5 }, { attackMs: 0 }, { releaseMs: 501 }, { delayMs: 9999 }, { code: 'run' }])
+    expect(() => validateConfiguration(make([{ ...pose, ...patch }]))).toThrow();
+  expect(() => validateConfiguration(make([{ ...pose, delayMs: 1500 }]))).toThrow('live_pose_lease');
+});
+
+it('adds bounded anatomical movement without text, randomness or inference', () => {
+  const before = faceWrites('idle', 0, 'normal', 4500), blink = faceWrites('idle', 0, 'normal', 5040);
+  expect(blink.find(w => w.target.part === 'eye_left' && w.target.prop === 'scaleY')!.value).toBeLessThan(0.3);
+  expect(blink.find(w => w.target.part === 'pupil_left')!.value).toBeLessThan(0.3);
+  expect(before.find(w => w.target.part === 'fin')).not.toEqual(blink.find(w => w.target.part === 'fin'));
+  expect(faceWrites('idle', 0, 'normal', 5040)).toEqual(blink);
+  expect(faceWrites('idle', 0, 'off', 5040)).toEqual([]);
+  const reduced = faceWrites('idle', 0, 'reduced', 5040);
+  expect(reduced.find(w => w.target.part === 'eye_left' && w.target.prop === 'scaleY')!.value).toBeGreaterThan(0.9);
 });

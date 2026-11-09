@@ -13,7 +13,10 @@
       "prop": { "enum": ["x", "y", "z", "rotateX", "rotateY", "rotateZ", "scaleX", "scaleY", "scaleZ"] } } },
     "pose": { "type": "object", "additionalProperties": false, "required": ["type", "target", "value", "durationMs"], "properties": {
       "type": { "const": "pose" }, "target": { "$ref": "#/$defs/target" }, "value": { "type": "number", "minimum": -0.6, "maximum": 2 },
-      "durationMs": { "type": "integer", "minimum": 100, "maximum": 10000 } } },
+      "durationMs": { "type": "integer", "minimum": 100, "maximum": 10000 },
+      "delayMs": { "type": "integer", "minimum": 0, "maximum": 9900 },
+      "attackMs": { "type": "integer", "minimum": 20, "maximum": 10000 },
+      "releaseMs": { "type": "integer", "minimum": 20, "maximum": 10000 } } },
     "bind": { "type": "object", "additionalProperties": false, "required": ["type", "id", "signal", "target", "gain", "offset", "clamp", "smoothMs"], "properties": {
       "type": { "const": "bind" }, "id": { "type": "string", "pattern": "^[a-zA-Z0-9_-]{1,32}$" },
       "signal": { "enum": ["agent.output", "user.head.yaw", "user.head.pitch", "user.position.x", "user.position.y", "user.expression.smile", "user.expression.browRaise", "user.expression.eyesClosed", "user.expression.mouthOpen", "user.mouthMoving"] },

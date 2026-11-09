@@ -45,9 +45,11 @@ export class LiveCompositor {
     this.cooldown.set(rule.id, at); this.reflex = { pose: rule.do, at };
   }
   private poseValue(timed: TimedPose, now: number) {
-    const elapsed = (now - timed.at) / timed.pose.durationMs;
-    if (elapsed < 0 || elapsed >= 1) return null;
-    const rest = neutral(timed.pose.target.prop), envelope = Math.sin(elapsed * Math.PI) ** 2;
+    const elapsed = now - timed.at - (timed.pose.delayMs ?? 0), duration = timed.pose.durationMs;
+    if (elapsed < 0 || elapsed >= duration) return null;
+    const attack = timed.pose.attackMs ?? duration / 2, release = timed.pose.releaseMs ?? duration / 2;
+    const phase = Math.min(1, elapsed / attack, (duration - elapsed) / release);
+    const rest = neutral(timed.pose.target.prop), envelope = Math.sin(phase * Math.PI / 2) ** 2;
     return rest + (timed.pose.value - rest) * envelope;
   }
   sample(now: number, snapshot: Observation | null, output: number, blocked = new Set<string>()): TransformWrite[] {
@@ -84,7 +86,9 @@ export class LiveCompositor {
         put(item.target, value === null ? neutral(item.target.prop) : Math.max(item.clamp[0], Math.min(item.clamp[1], item.offset + item.gain * value)), item.smoothMs);
       }
       if (item.type === 'orient') {
-        const position = snapshot?.camera === 'tracking' ? snapshot.user.position : null, max = item.maxDeg * Math.PI / 180;
+        const position = snapshot?.camera === 'tracking' && snapshot.user.present ? snapshot.user.position : null;
+        if (!position) continue;
+        const max = item.maxDeg * Math.PI / 180;
         put({ part: item.part, prop: 'rotateY' }, (position?.x ?? 0) * max, item.smoothMs);
         put({ part: item.part, prop: 'rotateX' }, -(position?.y ?? 0) * max, item.smoothMs);
       }
