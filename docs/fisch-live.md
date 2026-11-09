@@ -275,3 +275,7 @@ snapshot stale trả về signal chưa biết (`null`), để compositor chuyể
 neutral theo cơ chế hiện có. LiveBody bỏ snapshot quá 1.500 ms trước compositing.
 Track ID chỉ là liên tục hình học ngắn hạn, không phải nhận dạng người; qua giao
 chéo/che khuất mơ hồ hệ thống có thể cấp ID mới.
+
+`hands.entities[].confidence` là điểm phân loại handedness do MediaPipe trả về,
+không phải độ tin cậy của landmark, track hay ý nghĩa cử chỉ. Không dùng điểm này
+để suy ra rằng một chuyển động đã được hiểu chắc chắn.
