@@ -34,7 +34,7 @@ const cameraTransitions: { status: string; source: string; at: number }[] = [];
 const bridge = new LiveBridge(body, observations, () => resetReactive(), () => observeReactive());
 const reactive = new ReactiveSession({ now: () => performance.now(), wallNow: () => Date.now(), epoch: () => body.scheduler.epoch,
   id: () => crypto.randomUUID(), canAdmit: () => !document.hidden && body.canReactive(),
-  admit: (compiled, owner) => body.admitReactive(compiled, owner), cancel: (owner, reason) => body.cancelReactive(owner, reason), record: recording.record, handState: () => handEvents.handState() });
+  admit: (compiled, owner) => body.admitReactive(compiled, owner), cancel: (owner, reason) => body.cancelReactive(owner, reason), record: recording.record, handState: () => handEvents.handState(), handMotion: () => handEvents.handMotion() });
 body.attachReactive(reactive);
 let lastActivity = 'idle';
 const semanticEvents: SessionEvent[] = [];
@@ -51,7 +51,7 @@ function logActivity(text: string) {
 Object.assign(window, { fischLive: { pair: (base: string, token: string) => bridge.connect(base, token),
   selectThread: () => { hands.reset(); resetReactive(); logActivity('Đã chọn phiên Codex.'); return bridge.cancel(); },
   logActivity, playgroundStatus: (value: unknown) => playground.project(value), playgroundClear: () => playground.clear(),
-  configureReactive: (available: boolean, handVersion = 0) => configureReactive(available, handVersion),
+  configureReactive: (available: boolean, handVersion = 0, contractVersion = 1) => configureReactive(available, handVersion, contractVersion),
   setReactiveUserBusy: (busy: boolean) => reactive.setUserBusy(busy),
   reactiveUserIntent: () => { semanticEvents.length = 0; body.prepareUserMutation(); },
   takeReactiveRequest: () => reactive.takeRequest(), authorizeReactiveRequest: (id: string) => reactive.authorize(id),
@@ -120,13 +120,13 @@ function drawLandmarks(value: FaceSample) {
   drawLandmarkOverlay(element<HTMLCanvasElement>('landmarks'), value.landmarks, element<HTMLInputElement>('show-landmarks').checked);
 }
 function fixture(mode: string, handX = 0.25) {
-  if (!synthetic || stopped || !['present', 'present-hand', 'hand-only', 'hand-lost', 'absent', 'denied', 'error', 'stale'].includes(mode) || !Number.isFinite(handX) || handX < 0 || handX > 1) throw Error('synthetic_fixture_unavailable');
-  if (mode === 'present' || mode === 'present-hand' || mode === 'hand-only' || mode === 'hand-lost' || mode === 'absent') sample({
+  if (!synthetic || stopped || !['present', 'present-smile', 'present-neutral', 'present-hand', 'hand-only', 'hand-lost', 'absent', 'denied', 'error', 'stale'].includes(mode) || !Number.isFinite(handX) || handX < 0 || handX > 1) throw Error('synthetic_fixture_unavailable');
+  if (mode === 'present' || mode === 'present-smile' || mode === 'present-neutral' || mode === 'present-hand' || mode === 'hand-only' || mode === 'hand-lost' || mode === 'absent') sample({
     ...(mode === 'present-hand' || mode === 'hand-only' || mode === 'hand-lost' ? { handObservation: { v: 1 as const, trackingState: mode === 'hand-lost' ? 'lost' as const : 'tracked' as const, coordinateSpace: 'image-normalized' as const,
       landmarkSchema: 'mediapipe-hand-21' as const, zMeaning: 'wrist-relative-image-width' as const, mirrored: false as const, sourceWidth: 640, sourceHeight: 480,
       entities: mode === 'hand-lost' ? [] : [{ detectionId: 0, handedness: 'Left' as const, confidence: 0.9, landmarks: Array.from({ length: 21 }, () => ({ x: handX, y: 0.5, z: 0 })) }] } } : {}),
-    landmarks: mode === 'present' || mode === 'present-hand' ? Array.from({ length: 478 }, () => ({ x: 0.5, y: 0.5, z: 0 })) : [],
-    scores: { mouthSmileLeft: 0.4, mouthSmileRight: 0.4 }, matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+    landmarks: mode === 'present' || mode === 'present-smile' || mode === 'present-neutral' || mode === 'present-hand' ? Array.from({ length: 478 }, () => ({ x: 0.5, y: 0.5, z: 0 })) : [],
+    scores: { mouthSmileLeft: mode === 'present-smile' ? 0.9 : mode === 'present-neutral' ? 0.1 : 0.4, mouthSmileRight: mode === 'present-smile' ? 0.9 : mode === 'present-neutral' ? 0.1 : 0.4 }, matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
     durationMs: 0, delegate: 'SYNTHETIC / no inference' });
   else { handEvents.reset(); observations.status(mode as 'denied' | 'error' | 'stale', Date.now() - (mode === 'stale' ? 2000 : 0)); observeReactive(); }
   element('camera-status').textContent = 'Dữ liệu tổng hợp / không camera';
@@ -185,8 +185,10 @@ window.addEventListener('pagehide', stop);
 function observeReactive() { body.observe(observations.snapshot); reactive.observe(observations.snapshot, semanticEvents); }
 function resetReactive() { handEvents.reset(); reactive.reset(); semanticEvents.length = 0; }
 function updateHandProducer() { handEvents.configure(reactiveAvailable && handEventVersion === 1 && element<HTMLInputElement>('enable-reactivity').checked); }
-function configureReactive(available: boolean, handVersion = 0) {
-  const enabled = available === true && !stopped;
+function configureReactive(available: boolean, handVersion = 0, contractVersion = 1) {
+  const knownContract = contractVersion === 1 || contractVersion === 2;
+  const enabled = available === true && !stopped && knownContract;
+  if (knownContract) reactive.configureContract(contractVersion);
   reactiveAvailable = enabled; handEventVersion = handVersion;
   reactive.configure(enabled); element<HTMLInputElement>('enable-reactivity').disabled = !enabled;
   if (!enabled) element<HTMLInputElement>('enable-reactivity').checked = false;

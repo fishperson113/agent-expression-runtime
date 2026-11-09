@@ -19,6 +19,10 @@ export class HandEventSource {
     const state = this.gate.state();
     return freezeHandReadSet({ stateRevision: state.revision, sourceGeneration: state.sourceGeneration, primaryTrackId: state.primaryTrackId });
   }
+  handMotion(): number | null {
+    const state = this.gate.state();
+    return this.enabled && state.primaryTrackId !== null && state.primaryTrackId === state.confirmedTrackId && state.motion !== 'unknown' ? state.revision : null;
+  }
   sample(snapshot: Observation, face: FaceCue[]): LiveSourceEvent[] {
     const fresh = snapshot.sessionId !== this.sessionId || snapshot.capturedAt !== this.capturedAt;
     this.sessionId = snapshot.sessionId; this.capturedAt = snapshot.capturedAt;

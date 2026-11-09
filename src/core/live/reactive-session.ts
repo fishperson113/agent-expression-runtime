@@ -1,8 +1,10 @@
 import type { CausalKind, CausalPayloads } from './causal-recorder-types';
+import { matchesCriticalState } from './decision-contract';
+import { SemanticAxes } from './semantic-axes';
 import { ReactiveDecisionHost } from './decision-host';
 import { ReactiveLeaseGuard, type LeaseRevokeReason } from './reactive-lease';
 import { handEventKinds, validateObservation, validateSourceEvent } from './observation';
-import { freezeHandReadSet, matchesHandReadSet, type HandReadSet, type DecisionResult, type ReactiveRequest, type ReactiveState } from './decision-types';
+import { freezeHandReadSet, type HandReadSet, type DecisionResult, type ReactiveRequest, type ReactiveState } from './decision-types';
 import type { Observation } from './types';
 import type { ReactiveWindow, ReactiveWindowEvent, SessionEvent, SessionOptions } from './reactive-session-types';
 
@@ -22,6 +24,8 @@ type Transport = { id: string; request: ReactiveRequest; generation: number; aut
 
 /** Pure coordinator. It never contacts a provider or writes to a renderer directly. */
 export class ReactiveSession {
+  private contractVersion: 1 | 2 = 1;
+  private axes = new SemanticAxes();
   private available = false;
   private enabled = false;
   private userBusy = false;
@@ -58,6 +62,11 @@ export class ReactiveSession {
     if (!this.options.record) return;
     try { this.options.record(kind, structuredClone(payload)); } catch { /* Recording cannot affect control. */ }
   }
+  configureContract(version: 1 | 2) {
+    if (version !== 1 && version !== 2) { this.configure(false); return; }
+    if (version === this.contractVersion) return;
+    this.contractVersion = version; this.history = []; this.revoke('reset');
+  }
   configure(available: boolean) {
     this.available = available === true;
     if (!this.available) { this.enabled = false; this.revoke('unavailable'); }
@@ -71,7 +80,7 @@ export class ReactiveSession {
   reset() { this.clearSource('reset'); }
   private clearSource(reason: CausalPayloads['revocation']['reason']) {
     this.revoke(reason); this.snapshot = undefined; this.history = []; this.seen = -1;
-    this.presenceRevision++; this.sourceValid = false;
+    this.presenceRevision++; this.sourceValid = false; this.axes.clear();
   }
   private revoke(reason: CausalPayloads['revocation']['reason']) {
     const transport = this.transport;
@@ -89,7 +98,8 @@ export class ReactiveSession {
   }
   private readCurrent(): ReactiveState {
     return { sessionId: this.healthy() ? this.snapshot!.sessionId : 'unavailable', epoch: this.options.epoch(),
-      intentRevision: this.intentRevision, presenceRevision: this.presenceRevision, handState: this.handState(), trackIds: this.tracks() };
+      intentRevision: this.intentRevision, presenceRevision: this.presenceRevision, handState: this.handState(), trackIds: this.tracks(),
+      sourceHealthy: this.healthy(), semanticSnapshot: this.axes.snapshot(this.healthy()) };
   }
   private handState(): HandReadSet | undefined {
     try { const state = this.options.handState?.(); return state === undefined ? undefined : freezeHandReadSet(state); } catch { return; }
@@ -107,7 +117,7 @@ export class ReactiveSession {
   observe(value: Observation, events: SessionEvent[]) {
     this.tick();
     let snapshot: Observation;
-    try { snapshot = validateObservation(value); } catch { this.sourceValid = false; this.revoke('invalid_observation'); return; }
+    try { snapshot = validateObservation(value); } catch { this.sourceValid = false; this.axes.clear(); this.revoke('invalid_observation'); return; }
     const old = this.snapshot;
     if (old && snapshot.sessionId === old.sessionId && snapshot.seq <= old.seq) return;
     if (old && snapshot.sessionId !== old.sessionId) this.clearSource('session_changed');
@@ -118,6 +128,9 @@ export class ReactiveSession {
     this.sourceValid = ['tracking', 'absent'].includes(snapshot.camera) && this.fresh(snapshot.capturedAt, 1500);
     if (!this.sourceValid) this.revoke('source_unavailable');
     else if (previousTracks.some(track => !this.tracks().includes(track)) && this.transport?.request.requiredTrackIds.some(track => !this.tracks().includes(track))) this.revoke('track_lost');
+    const identity = this.axes.snapshot(this.healthy()).handIdentity;
+    this.axes.observe(snapshot, this.handState(), this.options.handMotion?.() ?? null);
+    if (this.contractVersion === 2 && this.sourceValid && identity !== this.axes.snapshot(this.healthy()).handIdentity) this.revoke('hand_changed');
     this.guard.check();
     this.history.push(snapshot); this.history = this.history.filter(item => this.fresh(item.capturedAt, 1500)).slice(-4);
     this.record('observation', { ...snapshot, summary: '' });
@@ -136,7 +149,7 @@ export class ReactiveSession {
       const candidate = { ...source, sessionId: this.snapshot!.sessionId, observationSeq: 'observationSeq' in source ? source.observationSeq : this.snapshot!.seq, seq: event.seq } as PendingEvent;
       this.record('event', candidate);
       if (!this.handEligible(candidate)) continue;
-      if (this.guard.owner || this.transport?.generation === this.guard.generation) this.revoke('semantic_changed');
+      if (this.contractVersion === 1 && (this.guard.owner || this.transport?.generation === this.guard.generation)) this.revoke('semantic_changed');
       if (!this.pending.size) this.firstAt = this.options.now();
       this.pending.set(key(candidate), candidate);
       while (this.pending.size > 8) this.pending.delete(this.pending.keys().next().value!);
@@ -153,7 +166,8 @@ export class ReactiveSession {
     if (epoch !== this.epoch) { this.epoch = epoch; this.revoke('epoch_changed'); }
     this.lastNow = now; this.lastWall = wall;
     if (this.sourceValid && this.snapshot && !this.fresh(this.snapshot.capturedAt, 1500)) { this.sourceValid = false; this.revoke('source_expired'); }
-    if (this.transport && now >= this.transport.request.deadline && this.lastReason !== 'deadline') this.revoke('deadline');
+    if (this.transport && !(this.transport.request.schemaVersion === 2 && this.guard.owner?.requestId === this.transport.id) &&
+      now >= this.transport.request.deadline && this.lastReason !== 'deadline') this.revoke('deadline');
     for (const [name, event] of this.pending) if (!this.fresh(event.at, 5000)) this.pending.delete(name);
     this.starts = this.starts.filter(at => now - at < 60000);
     this.guard.check();
@@ -165,12 +179,14 @@ export class ReactiveSession {
       now - this.lastStart < 15000 || this.starts.length >= 4 || this.count >= 256) return null;
     const requestId = this.options.id();
     if (![requestId, this.snapshot!.sessionId, this.options.epoch()].every(id => /^[a-zA-Z0-9_-]{1,64}$/.test(id)) || this.ids.has(requestId)) { this.revoke('invalid_request_id'); return null; }
-    const candidates = [...this.pending.values()], hand = candidates.some(isHand) ? this.handState() : undefined;
-    if (candidates.some(isHand) && !hand) { this.revoke('hand_changed'); return null; }
+    const candidates = [...this.pending.values()], knownHand = !!this.snapshot!.hands && ['tracked', 'lost'].includes(this.snapshot!.hands!.trackingState);
+    const needsHand = candidates.some(isHand) || this.contractVersion === 2 && knownHand, hand = needsHand ? this.handState() : undefined;
+    if (needsHand && (!hand || this.contractVersion === 2 && knownHand && (this.snapshot!.hands!.primaryTrackId ?? null) !== hand.primaryTrackId)) { this.revoke('hand_changed'); return null; }
     this.ids.add(requestId);
-    const request: ReactiveRequest = frozen({ schemaVersion: 1, sessionId: this.snapshot!.sessionId, epoch: this.options.epoch(),
+    const request: ReactiveRequest = frozen({ sessionId: this.snapshot!.sessionId, epoch: this.options.epoch(),
       requestId, intentRevision: this.intentRevision, presenceRevision: this.presenceRevision,
-      deadline: now + 5000, requiredTrackIds: this.tracks(), ...(hand ? { handReadSet: hand } : {}) });
+      deadline: now + 5000, requiredTrackIds: this.tracks(), ...(hand ? { handReadSet: hand } : {}),
+      ...(this.contractVersion === 2 ? { schemaVersion: 2 as const, semanticSnapshot: this.axes.snapshot(this.healthy()) } : { schemaVersion: 1 as const }) });
     const observationWindow: ReactiveWindow = frozen({ schemaVersion: 1, request,
       events: candidates.map(event => this.windowEvent(event)), observations: structuredClone(this.history) });
     this.record('request', { request, observationRefs: observationWindow.observations.map(value => ({ sessionId: value.sessionId, seq: value.seq })),
@@ -202,9 +218,7 @@ export class ReactiveSession {
     if (!this.healthy()) return this.authorization(transport, false, 'stale');
     if (this.userBusy || !this.options.canAdmit()) return this.authorization(transport, false, 'denied');
     const request = transport.request, state = this.readCurrent();
-    if (this.options.now() >= request.deadline || state.sessionId !== request.sessionId || state.epoch !== request.epoch ||
-      state.intentRevision !== request.intentRevision || state.presenceRevision !== request.presenceRevision ||
-      !matchesHandReadSet(request.handReadSet, state.handState) || !request.requiredTrackIds.every(track => state.trackIds.includes(track))) return this.authorization(transport, false, 'stale');
+    if (this.options.now() >= request.deadline || !matchesCriticalState(request, state)) return this.authorization(transport, false, 'stale');
     transport.authorized = true; this.lastReason = 'authorized'; return this.authorization(transport, true, 'authorized');
   }
   async deliver(id: string, data: unknown): Promise<DecisionResult | null> { return this.settle(id, data, false); }
@@ -218,7 +232,9 @@ export class ReactiveSession {
     this.record('decision', { requestId: result.requestId, reason: result.reason, ...(result.decisionId ? { decisionId: result.decisionId } : {}),
       ...(result.reason === 'observed' ? { mode: 'observe' as const } : {}),
       ...(result.reason === 'accepted' || result.reason === 'admission_failed' ? { mode: 'express' as const } : {}),
-      ...(owner ? { actionId: owner.actionId, validUntil: owner.validUntil } : {}) });
+      ...(owner ? { actionId: owner.actionId, validUntil: owner.validUntil } : {}),
+      ...(result.decisionVersion === 2 ? { decisionVersion: 2 as const, ...(result.prerequisites ? { prerequisites: [...result.prerequisites] } : {}),
+        ...(result.executionValidUntil === undefined ? {} : { executionValidUntil: result.executionValidUntil }) } : {}) });
     if (this.transport === transport) this.transport = undefined;
     this.uncertain ||= result.reason === 'transport_unknown'; this.lastReason = result.reason;
     return result;
