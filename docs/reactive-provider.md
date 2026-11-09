@@ -68,3 +68,15 @@ never becomes a native chat message or app-server turn. Queue, request receipts,
 native pending IDs and completed-turn history are bounded and held only in
 memory. Close invalidates late callbacks, aborts active transport and rejects
 queued unsent input. Wiring and live acceptance remain separate work.
+
+Every broker page evaluation has a 10-second bound (tests can inject a shorter
+positive timeout), with at most four outstanding waits. Any browser error or
+timeout permanently latches browserUnavailable for that broker: no further page
+evaluations, reactive dispatch or controlled native forwarding occurs. Waiting
+native requests receive explicit RPC errors; late barrier resolution cannot
+forward them. Initialize and other noncontrolled native RPCs still pass through.
+Close rejects outstanding waits and clears their timers. Recovery requires a
+broker/browser restart and reconciliation of unresolved provider transport; a
+later successful page promise does not automatically reopen the failed broker.
+Already-issued Playwright calls cannot be recalled, so browser generation, TTL
+and consent checks remain mandatory for any callback that eventually arrives.

@@ -2,8 +2,8 @@ import { expect, it, vi } from 'vitest';
 import { LiveReactiveBroker } from '../integrations/live-reactive-broker.mjs';
 import { ReactiveProviderError } from '../integrations/reactive-provider.mjs';
 
-const flush = async () => { for (let i = 0; i < 12; i++) await Promise.resolve(); };
-function fixture(provider = null) {
+const flush = async () => { for (let i = 0; i < 40; i++) await Promise.resolve(); };
+function fixture(provider = null, options = {}) {
   const forwarded = [], rejected = [], logs = [], deliveries = [], failures = [], candidates = [], order = [], calls = [];
   const output = { thread: 'native', turn: undefined }, state = { busy: false, available: false, takes: 0, authorize: async () => true, barrier: async () => {} };
   const api = { activity: value => calls.push(value), logActivity: () => {}, configureReactive: value => { state.available = value; },
@@ -17,9 +17,9 @@ function fixture(provider = null) {
     try { return await fn(arg); } finally { globalThis.window = old; }
   } };
   const broker = new LiveReactiveBroker({ page, provider, output, forward: message => { order.push('forward'); forwarded.push(message); },
-    reject: (message, error) => rejected.push({ message, error }), log: code => logs.push(code) });
+    reject: (message, error) => rejected.push({ message, error }), log: code => logs.push(code), ...options });
   const candidate = id => ({ request: { requestId: id }, observationWindow: { schemaVersion: 1, events: [{ type: id === 'left' ? 'user_left' : 'user_arrived' }] } });
-  return { broker, state, api, output, forwarded, rejected, logs, deliveries, failures, candidates, candidate, order, calls };
+  return { broker, page, state, api, output, forwarded, rejected, logs, deliveries, failures, candidates, candidate, order, calls };
 }
 it('routes arrival/left only to separate provider data and never selected native thread', async () => {
   const received = [], f = fixture({ decide: async (value, signal) => { received.push(value); expect(signal.aborted).toBe(false); return { mode: 'observe' }; } });
@@ -60,7 +60,7 @@ it('only steers a current native turn and checks again after barrier', async () 
   f.broker.client({ ...message, id: 2, params: { ...message.params, expectedTurnId: 'wrong' } });
   expect(f.rejected).toHaveLength(1); f.broker.client(message); await flush(); expect(f.forwarded).toEqual([message]);
   f.broker.close(); const g = fixture(); g.output.turn = 'u'; let release;
-  g.state.barrier = () => new Promise(resolve => { release = resolve; }); g.broker.client(message); g.output.turn = 'new'; release(); await flush();
+  g.state.barrier = () => new Promise(resolve => { release = resolve; }); g.broker.client(message); await flush(); g.output.turn = 'new'; release(); await flush();
   expect(g.forwarded).toHaveLength(0); expect(g.rejected).toHaveLength(1); g.broker.close();
 });
 it('retains one active transport across semantic revocation and unknown failure, but user input still works', async () => {
@@ -93,7 +93,7 @@ it('bounds duplicate user delivery, queue and completed history and cleans up on
   const message = { id: 1, method: 'turn/start', params: {} }; f.broker.client(message); f.broker.client(message);
   for (let id = 2; id <= 10; id++) f.broker.client({ ...message, id });
   expect(f.broker.queue.length).toBe(7); expect(f.broker.pending.size).toBe(8);
-  f.broker.close(); release(); await flush(); expect(f.forwarded).toHaveLength(0); expect(f.broker.pending.size).toBe(0);
+  await flush(); f.broker.close(); release(); await flush(); expect(f.forwarded).toHaveLength(0); expect(f.broker.pending.size).toBe(0);
   expect(f.broker.client({ method: 'initialize' })).toBe(true);
 });
 it('does not resurrect native busy state on acknowledgement arriving after completion', async () => {
@@ -117,4 +117,43 @@ it('deduplicates pulled request IDs before provider cost and ignores callbacks a
   let release; const g = fixture({ decide: async () => { calls++; return {}; } });
   g.state.authorize = () => new Promise(resolve => { release = resolve; }); g.candidates.push(g.candidate('later'));
   await g.broker.poll({}); await flush(); g.broker.close(); release(true); await flush(); expect(calls).toBe(1); expect(g.deliveries).toEqual([]);
+});
+
+it('bounds hanging native barriers and never forwards after their late resolution', async () => {
+  vi.useFakeTimers();
+  try {
+    const f = fixture(); let release, calls = 0;
+    f.page.evaluate = () => { calls++; return new Promise(resolve => { release = resolve; }); };
+    const message = { id: 1, method: 'turn/start', params: { threadId: 'native' } };
+    f.broker.client(message); await flush(); await vi.advanceTimersByTimeAsync(9999);
+    expect(f.rejected).toHaveLength(0); await vi.advanceTimersByTimeAsync(1);
+    expect(f.rejected).toHaveLength(1); expect(f.forwarded).toEqual([]); expect(f.broker.browserUnavailable).toBe(true);
+    f.broker.client({ ...message, id: 2 }); await f.broker.poll({}); expect(calls).toBe(1);
+    release(true); await flush(); expect(f.forwarded).toEqual([]); expect(f.rejected).toHaveLength(2);
+    expect(f.broker.client({ method: 'initialize' })).toBe(true); f.broker.close(); expect(vi.getTimerCount()).toBe(0);
+  } finally { vi.useRealTimers(); }
+});
+it('bounds authorization waits and suppresses provider results after independent browser failure', async () => {
+  vi.useFakeTimers();
+  try {
+    let providerCalls = 0; const f = fixture({ decide: async () => { providerCalls++; return {}; } }, { evaluateTimeoutMs: 10 });
+    f.state.authorize = () => new Promise(() => {}); f.candidates.push(f.candidate('auth'));
+    await f.broker.poll({}); await flush(); await vi.advanceTimersByTimeAsync(10);
+    expect(providerCalls).toBe(0); expect(f.broker.browserUnavailable).toBe(true); f.broker.close();
+    let resolve; const g = fixture({ decide: () => new Promise(done => { resolve = done; }) }, { evaluateTimeoutMs: 10 });
+    g.candidates.push(g.candidate('result')); await g.broker.poll({}); await flush();
+    g.page.evaluate = async () => { throw Error('private browser error'); };
+    await g.broker.poll({}); resolve({ mode: 'express' }); await flush(); expect(g.deliveries).toEqual([]);
+    expect(g.broker.browserUnavailable).toBe(true); g.broker.close(); expect(vi.getTimerCount()).toBe(0);
+  } finally { vi.useRealTimers(); }
+});
+it('close rejects outstanding browser waits and clears timers before late callbacks', async () => {
+  vi.useFakeTimers();
+  try {
+    const f = fixture(); let release;
+    f.page.evaluate = () => new Promise(resolve => { release = resolve; });
+    f.broker.client({ id: 1, method: 'thread/start', params: {} }); await flush(); expect(vi.getTimerCount()).toBe(1);
+    f.broker.close(); await flush(); expect(f.rejected).toHaveLength(1); expect(vi.getTimerCount()).toBe(0);
+    release(true); await flush(); expect(f.forwarded).toEqual([]); expect(f.broker.waiters.size).toBe(0);
+  } finally { vi.useRealTimers(); }
 });
