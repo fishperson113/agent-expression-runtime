@@ -1,5 +1,6 @@
 export class LiveOutput {
   thread; turn; selection; state = 'idle'; lastDelta = -Infinity; strength = 0;
+  constructor(onSelect = () => {}) { this.onSelect = onSelect; }
   request(message) {
     if (message.id !== undefined && ['thread/start', 'thread/resume', 'thread/fork'].includes(message.method)) this.selection = message.id;
   }
@@ -7,8 +8,10 @@ export class LiveOutput {
     if (this.selection !== undefined && message.id === this.selection && ('result' in message || 'error' in message)) {
       this.selection = undefined;
       if (typeof message.result?.thread?.id === 'string') {
+        const previous = this.thread;
         this.thread = message.result.thread.id; this.turn = undefined;
         this.state = 'idle'; this.strength = 0; this.lastDelta = -Infinity;
+        if (this.thread !== previous) return this.onSelect(this.thread, previous);
       }
     }
     const { method, params = {} } = message;

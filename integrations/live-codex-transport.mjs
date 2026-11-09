@@ -12,23 +12,29 @@ export function liveInstructions(message, instructions) {
 }
 
 function relayOutput(child, connection, onEvent, close) {
-  let buffer = '';
+  let buffer = '', draining = false;
   child.stderr.resume();
   child.stdin.on('error', () => { void close(); });
   child.stdout.on('data', chunk => {
+    child.stdout.pause();
     buffer += chunk;
     if (buffer.length > 1048576) { void close(); return; }
-    let newline;
-    while ((newline = buffer.indexOf('\n')) >= 0) {
-      const line = buffer.slice(0, newline); buffer = buffer.slice(newline + 1);
-      try {
+    void drain();
+  });
+  async function drain() {
+    if (draining) return;
+    draining = true;
+    try {
+      let newline;
+      while ((newline = buffer.indexOf('\n')) >= 0) {
+        const line = buffer.slice(0, newline); buffer = buffer.slice(newline + 1);
         if (connection.bufferedAmount > 1048576) throw Error('relay_backpressure');
-        const message = JSON.parse(line); onEvent(message);
+        const message = JSON.parse(line); await onEvent(message);
         if (connection.readyState === WebSocket.OPEN) connection.send(line);
       }
-      catch { void close(); return; }
-    }
-  });
+    } catch { void close(); }
+    finally { draining = false; child.stdout.resume(); }
+  }
 }
 
 export async function openCodexTransport({ host, args, cwd, env, instructions, onEvent = () => {}, onRequest = () => {} }) {

@@ -6,6 +6,7 @@ import { reserveModelTurn } from '../integrations/live-model-budget.mjs';
 import { scoreContract } from '../scripts/live-holdout.mjs';
 import { runModelTurn } from '../integrations/live-model-client.mjs';
 import { EventEmitter } from 'node:events';
+import { holdoutCapture } from '../integrations/live-holdout-capture.mjs';
 const directories = [];
 function budget(values = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'fisch-budget-')); directories.push(directory);
@@ -31,18 +32,43 @@ it('does not score ACKs as application or visual meaning and correlates epochs',
   expect(result.admitted).toBe(1); expect(result.applied).toBe(0);
   expect(result.visualEffectiveness).toBe(null); expect(result.contentRelevance).toBe(null);
 });
+it('retains bounded machine rejection codes without raw model payloads', () => {
+  const tools = ['session_busy', 'private text or payload', 'x'.repeat(65), undefined].map(code => ({ server: 'fisch_live', tool: 'express',
+    result: { isError: true, content: [{ type: 'text', text: JSON.stringify({ status: 'rejected', code }) }] } }));
+  const result = scoreContract({ status: 'completed', tools }, { diagnostics: { events: [] } });
+  expect(result.rejected).toBe(4); expect(result.rejectionCodes).toEqual(['session_busy']);
+});
 it('uses real protocol event boundaries in the deterministic client fixture', async () => {
-  const events = new EventEmitter();
+  const events = new EventEmitter(), captured = [];
   const client = { events, call: async method => {
     if (method === 'turn/start') queueMicrotask(() => {
       events.emit('notification', { method: 'turn/started', params: { threadId: 't', turn: { id: 'a' } } });
+      const item = { type: 'mcpToolCall', tool: 'express' };
+      events.emit('notification', { method: 'item/completed', params: { threadId: 't', turnId: 'old', item } });
+      events.emit('notification', { method: 'item/completed', params: { threadId: 'other', turnId: 'a', item } });
+      events.emit('notification', { method: 'item/completed', params: { threadId: 't', turnId: 'a', item } });
       events.emit('notification', { method: 'turn/completed', params: { threadId: 'other', turn: { id: 'a', status: 'failed' } } });
       events.emit('notification', { method: 'turn/completed', params: { threadId: 't', turn: { id: 'stale', status: 'failed' } } });
       events.emit('notification', { method: 'turn/completed', params: { threadId: 't', turn: { id: 'a', status: 'completed' } } });
     });
   } };
-  expect((await runModelTurn(client, 't', 'synthetic test prompt', 1000)).status).toBe('completed');
+  expect((await runModelTurn(client, 't', 'synthetic test prompt', 1000, item => captured.push(item))).status).toBe('completed');
+  expect(captured).toHaveLength(1);
   expect(events.listenerCount('notification')).toBe(0);
+});
+it('bounds active holdout evidence to body-only captures and reports unavailable frames', async () => {
+  const selectors = [], paths = [];
+  const page = { waitForTimeout: async () => {}, locator: selector => {
+    selectors.push(selector);
+    return { screenshot: async ({ path }) => { paths.push(path); if (paths.length === 2) throw Error('closed'); } };
+  } };
+  const capture = holdoutCapture(page, '/tmp', 'h01');
+  capture.capture({ server: 'other', tool: 'express' });
+  capture.capture({ server: 'fisch_live', tool: 'look' });
+  for (let i = 0; i < 10; i++) capture.capture({ server: 'fisch_live', tool: 'express' });
+  const report = await capture.finish();
+  expect(paths).toHaveLength(4); expect(new Set(selectors)).toEqual(new Set(['#body']));
+  expect(report.failed).toBe(1); expect(report.frames).toHaveLength(3);
 });
 it('fails closed at the deadline or concurrent lock and preserves the original file', () => {
   const path = budget({ used: 2 }), original = readFileSync(path, 'utf8');

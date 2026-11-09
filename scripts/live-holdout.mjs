@@ -4,11 +4,23 @@ import { fileURLToPath } from 'node:url';
 import { openLive, liveRoot, closeLiveResources } from '../integrations/live-launch.mjs';
 import { openModelClient, runModelTurn } from '../integrations/live-model-client.mjs';
 import { readModelBudget, reserveModelTurn } from '../integrations/live-model-budget.mjs';
+import { holdoutCapture } from '../integrations/live-holdout-capture.mjs';
 
 const prompts = JSON.parse(readFileSync(new URL('../integrations/live-holdout.json', import.meta.url), 'utf8'));
 const directory = resolve(liveRoot, '.runtime/live-overnight');
 const budgetPath = resolve(directory, 'model-budget.json');
 
+function rejectionCodes(calls) {
+  const codes = new Set();
+  for (const call of calls) for (const content of call.result?.content ?? []) {
+    if (content.type !== 'text') continue;
+    try {
+      const value = JSON.parse(content.text);
+      if (value.status === 'rejected' && typeof value.code === 'string' && /^[a-z][a-z0-9_]{0,63}$/.test(value.code)) codes.add(value.code);
+    } catch { /* Only fixed machine codes are retained. */ }
+  }
+  return [...codes];
+}
 export function scoreContract(turn, metrics) {
   const calls = turn.tools.filter(item => item.server === 'fisch_live' && ['express', 'return_to_face'].includes(item.tool));
   const receipts = [], rejected = [];
@@ -24,7 +36,7 @@ export function scoreContract(turn, metrics) {
   const reached = phase => receipts.filter(receipt => events.some(event => event.seq === receipt.seq && event.epoch === receipt.epoch && event.phase === phase)).length;
   return { turnStatus: turn.status, attempted: calls.length, rejected: rejected.length, admitted: receipts.length,
     applied: reached('applied'), frameSubmitted: reached('frame_submitted'), frameChangedProxy: reached('frame_changed_proxy'),
-    contractValidity: calls.length ? receipts.length / calls.length : null, toolHistoryTruncated: !!turn.truncated,
+    contractValidity: calls.length ? receipts.length / calls.length : null, rejectionCodes: rejectionCodes(calls), toolHistoryTruncated: !!turn.truncated,
     visualEffectiveness: null, contentRelevance: null, semanticConsistency: null };
 }
 export async function runHoldout() {
@@ -42,11 +54,13 @@ export async function runHoldout() {
       const threadId = result.thread.id; client.focus(threadId);
       for (const prompt of prompts) {
         const budget = reserveModelTurn(budgetPath, `holdout-${prompt.id}-pass-${pass}`);
-        const turn = await runModelTurn(client, threadId, prompt.prompt, Math.max(1, Math.min(90000, Date.parse(budget.deadline) - Date.now())));
+        const capture = holdoutCapture(live.page, directory, `holdout-${prompt.id}-pass-${pass}`);
+        const turn = await runModelTurn(client, threadId, prompt.prompt, Math.max(1, Math.min(90000, Date.parse(budget.deadline) - Date.now())), capture.capture);
+        const activeEvidence = await capture.finish();
         await live.page.waitForTimeout(600);
         const metrics = await live.page.evaluate(() => window.fischLive.metrics());
         await live.page.locator('#body').screenshot({ path: resolve(directory, `holdout-${prompt.id}-pass-${pass}.png`) });
-        rows.push({ id: prompt.id, pass, ...scoreContract(turn, metrics) });
+        rows.push({ id: prompt.id, pass, ...scoreContract(turn, metrics), activeEvidence });
         writeFileSync(resolve(directory, 'holdout-report.json'), JSON.stringify({ environment: 'Cloud Linux / headless software rendering / synthetic camera',
           modelTurnsUsed: readModelBudget(budgetPath).used, humanRecognition: 'pending', rows }, null, 2));
         if (turn.status !== 'completed') throw Error('Holdout stopped after failed turn; no blind retry');

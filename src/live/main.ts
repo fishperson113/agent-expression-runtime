@@ -14,6 +14,7 @@ const cameraTransitions: { status: string; source: string; at: number }[] = [];
 const bridge = new LiveBridge(body, observations);
 let lastActivity = 'idle';
 Object.assign(window, { fischLive: { pair: (base: string, token: string) => bridge.connect(base, token),
+  selectThread: () => bridge.cancel(),
   activity: (value: { turn: 'idle' | 'working' | 'waiting' | 'interrupted'; output: number; quality: string }) => {
     if (stopped) return;
     if (value.turn === 'interrupted' && lastActivity !== 'interrupted') void bridge.cancel();
