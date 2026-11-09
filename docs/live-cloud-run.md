@@ -411,7 +411,7 @@ shape/color were also checked. The preflight's local adapter selected installed
 Linux Chromium instead of the original Windows Edge fixture; the tracked
 preflight script was not changed. No native hook trust was bypassed.
 
-Total usage is 49/120 (including all historical failures and diagnostic/retest
+Total usage is 50/120 (including all historical failures and diagnostic/retest
 turns); hard deadline remains 2026-11-09 06:17:35 UTC. No further model work is
 needed to establish the automated application path. Full sanitized per-turn
 results, before/after controller evidence, functional samples and explicit limits
@@ -425,3 +425,11 @@ throughput, Windows GPU/Herdr, native hook delivery/trust and Vietnamese /voice
 remain pending. Previous software-rendering and vision target misses remain.
 The successful holdout establishes autonomous ordinary-conversation expression
 attempts/application in this bounded synthetic run, not full PRD acceptance.
+
+A real no-Herdr Codex TUI was additionally opened beside the paired headless body.
+It stopped at the explicit “Trust this folder?” gate for this checkout. The owner
+authorized official login, not additional security/trust changes, so Back/Escape
+was selected and the owned CLI/browser/gateway were closed without sending a
+model prompt. This startup reservation is conservatively retained as turn 50.
+Successful TUI inference remains pending project trust review/authorization; it is
+not inferred from the separate app-server holdout. No folder trust was granted.

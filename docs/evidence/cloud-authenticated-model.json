@@ -4,7 +4,7 @@
   "environment": "Cloud Linux, Chromium headless, SwiftShader; synthetic observations, camera off",
   "modelBudget": {
     "limit": 120,
-    "used": 49,
+    "used": 50,
     "usedAfterHoldout": 48,
     "deadline": "2026-11-09T06:17:35.373Z"
   },
@@ -81,6 +81,15 @@
     "Previous sustained software-rendering and vision performance misses remain; this run is not a new soak.",
     "R10/R11 transcript verification remains unsupported in Codex."
   ],
+  "terminalSmoke": {
+    "realCodexTuiOpened": true,
+    "herdrUsed": false,
+    "cameraUsed": false,
+    "status": "stopped_at_project_trust_gate",
+    "trustGranted": false,
+    "modelInputSent": false,
+    "reservationCounted": true
+  },
   "holdoutRows": [
     {"id":"h01","pass":1,"turnStatus":"completed","attempted":1,"rejected":0,"admitted":1,"applied":1,"frameSubmitted":1,"frameChangedProxy":1,"contractValidity":1,"rejectionCodes":[],"toolHistoryTruncated":false,"visualEffectiveness":null,"contentRelevance":null,"semanticConsistency":null,"activeCaptures":1,"failedCaptures":0},
     {"id":"h02","pass":1,"turnStatus":"completed","attempted":1,"rejected":0,"admitted":1,"applied":1,"frameSubmitted":1,"frameChangedProxy":1,"contractValidity":1,"rejectionCodes":[],"toolHistoryTruncated":false,"visualEffectiveness":null,"contentRelevance":null,"semanticConsistency":null,"activeCaptures":1,"failedCaptures":0},

@@ -6,10 +6,11 @@ The current implementation includes pane attachment, native interaction hooks, c
 
 Runtime `ce03da9`, merged in [PR #35](https://github.com/fishperson113/agent-expression-runtime/pull/35)
 as `d7bf017`. The owner completed official Codex device login after network access
-was restored. Model usage is 49/120, deadline 2026-11-09 06:17:35 UTC.
+was restored. Model usage is 50/120, deadline 2026-11-09 06:17:35 UTC.
 
 | Gate | Fresh evidence | Limit |
 |---|---|---|
+| Real terminal UI | Opens without Herdr; stopped at explicit folder-trust prompt; no model input sent | Project trust was not granted; successful TUI inference remains pending |
 | Ordinary model conversation | Unchanged ten prompts, two fresh threads: 20/20 completed; 20 expression attempts/admissions/applications/frame changes, zero rejections | Transport/application proxies; relevance and semantic consistency unscored |
 | Thread ownership | Second thread reproduced `controller_active`; explicit successful selection now awaits old controller cancellation; both-thread diagnostic and full holdout pass | Failed/superseded/background selections preserve ownership; single-controller rules unchanged |
 | Active visual evidence | Twenty body-only captures; [encouragement](evidence/cloud-model-encouragement.png) and [rollback](evidence/cloud-model-rollback.png) samples | 150 ms after tool completion; agent-inspected samples, no blinded human score |
