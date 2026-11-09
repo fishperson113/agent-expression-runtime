@@ -55,6 +55,8 @@ Token đi trong environment, HTTP Authorization và message WebSocket đầu ti�
 
 Live ưu tiên vision GPU. Một số probe trong lượt Windows/AMD lịch sử kết thúc video track sau vài giây; probe camera thô vẫn ổn định, và các lượt GPU sau cũng có thể chạy ổn. Vì vậy không kết luận đây là lỗi driver phổ quát. Nếu video track của lượt GPU kết thúc bất ngờ, Live thử lại đúng một lần bằng CPU; UI hiển thị delegate đang dùng. Tắt camera bằng nút hoặc dừng phiên hủy cả recovery timer, không tự bật lại.
 
+Nếu GPU báo rõ SwiftShader (dựng hình bằng phần mềm), Live chọn CPU cho thị giác ngay từ đầu; probe Cloud tổng hợp đo CPU nhanh hơn đường GPU software. UI vẫn ghi delegate thực tế. GPU native hoặc không đọc được metadata vẫn giữ lựa chọn GPU và cơ chế fallback hiện có. Đây không phải chứng nhận đạt 24 Hz hay accuracy người thật.
+
 Để chọn CPU từ đầu khi cần:
 
 ```powershell

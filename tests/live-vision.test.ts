@@ -35,3 +35,13 @@ it('honors manual stop during recovery and never reopens the camera afterwards',
   test.tracks[0].onended(); test.camera.stop(); await vi.advanceTimersByTimeAsync(1000);
   expect(test.getUserMedia).toHaveBeenCalledOnce(); expect(test.video.srcObject).toBe(null);
 });
+it('uses the worker-selected CPU delegate when deciding whether an ended track can recover', async () => {
+  vi.useFakeTimers(); const test = harness(); await test.camera.start();
+  test.instances[0].onmessage({ data: { type: 'ready', delegate: 'CPU' } });
+  test.tracks[0].onended(); await vi.advanceTimersByTimeAsync(500);
+  expect(test.getUserMedia).toHaveBeenCalledOnce();
+  expect(test.statuses.at(-1)).toBe('stopped'); expect(test.video.srcObject).toBe(null);
+  await test.camera.start();
+  expect(test.instances[1].postMessage).toHaveBeenCalledWith({ type: 'init', delegate: 'GPU' });
+  test.camera.stop();
+});
