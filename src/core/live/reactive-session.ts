@@ -7,7 +7,7 @@ import type { ReactiveWindow, SessionEvent, SessionOptions } from './reactive-se
 
 const faceEvents = new Set(['user_arrived', 'user_left', 'looked_away', 'looked_back', 'expression_changed']);
 const revokeReasons: Record<string, LeaseRevokeReason> = { presence_changed: 'presence_changed', session_changed: 'session_changed',
-  epoch_changed: 'epoch_changed', user_intent: 'intent_changed', user_busy: 'intent_changed', deadline: 'expired', source_expired: 'expired', track_lost: 'track_lost' };
+  epoch_changed: 'epoch_changed', semantic_changed: 'semantic_changed', user_intent: 'intent_changed', user_busy: 'intent_changed', deadline: 'expired', source_expired: 'expired', track_lost: 'track_lost' };
 const key = (type: string) => type.startsWith('user_') ? 'presence' : type.startsWith('looked_') ? 'orientation' : 'expression';
 function frozen<T>(value: T): T {
   if (value && typeof value === 'object') { for (const child of Object.values(value)) frozen(child); Object.freeze(value); }
@@ -101,6 +101,7 @@ export class ReactiveSession {
       if (!event || !Number.isSafeInteger(event.seq) || event.seq < 0 || event.seq <= this.seen) continue;
       this.seen = event.seq;
       if (!this.enabled || !this.available || !this.sourceValid || !faceEvents.has(event.type) || !this.fresh(event.at, 5000)) continue;
+      if (this.guard.owner || this.transport?.generation === this.guard.generation) this.revoke('semantic_changed');
       if (!this.pending.size) this.firstAt = this.options.now();
       this.pending.set(key(event.type), { type: event.type, seq: event.seq, at: event.at });
     }

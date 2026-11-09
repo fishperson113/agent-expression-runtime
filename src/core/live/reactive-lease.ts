@@ -2,7 +2,7 @@ import type { ReactiveOwnership, ReactiveRequest, ReactiveState } from './decisi
 
 export type ReactiveLease = Readonly<ReactiveRequest & ReactiveOwnership & { generation: number }>;
 export type LeaseRevokeReason = 'expired' | 'session_changed' | 'epoch_changed' | 'intent_changed' |
-  'presence_changed' | 'track_lost' | 'revoked';
+  'presence_changed' | 'track_lost' | 'semantic_changed' | 'revoked';
 
 /** A synchronous execution boundary. The caller checks before admission and every tick. */
 export class ReactiveLeaseGuard {

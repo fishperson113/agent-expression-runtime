@@ -242,3 +242,17 @@ No full envelope, recorder, live-model, human or naturalness gate is marked done
 - [Jev models](https://docs.typesafe.ai/models), [experimental images](https://docs.typesafe.ai/images)
 - [MediaPipe hands](https://developers.google.com/edge/mediapipe/solutions/vision/hand_landmarker/web_js)
 - [Lamport causal ordering](https://lamport.azurewebsites.net/pubs/time-clocks.pdf)
+
+## Conservative semantic-event invalidation
+
+The current live observer revokes its pending decision or execution lease when a
+new eligible, uniquely sequenced face event arrives. This includes orientation
+and expression changes, not just presence changes. Compatible fresh frames with
+no new semantic event remain valid, and duplicate event sequences have no effect.
+Revocation retains any outstanding transport until it settles; it does not reopen
+quota or authorize a retry. Cancellation is scoped to the observer's own lease.
+
+This is whole-decision conservative invalidation, not a generic semantic field
+read-set. Analog changes that do not produce an eligible event are still outside
+that contract. Per-field dependencies, tolerances and selective action repair
+remain future work; no gesture-to-effect rule or model quality claim is added.
