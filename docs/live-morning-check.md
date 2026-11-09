@@ -56,6 +56,21 @@ sáng. Không tự bật ghi chẩn đoán hoặc xuất JSON; một bản ghi 6
 chứng minh trải nghiệm trọn phiên. Không chia sẻ token/URL pairing, prompt riêng,
 key hoặc ledger khi báo lỗi. Hướng dẫn observer: [provider và ngân sách](reactive-provider.md).
 
+## Chọn luồng observer V2 khi đã được cấu hình
+
+Nếu provider riêng và ledger đang có đã được duyệt, đặt cờ này trong **cùng cửa sổ
+PowerShell của launcher**, trước lệnh `fisch.cmd live --hands`, để thử đúng V2:
+
+```powershell
+$env:FISCH_REACTIVE_CONTRACT_VERSION = '2'
+```
+
+Mặc định vẫn là V1. Cờ không cấp quyền camera, credential hay ngân sách; chưa có
+provider/ledger hợp lệ thì giữ observer off và tiếp tục co-create. Không sao chép
+login Codex sang observer. Xem [hợp đồng V2](reactive-provider.md#explicit-version-2-brief-decisions)
+và [bằng chứng có giới hạn](reactive-v2-evidence.md): Cloud đã kiểm tra điều phối
+bằng provider giả, chưa xác nhận ý nghĩa phản ứng hoặc trải nghiệm người thật.
+
 ## Ghi lại kết quả ngắn
 
 Ghi SHA Git, thời gian chờ setup, phút thực chơi, số tạo/remix/undo đã commit, thao tác chưa thử,
