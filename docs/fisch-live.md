@@ -10,11 +10,11 @@ Chạy đúng một lệnh:
 fisch live
 ```
 
-Lệnh chuẩn bị build/gateway, mở browser và Codex trong terminal hiện tại với MCP tạm thời. Workspace là thư mục đang gọi; không cần provider/pane ID hoặc mở Codex trước. Nếu Herdr thật sự sẵn sàng, adapter mở tab Fisch Live riêng. Phiên cũ không bị thay thế. Login hiện có được dùng lại; không có planner phụ. Cấu hình global không bị viết lại. Nếu asset thị giác chưa tải được, Live vẫn dùng được camera-off; chuẩn bị asset trước khi bật camera.
+Lệnh chuẩn bị build/gateway, mở browser và Codex trong terminal hiện tại với MCP tạm thời. Workspace là thư mục đang gọi; không cần provider/pane ID hoặc mở Codex trước. Trong Herdr hoặc multiplexer khác, Codex chạy ngay trong pane khởi chạy Live; chỉ `--agent <pane>` mới dùng adapter cũ. Phiên cũ không bị thay thế. Login hiện có được dùng lại; không có planner phụ. Cấu hình global không bị viết lại. Nếu asset thị giác chưa tải được, Live vẫn dùng được camera-off; chuẩn bị asset trước khi bật camera.
 
 Sau `npm link`, lệnh `fisch` có trên PATH. Với checkout mới, chạy bước link một lần sau chuẩn bị; sau đó luôn dùng `fisch live`. `fisch run` vẫn mở bản trong panel. Tùy chọn `--agent` chỉ dành cho debug/chọn workspace nguồn tường minh, không cần trong luồng thường ngày.
 
-Launcher mở Edge/Chromium với trang Live và camera mặc định **tắt**. Chọn **Bật camera** để xử lý tại máy. Quan sát video/landmark ở bên trái, cơ thể ở bên phải. Tiếp tục gõ vào Codex trong terminal/pane Live. MCP có thể hỏi quyền tool lần đầu; cấp quyền theo ý bạn. Launcher không sửa global Codex/Herdr config hoặc bypass hook trust.
+Launcher mở Edge/Chromium với trang Live và camera mặc định **tắt**. Chọn **Bật camera** để xử lý tại máy. Fisch ở panel trái; camera và nhật ký hoạt động agent ở panel phải. Tiếp tục gõ vào Codex trong terminal/pane Live. MCP có thể hỏi quyền tool lần đầu; cấp quyền theo ý bạn. Launcher không sửa global Codex/Herdr config hoặc bypass hook trust.
 
 Đóng cửa sổ browser, chọn **Dừng toàn bộ**, hoặc Ctrl+C tại launcher để dừng camera/gateway/renderer. Đường terminal đóng cả Codex do chính phiên Live sở hữu; các agent không liên quan giữ nguyên. Browser, gateway và agent có đường cleanup độc lập. Herdr giữ vòng đời pane riêng; tool Live không còn dùng được sau khi gateway dừng. Chạy lại Live tạo pairing token mới.
 
@@ -250,3 +250,13 @@ Protocol reference: https://learn.chatgpt.com/docs/app-server . Installed Codex
 Deterministic tests and camera-off visual checks are separate from real-camera,
 native-GPU performance and model-expression acceptance; do not treat them as the
 same certification. Native verification details are recorded in the PR.
+
+
+Verification for the reactive increment: 28 focused relay/reactivity tests pass.
+Linux CI on `c53c335` passed 293 JavaScript tests (4 skipped), production build,
+architecture and browser smoke. Windows browser-under-Vitest attempts timed out;
+standalone camera-off screenshot rendering succeeded, so no full Windows-browser
+pass is claimed. One real `gpt-6.1-sol` synthetic event turn started/completed and
+successfully called `observe`, with zero approval requests or camera/audio/image
+capture. It chose no `express` call: model-authored reaction animation remains an
+open acceptance check. Conservative cumulative model-test usage is 97/120.
