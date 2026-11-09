@@ -1,3 +1,4 @@
+import type { CausalKind, CausalPayloads } from './causal-recorder-types';
 import { ReactiveDecisionHost } from './decision-host';
 import { ReactiveLeaseGuard, type LeaseRevokeReason } from './reactive-lease';
 import { validateObservation } from './observation';
@@ -13,8 +14,9 @@ function frozen<T>(value: T): T {
   if (value && typeof value === 'object') { for (const child of Object.values(value)) frozen(child); Object.freeze(value); }
   return value;
 }
+type PendingEvent = SessionEvent & { sessionId: string; observationSeq: number };
 type Transport = { id: string; request: ReactiveRequest; generation: number; authorized: boolean; delivered: boolean; done: Promise<DecisionResult>;
-  resolve: (value: unknown) => void; reject: () => void };
+  authorizationOutcome?: boolean; owner?: import('./decision-types').ReactiveOwnership; resolve: (value: unknown) => void; reject: () => void };
 
 /** Pure coordinator. It never contacts a provider or writes to a renderer directly. */
 export class ReactiveSession {
@@ -23,7 +25,7 @@ export class ReactiveSession {
   private userBusy = false;
   private snapshot?: Observation;
   private history: Observation[] = [];
-  private pending = new Map<string, SessionEvent>();
+  private pending = new Map<string, PendingEvent>();
   private firstAt = 0;
   private seen = -1;
   private intentRevision = 0;
@@ -44,7 +46,14 @@ export class ReactiveSession {
   constructor(private options: SessionOptions) {
     this.epoch = options.epoch();
     this.host = new ReactiveDecisionHost(() => this.readCurrent(), options.now);
-    this.guard = new ReactiveLeaseGuard(() => this.readCurrent(), options.now, options.cancel);
+    this.guard = new ReactiveLeaseGuard(() => this.readCurrent(), options.now, (owner, reason) => {
+      this.record('revocation', { reason, requestId: owner.requestId, decisionId: owner.decisionId, actionId: owner.actionId });
+      options.cancel(owner, reason);
+    });
+  }
+  private record<K extends CausalKind>(kind: K, payload: CausalPayloads[K]) {
+    if (!this.options.record) return;
+    try { this.options.record(kind, structuredClone(payload)); } catch { /* Recording cannot affect control. */ }
   }
   configure(available: boolean) {
     this.available = available === true;
@@ -57,11 +66,13 @@ export class ReactiveSession {
   userIntent() { this.intentRevision++; this.revoke('user_intent'); }
   setUserBusy(busy: boolean) { this.userBusy = busy === true; if (this.userBusy) this.revoke('user_busy'); }
   reset() { this.clearSource('reset'); }
-  private clearSource(reason: string) {
+  private clearSource(reason: CausalPayloads['revocation']['reason']) {
     this.revoke(reason); this.snapshot = undefined; this.history = []; this.seen = -1;
     this.presenceRevision++; this.sourceValid = false;
   }
-  private revoke(reason: string) {
+  private revoke(reason: CausalPayloads['revocation']['reason']) {
+    const transport = this.transport;
+    if (!this.guard.owner && transport?.generation === this.guard.generation) this.record('revocation', { reason, requestId: transport.id });
     this.lastReason = reason; this.pending.clear(); this.host.revoke(); this.guard.revoke(revokeReasons[reason] ?? 'revoked');
   }
   private fresh(at: number, ttl: number) {
@@ -93,6 +104,7 @@ export class ReactiveSession {
     else if (previousTracks.some(track => !this.tracks().includes(track)) && this.transport?.request.requiredTrackIds.some(track => !this.tracks().includes(track))) this.revoke('track_lost');
     this.guard.check();
     this.history.push(snapshot); this.history = this.history.filter(item => this.fresh(item.capturedAt, 1500)).slice(-4);
+    this.record('observation', { ...snapshot, summary: '' });
     this.events(events);
   }
   private events(events: SessionEvent[]) {
@@ -101,9 +113,11 @@ export class ReactiveSession {
       if (!event || !Number.isSafeInteger(event.seq) || event.seq < 0 || event.seq <= this.seen) continue;
       this.seen = event.seq;
       if (!this.enabled || !this.available || !this.sourceValid || !faceEvents.has(event.type) || !this.fresh(event.at, 5000)) continue;
+      const candidate = { sessionId: this.snapshot!.sessionId, observationSeq: this.snapshot!.seq, seq: event.seq, type: event.type, at: event.at };
+      this.record('event', candidate);
       if (this.guard.owner || this.transport?.generation === this.guard.generation) this.revoke('semantic_changed');
       if (!this.pending.size) this.firstAt = this.options.now();
-      this.pending.set(key(event.type), { type: event.type, seq: event.seq, at: event.at });
+      this.pending.set(key(event.type), candidate);
     }
   }
   tick() {
@@ -128,8 +142,11 @@ export class ReactiveSession {
     const request: ReactiveRequest = frozen({ schemaVersion: 1, sessionId: this.snapshot!.sessionId, epoch: this.options.epoch(),
       requestId, intentRevision: this.intentRevision, presenceRevision: this.presenceRevision,
       deadline: now + 5000, requiredTrackIds: this.tracks() });
+    const candidates = [...this.pending.values()];
     const observationWindow: ReactiveWindow = frozen({ schemaVersion: 1, request,
-      events: [...this.pending.values()].map(event => ({ id: event.seq, type: event.type, at: event.at })), observations: structuredClone(this.history) });
+      events: candidates.map(event => ({ id: event.seq, type: event.type, at: event.at })), observations: structuredClone(this.history) });
+    this.record('request', { request, observationRefs: observationWindow.observations.map(value => ({ sessionId: value.sessionId, seq: value.seq })),
+      eventRefs: candidates.map(value => ({ sessionId: value.sessionId, seq: value.seq })) });
     this.pending.clear(); this.lastStart = now; this.starts.push(now); this.count++;
     this.dispatch(request); return { request, observationWindow };
   }
@@ -139,20 +156,28 @@ export class ReactiveSession {
     const generation = this.guard.generation;
     const done = this.host.run(request, { decide: () => promise }, (compiled, owner) => {
       if (!this.enabled || !this.available || !this.healthy() || this.userBusy || !this.options.canAdmit() || !this.guard.acquire(request, owner, generation)) throw Error('admission_revoked');
+      if (this.transport?.id === owner.requestId) this.transport.owner = owner;
       try { this.options.admit(compiled, owner); }
       catch (error) { this.guard.revoke(); throw error; }
     });
     this.transport = { id: request.requestId, request, generation, authorized: false, delivered: false, resolve, reject, done };
   }
+  private authorization(transport: Transport, allowed: boolean, reason: CausalPayloads['authorization']['reason']) {
+    if (transport.authorizationOutcome !== allowed) this.record('authorization', { requestId: transport.id, allowed, reason });
+    transport.authorizationOutcome = allowed; return allowed;
+  }
   authorize(id: string): boolean {
     this.tick(); const transport = this.transport;
-    if (!transport || transport.id !== id || transport.delivered || transport.authorized || transport.generation !== this.guard.generation ||
-      !this.enabled || !this.available || !this.healthy() || this.userBusy || !this.options.canAdmit()) return false;
+    if (!transport || transport.id !== id || transport.delivered || transport.authorized) return false;
+    if (transport.generation !== this.guard.generation) return this.authorization(transport, false, 'revoked');
+    if (!this.enabled || !this.available) return this.authorization(transport, false, 'unavailable');
+    if (!this.healthy()) return this.authorization(transport, false, 'stale');
+    if (this.userBusy || !this.options.canAdmit()) return this.authorization(transport, false, 'denied');
     const request = transport.request, state = this.readCurrent();
     if (this.options.now() >= request.deadline || state.sessionId !== request.sessionId || state.epoch !== request.epoch ||
       state.intentRevision !== request.intentRevision || state.presenceRevision !== request.presenceRevision ||
-      !request.requiredTrackIds.every(track => state.trackIds.includes(track))) return false;
-    transport.authorized = true; this.lastReason = 'authorized'; return true;
+      !request.requiredTrackIds.every(track => state.trackIds.includes(track))) return this.authorization(transport, false, 'stale');
+    transport.authorized = true; this.lastReason = 'authorized'; return this.authorization(transport, true, 'authorized');
   }
   async deliver(id: string, data: unknown): Promise<DecisionResult | null> { return this.settle(id, data, false); }
   async fail(id: string): Promise<DecisionResult | null> { return this.settle(id, undefined, true); }
@@ -161,6 +186,11 @@ export class ReactiveSession {
     if (!transport || transport.id !== id || transport.delivered) return null;
     transport.delivered = true; failed ? transport.reject() : transport.resolve(transport.authorized || data === null ? data : null);
     const result = await transport.done;
+    const owner = transport.owner?.decisionId === result.decisionId ? transport.owner : undefined;
+    this.record('decision', { requestId: result.requestId, reason: result.reason, ...(result.decisionId ? { decisionId: result.decisionId } : {}),
+      ...(result.reason === 'observed' ? { mode: 'observe' as const } : {}),
+      ...(result.reason === 'accepted' || result.reason === 'admission_failed' ? { mode: 'express' as const } : {}),
+      ...(owner ? { actionId: owner.actionId, validUntil: owner.validUntil } : {}) });
     if (this.transport === transport) this.transport = undefined;
     this.uncertain ||= result.reason === 'transport_unknown'; this.lastReason = result.reason;
     return result;
