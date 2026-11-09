@@ -57,6 +57,8 @@ Live ưu tiên vision GPU. Một số probe trong lượt Windows/AMD lịch s�
 
 Nếu GPU báo rõ SwiftShader (dựng hình bằng phần mềm), Live chọn CPU cho thị giác ngay từ đầu; probe Cloud tổng hợp đo CPU nhanh hơn đường GPU software. UI vẫn ghi delegate thực tế. GPU native hoặc không đọc được metadata vẫn giữ lựa chọn GPU và cơ chế fallback hiện có. Đây không phải chứng nhận đạt 24 Hz hay accuracy người thật.
 
+Bằng chứng Cloud cuối: detector dùng video giả không có khuôn mặt đo khoảng 13,09 Hz trên CPU, vẫn chưa đạt 24 Hz; soak quan sát tổng hợp 30 phút pass bộ nhớ/ổn định nhưng FPS/frame-time liên tục chưa đạt. Xem [kết quả và giới hạn](validation.md#final-cloud-performance-verification--2026-11-09).
+
 Để chọn CPU từ đầu khi cần:
 
 ```powershell

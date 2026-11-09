@@ -2,6 +2,26 @@
 
 The current implementation includes pane attachment, native interaction hooks, contextual planning, continuous presence, model-authored performances, adaptive Braille and prepared idle scenes. See [current behavior](expression-planner.md), [review remediation](review-progress.md) and [research/evidence limits](related-work.md#10-cập-nhật-braille-theo-thời-gian-và-idle-scene-tự-do). Test counts below are historical observations, not the current suite size or a fresh certification.
 
+## Final Cloud performance verification — 2026-11-09
+
+Runtime `fde1444`, merged in [PR #37](https://github.com/fishperson113/agent-expression-runtime/pull/37)
+as `f8ca747`. [Complete sanitized vectors](evidence/cloud-final-performance.json)
+retain both 30-minute runs and the unsuccessful batched-drawing experiment.
+
+| Gate | Final evidence | Status/limit |
+|---|---|---|
+| Regression | 255 JS tests / 49 files, build, architecture, strict harness, current-head Windows/core/gateway CI | Pass; R10/R11 unsupported in Codex |
+| Stability/private growth | 1,800.143 s + 60 s warm-up; 15 cycles; GC private +11,149,312 B, heap +1,026,328 B | Pass for synthetic observations; no model/camera inference in this soak |
+| Browser privacy | 18,601 typed observations, zero page errors/unexpected frames/off-loopback or blocked requests | Pass in this bounded camera-off synthetic run |
+| Sustained rendering | FPS 35.22–60.14, rolling frame p95 16.8–42.3 ms; median metrics similar to baseline | Targets remain missed; short overlay A/B does not certify sustained improvement |
+| Software vision | Explicit SwiftShader now selects CPU; fake no-face detector 5.60 -> 13.09 Hz | Improved short synthetic sample; 24 Hz still missed, physical accuracy untested |
+| Overlay allocation | Same 478-marker fixture, 976 resize writes -> 0; coordinates/clearing verified | Short functional/resource evidence; fillRect retained after batch regression |
+
+No real camera/microphone, persisted pixels, owner-PC use, credential export or
+security-policy changes occurred. Project trust for real TUI inference is still
+pending. The authenticated 20-turn application gate below remains separate from
+human semantic recognition, distraction, native hardware and Vietnamese voice.
+
 ## Authenticated Cloud model verification — 2026-11-09
 
 Runtime `ce03da9`, merged in [PR #35](https://github.com/fishperson113/agent-expression-runtime/pull/35)
