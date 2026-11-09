@@ -37,3 +37,20 @@ fn recent_transport_does_not_turn_stale_measurements_fresh() {
     assert!(store.ingest(value, vec![], "test", 1000));
     assert_eq!(store.read(0, 1000)["stale"], true);
 }
+
+#[test]
+fn structured_hands_survive_gateway_reads_and_expire_with_measurement() {
+    let mut value = snapshot(1, 1000);
+    value["hands"] = json!({"v":1,"trackingState":"tracked","coordinateSpace":"image-normalized",
+        "landmarkSchema":"mediapipe-hand-21","zMeaning":"wrist-relative-image-width","mirrored":false,
+        "sourceWidth":640,"sourceHeight":480,"entities":[{"detectionId":0,"handedness":"Left","confidence":0.9,
+            "landmarks":vec![json!({"x":0.2,"y":0.5,"z":-0.1});21]}]});
+    let mut store = observation::Observations::default();
+    assert!(store.ingest(value.clone(), vec![], "test", 1000));
+    assert_eq!(store.read(0, 1000)["snapshot"]["hands"], value["hands"]);
+    assert!(store.read(0, 3000)["snapshot"].get("hands").is_none());
+    value["hands"]["v"] = json!(2);
+    assert!(!observation::validate(&value, "test", 1000));
+    value["hands"]["v"] = json!(1); value["hands"]["entities"][0]["landmarks"][0]["x"] = json!("bad");
+    assert!(!observation::validate(&value, "test", 1000));
+}

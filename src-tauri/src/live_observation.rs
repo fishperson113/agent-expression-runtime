@@ -11,7 +11,9 @@ fn vector(value: &Value, names: &[&str], min: f64, max: f64) -> bool {
     value.is_null() || keys(value, names) && names.iter().all(|name| number(&value[*name], min, max))
 }
 pub fn validate(value: &Value, session: &str, now: u64) -> bool {
-    if !keys(value, &["v", "sessionId", "seq", "capturedAt", "camera", "user", "turn", "summary"])
+    let mut fields = vec!["v", "sessionId", "seq", "capturedAt", "camera", "user", "turn", "summary"];
+    if value.get("hands").is_some() { fields.push("hands"); if !hands(&value["hands"]) { return false; } }
+    if !keys(value, &fields)
         || value["v"] != 1 || value["sessionId"] != session || value["seq"].as_u64().is_none()
         || !value["capturedAt"].as_u64().is_some_and(|at| at.abs_diff(now) <= 1500)
         || !["starting", "tracking", "absent", "denied", "error", "stopped", "stale"].iter().any(|item| value["camera"] == *item)
@@ -26,6 +28,26 @@ pub fn validate(value: &Value, session: &str, now: u64) -> bool {
     if !vector(&user["position"], &["x", "y"], -1., 1.) || !vector(&user["head"], &["yaw", "pitch", "roll"], -180., 180.)
         || !vector(&user["expression"], &["smile", "browRaise", "eyesClosed", "mouthOpen"], 0., 1.) { return false; }
     user["present"] == true || ["position", "head", "facingScreen", "expression", "mouthMoving"].iter().all(|key| user[*key].is_null())
+}
+fn hands(value: &Value) -> bool {
+    if !keys(value, &["v", "trackingState", "coordinateSpace", "landmarkSchema", "zMeaning", "mirrored", "sourceWidth", "sourceHeight", "entities"])
+        || value["v"] != 1 || value["coordinateSpace"] != "image-normalized" || value["landmarkSchema"] != "mediapipe-hand-21"
+        || value["zMeaning"] != "wrist-relative-image-width" || value["mirrored"] != false { return false; }
+    if !["tracked", "lost", "unavailable", "error"].iter().any(|state| value["trackingState"] == *state) { return false; }
+    if !["sourceWidth", "sourceHeight"].iter().all(|key| value[*key].as_u64().is_some_and(|n| (1..=16384).contains(&n))) { return false; }
+    let Some(entities) = value["entities"].as_array() else { return false; };
+    if entities.len() > 2 || (value["trackingState"] == "tracked") != !entities.is_empty() { return false; }
+    let mut ids = Vec::new();
+    for entity in entities {
+        if !keys(entity, &["detectionId", "handedness", "confidence", "landmarks"])
+            || !entity["detectionId"].as_u64().is_some_and(|id| id <= 1 && !ids.contains(&id))
+            || !["Left", "Right", "Unknown"].iter().any(|name| entity["handedness"] == *name)
+            || !number(&entity["confidence"], 0., 1.) { return false; }
+        ids.push(entity["detectionId"].as_u64().unwrap());
+        if !entity["landmarks"].as_array().is_some_and(|points| points.len() == 21 && points.iter().all(|point|
+            keys(point, &["x", "y", "z"]) && ["x", "y", "z"].iter().all(|key| number(&point[*key], -4., 4.)))) { return false; }
+    }
+    true
 }
 pub fn event_type(value: &Value) -> bool {
     ["user_arrived", "user_left", "looked_away", "looked_back", "expression_changed", "mouth_started", "mouth_stopped", "turn_changed"].iter().any(|kind| value == kind)
@@ -46,7 +68,7 @@ impl Observations {
         let stale = age.is_none_or(|age| age > 1500) || self.snapshot.as_ref().is_some_and(|value| value["camera"] == "stale"); let mut snapshot = self.snapshot.clone();
         if let Some(ref mut value) = snapshot {
             value["summary"] = json!(if stale { "Quan sát đã cũ; trạng thái người dùng chưa biết." } else if value["user"]["present"] == true { "Có người trong khung hình. Hướng đầu và nét mặt là ước lượng hình học." } else { "Chưa thấy khuôn mặt trong khung hình." });
-            if stale { value["camera"] = json!("stale"); value["user"] = json!({"present":false,"quality":{"score":0,"basis":"unavailable"},"position":null,"head":null,"facingScreen":null,"expression":null,"mouthMoving":null}); }
+            if stale { value.as_object_mut().unwrap().remove("hands"); value["camera"] = json!("stale"); value["user"] = json!({"present":false,"quality":{"score":0,"basis":"unavailable"},"position":null,"head":null,"facingScreen":null,"expression":null,"mouthMoving":null}); }
         }
         json!({"snapshot":snapshot,"receivedAt":self.received_at,"ageMs":age,"stale":stale,"events":self.events.iter().filter(|event| event["id"].as_u64().unwrap_or(0)>cursor).collect::<Vec<_>>(),"cursor":self.cursor,"gap":self.events.front().is_some_and(|event| cursor.saturating_add(1)<event["id"].as_u64().unwrap_or(0))})
     }

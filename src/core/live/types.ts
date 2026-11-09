@@ -13,7 +13,7 @@ export type UserObservation = {
 };
 export type Observation = {
   v: 1; sessionId: string; seq: number; capturedAt: number;
-  camera: CameraStatus; user: UserObservation; turn: LiveTurn; summary: string;
+  hands?: HandObservation; camera: CameraStatus; user: UserObservation; turn: LiveTurn; summary: string;
 };
 export type LiveEventKind = 'user_arrived' | 'user_left' | 'looked_away' | 'looked_back' |
   'expression_changed' | 'mouth_started' | 'mouth_stopped' | 'turn_changed';
@@ -25,3 +25,12 @@ export function unavailableUser(): UserObservation {
   return { present: false, quality: { score: 0, basis: 'unavailable' }, position: null,
     head: null, facingScreen: null, expression: null, mouthMoving: null };
 }
+
+export type HandObservation = {
+  v: 1; trackingState: 'tracked' | 'lost' | 'unavailable' | 'error';
+  coordinateSpace: 'image-normalized'; landmarkSchema: 'mediapipe-hand-21';
+  zMeaning: 'wrist-relative-image-width'; mirrored: false;
+  sourceWidth: number; sourceHeight: number;
+  entities: { detectionId: number; handedness: 'Left' | 'Right' | 'Unknown'; confidence: number;
+    landmarks: { x: number; y: number; z: number }[] }[];
+};

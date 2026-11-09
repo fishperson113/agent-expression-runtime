@@ -1,6 +1,6 @@
-import { unavailableUser, type Observation, type LiveTurn, type LiveEventKind, type Expressions } from '../core/live/types';
+import { unavailableUser, type Observation, type LiveTurn, type LiveEventKind, type Expressions, type HandObservation } from '../core/live/types';
 
-export type FaceSample = { hands?: { categoryName: string; score: number }[]; handsFailed?: boolean; landmarks: { x: number; y: number; z: number }[];
+export type FaceSample = { hands?: { categoryName: string; score: number }[]; handsFailed?: boolean; handObservation?: HandObservation; landmarks: { x: number; y: number; z: number }[];
   scores: Record<string, number>; matrix: number[]; durationMs: number; delegate: string };
 const clamp = (value: number, min = 0, max = 1) => Math.max(min, Math.min(max, value));
 type Cue = { type: LiveEventKind; at: number };
@@ -28,7 +28,8 @@ export class FaceObservations {
   status(camera: Observation['camera'], at: number) {
     this.streak = 0; this.previousAt = undefined; this.states.clear(); this.mouthAt = -Infinity;
     this.snapshot = { ...this.snapshot, seq: this.snapshot.seq + 1, capturedAt: at, camera,
-      user: unavailableUser(), summary: camera === 'denied' ? 'Chưa có quyền camera; trạng thái người dùng chưa biết.' : 'Camera không quan sát; trạng thái người dùng chưa biết.' };
+      hands: undefined, user: unavailableUser(), summary: camera === 'denied' ? 'Chưa có quyền camera; trạng thái người dùng chưa biết.' : 'Camera không quan sát; trạng thái người dùng chưa biết.' };
+    delete this.snapshot.hands;
     return this.snapshot;
   }
   turn(turn: LiveTurn, at: number): Cue[] {
@@ -60,7 +61,8 @@ export class FaceObservations {
       if (changes.length) { this.expressionHigh = high; events.push(...changes); }
     }
     this.snapshot = { ...this.snapshot, seq: this.snapshot.seq + 1, capturedAt: at,
-      camera: present ? 'tracking' : 'absent', user, summary: this.summary(user) };
+      camera: present ? 'tracking' : 'absent', hands: sample.handObservation, user, summary: this.summary(user) };
+    if (!sample.handObservation) delete this.snapshot.hands;
     return events;
   }
   private user(sample: FaceSample, dt: number, at: number): Observation['user'] {
