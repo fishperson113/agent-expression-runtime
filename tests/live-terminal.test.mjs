@@ -102,3 +102,51 @@ it('uses the current terminal relay inside Herdr unless a legacy pane is explici
   }) });
   expect(legacy).toEqual({ kind: 'herdr', source: { agent: 'codex', pane_id: 'legacy', cwd: '/other' } });
 });
+
+it('claims current user-turn ownership from its correlated in-progress ACK before the started notification', () => {
+  const stream = new LiveOutput(); stream.thread = 'native';
+  stream.request({ id: 101, method: 'turn/start', params: { threadId: 'native' } });
+  stream.accept({ id: 101, result: { turn: { id: 'acknowledged', status: 'inProgress' } } }, 100);
+  expect(stream.turn).toBe('acknowledged'); expect(stream.sample(100).turn).toBe('working'); expect(stream.sample(100).output).toBe(0);
+  stream.accept({ method: 'item/agentMessage/delta', params: { threadId: 'native', turnId: 'acknowledged', delta: 'reply' } }, 110);
+  const strength = stream.sample(111).output;
+  stream.accept({ method: 'turn/started', params: { threadId: 'native', turn: { id: 'acknowledged' } } }, 112);
+  expect(stream.sample(111).output).toBe(strength);
+});
+it('does not claim ownership from failed, uncorrelated, wrong-thread or terminal ACKs', () => {
+  const values = [{ id: 101, error: { code: -1 } }, { id: 999, result: { turn: { id: 'u', status: 'inProgress' } } },
+    { id: 101, result: { turn: { id: 'u', status: 'failed' } } }, { id: 101, result: { turn: { id: 'u', status: 'completed' } } },
+    { id: 101, result: { turn: { id: 'u' } } }, { id: 101, error: { code: -1 }, result: { turn: { id: 'u', status: 'inProgress' } } }];
+  for (const message of values) {
+    const stream = new LiveOutput(); stream.thread = 'native'; stream.request({ id: 101, method: 'turn/start', params: { threadId: 'native' } });
+    stream.accept(message); expect(stream.turn).toBeUndefined(); expect(stream.sample().turn).toBe('idle');
+  }
+  const stream = new LiveOutput(); stream.thread = 'native'; stream.request({ id: 101, method: 'turn/start', params: { threadId: 'other' } });
+  stream.accept({ id: 101, result: { turn: { id: 'u', status: 'inProgress' } } }); expect(stream.turn).toBeUndefined();
+});
+it('does not revive a completed turn or overwrite a new turn from late ACKs after thread selection', () => {
+  const completed = new LiveOutput(); completed.thread = 'native';
+  completed.request({ id: 101, method: 'turn/start', params: { threadId: 'native' } });
+  completed.accept({ method: 'turn/completed', params: { threadId: 'native', turn: { id: 'old', status: 'completed' } } });
+  completed.accept({ id: 101, result: { turn: { id: 'old', status: 'inProgress' } } }); expect(completed.turn).toBeUndefined();
+  completed.accept({ method: 'turn/started', params: { threadId: 'native', turn: { id: 'old' } } }); expect(completed.turn).toBeUndefined();
+  const changed = new LiveOutput(); changed.thread = 'native';
+  changed.request({ id: 101, method: 'turn/start', params: { threadId: 'native' } });
+  changed.request({ id: 102, method: 'thread/resume' }); changed.accept({ id: 102, result: { thread: { id: 'new_thread' } } });
+  changed.accept({ id: 101, result: { turn: { id: 'old', status: 'inProgress' } } }); expect(changed.thread).toBe('new_thread'); expect(changed.turn).toBeUndefined();
+  changed.request({ id: 103, method: 'turn/start', params: { threadId: 'new_thread' } });
+  changed.accept({ method: 'turn/started', params: { threadId: 'new_thread', turn: { id: 'newer' } } });
+  changed.accept({ id: 103, result: { turn: { id: 'older', status: 'inProgress' } } }); expect(changed.turn).toBe('newer');
+});
+
+it('bounds ACK and completion correlation without reopening old completed ACKs after tombstone eviction', () => {
+  const stream = new LiveOutput(); stream.thread = 'native';
+  stream.request({ id: 501, method: 'turn/start', params: { threadId: 'native' } });
+  for (let i = 0; i < 65; i++) stream.accept({ method: 'turn/completed', params: { threadId: 'native', turn: { id: `old_${i}`, status: 'completed' } } });
+  expect(stream.completed.size).toBe(64); expect(stream.turnRequests.size).toBe(0);
+  stream.accept({ id: 501, result: { turn: { id: 'old_0', status: 'inProgress' } } }); expect(stream.turn).toBeUndefined();
+  stream.request({ id: 502, method: 'turn/start', params: { threadId: 'native' } });
+  stream.accept({ id: 502, result: { turn: { id: 'fresh', status: 'inProgress' } } }); expect(stream.turn).toBe('fresh');
+  for (let i = 0; i < 65; i++) stream.request({ id: 1000 + i, method: 'turn/start', params: { threadId: 'native' } });
+  expect(stream.turnRequests.size).toBe(64);
+});

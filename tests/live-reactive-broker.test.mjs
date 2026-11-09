@@ -1,5 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { LiveReactiveBroker } from '../integrations/live-reactive-broker.mjs';
+import { LiveOutput } from '../integrations/live-output.mjs';
 import { ReactiveProviderError } from '../integrations/reactive-provider.mjs';
 
 const flush = async () => { for (let i = 0; i < 40; i++) await Promise.resolve(); };
@@ -50,7 +51,9 @@ it('awaits user revocation before forwarding unchanged input and stays busy thro
   await f.broker.poll({}); expect(f.state.busy).toBe(true);
   release(); await flush(); expect(f.order).toEqual(['barrier', 'revoked', 'forward']); expect(f.forwarded[0]).toBe(message);
   await f.broker.poll({}); expect(f.state.busy).toBe(true);
-  f.broker.event({ id: 1, result: { turn: { id: 'u' } } }); await f.broker.poll({}); expect(f.state.busy).toBe(true);
+  f.output.turn = 'u'; f.broker.event({ id: 1, result: { turn: { id: 'u', status: 'inProgress' } } });
+  expect(f.broker.turns.has('u')).toBe(true); await f.broker.poll({}); expect(f.state.busy).toBe(true);
+  f.output.turn = undefined;
   f.broker.event({ method: 'turn/completed', params: { threadId: 'native', turn: { id: 'u' } } });
   await f.broker.poll({}); expect(f.state.busy).toBe(false); f.broker.close();
 });
@@ -194,4 +197,33 @@ it('freezes the authorized payload before an asynchronous authorization wait', a
   candidate.observationWindow.request.epoch = 'changed'; candidate.observationWindow.events[0].type = 'user_left';
   release(true); await flush(); expect(received.request.epoch).toBe('e'); expect(received.events[0].type).toBe('user_arrived');
   expect(Object.isFrozen(received.request)).toBe(true); f.broker.close();
+});
+
+it('steers the acknowledged native turn before its started notification without weakening either barrier check', async () => {
+  const output = new LiveOutput(); output.thread = 'native'; const f = fixture(null, { output });
+  const start = { id: 501, method: 'turn/start', params: { threadId: 'native', input: [] } };
+  output.request(start); f.broker.client(start); await flush();
+  const acknowledged = { id: 501, result: { turn: { id: 'acknowledged', status: 'inProgress' } } };
+  output.accept(acknowledged); f.broker.event(acknowledged);
+  const steer = { id: 502, method: 'turn/steer', params: { threadId: 'native', expectedTurnId: 'acknowledged', input: [] } };
+  f.broker.client(steer); await flush();
+  expect(f.rejected).toEqual([]); expect(f.forwarded.map(message => message.method)).toEqual(['turn/start', 'turn/steer']);
+  f.broker.close();
+});
+
+it('rejects steer ownership after error, wrong-thread, completed and changed-thread native ACKs', async () => {
+  for (const reason of ['error', 'wrong_thread', 'completed', 'changed_thread']) {
+    const output = new LiveOutput(); output.thread = 'native'; const f = fixture(null, { output });
+    const start = { id: 601, method: 'turn/start', params: { threadId: reason === 'wrong_thread' ? 'other' : 'native' } };
+    output.request(start); f.broker.client(start); await flush();
+    if (reason === 'completed') {
+      const complete = { method: 'turn/completed', params: { threadId: 'native', turn: { id: 'old', status: 'completed' } } };
+      output.accept(complete); f.broker.event(complete);
+    }
+    if (reason === 'changed_thread') { output.request({ id: 602, method: 'thread/resume' }); output.accept({ id: 602, result: { thread: { id: 'new' } } }); }
+    const ack = reason === 'error' ? { id: 601, error: { code: -1 } } : { id: 601, result: { turn: { id: 'old', status: 'inProgress' } } };
+    output.accept(ack); f.broker.event(ack); expect(output.turn).toBeUndefined(); expect(f.broker.turns.size).toBe(0);
+    f.broker.client({ id: 603, method: 'turn/steer', params: { threadId: 'native', expectedTurnId: 'old' } }); await flush();
+    expect(f.rejected.at(-1).error.message).toBe('reactive_steer_invalid'); expect(f.forwarded).toHaveLength(1); f.broker.close();
+  }
 });
