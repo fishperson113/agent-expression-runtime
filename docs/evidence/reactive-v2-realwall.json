@@ -1,0 +1,256 @@
+{
+  "schemaVersion": 1,
+  "mode": "real-wall synthetic browser orchestration",
+  "testedSourceSha": "38d0b79bb97c45846579ed3c9474578da0a3a21d",
+  "testedTree": "41811b2aed42a4e768784b5bd82396f9acc48a36",
+  "releasedRuntimeSha": "07bbac210a38d5ab985e534c1bfbffa23f8d9f8b",
+  "releaseDifference": "Parallel setup/Windows increment #93; full trees differ, V2 modules unchanged",
+  "virtualClock": false,
+  "actualModelCalls": 0,
+  "fixtureHTTPRequests": 7,
+  "scenarios": [
+    {
+      "name": "v1_churn_2s",
+      "version": 1,
+      "churn": true,
+      "delay": 2000,
+      "expected": "drop",
+      "pass": true,
+      "dispatchToTerminalMs": 2068.493619,
+      "realElapsedMs": 6065.55412,
+      "applied": false,
+      "completed": false
+    },
+    {
+      "name": "v2_generic_churn_2s",
+      "version": 2,
+      "churn": true,
+      "delay": 2000,
+      "expected": "complete",
+      "pass": true,
+      "dispatchToTerminalMs": 2038.4616490000008,
+      "realElapsedMs": 5462.286649000001,
+      "applied": true,
+      "completed": true
+    },
+    {
+      "name": "v2_expression_churn_2s",
+      "version": 2,
+      "churn": true,
+      "delay": 2000,
+      "prerequisites": [
+        "expression"
+      ],
+      "expected": "drop",
+      "pass": true,
+      "dispatchToTerminalMs": 2028.8460800000012,
+      "realElapsedMs": 5332.990462,
+      "applied": false,
+      "completed": false
+    },
+    {
+      "name": "v1_late_4500",
+      "version": 1,
+      "delay": 4500,
+      "expected": "cut",
+      "pass": true,
+      "dispatchToTerminalMs": 4538.243552,
+      "realElapsedMs": 8000.462785,
+      "applied": true,
+      "completed": false
+    },
+    {
+      "name": "v2_late_4500",
+      "version": 2,
+      "delay": 4500,
+      "expected": "complete",
+      "pass": true,
+      "dispatchToTerminalMs": 4561.417897000003,
+      "realElapsedMs": 8134.268382000002,
+      "applied": true,
+      "completed": true
+    },
+    {
+      "name": "v2_expired_5200",
+      "version": 2,
+      "delay": 5200,
+      "expected": "drop",
+      "pass": true,
+      "dispatchToTerminalMs": 5219.040426,
+      "realElapsedMs": 8539.435707999997,
+      "applied": false,
+      "completed": false
+    },
+    {
+      "name": "v2_user_cancel",
+      "version": 2,
+      "delay": 500,
+      "expected": "cancel",
+      "pass": true,
+      "dispatchToTerminalMs": 531.1706310000009,
+      "realElapsedMs": 3817.436462999998,
+      "applied": true,
+      "completed": false
+    }
+  ],
+  "lineage": {
+    "completeBundles": 7,
+    "parentReferences": 92,
+    "missingParents": 0
+  },
+  "continuousV2": {
+    "sourceSha": "38d0b79bb97c45846579ed3c9474578da0a3a21d",
+    "sourceTree": "41811b2aed42a4e768784b5bd82396f9acc48a36",
+    "measurementMs": 1200207.938936,
+    "measurementStartUtc": "2026-11-09T21:23:14.649370+00:00",
+    "measurementEndUtc": "2026-11-09T21:43:14.857309+00:00",
+    "measurementHostSamples": 1201,
+    "wholeRunFakeRequests": 84,
+    "measuredCandidates": 80,
+    "measuredAuthorized": 80,
+    "measuredFakeHttpRequests": 80,
+    "measuredAccepted": 80,
+    "measuredExecutionCounts": {
+      "admitted": 80,
+      "applied": 80,
+      "frame_submitted": 80,
+      "frame_changed_proxy": 80,
+      "completed": 80
+    },
+    "measuredRequestsOverlappingExpressionChange": 79,
+    "observedMeasuredSourceEventsLowerBound": 599,
+    "sourceCoverageComplete": false,
+    "sourceSequenceGaps": [
+      {
+        "previous": 528,
+        "next": 530,
+        "previousGatewayId": 528,
+        "nextGatewayId": 529,
+        "cause": "undetermined; not an observed host polling gap"
+      }
+    ],
+    "candidateSourceRefsMissing": 0,
+    "maxDispatchesInRolling60s": 4,
+    "longestAppliedActionStartSilenceMs": 15125,
+    "hostGapMs": {
+      "n": 1201,
+      "min": 998.2564169999678,
+      "p50": 999.8085829999764,
+      "p95": 1002.4218459999538,
+      "max": 1043.1425220000092
+    },
+    "sourceIntervalMs": {
+      "n": 22924,
+      "min": 49.099999997764826,
+      "p50": 50.100000001490116,
+      "p95": 61.5,
+      "max": 836.6000000014901
+    },
+    "rafIntervalMs": {
+      "n": 36522,
+      "min": 16.5,
+      "p50": 33.300000000046566,
+      "p95": 50.09999999997672,
+      "max": 800
+    },
+    "actualBrowserVersion": "156.0.8078.79",
+    "memoryBytes": {
+      "heap": {
+        "baseline": 9947852,
+        "peak": 35306240,
+        "end": 32787840,
+        "endMinusBaseline": 22839988,
+        "linearSlopeBytesPerMinute": 665792.7148157125
+      },
+      "browserPrivate": {
+        "baseline": 337895424,
+        "peak": 389468160,
+        "end": 389124096,
+        "endMinusBaseline": 51228672,
+        "linearSlopeBytesPerMinute": 2450016.1095173317
+      },
+      "browserRss": {
+        "baseline": 634777600,
+        "peak": 693063680,
+        "end": 692744192,
+        "endMinusBaseline": 57966592,
+        "linearSlopeBytesPerMinute": 2679188.090443667
+      },
+      "rustRss": {
+        "baseline": 5423104,
+        "peak": 5521408,
+        "end": 5521408,
+        "endMinusBaseline": 98304,
+        "linearSlopeBytesPerMinute": 1604.8963342482703
+      }
+    },
+    "actualModelRequests": 0,
+    "productRecorderEnabled": false,
+    "limitations": [
+      "Synthetic .9/.1 scores through production FaceObservations; no camera or perception accuracy/human naturalness claim.",
+      "LoopbackV2 generic fixtures, prerequisites[]; no real model quality/cost evidence.",
+      "Independent host20min stream; product recorder staysOFF.",
+      "Position abs4 bound and frame/rAF/hash are declared numeric/render proxies.",
+      "No forcedGC; positive memory slope must be reported even if endpoint drops after naturalGC.",
+      "One sourceSeq gap leaves complete opportunity capture unproven; observed source counts are lower bounds.",
+      "Browser-private memory grows +51,228,672B with positive2,450,016B/min slope; this is not leak-free acceptance."
+    ],
+    "status": "complete"
+  },
+  "limitations": [
+    "Synthetic input and fixed fake output; no semantic quality, physical camera or human enjoyment claim",
+    "Frame-change proxy only; no capture-to-photon claim",
+    "Default remains V1; production provider/budget not configured"
+  ],
+  "latestMainCritical": {
+    "sourceSha": "07bbac210a38d5ab985e534c1bfbffa23f8d9f8b",
+    "tree": "5d6dc514a1521c5182630ca4d9b7bcd9b162a535",
+    "browserVersion": "141.0.7390.37",
+    "cases": [
+      {
+        "name": "v2_hand_motion_2s",
+        "pass": true,
+        "applied": true,
+        "completed": true,
+        "dispatchToResponseMs": 2066.225525
+      },
+      {
+        "name": "v2_hand_absence_return",
+        "pass": true,
+        "applied": false,
+        "completed": false,
+        "dispatchToResponseMs": 2025.9222910000008
+      },
+      {
+        "name": "v2_face_withdraw",
+        "pass": true,
+        "applied": false,
+        "completed": false,
+        "dispatchToResponseMs": 2011.8020159999996
+      },
+      {
+        "name": "v2_active_source_denied",
+        "pass": true,
+        "applied": true,
+        "completed": false,
+        "dispatchToResponseMs": 513.0364719999998
+      },
+      {
+        "name": "v2_unknown_known_unknown",
+        "pass": true,
+        "applied": false,
+        "completed": false,
+        "dispatchToResponseMs": 2012.0872610000006
+      }
+    ],
+    "limitation": "Denied-source cancellation also changes presence; not isolated source-health-only evidence. Current after-counters are not exposed."
+  },
+  "latestMainChecks": {
+    "sourceSha": "07bbac210a38d5ab985e534c1bfbffa23f8d9f8b",
+    "testFiles": 98,
+    "passed": 664,
+    "skipped": 0,
+    "durationSeconds": 229.92,
+    "buildPassed": true
+  }
+}
