@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "kind": "synthetic",
+  "license": "CC0-1.0",
+  "video": "synthetic",
+  "frameCount": 4,
+  "fps": 30,
+  "firstFrame": 1,
+  "endInclusive": true,
+  "timeline": "ipn-hands-fps30",
+  "annotations": {
+    "path": "annotations.txt",
+    "sha256": "a0d0456b319e6d2ff77a4eccc5ed8791b3ee6b8fe0f51436f739dad8d3b40d1a"
+  },
+  "landmarks": {
+    "path": "landmarks.json",
+    "sha256": "b1653ede91edaa93051512f0ca7b633590288609ef1b9e670c58a03d437abdbc"
+  }
+}
