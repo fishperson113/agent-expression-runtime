@@ -260,3 +260,22 @@ pass is claimed. One real `gpt-6.1-sol` synthetic event turn started/completed a
 successfully called `observe`, with zero approval requests or camera/audio/image
 capture. It chose no `express` call: model-authored reaction animation remains an
 open acceptance check. Conservative cumulative model-test usage is 97/120.
+
+### Liên kết chuyển động bàn tay
+
+Agent có thể tự khai báo `bind` với `hand.primary.position.x` hoặc
+`hand.primary.position.y` qua DSL hiện có. Hai tín hiệu lấy cổ tay của track chính
+đang nhìn thấy, ánh xạ tọa độ ảnh chưa mirror bằng `1 - 2 * coordinate`, giới hạn
+trong `[-1,1]` như `user.position`. Bàn tay vẫn dùng được khi không thấy mặt.
+Không có hiệu ứng cử chỉ mặc định: agent chọn part, gain, clamp và lease như các
+binding khác; local compositor cập nhật tọa độ mới mà không đợi model.
+
+Primary đang mất trong cửa sổ hysteresis, tracking lost/error, camera tắt hoặc
+snapshot stale trả về signal chưa biết (`null`), để compositor chuyển nhẹ về
+neutral theo cơ chế hiện có. LiveBody bỏ snapshot quá 1.500 ms trước compositing.
+Track ID chỉ là liên tục hình học ngắn hạn, không phải nhận dạng người; qua giao
+chéo/che khuất mơ hồ hệ thống có thể cấp ID mới.
+
+`hands.entities[].confidence` là điểm phân loại handedness do MediaPipe trả về,
+không phải độ tin cậy của landmark, track hay ý nghĩa cử chỉ. Không dùng điểm này
+để suy ra rằng một chuyển động đã được hiểu chắc chắn.

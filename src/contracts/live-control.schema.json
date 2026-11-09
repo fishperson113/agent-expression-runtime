@@ -19,7 +19,7 @@
       "releaseMs": { "type": "integer", "minimum": 20, "maximum": 10000 } } },
     "bind": { "type": "object", "additionalProperties": false, "required": ["type", "id", "signal", "target", "gain", "offset", "clamp", "smoothMs"], "properties": {
       "type": { "const": "bind" }, "id": { "type": "string", "pattern": "^[a-zA-Z0-9_-]{1,32}$" },
-      "signal": { "enum": ["agent.output", "user.head.yaw", "user.head.pitch", "user.position.x", "user.position.y", "user.expression.smile", "user.expression.browRaise", "user.expression.eyesClosed", "user.expression.mouthOpen", "user.mouthMoving"] },
+      "signal": { "enum": ["agent.output", "user.head.yaw", "user.head.pitch", "user.position.x", "user.position.y", "hand.primary.position.x", "hand.primary.position.y", "user.expression.smile", "user.expression.browRaise", "user.expression.eyesClosed", "user.expression.mouthOpen", "user.mouthMoving"] },
       "target": { "$ref": "#/$defs/target" }, "gain": { "type": "number", "minimum": -4, "maximum": 4 }, "offset": { "type": "number", "minimum": -0.6, "maximum": 2 },
       "clamp": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "number", "minimum": -0.6, "maximum": 2 } },
       "smoothMs": { "type": "number", "minimum": 40, "maximum": 2000 } } },
