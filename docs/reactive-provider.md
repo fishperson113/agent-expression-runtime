@@ -1,8 +1,10 @@
 # Data-only reactive Responses adapter
 
-This adapter is not wired into Live. It does not enable inference or resolve
-PR #51's autonomous acceptance blocker. Current tests use injected responses and
-a loopback fake HTTP server; they consume no production model budget.
+Live terminal wiring uses this separate data-only adapter for explicitly configured
+reactive inference; it defaults off. Camera decisions never enter the Native coding
+thread. This contains the shared-thread capability route; the historical unrelated
+output's cause remains unproven, and real-provider semantic acceptance is pending.
+Tests use injected responses and loopback fake HTTP without production model budget.
 
 `reactiveProviderConfig(env)` defaults off, even if OPENAI_API_KEY or a planner
 backend exists. Explicit FISCH_REACTIVE_BACKEND=responses, FISCH_REACTIVE_MODEL

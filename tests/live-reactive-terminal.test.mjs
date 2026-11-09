@@ -9,7 +9,7 @@ import { createLiveReactiveProvider } from '../integrations/live-reactive-provid
 
 const fakeServer = `let b='',seen=[];const send=x=>process.stdout.write(JSON.stringify(x)+'\\n');process.stdin.on('data',c=>{b+=c;let n;while((n=b.indexOf('\\n'))>=0){const m=JSON.parse(b.slice(0,n));b=b.slice(n+1);if(m.method==='test/snapshot'){send({id:m.id,result:{seen,keys:Object.keys(process.env).filter(k=>k.startsWith('FISCH_REACTIVE_'))}});continue}seen.push(m);let result={};if(m.method==='thread/start')result={thread:{id:'native'}};if(m.method==='turn/start')result={turn:{id:'user',status:'inProgress'}};send({id:m.id,result});if(m.method==='turn/start')send({method:'turn/started',params:{threadId:'native',turn:{id:'user'}}});if(m.method==='turn/interrupt')send({method:'turn/completed',params:{threadId:'native',turn:{id:'user',status:'interrupted'}}})}});`;
 const validWindow = revision => ({ schemaVersion: 1, request: { schemaVersion: 1, sessionId: 's', epoch: 'e', requestId: 'camera',
-  intentRevision: revision, deadline: 100000, requiredTrackIds: [] }, events: [{ id: 1, type: 'user_arrived', at: 100 }],
+  intentRevision: revision, presenceRevision: 1, deadline: 100000, requiredTrackIds: [] }, events: [{ id: 1, type: 'user_arrived', at: 100 }],
   observations: [{ v: 1, sessionId: 's', seq: 1, capturedAt: 100, camera: 'tracking', turn: 'idle', summary: 'LOCAL_ONLY_SUMMARY',
     user: { present: false, quality: { score: 0, basis: 'unavailable' }, position: null, head: null, facingScreen: null,
       expression: null, mouthMoving: null } }] });
