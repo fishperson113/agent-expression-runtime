@@ -477,3 +477,35 @@ Isolated final gateway/browser functional check also passes macro-after-cancel,
 invalid rejection, synthetic look/cooldown and reload with zero page errors and
 camera off. Cold observe 45.14 ms, warm p95 4.52 ms, admission p95 24.38 ms;
 these remain functional samples, not animation completion or sustained latency.
+
+
+## Checkpoint 16 — final stable performance verification
+
+PR #37 merged as f8ca747 after every current-head CI job passed and the frozen
+fde1444 runtime completed 1,800.143 seconds plus 60-second warm-up. Sixty samples,
+15 topology/cancel/resize cycles, 18,601 typed synthetic observations; zero page
+errors, unexpected frames or browser off-loopback/blocked requests. GC-normalized
+private growth 11,149,312 bytes and heap growth 1,026,328 bytes: stability/private
+growth pass. No frontend changes, browser-heavy tests or model turns overlapped.
+
+Final rolling FPS range 35.22–60.14, p95 range 16.8–42.3 ms still miss sustained
+targets. Median long-run metrics are close to baseline; the short overlay sample
+does not establish sustained FPS improvement. The smaller allocation workload
+and correct software delegate selection are retained without claiming full
+performance acceptance. Full baseline/final vectors are in
+[cloud-final-performance.json](evidence/cloud-final-performance.json).
+
+One final no-model detector probe on the committed runtime used Chromium's fake
+no-face video device: GPU requested, actual CPU, 13.09 Hz (prior GPU SwiftShader
+5.60 Hz); 24 Hz remains missed. Render sample 33.88 FPS, p95 46.3 ms. Zero audio
+tracks, persisted pixels, page errors or browser egress; virtual capture stopped
+and owned resources closed. This does not test physical camera, tracking accuracy
+or native GPU performance. No additional model budget was consumed.
+
+Model reservations remain 50/120, hard deadline 2026-11-09 06:17:35 UTC. The
+completed ordinary-conversation holdout remains 20/20 admitted/applied with frame
+proxies, independently of unscored semantic/human gates. Actual TUI inference is
+still blocked at project trust; no trust/security change was authorized or made.
+Physical-camera accuracy/throughput, native Windows GPU/Herdr, native hook trust/
+context, Vietnamese /voice and human recognition/distraction remain pending.
+No owner Windows machine, real camera/microphone or policy workaround was used.
