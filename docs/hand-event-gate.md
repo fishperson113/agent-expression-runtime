@@ -1,9 +1,10 @@
-# Temporal hand event gate (inert foundation)
+# Temporal primary-hand events
 
-`HandEventGate` is a pure primary-hand geometry extractor. It is not connected to
-camera publication, reactive dispatch, Node provider input, Rust events or recorder
-records yet. Hand-only observations can therefore still have no automatic model
-turn in the current composition. No gesture class selects an effect.
+`HandEventGate` is a pure primary-hand geometry extractor. The Live composition
+connects it to new perception samples, one face/hand source sequence, the bounded
+reactive scheduler and existing versioned wire/recorder contracts. Hand-only input
+can trigger an optional observer decision without a face event. No gesture class
+selects an effect; model output still passes causal validation and the DSL boundary.
 
 The gate uses stable primary track IDs, injected monotonic milliseconds for
 velocity/debounce, and observation wall timestamps for event metadata. Appearance
@@ -20,12 +21,27 @@ Outputs carry `eventVersion:1`, track ID, current/evidence-start observation
 sequence, wall time, source generation and semantic state revision. They deliberately
 have no event ID: the composition must allocate face/hand event IDs from one source
 sequence when wired. Same continuing-motion frames do not change revision. Primary
-visibility changes revision immediately, before appearance/loss debounce; a future
-absence prerequisite must compare it so a returned hand invalidates a lost-hand
-reaction before its next appearance event. This module alone grants no authority.
+visibility changes revision immediately, before appearance/loss debounce; the live
+absence prerequisite compares it so a returned hand invalidates a lost-hand
+reaction before its next appearance event. The extractor alone grants no authority.
 
-Follow-up work must version and validate the event shape across TS, Rust, Node and
-recorder; preserve source sequence separately from Rust cursor; add causal absence
-prerequisites to request/lease validation; then connect one global allocator and
-bounded reactive keys. Existing face events remain compatible; unknown versions
-must reject rather than silently losing track or lineage metadata.
+The helper advertises hand-event contract version 1 via `configureReactive`.
+Unknown/omitted versions keep the hand producer off while legacy face windows
+remain compatible. Hand production also requires provider availability and the
+existing reaction opt-in; polling the same version does not reset evidence.
+Only perception samples advance the gate. Turn-only updates allocate source IDs
+without becoming fake hand evidence. Source resets revoke obsolete hand candidates.
+
+Requests containing hand events capture `handReadSet`; authorization, admission
+and execution compare its revision, source generation and primary role. A lost-hand
+candidate is eligible only while the primary is null. Handover to another hand
+supersedes the global hand-presence candidate, preserving the old event in the
+trace without bundling a false absence prerequisite. Continuing same-track motion
+frames remain compatible. Semantic boundaries still revoke conservatively; the
+five-second deadline, cooldown and rolling quota are unchanged. This is a primary
+role read-set, not general per-field semantic inference or identity recognition.
+
+Cloud fixtures expose `hand-only` (valid hand tracking without a face) and
+`hand-lost` (valid tracking result with no hand), separately from unavailable
+camera/error fixtures. These are synthetic no-inference inputs, not physical
+camera or gesture-quality evidence.
