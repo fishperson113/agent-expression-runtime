@@ -339,3 +339,10 @@ The failed h01 screenshot is body-only, synthetic/camera-off, and stays ignored
 under .runtime/live-overnight. No physical camera, microphone or owner Windows
 machine was used. Previously missed render/vision targets and manual gates remain
 open; no runtime change or new soak is justified by this authentication failure.
+
+Fresh validation: 248/248 JavaScript tests across 48 files passed after installing
+Playwright Chromium in a workspace-owned cache; the initial run without that
+browser had eight infrastructure failures and is not claimed as passing. Locked
+gateway Rust tests passed (16/16), frontend TypeScript/Vite build, architecture,
+strict my-harness and whitespace checks passed. The existing large-bundle warning
+remains. R10/R11 transcript verification remains unsupported in Codex.
