@@ -6,6 +6,7 @@ import { FaceObservations, type FaceSample } from './observation';
 import { VisionCamera } from './vision';
 import { LiveBridge } from './bridge';
 import type { LiveEventKind } from '../core/live/types';
+import { ReactiveSession } from '../core/live/reactive-session';
 import { drawLandmarkOverlay } from './landmark-overlay';
 
 mountLive(element('app'));
@@ -14,9 +15,13 @@ const body = new LiveBody(element<HTMLCanvasElement>('body'), text => { element(
 const hands = new HandGestures();
 const observations = new FaceObservations(crypto.randomUUID());
 const cameraTransitions: { status: string; source: string; at: number }[] = [];
-const bridge = new LiveBridge(body, observations);
+const bridge = new LiveBridge(body, observations, () => resetReactive(), () => observeReactive());
+const reactive = new ReactiveSession({ now: () => performance.now(), wallNow: () => Date.now(), epoch: () => body.scheduler.epoch,
+  id: () => crypto.randomUUID(), canAdmit: () => !document.hidden && body.canReactive(),
+  admit: (compiled, owner) => body.admitReactive(compiled, owner), cancel: (owner, reason) => body.cancelReactive(owner, reason) });
+body.attachReactive(reactive);
 let lastActivity = 'idle';
-let semanticSequence = 0, semanticGeneration = 0;
+let semanticSequence = 0;
 const semanticEvents: { type: LiveEventKind; at: number; seq: number }[] = [];
 const activityLog: { text: string; at: number }[] = [];
 function logActivity(text: string) {
@@ -29,27 +34,30 @@ function logActivity(text: string) {
   }));
 }
 Object.assign(window, { fischLive: { pair: (base: string, token: string) => bridge.connect(base, token),
-  selectThread: () => { hands.reset(); semanticGeneration++; semanticEvents.length = 0; logActivity('Đã chọn phiên Codex.'); return bridge.cancel(); },
+  selectThread: () => { hands.reset(); resetReactive(); logActivity('Đã chọn phiên Codex.'); return bridge.cancel(); },
   logActivity,
-  reactivity: () => ({ sessionId: observations.snapshot.sessionId + ':' + semanticGeneration, enabled: element<HTMLInputElement>('enable-reactivity').checked, stopped,
-    camera: observations.snapshot.camera, capturedAt: observations.snapshot.capturedAt, events: [...semanticEvents] }),
+  configureReactive: (available: boolean) => configureReactive(available),
+  setReactiveUserBusy: (busy: boolean) => reactive.setUserBusy(busy),
+  reactiveUserIntent: () => { semanticEvents.length = 0; body.prepareUserMutation(); },
+  takeReactiveRequest: () => reactive.takeRequest(), authorizeReactiveRequest: (id: string) => reactive.authorize(id),
+  deliverReactiveDecision: (id: string, data: unknown) => reactive.deliver(id, data), failReactiveDecision: (id: string) => reactive.fail(id),
+  reactiveStatus: () => reactive.status(),
+  reactivity: () => ({ sessionId: 'legacy-reactivity-disabled', enabled: false, stopped: true,
+    camera: 'stopped', capturedAt: Date.now(), events: [] }),
   activity: (value: { turn: 'idle' | 'working' | 'waiting' | 'interrupted'; output: number; quality: string }) => {
     if (stopped) return;
-    const reactiveAvailable = value.quality === 'codex-agent-message-delta';
-    element<HTMLInputElement>('enable-reactivity').disabled = !reactiveAvailable;
-    element('reactivity-status').textContent = reactiveAvailable ? 'Codex đã kết nối; phản ứng camera là tùy chọn.' : 'Phản ứng Codex cần phiên terminal Live kết nối.';
-    if (!reactiveAvailable) element<HTMLInputElement>('enable-reactivity').checked = false;
     if (value.turn === 'interrupted' && lastActivity !== 'interrupted') { hands.reset(); void bridge.cancel(); }
     if (lastActivity !== value.turn) logActivity(({ idle: 'Lượt Codex đã kết thúc.', working: 'Codex bắt đầu xử lý.',
       waiting: 'Codex đang chờ bạn.', interrupted: 'Lượt Codex đã bị ngắt.' })[value.turn]);
     lastActivity = value.turn;
     body.output = value.output; body.activity(value.turn); events(observations.turn(value.turn, Date.now()));
     element('activity').textContent = ({ idle: 'Đang chờ', working: value.output > 0 ? 'Đang trả lời' : 'Đang xử lý', waiting: 'Chờ bạn', interrupted: 'Đã ngắt' })[value.turn];
-  }, fixture: (mode: string) => fixture(mode), metrics: () => ({ ...body.metrics, syntheticFixture: synthetic,
+  }, fixture: (mode: string, handX?: number) => fixture(mode, handX), metrics: () => ({ ...body.metrics, syntheticFixture: synthetic,
     camera: observations.snapshot.camera, cameraSeq: observations.snapshot.seq,
     cameraStatus: element('camera-status').textContent, cameraActive: !!element<HTMLVideoElement>('camera').srcObject,
     cameraTransitions, stopped,
     simulatedParticles: body.scheduler.state.particlePositions?.length ? body.scheduler.state.particlePositions.length / 3 : 2000 }), event: (type: string) => {
+    if (type === 'user_message') { semanticEvents.length = 0; reactive.userIntent(); }
     const turn = type === 'user_message' ? 'working' : type === 'needs_user' ? 'waiting' : type === 'interrupted' ? 'interrupted' : 'idle';
     body.activity(turn); events(observations.turn(turn, Date.now()));
     if (type === 'interrupted') void bridge.cancel();
@@ -68,13 +76,14 @@ function events(values: { type: LiveEventKind; at: number }[]) {
       logActivity('Quan sát local: ' + event.type);
     }
   }
+  observeReactive();
   recent.splice(20);
   element('events').replaceChildren(...recent.map(event => { const item = document.createElement('li');
     item.textContent = new Date(event.at).toLocaleTimeString('vi-VN') + ' / ' + event.type; return item; }));
 }
 function sample(value: FaceSample) {
   sampleCount++; inferenceMs += value.durationMs;
-  events(observations.update(value, Date.now())); body.observe(observations.snapshot);
+  events(observations.update(value, Date.now()));
   const elapsed = (performance.now() - sampleAt) / 1000;
   element('vision-metrics').textContent = `${value.delegate} / ${(sampleCount / elapsed).toFixed(1)} mẫu/s / ${(inferenceMs / sampleCount).toFixed(0)} ms inference`;
   element('summary').textContent = observations.snapshot.summary;
@@ -90,13 +99,16 @@ function sample(value: FaceSample) {
 function drawLandmarks(value: FaceSample) {
   drawLandmarkOverlay(element<HTMLCanvasElement>('landmarks'), value.landmarks, element<HTMLInputElement>('show-landmarks').checked);
 }
-function fixture(mode: string) {
-  if (!synthetic || stopped || !['present', 'absent', 'denied', 'error', 'stale'].includes(mode)) throw Error('synthetic_fixture_unavailable');
-  if (mode === 'present' || mode === 'absent') sample({
-    landmarks: mode === 'present' ? Array.from({ length: 478 }, () => ({ x: 0.5, y: 0.5, z: 0 })) : [],
+function fixture(mode: string, handX = 0.25) {
+  if (!synthetic || stopped || !['present', 'present-hand', 'absent', 'denied', 'error', 'stale'].includes(mode) || !Number.isFinite(handX) || handX < 0 || handX > 1) throw Error('synthetic_fixture_unavailable');
+  if (mode === 'present' || mode === 'present-hand' || mode === 'absent') sample({
+    ...(mode === 'present-hand' ? { handObservation: { v: 1 as const, trackingState: 'tracked' as const, coordinateSpace: 'image-normalized' as const,
+      landmarkSchema: 'mediapipe-hand-21' as const, zMeaning: 'wrist-relative-image-width' as const, mirrored: false as const, sourceWidth: 640, sourceHeight: 480,
+      entities: [{ detectionId: 0, handedness: 'Left' as const, confidence: 0.9, landmarks: Array.from({ length: 21 }, () => ({ x: handX, y: 0.5, z: 0 })) }] } } : {}),
+    landmarks: mode !== 'absent' ? Array.from({ length: 478 }, () => ({ x: 0.5, y: 0.5, z: 0 })) : [],
     scores: { mouthSmileLeft: 0.4, mouthSmileRight: 0.4 }, matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
     durationMs: 0, delegate: 'SYNTHETIC / no inference' });
-  else { observations.status(mode as 'denied' | 'error' | 'stale', Date.now() - (mode === 'stale' ? 2000 : 0)); body.observe(observations.snapshot); }
+  else { observations.status(mode as 'denied' | 'error' | 'stale', Date.now() - (mode === 'stale' ? 2000 : 0)); observeReactive(); }
   element('camera-status').textContent = 'Dữ liệu tổng hợp / không camera';
 }
 function cameraStatus(status: string, source = 'vision') {
@@ -113,11 +125,11 @@ function cameraStatus(status: string, source = 'vision') {
   if (!status.startsWith('ready-')) hands.reset();
   if (!active) { hands.reset(); element('hand-status').textContent = 'Cử chỉ tay đang tắt'; }
   element('camera-placeholder').hidden = active;
-  if (!status.startsWith('ready-')) { observations.status(status === 'starting' || status === 'recovering-CPU' ? 'starting' : status === 'denied' ? 'denied' : status === 'stopped' ? 'stopped' : 'error', Date.now()); body.observe(observations.snapshot); }
+  if (!status.startsWith('ready-')) { observations.status(status === 'starting' || status === 'recovering-CPU' ? 'starting' : status === 'denied' ? 'denied' : status === 'stopped' ? 'stopped' : 'error', Date.now()); observeReactive(); }
 }
 element('enable-reactivity').onchange = () => {
-  semanticEvents.length = 0;
-  logActivity(element<HTMLInputElement>('enable-reactivity').checked ? 'Đã bật phản ứng Codex từ quan sát local.' : 'Đã tắt phản ứng Codex từ camera.');
+  semanticEvents.length = 0; reactive.enable(element<HTMLInputElement>('enable-reactivity').checked); observeReactive();
+  logActivity(element<HTMLInputElement>('enable-reactivity').checked ? 'Đã bật bộ quyết định từ quan sát local.' : 'Đã tắt bộ quyết định từ camera.');
 };
 element('enable-hands').onchange = () => { camera.hands = element<HTMLInputElement>('enable-hands').checked; hands.reset(); };
 element('fullscreen').onclick = () => { void element('body').parentElement!.requestFullscreen().catch(() => { element('fault').textContent = 'Trình duyệt chưa cho phép toàn màn hình.'; }); };
@@ -129,9 +141,9 @@ if (synthetic) {
   element('camera-status').textContent = 'Dữ liệu tổng hợp / không camera';
 }
 element('camera-stop').onclick = () => { camera.stop(); cameraStatus('stopped', 'button'); };
-element('cancel').onclick = () => { hands.reset(); semanticGeneration++; semanticEvents.length = 0; logActivity('Đã dừng biểu đạt.'); void bridge.cancel(); };
+element('cancel').onclick = () => { hands.reset(); resetReactive(); logActivity('Đã dừng biểu đạt.'); void bridge.cancel(); };
 element<HTMLSelectElement>('motion').value = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'reduced' : 'normal';
-element('motion').onchange = () => body.motion(element<HTMLSelectElement>('motion').value as 'normal' | 'reduced' | 'off');
+element('motion').onchange = () => { if (element<HTMLSelectElement>('motion').value === 'off') resetReactive(); body.motion(element<HTMLSelectElement>('motion').value as 'normal' | 'reduced' | 'off'); };
 body.motion(element<HTMLSelectElement>('motion').value as 'normal' | 'reduced');
 const timer = setInterval(() => {
   element('world-state').textContent = JSON.stringify(observations.snapshot, null, 2);
@@ -140,10 +152,24 @@ const timer = setInterval(() => {
   element('render-metrics').textContent = `${metrics.particles.toLocaleString()} hạt / ${metrics.meanFps.toFixed(0)} FPS / p95 ${metrics.frameP95.toFixed(1)} ms`;
 }, 500);
 function stop() {
-  if (stopped) return; logActivity('Đã dừng phiên Live.'); stopped = true; semanticEvents.length = 0;
+  if (stopped) return; logActivity('Đã dừng phiên Live.'); resetReactive(); reactive.configure(false); stopped = true;
   camera.stop(); hands.reset(); cameraStatus('stopped', 'shutdown'); clearInterval(timer); bridge.stop(); body.dispose();
   element<HTMLButtonElement>('camera-start').disabled = true; element('connection').textContent = 'Đã dừng phiên Live';
   void (window as any).fischLiveStop?.();
 }
 element('stop-all').onclick = stop;
 window.addEventListener('pagehide', stop);
+
+function observeReactive() { body.observe(observations.snapshot); reactive.observe(observations.snapshot, semanticEvents); }
+function resetReactive() { reactive.reset(); semanticEvents.length = 0; }
+function configureReactive(available: boolean) {
+  const enabled = available === true && !stopped;
+  reactive.configure(enabled); element<HTMLInputElement>('enable-reactivity').disabled = !enabled;
+  if (!enabled) element<HTMLInputElement>('enable-reactivity').checked = false;
+  element('reactivity-status').textContent = !enabled ? 'Phản ứng tự động chưa có bộ quyết định được kết nối.'
+    : body.userSceneOwned ? 'Đang giữ hình bạn tạo; phản ứng tự động tạm nhường quyền.' : 'Bộ quyết định đã kết nối; phản ứng camera là tùy chọn.';
+}
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) return;
+  resetReactive(); camera.stop(); cameraStatus('stopped', 'hidden');
+});

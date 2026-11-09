@@ -73,11 +73,13 @@ it('shows a large Fisch panel beside a narrower camera and activity panel with c
     expect(await page.locator('#enable-reactivity').getAttribute('aria-describedby')).toBe('reactivity-privacy');
     expect(await page.locator('#enable-reactivity').isDisabled()).toBe(true);
     await page.evaluate(() => window.fischLive.activity({ turn: 'idle', output: 0, quality: 'codex-agent-message-delta' }));
-    await page.locator('#enable-reactivity').check(); await page.locator('#enable-reactivity').uncheck();
-    expect(await page.evaluate(() => window.fischLive.reactivity().events)).toEqual([]);
-    const session = await page.evaluate(() => window.fischLive.reactivity().sessionId);
+    expect(await page.locator('#enable-reactivity').isDisabled()).toBe(true);
+    await page.evaluate(() => window.fischLive.configureReactive(true));
+    await page.locator('#enable-reactivity').check();
+    expect(await page.evaluate(() => window.fischLive.reactivity())).toMatchObject({ enabled: false, stopped: true, camera: 'stopped', events: [] });
+    await page.locator('#enable-reactivity').uncheck();
     await page.locator('#cancel').click();
-    expect(await page.evaluate(() => window.fischLive.reactivity().sessionId)).not.toBe(session);
+    expect(await page.evaluate(() => window.fischLive.reactiveStatus())).toMatchObject({ pending: 0, owner: null, sourceValid: false });
     await page.evaluate(() => window.fischLive.activity({ turn: 'working', output: 0, quality: 'fixture' }));
     await page.waitForTimeout(600);
     const logs = await page.locator('#agent-activity li').count();

@@ -9,7 +9,12 @@ import type { BodyState } from '../core/ports';
 import type { PresenceState } from '../core/runtime/presence';
 import type { Observation, LiveEventKind } from '../core/live/types';
 import { faceProgram, faceWrites, isFace } from '../core/live/face';
-import { SceneTrace } from '../core/live/trace';
+import type { LiveCompiled } from '../core/live/control-types';
+import type { ReactiveOwnership } from '../core/live/decision-types';
+import type { ReactiveLease, LeaseRevokeReason } from '../core/live/reactive-lease';
+import type { ReactiveSession } from '../core/live/reactive-session';
+import { SceneTrace, type TraceAttribution } from '../core/live/trace';
+import type { Compiled } from '../core/runtime/ir';
 
 export class LiveBody {
   readonly renderer: ThreeRenderer;
@@ -29,13 +34,20 @@ export class LiveBody {
   private attentionUntil = 0;
   private faceBlend = new Map<string, number>();
   private faceAt = performance.now();
+  private reactive?: ReactiveSession;
+  private reactiveOwner?: ReactiveOwnership;
+  private userLeaseUntil = 0;
+  private userGeometryLocked = false;
+  private origins = new WeakMap<Compiled, TraceAttribution>();
   output = 0;
   feedback?: (event: { epoch: string; seq: number; status: string }) => void;
   constructor(private canvas: HTMLCanvasElement, private status: (text: string) => void) {
     this.renderer = new ThreeRenderer(canvas, status); this.renderer.quality(2000);
     this.scheduler = new Scheduler({ now: () => performance.now() }, { apply: (state, now) => this.apply(state, now),
       dispose: () => this.renderer.dispose() }, { count: status }, (status, ir) => {
-        this.trace.record(ir.seq, status, performance.now(), undefined, ir.epoch); this.feedback?.({ status, epoch: ir.epoch, seq: ir.seq });
+        const source = this.origins.get(ir) ?? { origin: 'ambient' as const };
+        this.trace.record(ir.seq, status, performance.now(), undefined, ir.epoch, source);
+        if (source.origin === 'native') this.feedback?.({ status, epoch: ir.epoch, seq: ir.seq });
       }, 2000);
     this.defaults.install(validateConfiguration(defaults), performance.now());
     this.restFace(0);
@@ -46,6 +58,7 @@ export class LiveBody {
   private frame = () => {
     const now = performance.now(); this.samples.push(now - this.previous); this.previous = now;
     if (this.samples.length > 120) this.samples.shift();
+    this.reactive?.tick();
     if (!document.hidden && this.controls.mode !== 'off') this.scheduler.tick();
     this.frameId = requestAnimationFrame(this.frame);
   };
@@ -78,38 +91,85 @@ export class LiveBody {
     return new Set((state.ownedProperties ?? []).flatMap(property => (mapping[property] ?? []).map(prop => 'body:' + prop)));
   }
   admit(record: any) {
+    this.prepareUserMutation();
     const at = performance.now();
-    this.trace.record(record?.seq, 'received', at, undefined, record?.epoch);
+    this.trace.record(record?.seq, 'received', at, undefined, record?.epoch, { origin: 'native' });
     try {
       const compiled = record.kind === 'define' ? { program: this.compiler.compiler.prepareDefinition(record, at) } : this.compiler.compile(record, at);
-      if (compiled.configuration) {
-        const shapes = compiled.program.kind === 'program' ? compiled.program.ops.filter(op => op.property === 'shape') : [];
-        const last = shapes.at(-1)?.value;
-        const ids = new Set(last === undefined ? this.scheduler.state.particleParts?.map(part => part.id) : typeof last === 'object' ? last.parts.map(part => part.id) : []);
-        for (const part of referencedParts(compiled.configuration)) if (!ids.has(part)) throw Error('live_missing_part_' + part);
-      }
-      const result = this.scheduler.admit(compiled.program), accepted = ['accepted', 'state', 'defined'].includes(result);
-      if (compiled.program.kind === 'define' && compiled.program.draft !== undefined) this.compiler.compiler.settleDefinition(compiled.program.draft, accepted);
-      if (accepted && compiled.configuration) this.controls.install(compiled.configuration, at);
-      this.trace.record(record.seq, accepted ? 'admitted' : 'rejected', performance.now(), accepted ? undefined : result, record.epoch);
+      const result = this.admitCompiled(compiled, at), accepted = ['accepted', 'state', 'defined'].includes(result);
+      if (accepted) { this.userLeaseUntil = Math.max(this.userLeaseUntil, this.leaseUntil(compiled, at)); this.userGeometry(compiled, at); }
+      this.trace.record(record.seq, accepted ? 'admitted' : 'rejected', performance.now(), accepted ? undefined : result, record.epoch, { origin: 'native' });
       this.status(accepted ? 'Biểu đạt đã được nhận.' : result);
       return { status: accepted ? 'accepted' : 'rejected', code: accepted ? undefined : result, latencyMs: performance.now() - at };
     } catch (error) {
       const code = error instanceof Error ? error.message : 'live_compile_failed';
-      this.trace.record(record?.seq, 'rejected', performance.now(), code, record?.epoch);
+      this.trace.record(record?.seq, 'rejected', performance.now(), code, record?.epoch, { origin: 'native' });
       return { status: 'rejected', code };
     }
   }
+  attachReactive(session: ReactiveSession) { this.reactive = session; }
+  prepareUserMutation() { this.reactive?.userIntent(); }
+  get userSceneOwned() { return this.userGeometryLocked; }
+  canReactive() { return !this.userGeometryLocked && this.controls.mode !== 'off' && performance.now() >= this.userLeaseUntil && !this.scheduler.busy; }
+  private userGeometry(compiled: LiveCompiled, at: number) {
+    if (compiled.program.kind !== 'program') return;
+    const shape = compiled.program.ops.filter(op => op.property === 'shape').at(-1)?.value;
+    if (shape === undefined) return;
+    const resting = typeof shape === 'object' && isFace(shape.parts);
+    this.userGeometryLocked = !resting;
+    if (resting && compiled.configuration && !compiled.configuration.controls.length && !compiled.configuration.poses.length)
+      this.userLeaseUntil = at + compiled.program.duration;
+  }
+  private leaseUntil(compiled: LiveCompiled, at: number) {
+    const program = compiled.program, duration = program.kind === 'define' ? 0 : program.duration;
+    const start = program.kind === 'program' && program.policy === 'append' ? Math.max(at, this.userLeaseUntil) : at;
+    return Math.max(start + duration, at + (compiled.configuration?.lifetimeMs ?? 0));
+  }
+  private validateParts(compiled: LiveCompiled) {
+    if (compiled.configuration) {
+      const shapes = compiled.program.kind === 'program' ? compiled.program.ops.filter(op => op.property === 'shape') : [];
+      const last = shapes.at(-1)?.value;
+      const ids = new Set(last === undefined ? this.scheduler.state.particleParts?.map(part => part.id) : typeof last === 'object' ? last.parts.map(part => part.id) : []);
+      for (const part of referencedParts(compiled.configuration)) if (!ids.has(part)) throw Error('live_missing_part_' + part);
+    }
+  }
+  private admitCompiled(compiled: LiveCompiled, at: number, source: TraceAttribution = { origin: 'native' }) {
+    this.validateParts(compiled);
+    this.origins.set(compiled.program, source);
+    const result = this.scheduler.admit(compiled.program), accepted = ['accepted', 'state', 'defined'].includes(result);
+    if (compiled.program.kind === 'define' && compiled.program.draft !== undefined) this.compiler.compiler.settleDefinition(compiled.program.draft, accepted);
+    if (accepted && compiled.configuration) this.controls.install(compiled.configuration, at);
+    return result;
+  }
+  admitReactive(compiled: LiveCompiled, owner: ReactiveOwnership) {
+    if (!this.canReactive() || compiled.program.kind !== 'program' || compiled.program.epoch !== this.scheduler.epoch) throw Error('reactive_admission_rejected');
+    this.validateParts(compiled);
+    this.reactiveOwner = owner;
+    this.scheduler.cancel(this.scheduler.epoch, false); this.controls.release();
+    const source: TraceAttribution = { origin: 'reactive', requestId: owner.requestId, decisionId: owner.decisionId, actionId: owner.actionId };
+    const result = this.admitCompiled(compiled, performance.now(), source);
+    if (result !== 'accepted') throw Error('reactive_admission_rejected');
+    this.trace.record(compiled.program.seq, 'admitted', performance.now(), undefined, compiled.program.epoch, source);
+  }
+  cancelReactive(owner: ReactiveLease, _reason: LeaseRevokeReason) {
+    const current = this.reactiveOwner;
+    if (!current || !(['requestId', 'decisionId', 'actionId', 'validUntil'] as const).every(key => current[key] === owner[key])) return;
+    this.reactiveOwner = undefined;
+    this.scheduler.cancel(this.scheduler.epoch, false); this.controls.release();
+    this.restFace(this.controls.mode === 'off' ? 0 : 600);
+  }
   epoch(epoch: string, reset = false) {
+    this.reactive?.reset(); this.reactiveOwner = undefined; this.userLeaseUntil = 0; this.userGeometryLocked = false;
     this.trace.reset();
-    this.controls.reset(); this.scheduler.cancel(epoch);
+    this.controls.reset(); this.scheduler.cancel(epoch, false);
     if (reset) { this.compiler.compiler.reset(); this.partIds = ''; }
     else this.compiler.compiler.discardDefinitions();
     this.restFace(this.controls.mode === 'off' ? 0 : 600);
   }
   private restFace(durationMs: number) {
     const record = { v: 1, epoch: this.scheduler.epoch, seq: 0, kind: 'program', track: 'body', policy: 'replace', body: faceProgram(durationMs) };
-    this.scheduler.admit(this.compiler.compile(record, performance.now()).program);
+    const program = this.compiler.compile(record, performance.now()).program;
+    this.origins.set(program, { origin: 'ambient' }); this.scheduler.admit(program);
     this.faceBlend.clear();
     this.scheduler.tick();
   }
@@ -124,13 +184,14 @@ export class LiveBody {
   private faceActivity(at: number) { return this.output > 0.01 ? 'replying' : at < this.attentionUntil ? 'attention' : this.activityState; }
   event(type: LiveEventKind) { const now = performance.now(); this.defaults.event(type, now); this.controls.event(type, now); }
   motion(mode: 'normal' | 'reduced' | 'off') {
+    if (mode === 'off') this.reactive?.reset();
     this.controls.mode = mode; this.defaults.mode = mode; this.renderer.reducedMotion = mode === 'reduced';
     this.scheduler.state.presenceIntent = { activity: 'idle', mode };
   }
   get metrics() { const sorted = [...this.samples].sort((a, b) => a - b); const p95 = sorted[Math.floor(sorted.length * 0.95)] ?? 0;
-    return { activity: this.faceActivity(performance.now()), diagnostics: this.trace.snapshot(), render: this.renderer.renderSnapshot,
+    return { reactiveOwner: this.reactiveOwner?.actionId ?? null, userGeometryLocked: this.userGeometryLocked, userLeaseUntil: this.userLeaseUntil, schedulerBusy: this.scheduler.busy, queueDepth: this.scheduler.queueDepth, activity: this.faceActivity(performance.now()), diagnostics: this.trace.snapshot(), render: this.renderer.renderSnapshot,
       scene: isFace(this.scheduler.state.particleParts ?? []) ? 'face' : this.scheduler.state.shape,
       parts: this.scheduler.state.particleParts?.map(part => part.id) ?? [],
       frameP95: p95, meanFps: 1000 / (this.samples.reduce((sum, value) => sum + value, 0) / Math.max(1, this.samples.length)), particles: this.renderer.count }; }
-  dispose() { cancelAnimationFrame(this.frameId); this.resize.disconnect(); this.scheduler.dispose(); }
+  dispose() { this.reactive?.configure(false); cancelAnimationFrame(this.frameId); this.resize.disconnect(); this.scheduler.dispose(); }
 }
