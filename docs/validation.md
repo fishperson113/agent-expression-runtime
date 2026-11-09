@@ -2,8 +2,35 @@
 
 The current implementation includes pane attachment, native interaction hooks, contextual planning, continuous presence, model-authored performances, adaptive Braille and prepared idle scenes. See [current behavior](expression-planner.md), [review remediation](review-progress.md) and [research/evidence limits](related-work.md#10-cập-nhật-braille-theo-thời-gian-và-idle-scene-tự-do). Test counts below are historical observations, not the current suite size or a fresh certification.
 
-## Cloud terminal/face development — 2026-11-08
+## Authenticated Cloud model verification — 2026-11-09
 
+Runtime `ce03da9`, merged in [PR #35](https://github.com/fishperson113/agent-expression-runtime/pull/35)
+as `d7bf017`. The owner completed official Codex device login after network access
+was restored. Model usage is 50/120, deadline 2026-11-09 06:17:35 UTC.
+
+| Gate | Fresh evidence | Limit |
+|---|---|---|
+| Real terminal UI | Opens without Herdr; stopped at explicit folder-trust prompt; no model input sent | Project trust was not granted; successful TUI inference remains pending |
+| Ordinary model conversation | Unchanged ten prompts, two fresh threads: 20/20 completed; 20 expression attempts/admissions/applications/frame changes, zero rejections | Transport/application proxies; relevance and semantic consistency unscored |
+| Thread ownership | Second thread reproduced `controller_active`; explicit successful selection now awaits old controller cancellation; both-thread diagnostic and full holdout pass | Failed/superseded/background selections preserve ownership; single-controller rules unchanged |
+| Active visual evidence | Twenty body-only captures; [encouragement](evidence/cloud-model-encouragement.png) and [rollback](evidence/cloud-model-rollback.png) samples | 150 ms after tool completion; agent-inspected samples, no blinded human score |
+| Synthetic vision | Real Codex called observe/look and read the random image code correctly; shape/color also checked | Synthetic-only; native hook injection and real-camera vision not tested |
+| Regression | 251 JS tests / 48 files, build, architecture, strict harness; current-head Windows/core/gateway CI passed | R10/R11 unsupported in Codex; CI is not native usability acceptance |
+| Functional RPC | Cold observe 33.63 ms, warm p95 4.10 ms, express admission p95 16.28 ms; cancel/reload/invalid/cooldown passed, zero script errors | Isolated headless functional sample, not sustained latency or animation completion |
+| Asset access | Official Face Landmarker download matches pinned SHA-256 | Physical camera unused; inference throughput/accuracy still pending |
+
+[Sanitized numeric evidence](evidence/cloud-authenticated-model.json) includes the
+failed baseline, focused before/after reproducer and every corrected holdout row.
+No raw model/tool payload, credential, camera pixels or personal conversation is
+included. The existing 30-minute stability evidence below is historical; the
+software-rendering/vision performance misses remain misses. No new soak is claimed.
+Human theme recognition >=6/10, actual-person accuracy >=8/10, distraction,
+Windows GPU/Herdr, native hook trust/context delivery and Vietnamese /voice remain
+open. Successful ordinary tool use does not certify expressive meaning.
+
+## Historical Cloud terminal/face development — 2026-11-08
+
+The authenticated follow-up above supersedes this historical network/auth status.
 This run used managed Linux Cloud while the owner's computer was off. The stable browser/gateway source
 is 992d48c (merged into main as 74195ca); the final Node-only thread-selection
 correction is c0d63ce, followed by relay helper extraction 6ac50b7 (runtime
