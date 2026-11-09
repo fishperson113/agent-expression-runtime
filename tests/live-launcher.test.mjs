@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 import { liveCodexArguments } from '../scripts/live-codex.mjs';
 import { selectLiveSource, liveControl } from '../scripts/live-session.mjs';
 import { assistantText, OutputActivity } from '../integrations/output-activity.mjs';
-import { createLivePane } from '../integrations/live-launch.mjs';
+import { createLivePane, livePageOptions } from '../integrations/live-launch.mjs';
 
 it('keeps credentials in inherited environment, never command arguments or a new prompt', () => {
   const args = liveCodexArguments(process.cwd());
@@ -48,4 +48,10 @@ it('forwards only lifecycle type, never prompt text, to the browser', async () =
   expect(forwarded).toEqual(['user_message']);
   expect((await handler({ method: 'status' })).hookEvents).toBe(1);
   expect((await handler({ method: 'event', args: { type: 'tool_text' } })).status).toBe('ignored');
+});
+
+it('uses the real window viewport for visible Live, keeping headless fixtures deterministic', () => {
+  expect(livePageOptions()).toEqual({ viewport: null });
+  expect(livePageOptions(false)).toEqual({ viewport: null });
+  expect(livePageOptions(true)).toEqual({ viewport: { width: 1360, height: 950 } });
 });
