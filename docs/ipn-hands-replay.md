@@ -89,3 +89,19 @@ A later video/classifier benchmark still needs decode-to-timeline verification,
 a licensed verified subset, predicted classes and explicit taxonomy mapping,
 segment/boundary metrics, false-trigger rate and latency measurements. This PR
 provides the offline validation/replay prerequisite and does not certify those gates.
+
+## Discrepancy follow-up (2026-11-09 UTC)
+
+The GitHub API lists one commit introducing `README_HandS.md`:
+`093729579be671df0cc9dd8cbc58b9a342663800`, named author GibranBenitez,
+2026-10-09 06:18:35 UTC, message `IPN HandS - annotations`. No GitHub releases
+were listed. A second public Drive download produced the same 82,274-byte ZIP and
+same observed SHA-256 as above. The final HTTP response was 200,
+`Content-Type: application/octet-stream`, attachment `IPN_HandS_annotations.zip`,
+`Last-Modified: Fri, 09 Oct 2026 06:12:30 GMT`. This rules out a sign-in HTML page
+being mistaken for ZIP bytes; it does not explain or resolve the checksum mismatch.
+No updated author-published checksum or version was found, so admission stays blocked.
+
+A separate small CC0 real-video fixture now supports actual decode/MP4 replay:
+see [public video replay](public-video-replay.md). It is a smoke input without
+framewise gesture labels, not a replacement HandS benchmark.
