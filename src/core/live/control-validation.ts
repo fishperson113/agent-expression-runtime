@@ -9,11 +9,15 @@ export function target(value: unknown): TransformTarget {
   return object as TransformTarget;
 }
 export function pose(value: unknown): Pose {
-  const object = strictObject(value, ['type', 'target', 'value', 'durationMs']);
+  const optional = ['delayMs', 'attackMs', 'releaseMs'].filter(key => value && typeof value === 'object' && key in value);
+  const object = strictObject(value, ['type', 'target', 'value', 'durationMs', ...optional]);
   if (object.type !== 'pose') throw Error('live_pose');
   const aim = target(object.target); finite(object.value, ...transformRange(aim.prop));
   finite(object.durationMs, 100, 10000);
   if (!Number.isInteger(object.durationMs)) throw Error('live_duration');
+  for (const key of optional) { finite(object[key], key === 'delayMs' ? 0 : 20, 10000); if (!Number.isInteger(object[key])) throw Error('live_duration'); }
+  if ((object.delayMs ?? 0) + object.durationMs > 10000 ||
+    (object.attackMs ?? object.durationMs / 2) + (object.releaseMs ?? object.durationMs / 2) > object.durationMs) throw Error('live_pose_timing');
   return object as Pose;
 }
 function control(value: any): LiveControl {
@@ -52,7 +56,13 @@ export function validateConfiguration(value: unknown): LiveConfiguration {
     for (const key of channels) { if (writes.has(key)) throw Error('live_property_conflict'); writes.add(key); }
   }
   if (bindings > 16 || reflexes > 16) throw Error('live_control_budget');
-  const owned = new Set<string>();
-  for (const item of poses) { const key = channel(item.target); if (owned.has(key)) throw Error('live_property_conflict'); owned.add(key); }
+  const owned = new Map<string, [number, number][]>();
+  for (const item of poses) {
+    const key = channel(item.target), start = item.delayMs ?? 0, end = start + item.durationMs;
+    if (end > object.lifetimeMs) throw Error('live_pose_lease');
+    const spans = owned.get(key) ?? [];
+    if (spans.some(([a, b]) => start < b && end > a)) throw Error('live_property_conflict');
+    spans.push([start, end]); owned.set(key, spans);
+  }
   return structuredClone({ controls, poses, lifetimeMs: object.lifetimeMs });
 }

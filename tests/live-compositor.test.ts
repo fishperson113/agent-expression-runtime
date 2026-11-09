@@ -71,3 +71,28 @@ it('follows an authored reflex envelope without a second value filter while pres
   for (let at = 620; at <= 2400; at += 20) c.sample(at, null, 0);
   expect(c.sample(2400, null, 0)).toEqual([]);
 });
+
+it('plays delayed authored beats with a visible hold and then releases channels', () => {
+  const c = new LiveCompositor(), target = { part: 'body', prop: 'rotateZ' } as const;
+  c.install(validateConfiguration({ lifetimeMs: 2000, controls: [], poses: [
+    { type: 'pose', target, value: 0.3, delayMs: 200, durationMs: 600, attackMs: 100, releaseMs: 100 },
+    { type: 'pose', target, value: -0.2, delayMs: 900, durationMs: 500, attackMs: 100, releaseMs: 200 },
+  ] }), 0);
+  expect(c.sample(100, null, 0)).toEqual([]);
+  for (let at = 200; at <= 500; at += 20) c.sample(at, null, 0);
+  expect(c.sample(500, null, 0)[0].value).toBeCloseTo(0.3, 2);
+  for (let at = 520; at <= 1100; at += 20) c.sample(at, null, 0);
+  expect(c.sample(1100, null, 0)[0].value).toBeLessThan(-0.18);
+  c.reset(); expect(c.sample(1120, null, 0)).toEqual([]);
+});
+it('does not claim attention channels when the user position is unavailable', () => {
+  const c = new LiveCompositor();
+  c.install(validateConfiguration({ lifetimeMs: 2000, poses: [], controls: [
+    { type: 'orient', id: 'attention', part: 'body', toward: { entity: 'user' }, maxDeg: 20, smoothMs: 100 },
+  ] }), 0);
+  expect(c.sample(0, null, 0)).toEqual([]);
+  const snapshot = { camera: 'tracking', user: { present: true, position: { x: 0.5, y: 0.2 } } } as any;
+  expect(c.sample(100, snapshot, 0).length).toBe(2);
+  for (let at = 200; at <= 1800; at += 20) c.sample(at, null, 0);
+  expect(c.sample(1800, null, 0)).toEqual([]);
+});

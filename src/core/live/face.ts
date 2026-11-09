@@ -19,7 +19,7 @@ export function faceProgram(durationMs = 600): Node {
     { type: 'style', pointSize: 1.8, brightness: 0.85, dispersion: 0, durationMs },
   ] };
 }
-export function faceWrites(activity: string, output: number, mode: 'normal' | 'reduced' | 'off'): TransformWrite[] {
+export function faceWrites(activity: string, output: number, mode: 'normal' | 'reduced' | 'off', at = 0): TransformWrite[] {
   if (mode === 'off') return [];
   const writes = new Map<string, TransformWrite>();
   for (const pose of Object.values(definition.states).flat()) {
@@ -32,5 +32,22 @@ export function faceWrites(activity: string, output: number, mode: 'normal' | 'r
     const rest = neutral(prop), value = pose.value + ('outputGain' in pose ? Number(pose.outputGain) * Math.max(0, Math.min(1, output)) : 0);
     writes.set(part + ':' + prop, { target: { part, prop }, value: rest + (value - rest) * (mode === 'reduced' ? 0.08 : 1) });
   }
+  for (const write of livingFace(at, mode)) {
+    const key = write.target.part + ':' + write.target.prop, base = writes.get(key);
+    writes.set(key, base ? { ...write, value: base.value * write.value } : write);
+  }
   return [...writes.values()];
+}
+
+function livingFace(at: number, mode: 'normal' | 'reduced'): TransformWrite[] {
+  const t = at / 1000, gain = mode === 'reduced' ? 0.08 : 1;
+  const blinkPhase = ((t % 5.7) - 4.9) / 0.28;
+  const blink = blinkPhase > 0 && blinkPhase < 1 ? Math.sin(blinkPhase * Math.PI) ** 2 : 0;
+  const eyes = [definition.roles.leftEye, definition.roles.rightEye, 'pupil_left', 'pupil_right'];
+  return [
+    ...eyes.map(part => ({ target: { part, prop: 'scaleY' as const }, value: 1 - blink * 0.82 * gain })),
+    { target: { part: 'fin', prop: 'rotateZ' }, value: Math.sin(t * 2.3) * 0.09 * gain },
+    { target: { part: 'gill', prop: 'scaleX' }, value: 1 + Math.sin(t * 1.7) * 0.035 * gain },
+    { target: { part: 'dorsal', prop: 'rotateZ' }, value: Math.sin(t * 1.4 + 0.7) * 0.035 * gain },
+  ];
 }
