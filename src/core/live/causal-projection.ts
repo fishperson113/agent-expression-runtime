@@ -1,5 +1,5 @@
 import { freezeHandReadSet } from './decision-types';
-import { eventKinds, validateObservation } from './observation';
+import { validateSourceEvent, validateObservation } from './observation';
 import { causalRevocationReasons, type CausalKind } from './causal-recorder-types';
 const id = (value: unknown, max = 64) => typeof value === 'string' && new RegExp(`^[a-zA-Z0-9_-]{1,${max}}$`).test(value);
 const number = (value: unknown) => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= Number.MAX_SAFE_INTEGER;
@@ -90,9 +90,10 @@ export function project(kind: CausalKind, value: unknown): unknown {
   if (kind === 'observation') { const { summary: _summary, ...snapshot } = validateObservation(value); return snapshot; }
   if (kind === 'request') return structuredClone(requestPayload(value));
   if (kind === 'event') {
-    const event = object(value, ['sessionId', 'observationSeq', 'seq', 'type', 'at']);
-    requireValue(id(event.sessionId, 80) && integer(event.observationSeq) && integer(event.seq) && eventKinds.includes(event.type) && number(event.at));
-    return structuredClone(event);
+    const { sessionId, observationSeq, seq, ...source } = value as Record<string, any>;
+    requireValue(id(sessionId, 80) && integer(observationSeq) && integer(seq));
+    const event = validateSourceEvent('eventVersion' in source ? { ...source, observationSeq } : source);
+    return { ...event, sessionId, observationSeq, seq };
   }
   return structuredClone(metadata(kind, value));
 }

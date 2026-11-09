@@ -84,7 +84,8 @@ export class CausalRecorder {
     let missing = false;
     if (record.kind === 'observation') this.observations.add(reference(value as any));
     if (record.kind === 'event') {
-      missing = !this.observations.has(reference({ sessionId: value.sessionId, seq: value.observationSeq })); this.events.add(reference(value as any));
+      missing = !this.observations.has(reference({ sessionId: value.sessionId, seq: value.observationSeq })) ||
+        (value.eventVersion === 1 && !this.observations.has(reference({ sessionId: value.sessionId, seq: value.evidenceStartSeq }))); this.events.add(reference(value as any));
     }
     if (record.kind === 'request') {
       missing = value.observationRefs.some((ref: any) => !this.observations.has(reference(ref))) || value.eventRefs.some((ref: any) => !this.events.has(reference(ref))) || !value.observationRefs.length || !value.eventRefs.length;
