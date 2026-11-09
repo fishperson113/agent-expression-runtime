@@ -1,0 +1,246 @@
+{
+  "sourceSha": "dc6641203f246b09d5e80343cff62326ce51aee4",
+  "baselineSha": "354d6428ea29255229a9a24c67332583bc7635bc",
+  "runtimeInputSha256": "901f0ecd5693fc6112596e1563608cbd971cf65b5ca89f77c13e2c5781d844d8",
+  "runtimeInputs": [
+    {
+      "path": "src/contracts/capabilities.json",
+      "sha256": "33bd58d9cc97694b4cdb36291a0912c1dc97408253e7f8c01e031714a8f61912"
+    },
+    {
+      "path": "src/core/ast/types.ts",
+      "sha256": "8473fe6d29007b9b0add8d6133de4f6d6ed49128337f2d12bb04f6bacbfcb76f"
+    },
+    {
+      "path": "src/core/compiler/compiler.ts",
+      "sha256": "e8e3285cf2a1f6091bc8998c5b6adcaf299059e30ccf6f3b0a461680957f493b"
+    },
+    {
+      "path": "src/core/geometry/assignment.ts",
+      "sha256": "0626e640a4a10c9b66837010f8b11455a70b584db692932d0461406a29a7e6a6"
+    },
+    {
+      "path": "src/core/geometry/curves.ts",
+      "sha256": "10a898baf584d8c0ec1290cccfa23fc57dd1d0a92c07b591364a4d730865f001"
+    },
+    {
+      "path": "src/core/geometry/morph.ts",
+      "sha256": "ce04dd3afe3e1fbfe6cf6715d55d3c75a8a02a77f2c15fed0de6d98e1af8faa9"
+    },
+    {
+      "path": "src/core/geometry/primitives.ts",
+      "sha256": "315bcdbc1a72ca7449ac952b6efcbeadc1b3f43677f968f29ee85d910ab77ccb"
+    },
+    {
+      "path": "src/core/geometry/sampling.ts",
+      "sha256": "3f36f651120c0b010886ba547648606ee733337fbeb7f8736cc59e6335d92114"
+    },
+    {
+      "path": "src/core/geometry/validate.ts",
+      "sha256": "56b8cd50c402c79943d03f802cdbfe8ab405f8ee194b59bbd6d1c6f43710af23"
+    },
+    {
+      "path": "src/core/live/compiler.ts",
+      "sha256": "93bb71db471a8459b950ff953df7a5f8c45e0d2c464013e7aca4fc22da7b0dc2"
+    },
+    {
+      "path": "src/core/live/control-types.ts",
+      "sha256": "c24607f68cf665f6636d8e911c66ca6e5afe6303172d75b7075144d69a047fab"
+    },
+    {
+      "path": "src/core/live/control-validation.ts",
+      "sha256": "73584540746e380810caa3ab6c120651325de4883dfdbf8a792bbce77e08e95f"
+    },
+    {
+      "path": "src/core/live/decision-host.ts",
+      "sha256": "a475faf184b724ccb0b03d002743a85ed13e6407e8d017db2c904e5d80b67c10"
+    },
+    {
+      "path": "src/core/live/face.json",
+      "sha256": "fe4c41bb5432af5793d1557710cbc97218b2e815bd15dabbbac8b4f127f6f721"
+    },
+    {
+      "path": "src/core/live/face.ts",
+      "sha256": "db59eeeb176f51f786347664393f9f2ae6da97f458acaded30e7bc8eac2f4fce"
+    },
+    {
+      "path": "src/core/live/hand-tracker.ts",
+      "sha256": "4dbb65f334f60080eff4ae3da2c291b9076c4a01772ea2cc282a3831bacb64bb"
+    },
+    {
+      "path": "src/core/live/observation.ts",
+      "sha256": "1f629d1980ba5a3c521fcd5001f1542e16c4153de9f1391fb1712e7a9ebd9b9e"
+    },
+    {
+      "path": "src/core/live/reactive-lease.ts",
+      "sha256": "206a01511a3baeba258e42c32b394f76422ed6f475984d9305ee45b96d4eb6ec"
+    },
+    {
+      "path": "src/core/live/reactive-session.ts",
+      "sha256": "2d2b76ac27952d3b62ca161ac289a5d1aac83c50ca03a4cd4163b3be1277fa6f"
+    },
+    {
+      "path": "src/core/live/signals.ts",
+      "sha256": "25b06f45c800d9f872271bb39a98fa3d230ee8120b63f95c44d8ba1528b228c9"
+    },
+    {
+      "path": "src/core/live/types.ts",
+      "sha256": "eb097a42f0db474f920696443ba98ce211e39e4ae1e6638f37c8b66165a5258c"
+    },
+    {
+      "path": "src/core/runtime/presence.ts",
+      "sha256": "075f36d1ac88606fee10adbff905cf50727515e292ca9b59316391657d7d5a13"
+    },
+    {
+      "path": "src/core/runtime/scheduler.ts",
+      "sha256": "87fee8ef04698c759a70d3e7af086ffa6c688b759094d70cf2a36ae2afe6fcd9"
+    },
+    {
+      "path": "src/live/observation.ts",
+      "sha256": "f10e47cfee5583d660f37c0a8b0501f9fbdeb6bdfb539f7ecbfe92e5e225cfc0"
+    },
+    {
+      "path": "src/primitives/registry.ts",
+      "sha256": "e34cf29f75c1e62ec91eb56a1a841769ee89db3fab55671b22d1f2906067faca"
+    }
+  ],
+  "runtimeDirty": false,
+  "changedFromHead": [],
+  "changedFromBaseline": [
+    "src/core/live/reactive-session.ts",
+    "src/core/live/signals.ts"
+  ],
+  "sameExecutedSourcesAsBaseline": false,
+  "generatedAt": "2026-11-09T20:00:03.596Z",
+  "runKind": "full virtual diagnostic",
+  "elapsedHostMs": 102938,
+  "sourceStepMs": 50,
+  "mainPollMs": 50,
+  "syntheticWallOriginMs": 1800000000000,
+  "diagnosticParticles": 64,
+  "provider": "in-process fixed diagnostic decision",
+  "actualModelCalls": 0,
+  "mediaApisUsed": false,
+  "durationMs": 1200000,
+  "mainScenarioCount": 77,
+  "accountingChecks": "passed",
+  "controlsPollMs": 100,
+  "controls": [
+    {
+      "rate": 0,
+      "latency": 2000,
+      "seed": 0,
+      "mode": "fresh",
+      "frames": 24000,
+      "validSourceFrames": 24000,
+      "sourceValidityRatio": 1,
+      "rawScoreChanges": 0,
+      "semanticOpportunities": 1,
+      "sourceEligibleOpportunities": 1,
+      "candidateEligible": 1,
+      "providerRequested": 1,
+      "authorizationDenied": 0,
+      "decisionsReturned": 1,
+      "admitted": 1,
+      "firstStateSink": 1,
+      "firstChangedStateSink": 1,
+      "phases": {
+        "applied": 1,
+        "completed": 1
+      },
+      "eventTypes": {
+        "user_arrived": 1
+      },
+      "verdicts": {
+        "accepted": 1
+      },
+      "preflightCleanupVerdicts": {},
+      "revocations": {
+        "enabled": 1
+      },
+      "firstRequestRevocations": {},
+      "leaseRevocations": {
+        "expired": 1
+      },
+      "actualCancelReasons": {},
+      "sourceStatusFrames": {
+        "tracking": 24000
+      },
+      "observedRequestTtlsMs": [
+        5000
+      ],
+      "outstandingAtEnd": 0,
+      "actualGpuFramesMeasured": false,
+      "longestAppliedSilence": {
+        "milliseconds": 1196200,
+        "from": 3800,
+        "to": 1200000,
+        "semanticOpportunities": 0
+      },
+      "longestCompletedSilence": {
+        "milliseconds": 1195600,
+        "from": 4400,
+        "to": 1200000,
+        "semanticOpportunities": 0
+      }
+    },
+    {
+      "rate": 0.5,
+      "latency": 2000,
+      "seed": 0,
+      "mode": "fresh",
+      "frames": 24000,
+      "validSourceFrames": 24000,
+      "sourceValidityRatio": 1,
+      "rawScoreChanges": 599,
+      "semanticOpportunities": 600,
+      "sourceEligibleOpportunities": 600,
+      "candidateEligible": 80,
+      "providerRequested": 80,
+      "authorizationDenied": 0,
+      "decisionsReturned": 80,
+      "admitted": 0,
+      "firstStateSink": 0,
+      "firstChangedStateSink": 0,
+      "phases": {},
+      "eventTypes": {
+        "user_arrived": 1,
+        "expression_changed": 599
+      },
+      "verdicts": {
+        "revoked": 80
+      },
+      "preflightCleanupVerdicts": {},
+      "revocations": {
+        "enabled": 1,
+        "semantic_changed": 80
+      },
+      "firstRequestRevocations": {
+        "semantic_changed": 80
+      },
+      "leaseRevocations": {},
+      "actualCancelReasons": {},
+      "sourceStatusFrames": {
+        "tracking": 24000
+      },
+      "observedRequestTtlsMs": [
+        5000
+      ],
+      "outstandingAtEnd": 0,
+      "actualGpuFramesMeasured": false,
+      "longestAppliedSilence": {
+        "milliseconds": 1200000,
+        "from": 0,
+        "to": 1200000,
+        "semanticOpportunities": 600
+      },
+      "longestCompletedSilence": {
+        "milliseconds": 1200000,
+        "from": 0,
+        "to": 1200000,
+        "semanticOpportunities": 600
+      }
+    }
+  ],
+  "baselineAvailable": true
+}
