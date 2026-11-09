@@ -8,7 +8,7 @@ function fixture() {
   const admitted: unknown[] = [], cancelled: unknown[] = [];
   const session = new ReactiveSession({ now: () => now, wallNow: () => wall, epoch: () => epoch, id: () => `r${++id}`,
     canAdmit: () => canAdmit, admit: (...args) => admitted.push(args), cancel: (...args) => cancelled.push(args) });
-  const observe = (present = true, type?: 'user_arrived' | 'user_left' | 'expression_changed', tracks: string[] = []) => {
+  const observe = (present = true, type?: 'user_arrived' | 'user_left' | 'expression_changed' | 'looked_away' | 'looked_back', tracks: string[] = []) => {
     const snapshot: Observation = { v: 1, sessionId: 's', seq: ++seq, capturedAt: wall, camera: present ? 'tracking' : 'absent',
       turn: 'idle', summary: '', user: { ...unavailableUser(), present } };
     if (tracks.length) snapshot.hands = { v: 1, trackingState: 'tracked', coordinateSpace: 'image-normalized', landmarkSchema: 'mediapipe-hand-21',
@@ -147,4 +147,43 @@ it('checks user intent and final admission permission again before dispatch auth
     expect(f.session.authorize(request.requestId)).toBe(false); await f.session.deliver(request.requestId, null);
     expect(f.admitted).toEqual([]);
   }
+});
+
+it('revokes delayed observer decisions on newly sequenced orientation and expression events', async () => {
+  for (const type of ['looked_back', 'expression_changed'] as const) {
+    const f = fixture(); f.observe(true, 'looked_away'); f.advance(750); f.observe();
+    const next = f.session.takeRequest()!; expect(f.session.authorize(next.request.requestId)).toBe(true);
+    f.advance(10); f.observe(true, type);
+    expect(f.session.status().reason).toBe('semantic_changed'); expect(f.session.status().transport).toBe(next.request.requestId);
+    expect((await f.session.deliver(next.request.requestId, express(next.request)))?.reason).toBe('revoked');
+    expect(f.admitted).toEqual([]); expect(f.cancelled).toEqual([]);
+  }
+});
+it('cancels only an active observer lease on a new semantic event and retains compatible frame acceptance', async () => {
+  for (const type of ['looked_back', 'expression_changed'] as const) {
+    const f = fixture(), next = f.launch();
+    for (let i = 0; i < 20; i++) { f.advance(10); f.observe(); }
+    expect((await f.session.deliver(next.request.requestId, express(next.request)))?.reason).toBe('accepted');
+    f.advance(10); f.observe(true, type);
+    expect(f.cancelled).toHaveLength(1); expect(f.cancelled[0]).toEqual([expect.objectContaining({ actionId: `a${next.request.requestId}` }), 'semantic_changed']);
+    expect(f.session.status().owner).toBeNull(); f.session.tick(); expect(f.cancelled).toHaveLength(1);
+  }
+});
+it('ignores duplicate semantic sequences and never cancels a user-owned channel without an observer lease', async () => {
+  const f = fixture(), next = f.launch();
+  f.advance(10); const fresh = f.observe();
+  f.session.observe({ ...fresh, seq: fresh.seq + 1 }, [{ seq: 1, type: 'looked_back', at: f.wall() }]);
+  expect((await f.session.deliver(next.request.requestId, express(next.request)))?.reason).toBe('accepted');
+  expect(f.cancelled).toEqual([]);
+  const user = fixture(), pending = user.launch(); user.session.userIntent(); user.block();
+  user.advance(10); user.observe(true, 'looked_back');
+  expect((await user.session.deliver(pending.request.requestId, express(pending.request)))?.reason).toBe('revoked');
+  expect(user.cancelled).toEqual([]); expect(user.admitted).toEqual([]);
+});
+it('keeps the latest semantic candidate in a finite burst after invalidating an outstanding request', () => {
+  const f = fixture(), next = f.launch();
+  f.observe(true, 'looked_back');
+  for (let i = 0; i < 100; i++) { f.advance(7); f.observe(true, 'expression_changed'); }
+  expect(f.session.status().pending).toBe(2); expect(f.session.status().transport).toBe(next.request.requestId);
+  expect(f.session.takeRequest()).toBeNull(); expect(f.session.status().dispatches).toBe(1);
 });
