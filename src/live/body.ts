@@ -36,6 +36,7 @@ export class LiveBody {
   private reactive?: ReactiveSession;
   private reactiveOwner?: ReactiveOwnership;
   private userLeaseUntil = 0;
+  private userGeometryLocked = false;
   output = 0;
   feedback?: (event: { epoch: string; seq: number; status: string }) => void;
   constructor(private canvas: HTMLCanvasElement, private status: (text: string) => void) {
@@ -92,7 +93,7 @@ export class LiveBody {
     try {
       const compiled = record.kind === 'define' ? { program: this.compiler.compiler.prepareDefinition(record, at) } : this.compiler.compile(record, at);
       const result = this.admitCompiled(compiled, at), accepted = ['accepted', 'state', 'defined'].includes(result);
-      if (accepted) this.userLeaseUntil = Math.max(this.userLeaseUntil, this.leaseUntil(compiled, at));
+      if (accepted) { this.userLeaseUntil = Math.max(this.userLeaseUntil, this.leaseUntil(compiled, at)); this.userGeometry(compiled, at); }
       this.trace.record(record.seq, accepted ? 'admitted' : 'rejected', performance.now(), accepted ? undefined : result, record.epoch);
       this.status(accepted ? 'Biểu đạt đã được nhận.' : result);
       return { status: accepted ? 'accepted' : 'rejected', code: accepted ? undefined : result, latencyMs: performance.now() - at };
@@ -103,7 +104,17 @@ export class LiveBody {
     }
   }
   attachReactive(session: ReactiveSession) { this.reactive = session; }
-  canReactive() { return this.controls.mode !== 'off' && performance.now() >= this.userLeaseUntil && !this.scheduler.busy; }
+  get userSceneOwned() { return this.userGeometryLocked; }
+  canReactive() { return !this.userGeometryLocked && this.controls.mode !== 'off' && performance.now() >= this.userLeaseUntil && !this.scheduler.busy; }
+  private userGeometry(compiled: LiveCompiled, at: number) {
+    if (compiled.program.kind !== 'program') return;
+    const shape = compiled.program.ops.filter(op => op.property === 'shape').at(-1)?.value;
+    if (shape === undefined) return;
+    const resting = typeof shape === 'object' && isFace(shape.parts);
+    this.userGeometryLocked = !resting;
+    if (resting && compiled.configuration && !compiled.configuration.controls.length && !compiled.configuration.poses.length)
+      this.userLeaseUntil = at + compiled.program.duration;
+  }
   private leaseUntil(compiled: LiveCompiled, at: number) {
     const program = compiled.program, duration = program.kind === 'define' ? 0 : program.duration;
     const start = program.kind === 'program' && program.policy === 'append' ? Math.max(at, this.userLeaseUntil) : at;
@@ -137,7 +148,7 @@ export class LiveBody {
     this.restFace(this.controls.mode === 'off' ? 0 : 600);
   }
   epoch(epoch: string, reset = false) {
-    this.reactive?.reset(); this.reactiveOwner = undefined; this.userLeaseUntil = 0;
+    this.reactive?.reset(); this.reactiveOwner = undefined; this.userLeaseUntil = 0; this.userGeometryLocked = false;
     this.trace.reset();
     this.controls.reset(); this.scheduler.cancel(epoch, false);
     if (reset) { this.compiler.compiler.reset(); this.partIds = ''; }
@@ -166,7 +177,7 @@ export class LiveBody {
     this.scheduler.state.presenceIntent = { activity: 'idle', mode };
   }
   get metrics() { const sorted = [...this.samples].sort((a, b) => a - b); const p95 = sorted[Math.floor(sorted.length * 0.95)] ?? 0;
-    return { reactiveOwner: this.reactiveOwner?.actionId ?? null, userLeaseUntil: this.userLeaseUntil, schedulerBusy: this.scheduler.busy, queueDepth: this.scheduler.queueDepth, activity: this.faceActivity(performance.now()), diagnostics: this.trace.snapshot(), render: this.renderer.renderSnapshot,
+    return { reactiveOwner: this.reactiveOwner?.actionId ?? null, userGeometryLocked: this.userGeometryLocked, userLeaseUntil: this.userLeaseUntil, schedulerBusy: this.scheduler.busy, queueDepth: this.scheduler.queueDepth, activity: this.faceActivity(performance.now()), diagnostics: this.trace.snapshot(), render: this.renderer.renderSnapshot,
       scene: isFace(this.scheduler.state.particleParts ?? []) ? 'face' : this.scheduler.state.shape,
       parts: this.scheduler.state.particleParts?.map(part => part.id) ?? [],
       frameP95: p95, meanFps: 1000 / (this.samples.reduce((sum, value) => sum + value, 0) / Math.max(1, this.samples.length)), particles: this.renderer.count }; }

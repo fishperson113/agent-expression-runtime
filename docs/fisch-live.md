@@ -279,3 +279,8 @@ chéo/che khuất mơ hồ hệ thống có thể cấp ID mới.
 `hands.entities[].confidence` là điểm phân loại handedness do MediaPipe trả về,
 không phải độ tin cậy của landmark, track hay ý nghĩa cử chỉ. Không dùng điểm này
 để suy ra rằng một chuyển động đã được hiểu chắc chắn.
+
+Hình do người dùng hoặc tác vụ co-create gửi qua đường admission chung được giữ
+sau khi animation kết thúc; bộ quyết định quan sát không được thay thế nó.
+Trả về avatar chuẩn qua `return_to_face`, hoặc reset/cancel rõ ràng, mới nhường lại
+quyền này. Gửi thêm một chuyển động ngắn không tự xóa lease của binding trước đó.

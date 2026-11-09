@@ -21,7 +21,7 @@ const reactive = new ReactiveSession({ now: () => performance.now(), wallNow: ()
   admit: (compiled, owner) => body.admitReactive(compiled, owner), cancel: (owner, reason) => body.cancelReactive(owner, reason) });
 body.attachReactive(reactive);
 let lastActivity = 'idle';
-let semanticSequence = 0, semanticGeneration = 0;
+let semanticSequence = 0;
 const semanticEvents: { type: LiveEventKind; at: number; seq: number }[] = [];
 const activityLog: { text: string; at: number }[] = [];
 function logActivity(text: string) {
@@ -42,8 +42,8 @@ Object.assign(window, { fischLive: { pair: (base: string, token: string) => brid
   takeReactiveRequest: () => reactive.takeRequest(), authorizeReactiveRequest: (id: string) => reactive.authorize(id),
   deliverReactiveDecision: (id: string, data: unknown) => reactive.deliver(id, data), failReactiveDecision: (id: string) => reactive.fail(id),
   reactiveStatus: () => reactive.status(),
-  reactivity: () => ({ sessionId: observations.snapshot.sessionId + ':' + semanticGeneration, enabled: element<HTMLInputElement>('enable-reactivity').checked, stopped,
-    camera: observations.snapshot.camera, capturedAt: observations.snapshot.capturedAt, events: [...semanticEvents] }),
+  reactivity: () => ({ sessionId: 'legacy-reactivity-disabled', enabled: false, stopped: true,
+    camera: 'stopped', capturedAt: Date.now(), events: [] }),
   activity: (value: { turn: 'idle' | 'working' | 'waiting' | 'interrupted'; output: number; quality: string }) => {
     if (stopped) return;
     if (value.turn === 'interrupted' && lastActivity !== 'interrupted') { hands.reset(); void bridge.cancel(); }
@@ -129,7 +129,7 @@ function cameraStatus(status: string, source = 'vision') {
 }
 element('enable-reactivity').onchange = () => {
   semanticEvents.length = 0; reactive.enable(element<HTMLInputElement>('enable-reactivity').checked); observeReactive();
-  logActivity(element<HTMLInputElement>('enable-reactivity').checked ? 'Đã bật phản ứng Codex từ quan sát local.' : 'Đã tắt phản ứng Codex từ camera.');
+  logActivity(element<HTMLInputElement>('enable-reactivity').checked ? 'Đã bật bộ quyết định từ quan sát local.' : 'Đã tắt bộ quyết định từ camera.');
 };
 element('enable-hands').onchange = () => { camera.hands = element<HTMLInputElement>('enable-hands').checked; hands.reset(); };
 element('fullscreen').onclick = () => { void element('body').parentElement!.requestFullscreen().catch(() => { element('fault').textContent = 'Trình duyệt chưa cho phép toàn màn hình.'; }); };
@@ -161,12 +161,13 @@ element('stop-all').onclick = stop;
 window.addEventListener('pagehide', stop);
 
 function observeReactive() { body.observe(observations.snapshot); reactive.observe(observations.snapshot, semanticEvents); }
-function resetReactive() { reactive.reset(); semanticGeneration++; semanticEvents.length = 0; }
+function resetReactive() { reactive.reset(); semanticEvents.length = 0; }
 function configureReactive(available: boolean) {
   const enabled = available === true && !stopped;
   reactive.configure(enabled); element<HTMLInputElement>('enable-reactivity').disabled = !enabled;
   if (!enabled) element<HTMLInputElement>('enable-reactivity').checked = false;
-  element('reactivity-status').textContent = enabled ? 'Bộ quyết định đã kết nối; phản ứng camera là tùy chọn.' : 'Phản ứng tự động chưa có bộ quyết định được kết nối.';
+  element('reactivity-status').textContent = !enabled ? 'Phản ứng tự động chưa có bộ quyết định được kết nối.'
+    : body.userSceneOwned ? 'Đang giữ hình bạn tạo; phản ứng tự động tạm nhường quyền.' : 'Bộ quyết định đã kết nối; phản ứng camera là tùy chọn.';
 }
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) return;

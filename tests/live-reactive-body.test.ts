@@ -3,6 +3,7 @@ import { LiveBody } from '../src/live/body';
 import { ReactiveSession } from '../src/core/live/reactive-session';
 import { FaceObservations } from '../src/live/observation';
 import type { ReactiveRequest } from '../src/core/live/decision-types';
+import { faceProgram } from '../src/core/live/face';
 vi.mock('../src/adapters/three-renderer', () => ({ ThreeRenderer: class {
   count = 2000; reducedMotion = false; renderSnapshot = { contextLost: false, frame: 0, signature: 'fixture' };
   quality() {} resize() {} apply() {} dispose() {}
@@ -69,4 +70,16 @@ it('ticks revocation even while hidden or motion is off and rejects non-program 
   f.hide(); f.frame(); expect(tick).toHaveBeenCalled(); expect(scheduler).not.toHaveBeenCalled();
   f.body.motion('off'); tick.mockClear(); f.frame(); expect(tick).toHaveBeenCalled();
   expect(() => f.body.admitReactive({ program: { kind: 'define' } } as any, {} as any)).toThrow('reactive_admission_rejected'); f.body.dispose();
+});
+it('preserves user geometry after animation completes until an explicit return to the avatar', () => {
+  const f = setup(), epoch = f.body.scheduler.epoch;
+  expect(f.body.admit({ v: 1, epoch, seq: 1, kind: 'program', track: 'body', policy: 'replace',
+    body: { type: 'morph', target: 'sphere', durationMs: 100 } }).status).toBe('accepted');
+  f.advance(1000); f.frame();
+  expect(f.body.scheduler.busy).toBe(false); expect(f.body.metrics.userGeometryLocked).toBe(true); expect(f.body.canReactive()).toBe(false);
+  expect(f.body.admit({ v: 1, epoch, seq: 2, kind: 'program', track: 'body', policy: 'replace',
+    body: { type: 'live', program: faceProgram(100), configuration: { controls: [], poses: [], lifetimeMs: 60000 } } }).status).toBe('accepted');
+  f.advance(101); f.frame();
+  expect(f.body.metrics.userGeometryLocked).toBe(false); expect(f.body.canReactive()).toBe(true);
+  f.body.dispose();
 });
