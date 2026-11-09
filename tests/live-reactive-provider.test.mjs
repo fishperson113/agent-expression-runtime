@@ -16,7 +16,10 @@ function ledger(values = {}) {
   return path;
 }
 const window = (requestId = 'r') => ({ schemaVersion: 1, request: { schemaVersion: 1, sessionId: 's', epoch: 'e',
-  requestId, intentRevision: 0, deadline: 1000, requiredTrackIds: [] }, events: [], observations: [] });
+  requestId, intentRevision: 0, presenceRevision: 0, deadline: 1000, requiredTrackIds: [] },
+  events: [{ id: 1, type: 'user_left', at: 100 }], observations: [{ v: 1, sessionId: 's', seq: 1, capturedAt: 100,
+    camera: 'absent', turn: 'idle', summary: '', user: { present: false, quality: { score: 0, basis: 'unavailable' },
+      position: null, head: null, facingScreen: null, expression: null, mouthMoving: null } }] });
 afterEach(() => { for (const path of directories.splice(0)) rmSync(path, { recursive: true, force: true }); vi.clearAllMocks(); });
 it('defaults off without reading files, clock or network despite unrelated credentials', () => {
   const fetch = vi.fn(), clock = vi.fn(); readFileSync.mockClear();

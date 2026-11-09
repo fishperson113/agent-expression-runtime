@@ -108,3 +108,12 @@ it('marks only preflight and completed failures as transport-settled', async () 
     adapter(async () => new Response(new ReadableStream({ start(controller) { controller.error(Error('read')); } }))).decide(window())];
   for (const promise of unknown) await expect(promise).rejects.toMatchObject({ transportSettled: false });
 });
+
+it('requires presence and nonempty camera evidence before reservation or network', async () => {
+  for (const change of [value => { delete value.request.presenceRevision; }, value => { value.events = []; }, value => { value.observations = []; }]) {
+    let reserves = 0, calls = 0; const value = window(); change(value);
+    const provider = adapter(async () => { calls++; return new Response(JSON.stringify(response())); }, async () => { reserves++; return true; });
+    await expect(provider.decide(value)).rejects.toMatchObject({ code: 'reactive_window_invalid', transportSettled: true });
+    expect(reserves).toBe(0); expect(calls).toBe(0);
+  }
+});
