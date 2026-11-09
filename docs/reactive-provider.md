@@ -80,3 +80,18 @@ broker/browser restart and reconciliation of unresolved provider transport; a
 later successful page promise does not automatically reopen the failed broker.
 Already-issued Playwright calls cannot be recalled, so browser generation, TTL
 and consent checks remain mandatory for any callback that eventually arrives.
+
+`createLiveReactiveProvider(env, {fetch, now})` prepares this provider on Node only.
+It additionally requires `FISCH_REACTIVE_BUDGET` to name an absolute path to the
+existing approved cumulative budget ledger. It never creates or resets a ledger,
+changes its deadline, or increases its limit. Missing, unreadable, invalid,
+expired or exhausted ledgers leave the provider unavailable with a fixed reason;
+native CLI input remains independent. An atomic reservation rechecks the same
+ledger immediately before each HTTP request, including after startup validation.
+No retries or replacement ledgers are created after denial.
+
+The factory returns only `{provider, reason}`; it does not expose configuration,
+credentials or the ledger path as browser metadata. `nativeLiveEnvironment(env)`
+returns a copy excluding every `FISCH_REACTIVE_*` variable before launching the
+native Codex child. It preserves other existing environment variables without
+modifying global settings, login state, or the caller's environment.
