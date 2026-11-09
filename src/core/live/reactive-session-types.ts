@@ -11,6 +11,7 @@ export type ReactiveWindow = Readonly<{ schemaVersion: 1; request: ReactiveReque
 export type SessionOptions = {
   record?: CausalSink;
   handState?: () => HandReadSet | undefined;
+  handMotion?: () => number | null;
   now: () => number; wallNow: () => number; epoch: () => string; id: () => string; canAdmit: () => boolean;
   admit: (compiled: LiveCompiled, owner: ReactiveOwnership) => void;
   cancel: (owner: ReactiveLease, reason: LeaseRevokeReason) => void;
