@@ -232,5 +232,5 @@ it('advertises the supported hand-event contract explicitly without resetting av
   const f = fixture({ decide: async () => null }), configured = [];
   f.api.configureReactive = (...args) => configured.push(args);
   await f.broker.poll({}); await f.broker.poll({});
-  expect(configured).toEqual([[true, 1], [true, 1]]); f.broker.close();
+  expect(configured).toEqual([[true, 1, 1], [true, 1, 1]]); f.broker.close();
 });

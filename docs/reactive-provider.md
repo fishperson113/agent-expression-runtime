@@ -149,3 +149,43 @@ unknown fields, invalid IDs/hashes/outcomes, nonfinite or negative durations,
 unsafe token counts and accessor properties without reading their values. It
 returns a fresh deeply frozen projection; producer callbacks use the same
 validator. Future brokers must validate receipts again before queuing them.
+
+## Explicit version-2 brief decisions
+
+FISCH_REACTIVE_CONTRACT_VERSION=2 opts into the coordinated V2 contract. Default
+is 1; unknown settings are rejected. Enabled adapters expose a readonly,
+nonenumerable contractVersion capability. The broker advertises
+configureReactive(available, 1, contractVersion), selecting 2 only when its
+provider explicitly exposes 2. Native child environment filtering still removes
+all dedicated observer configuration. No credentials, ledger limits or provider
+activation defaults change. Browser/session/core V2 support must be installed
+before opting in; a request/adapter version mismatch fails before reservation
+or network, rather than falling back silently.
+
+The observation-window container stays version 1. Its request is a strict union
+of V1 and V2: V2 adds mandatory semanticSnapshot with orientation, expression and
+handMotion nullable safe counters, and mandatory nonnull handIdentity history
+revision. Identity is not perception confidence. All fields are compared between
+the authorized outer request and frozen provider input. Critical identity,
+presence, intent, source, track and permission checks cannot be waived.
+
+V2 decisions require unique prerequisites drawn from orientation, expression and
+hand_motion. Selected unknown captured axes are rejected, including for observe;
+[] permits a context-independent symbolic phrase only when appropriate. The
+prompt asks for explicit dependencies or observe when that is not appropriate;
+this does not establish actual model-choice quality. The model does not receive
+an execution lease field. validUntil remains the request's admission deadline.
+Only the host may derive execution authority from accepted compiled duration
+plus 100 ms, bounded to 1,100 ms by the coordinated core.
+
+V2 express bodies have exactly one sequence step containing one parallel group
+of one to three morph/flow/shapeQuality leaves. Each leaf duration is 200–1,000
+ms. Assemblies, live configuration, coordinates, extra leaf fields and model
+lease fields are rejected. Parallel composition has compiled duration at most
+1,000 ms; the core independently validates these limits before admission.
+
+The sent strict schema closes every object and requires all fields, following
+[OpenAI's structured-output requirements](https://developers.openai.com/api/docs/guides/structured-outputs).
+It omits uniqueItems; local parsing and the core enforce prerequisite uniqueness.
+No live API compatibility or semantic-quality test is claimed. Existing receipt
+prompt/request hashes bind the selected instructions, schema and input version.

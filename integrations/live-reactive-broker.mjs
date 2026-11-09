@@ -101,7 +101,7 @@ export class LiveReactiveBroker {
     try {
       const available = !!this.provider && !this.paused && !this.uncertain;
       const queuedReceipts = this.providerReceipts.splice(0, 8);
-      const polled = await this.evaluate(({ activity, entries, busy, available, take, receipts }) => {
+      const polled = await this.evaluate(({ activity, entries, busy, available, take, receipts, contractVersion }) => {
         const api = window.fischLive;
         for (const item of receipts) { try {
           const pending = api.recordProviderReceipt?.(item.token, item.receipt);
@@ -109,10 +109,10 @@ export class LiveReactiveBroker {
         } catch {} }
         api.activity(activity);
         for (const text of entries) api.logActivity?.(text);
-        api.configureReactive(available, 1); api.setReactiveUserBusy(busy);
+        api.configureReactive(available, 1, contractVersion); api.setReactiveUserBusy(busy);
         let token = null; try { token = api.recordingCaptureToken?.() ?? null; } catch {}
         return { candidate: take ? api.takeReactiveRequest() : null, captureToken: token };
-      }, { activity, entries, busy: this.busy(), available, take: available && !this.active && !this.busy(), receipts: queuedReceipts });
+      }, { activity, entries, busy: this.busy(), available, take: available && !this.active && !this.busy(), receipts: queuedReceipts, contractVersion: this.provider?.contractVersion === 2 ? 2 : 1 });
       const candidate = polled?.candidate, token = captureToken(polled?.captureToken);
       if (!this.closed && !this.browserUnavailable && candidate && !this.active && !this.busy()) this.start(candidate, token);
       else if (!this.closed && !this.browserUnavailable && candidate) await this.deliver(candidate.request.requestId, null);
