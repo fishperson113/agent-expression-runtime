@@ -8,13 +8,13 @@ export function blindCodes(count) {
   while (codes.size < count) codes.add('V-' + randomBytes(4).toString('hex').toUpperCase());
   return [...codes];
 }
-export function writeScoringPack(directory, codes) {
+export function writeScoringPack(directory, codes, complete = false) {
   const sorted = [...codes].sort();
   mkdirSync(resolve(directory, 'blind'), { recursive: true });
   writeFileSync(resolve(directory, 'blind', 'scoring.csv'), 'code,theme_guess,emotion_guess,clarity_0_to_10,confidence_0_to_10,notes\n' + sorted.map(code => code + ',,,,,').join('\n'));
   writeFileSync(resolve(directory, 'blind', 'index.html'), `<!doctype html><html lang="vi"><meta charset="utf-8"><title>Fisch · chấm mù</title>
   <style>body{max-width:900px;margin:32px auto;padding:16px;background:#080e14;color:#e6f0f2;font:16px system-ui}video{width:100%;max-height:70vh}section{margin:32px 0}a{color:#79e6d3}</style>
-  <h1>Fisch · chấm mù</h1><p>Không xem prompt hoặc đáp án trước khi chấm. Với mỗi clip: đoán chủ đề và cảm xúc, chấm độ dễ hiểu 0–10 và độ tự tin 0–10. Có thể ghi “không rõ”. Ghi câu trả lời độc lập trước khi thảo luận.</p>
+  <h1>Fisch · chấm mù</h1><p>${complete ? 'Bộ 20 clip đã ghi đủ; chờ con người chấm.' : 'BỘ CHƯA HOÀN TẤT — chưa phát cho người chấm.'}</p><p>Không xem prompt hoặc đáp án trước khi chấm. Với mỗi clip: đoán chủ đề và cảm xúc, chấm độ dễ hiểu 0–10 và độ tự tin 0–10. Có thể ghi “không rõ”. Ghi câu trả lời độc lập trước khi thảo luận.</p>
   <p><a href="scoring.csv" download>Tải phiếu chấm</a> · Gửi lại phiếu sau khi xem hết. Chưa có kết luận đạt.</p>
   ${sorted.map(code => `<section><h2>${code}</h2><video controls preload="none" src="${code}.mp4" aria-label="Clip ${code}"></video></section>`).join('')}<p>Không có âm thanh. Đây là phần thân hạt, không phải camera người dùng.</p></html>`);
 }
