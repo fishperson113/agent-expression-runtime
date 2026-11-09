@@ -1,0 +1,769 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-09",
+  "runtimeBaseline": "318af9cf84c2497784b34a3ad587b21bc57879be",
+  "budget": {
+    "reservedModelTurns": 53,
+    "limit": 120,
+    "deadlineUtc": "2026-11-09T06:17:35.373Z",
+    "newModelCalls": 0
+  },
+  "method": {
+    "maximumOptimizationRounds": 2,
+    "pairsEach": 2,
+    "orderEachRound": [
+      "baseline-1",
+      "candidate-1",
+      "baseline-2",
+      "candidate-2"
+    ],
+    "warmupSecondsEach": 10,
+    "windowSecondsEach": 20,
+    "environment": "Cloud headless Chromium SwiftShader / CPU Face Landmarker / fake no-face camera / nominal 30 FPS / 640x480",
+    "fixedWorkload": "Bird geometry, 2000 simulated/drawn particles, 1360x950 viewport, normal motion; same model/confidence/resolution",
+    "measurement": "Actual elapsed browser clock, completed worker sample count, submitted renderer frame count and rAF intervals; 4096 bounded samples/intervals, no truncation",
+    "decision": "Require a consistent meaningful gain across both paired repeats without reducing visual/processing quality; neither candidate qualifies",
+    "limits": "Bounded sequential windows, not a randomized hardware-wide benchmark or sustained/native acceptance"
+  },
+  "rounds": [
+    {
+      "number": 1,
+      "variant": "blank-overlay",
+      "hypothesis": "Avoid repeated clears of an already empty overlay without changing landmark visibility",
+      "candidatePatch": "--- a/src/live/landmark-overlay.ts\n+++ b/src/live/landmark-overlay.ts\n@@ -1,10 +1,14 @@\n+const blankOverlays = new WeakSet<HTMLCanvasElement>();\n export function drawLandmarkOverlay(canvas: HTMLCanvasElement, points: { x: number; y: number }[], visible: boolean) {\n   const context = canvas.getContext('2d');\n   if (!context) return;\n+  const resized = canvas.width !== 640 || canvas.height !== 480;\n   if (canvas.width !== 640) canvas.width = 640;\n   if (canvas.height !== 480) canvas.height = 480;\n+  if ((!visible || !points.length) && !resized && blankOverlays.has(canvas)) return;\n   context.clearRect(0, 0, 640, 480);\n-  if (!visible || !points.length) return;\n+  if (!visible || !points.length) { blankOverlays.add(canvas); return; }\n+  blankOverlays.delete(canvas);\n   context.fillStyle = '#79e6d3';\n   for (const point of points) context.fillRect(point.x * 640, point.y * 480, 2, 2);\n }\n",
+      "sourceSha256": {
+        "baseline": "6f9e967bce111480a657b009998386e9739bc262d0d39ffd849cdf061e89e232",
+        "candidate": "a860b78249fef6b5b64274426306f6a026cb6d6403889fbe9a39be23a1f8ee52"
+      },
+      "retained": false,
+      "runs": [
+        {
+          "variant": "r1-baseline-1",
+          "source": "318af9c + named isolated candidate",
+          "warmupSeconds": 10,
+          "nominalWindowSeconds": 20,
+          "elapsedSeconds": 20.003,
+          "inferences": 469,
+          "inferenceHz": 23.446483027545867,
+          "renderFrames": 602,
+          "renderHz": 30.095485677148428,
+          "frameMs": {
+            "mean": 33.184551495015995,
+            "p50": 30.799999998882413,
+            "p95": 50.80000000074506,
+            "min": 10.199999999254942,
+            "max": 61.20000000111759
+          },
+          "inferenceMs": {
+            "mean": 36.493816631196786,
+            "p50": 32,
+            "p95": 64.69999999925494,
+            "min": 10.5,
+            "max": 93.90000000037253
+          },
+          "postToResultMs": {
+            "mean": 39.15266524516205,
+            "p50": 36,
+            "p95": 67.59999999962747,
+            "min": 10.900000000372529,
+            "max": 95.5
+          },
+          "resultToPostIdleMs": {
+            "mean": 3.528784648223377,
+            "p50": 0.5,
+            "p95": 19,
+            "min": 0.09999999962747097,
+            "max": 38.5
+          },
+          "overlayClears": 469,
+          "eventDomRebuilds": 469,
+          "camera": "absent",
+          "cameraActive": true,
+          "particles": 2000,
+          "simulatedParticles": 2000,
+          "counts": {
+            "observations": 300,
+            "syntheticImages": 0,
+            "unexpectedFrames": 0,
+            "nonLoopbackRequests": 0,
+            "blockedExternalRequests": 0
+          },
+          "errors": [],
+          "modelCalls": 0,
+          "pixelsPersisted": false,
+          "scope": "Fake 640x480 nominal 30 FPS no-face video; CPU vision/SwiftShader; fixed bird 2000 particles; ordinary motion; no physical camera/mic"
+        },
+        {
+          "variant": "r1-blank-overlay-1",
+          "source": "318af9c + named isolated candidate",
+          "warmupSeconds": 10,
+          "nominalWindowSeconds": 20,
+          "elapsedSeconds": 20.007400000000374,
+          "inferences": 455,
+          "inferenceHz": 22.741585613322645,
+          "renderFrames": 594,
+          "renderHz": 29.689015064425607,
+          "frameMs": {
+            "mean": 33.612121212120584,
+            "p50": 30.799999998882413,
+            "p95": 52,
+            "min": 9.900000000372529,
+            "max": 76.5
+          },
+          "inferenceMs": {
+            "mean": 37.72791208792273,
+            "p50": 33.19999999925494,
+            "p95": 66.60000000149012,
+            "min": 12.5,
+            "max": 101.79999999888241
+          },
+          "postToResultMs": {
+            "mean": 40.41362637364111,
+            "p50": 37.09999999962747,
+            "p95": 69.70000000111759,
+            "min": 14.099999999627471,
+            "max": 102
+          },
+          "resultToPostIdleMs": {
+            "mean": 3.5635164835050213,
+            "p50": 0.5,
+            "p95": 21.700000001117587,
+            "min": 0,
+            "max": 42.59999999962747
+          },
+          "overlayClears": 0,
+          "eventDomRebuilds": 455,
+          "camera": "absent",
+          "cameraActive": true,
+          "particles": 2000,
+          "simulatedParticles": 2000,
+          "counts": {
+            "observations": 299,
+            "syntheticImages": 0,
+            "unexpectedFrames": 0,
+            "nonLoopbackRequests": 0,
+            "blockedExternalRequests": 0
+          },
+          "errors": [],
+          "modelCalls": 0,
+          "pixelsPersisted": false,
+          "scope": "Fake 640x480 nominal 30 FPS no-face video; CPU vision/SwiftShader; fixed bird 2000 particles; ordinary motion; no physical camera/mic"
+        },
+        {
+          "variant": "r1-baseline-2",
+          "source": "318af9c + named isolated candidate",
+          "warmupSeconds": 10,
+          "nominalWindowSeconds": 20,
+          "elapsedSeconds": 20.00240000000037,
+          "inferences": 443,
+          "inferenceHz": 22.147342318921318,
+          "renderFrames": 592,
+          "renderHz": 29.59644842618831,
+          "frameMs": {
+            "mean": 33.7675675675682,
+            "p50": 31.90000000037253,
+            "p95": 51.40000000037253,
+            "min": 3.800000000745058,
+            "max": 61.30000000074506
+          },
+          "inferenceMs": {
+            "mean": 39.57855530481357,
+            "p50": 38.69999999925494,
+            "p95": 67.5,
+            "min": 10.199999999254942,
+            "max": 94.09999999962747
+          },
+          "postToResultMs": {
+            "mean": 41.964334085806534,
+            "p50": 41.40000000037253,
+            "p95": 69.80000000074506,
+            "min": 11.400000000372529,
+            "max": 94.19999999925494
+          },
+          "resultToPostIdleMs": {
+            "mean": 3.217155756176561,
+            "p50": 0.5,
+            "p95": 17.40000000037253,
+            "min": 0.09999999962747097,
+            "max": 34.09999999962747
+          },
+          "overlayClears": 443,
+          "eventDomRebuilds": 443,
+          "camera": "absent",
+          "cameraActive": true,
+          "particles": 2000,
+          "simulatedParticles": 2000,
+          "counts": {
+            "observations": 299,
+            "syntheticImages": 0,
+            "unexpectedFrames": 0,
+            "nonLoopbackRequests": 0,
+            "blockedExternalRequests": 0
+          },
+          "errors": [],
+          "modelCalls": 0,
+          "pixelsPersisted": false,
+          "scope": "Fake 640x480 nominal 30 FPS no-face video; CPU vision/SwiftShader; fixed bird 2000 particles; ordinary motion; no physical camera/mic"
+        },
+        {
+          "variant": "r1-blank-overlay-2",
+          "source": "318af9c + named isolated candidate",
+          "warmupSeconds": 10,
+          "nominalWindowSeconds": 20,
+          "elapsedSeconds": 20.00320000000112,
+          "inferences": 446,
+          "inferenceHz": 22.296432570787427,
+          "renderFrames": 602,
+          "renderHz": 30.095184770435047,
+          "frameMs": {
+            "mean": 33.21196013289284,
+            "p50": 30.40000000037253,
+            "p95": 50.80000000074506,
+            "min": 11.600000001490116,
+            "max": 67.90000000037253
+          },
+          "inferenceMs": {
+            "mean": 39.144170403655934,
+            "p50": 38.29999999888241,
+            "p95": 67,
+            "min": 11.5,
+            "max": 97.40000000037253
+          },
+          "postToResultMs": {
+            "mean": 41.5289237668128,
+            "p50": 40.90000000037253,
+            "p95": 69.20000000111759,
+            "min": 11.599999999627471,
+            "max": 115.70000000111759
+          },
+          "resultToPostIdleMs": {
+            "mean": 3.288789237657303,
+            "p50": 0.5,
+            "p95": 16.90000000037253,
+            "min": 0.09999999962747097,
+            "max": 42.19999999925494
+          },
+          "overlayClears": 0,
+          "eventDomRebuilds": 446,
+          "camera": "absent",
+          "cameraActive": true,
+          "particles": 2000,
+          "simulatedParticles": 2000,
+          "counts": {
+            "observations": 299,
+            "syntheticImages": 0,
+            "unexpectedFrames": 0,
+            "nonLoopbackRequests": 0,
+            "blockedExternalRequests": 0
+          },
+          "errors": [],
+          "modelCalls": 0,
+          "pixelsPersisted": false,
+          "scope": "Fake 640x480 nominal 30 FPS no-face video; CPU vision/SwiftShader; fixed bird 2000 particles; ordinary motion; no physical camera/mic"
+        }
+      ],
+      "pairedDeltaPercent": [
+        {
+          "repeat": 1,
+          "inferenceHz": -3.0064100163554652,
+          "renderHz": -1.3506032668263446
+        },
+        {
+          "repeat": 2,
+          "inferenceHz": 0.6731744591256694,
+          "renderHz": 1.685122272324513
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "variant": "no-depth",
+      "hypothesis": "Remove unused depth attachment/test for the single Points material whose depth writes are already disabled",
+      "candidatePatch": "--- a/src/adapters/three-renderer.ts\n+++ b/src/adapters/three-renderer.ts\n@@ -61,6 +61,7 @@\n     this.renderer = new THREE.WebGLRenderer({\n       canvas,\n       alpha: true,\n+      depth: false,\n       antialias: false,\n       powerPreference: 'high-performance',\n     });\n@@ -74,6 +75,7 @@\n     this.material = new THREE.ShaderMaterial({\n       transparent: true,\n       depthWrite: false,\n+      depthTest: false,\n       uniforms: {\n         color: { value: new THREE.Color('#79e6d3') },\n         size: { value: 2 },\n",
+      "sourceSha256": {
+        "baseline": "d3a4d03510a5de2cbb98bf094a1b413d3e461932e1b6e43160e7654ee2535bb2",
+        "candidate": "55b583b6146dbd3f6f8f01c040730aad3cabc12768acc7f35bcefb56a59b0485"
+      },
+      "retained": false,
+      "runs": [
+        {
+          "variant": "r2-baseline-1",
+          "source": "318af9c + named isolated candidate",
+          "warmupSeconds": 10,
+          "nominalWindowSeconds": 20,
+          "elapsedSeconds": 20.0045,
+          "inferences": 460,
+          "inferenceHz": 22.994826164113075,
+          "renderFrames": 607,
+          "renderHz": 30.343172786123123,
+          "frameMs": {
+            "mean": 32.950082372321674,
+            "p50": 30.400000002235174,
+            "p95": 51.20000000298023,
+            "min": 7.899999998509884,
+            "max": 67
+          },
+          "inferenceMs": {
+            "mean": 36.833695652173915,
+            "p50": 31.199999999254942,
+            "p95": 68.19999999925494,
+            "min": 9.400000002235174,
+            "max": 91.59999999776483
+          },
+          "postToResultMs": {
+            "mean": 39.897173912968974,
+            "p50": 36.899999998509884,
+            "p95": 71.80000000074506,
+            "min": 10.199999999254942,
+            "max": 100.39999999850988
+          },
+          "resultToPostIdleMs": {
+            "mean": 3.5417391305141477,
+            "p50": 0.5,
+            "p95": 20,
+            "min": 0.09999999776482582,
+            "max": 42.899999998509884
+          },
+          "overlayClears": 460,
+          "eventDomRebuilds": 460,
+          "camera": "absent",
+          "cameraActive": true,
+          "particles": 2000,
+          "simulatedParticles": 2000,
+          "counts": {
+            "observations": 299,
+            "syntheticImages": 0,
+            "unexpectedFrames": 0,
+            "nonLoopbackRequests": 0,
+            "blockedExternalRequests": 0
+          },
+          "errors": [],
+          "modelCalls": 0,
+          "pixelsPersisted": false,
+          "scope": "Fake 640x480 nominal 30 FPS no-face video; CPU vision/SwiftShader; fixed bird 2000 particles; ordinary motion; no physical camera/mic"
+        },
+        {
+          "variant": "r2-no-depth-1",
+          "source": "318af9c + named isolated candidate",
+          "warmupSeconds": 10,
+          "nominalWindowSeconds": 20,
+          "elapsedSeconds": 20.00910000000149,
+          "inferences": 439,
+          "inferenceHz": 21.94001729213045,
+          "renderFrames": 594,
+          "renderHz": 29.68649264584393,
+          "frameMs": {
+            "mean": 33.66060606060982,
+            "p50": 31.700000002980232,
+            "p95": 52,
+            "min": 13.100000001490116,
+            "max": 60.19999999925494
+          },
+          "inferenceMs": {
+            "mean": 38.82505694740284,
+            "p50": 35.19999999925494,
+            "p95": 67.90000000223517,
+            "min": 9.399999998509884,
+            "max": 94.19999999925494
+          },
+          "postToResultMs": {
+            "mean": 41.452619589992494,
+            "p50": 39.5,
+            "p95": 71.10000000149012,
+            "min": 9.600000001490116,
+            "max": 94.5
+          },
+          "resultToPostIdleMs": {
+            "mean": 4.1339407744721965,
+            "p50": 0.5,
+            "p95": 22.100000001490116,
+            "min": 0.09999999776482582,
+            "max": 45.5
+          },
+          "overlayClears": 439,
+          "eventDomRebuilds": 439,
+          "camera": "absent",
+          "cameraActive": true,
+          "particles": 2000,
+          "simulatedParticles": 2000,
+          "counts": {
+            "observations": 300,
+            "syntheticImages": 0,
+            "unexpectedFrames": 0,
+            "nonLoopbackRequests": 0,
+            "blockedExternalRequests": 0
+          },
+          "errors": [],
+          "modelCalls": 0,
+          "pixelsPersisted": false,
+          "scope": "Fake 640x480 nominal 30 FPS no-face video; CPU vision/SwiftShader; fixed bird 2000 particles; ordinary motion; no physical camera/mic"
+        },
+        {
+          "variant": "r2-baseline-2",
+          "source": "318af9c + named isolated candidate",
+          "warmupSeconds": 10,
+          "nominalWindowSeconds": 20,
+          "elapsedSeconds": 20.008199999999256,
+          "inferences": 463,
+          "inferenceHz": 23.140512389920993,
+          "renderFrames": 595,
+          "renderHz": 29.737807498926546,
+          "frameMs": {
+            "mean": 33.61277310923994,
+            "p50": 31.399999998509884,
+            "p95": 50.899999998509884,
+            "min": 12.099999997764826,
+            "max": 60.899999998509884
+          },
+          "inferenceMs": {
+            "mean": 37.839308855117785,
+            "p50": 33.80000000074506,
+            "p95": 66.40000000223517,
+            "min": 11.399999998509884,
+            "max": 93.19999999925494
+          },
+          "postToResultMs": {
+            "mean": 40.537796976193626,
+            "p50": 40.399999998509884,
+            "p95": 68.5,
+            "min": 12.5,
+            "max": 93.70000000298023
+          },
+          "resultToPostIdleMs": {
+            "mean": 2.714686825131237,
+            "p50": 0.5,
+            "p95": 16.199999999254942,
+            "min": 0.09999999776482582,
+            "max": 39.100000001490116
+          },
+          "overlayClears": 463,
+          "eventDomRebuilds": 463,
+          "camera": "absent",
+          "cameraActive": true,
+          "particles": 2000,
+          "simulatedParticles": 2000,
+          "counts": {
+            "observations": 300,
+            "syntheticImages": 0,
+            "unexpectedFrames": 0,
+            "nonLoopbackRequests": 0,
+            "blockedExternalRequests": 0
+          },
+          "errors": [],
+          "modelCalls": 0,
+          "pixelsPersisted": false,
+          "scope": "Fake 640x480 nominal 30 FPS no-face video; CPU vision/SwiftShader; fixed bird 2000 particles; ordinary motion; no physical camera/mic"
+        },
+        {
+          "variant": "r2-no-depth-2",
+          "source": "318af9c + named isolated candidate",
+          "warmupSeconds": 10,
+          "nominalWindowSeconds": 20,
+          "elapsedSeconds": 20.003699999999256,
+          "inferences": 462,
+          "inferenceHz": 23.095727290452125,
+          "renderFrames": 599,
+          "renderHz": 29.944460274850268,
+          "frameMs": {
+            "mean": 33.36644407345576,
+            "p50": 31,
+            "p95": 50,
+            "min": 8.599999997764826,
+            "max": 58.19999999925494
+          },
+          "inferenceMs": {
+            "mean": 37.7261904760534,
+            "p50": 34.400000002235174,
+            "p95": 67.30000000074506,
+            "min": 10.899999998509884,
+            "max": 92.5
+          },
+          "postToResultMs": {
+            "mean": 40.05952380935448,
+            "p50": 37.80000000074506,
+            "p95": 68.69999999925494,
+            "min": 11,
+            "max": 92.80000000074506
+          },
+          "resultToPostIdleMs": {
+            "mean": 3.1333333334978266,
+            "p50": 0.5,
+            "p95": 17.700000002980232,
+            "min": 0,
+            "max": 38.69999999925494
+          },
+          "overlayClears": 462,
+          "eventDomRebuilds": 462,
+          "camera": "absent",
+          "cameraActive": true,
+          "particles": 2000,
+          "simulatedParticles": 2000,
+          "counts": {
+            "observations": 300,
+            "syntheticImages": 0,
+            "unexpectedFrames": 0,
+            "nonLoopbackRequests": 0,
+            "blockedExternalRequests": 0
+          },
+          "errors": [],
+          "modelCalls": 0,
+          "pixelsPersisted": false,
+          "scope": "Fake 640x480 nominal 30 FPS no-face video; CPU vision/SwiftShader; fixed bird 2000 particles; ordinary motion; no physical camera/mic"
+        }
+      ],
+      "pairedDeltaPercent": [
+        {
+          "repeat": 1,
+          "inferenceHz": -4.58715740860357,
+          "renderHz": -2.164177572687831
+        },
+        {
+          "repeat": 2,
+          "inferenceHz": -0.19353547023606144,
+          "renderHz": 0.6949159783591341
+        }
+      ]
+    }
+  ],
+  "depthQuality": {
+    "referenceDepth": true,
+    "candidateDepth": false,
+    "cases": [
+      {
+        "index": 0,
+        "count": 2000,
+        "pointSize": 1.8,
+        "brightness": 0.3,
+        "grow": 0.25,
+        "foregroundPixels": 1802,
+        "changedChannels": 0,
+        "maxChannelDelta": 0
+      },
+      {
+        "index": 1,
+        "count": 2000,
+        "pointSize": 2,
+        "brightness": 0.65,
+        "grow": 1,
+        "foregroundPixels": 3563,
+        "changedChannels": 0,
+        "maxChannelDelta": 0
+      },
+      {
+        "index": 2,
+        "count": 2000,
+        "pointSize": 4,
+        "brightness": 1,
+        "grow": 2,
+        "foregroundPixels": 6705,
+        "changedChannels": 0,
+        "maxChannelDelta": 0
+      },
+      {
+        "index": 3,
+        "count": 2000,
+        "pointSize": 8,
+        "brightness": 1.2,
+        "grow": 0.25,
+        "foregroundPixels": 2224,
+        "changedChannels": 0,
+        "maxChannelDelta": 0
+      },
+      {
+        "index": 4,
+        "count": 2000,
+        "pointSize": 1.8,
+        "brightness": 0.3,
+        "grow": 1,
+        "foregroundPixels": 3363,
+        "changedChannels": 0,
+        "maxChannelDelta": 0
+      },
+      {
+        "index": 5,
+        "count": 2000,
+        "pointSize": 2,
+        "brightness": 0.65,
+        "grow": 2,
+        "foregroundPixels": 4094,
+        "changedChannels": 0,
+        "maxChannelDelta": 0
+      },
+      {
+        "index": 6,
+        "count": 2000,
+        "pointSize": 4,
+        "brightness": 1,
+        "grow": 0.25,
+        "foregroundPixels": 1597,
+        "changedChannels": 0,
+        "maxChannelDelta": 0
+      },
+      {
+        "index": 7,
+        "count": 2000,
+        "pointSize": 8,
+        "brightness": 1.2,
+        "grow": 1,
+        "foregroundPixels": 12459,
+        "changedChannels": 0,
+        "maxChannelDelta": 0
+      },
+      {
+        "index": 8,
+        "count": 10000,
+        "pointSize": 1.8,
+        "brightness": 0.3,
+        "grow": 2,
+        "foregroundPixels": 1597,
+        "changedChannels": 0,
+        "maxChannelDelta": 0
+      },
+      {
+        "index": 9,
+        "count": 10000,
+        "pointSize": 2,
+        "brightness": 0.65,
+        "grow": 0.25,
+        "foregroundPixels": 136,
+        "changedChannels": 0,
+        "maxChannelDelta": 0
+      },
+      {
+        "index": 10,
+        "count": 10000,
+        "pointSize": 4,
+        "brightness": 1,
+        "grow": 1,
+        "foregroundPixels": 1281,
+        "changedChannels": 0,
+        "maxChannelDelta": 0
+      },
+      {
+        "index": 11,
+        "count": 10000,
+        "pointSize": 8,
+        "brightness": 1.2,
+        "grow": 2,
+        "foregroundPixels": 4376,
+        "changedChannels": 0,
+        "maxChannelDelta": 0
+      }
+    ],
+    "errors": [],
+    "pixelsPersisted": false,
+    "cameraUsed": false
+  },
+  "loadedTurnReflex": {
+    "runtime": "318af9c",
+    "case": "confirmed turn_changed -> declared body-y 0.3 / 600ms reflex while real FaceLandmarker CPU runs on fake no-face video",
+    "trials": [
+      {
+        "latencyMs": 182.5,
+        "centroidDeltaPixels": 5.142066314302099,
+        "noisePixels": 0.44536195795441813,
+        "frames": 20,
+        "cameraActive": true,
+        "camera": "absent"
+      },
+      {
+        "latencyMs": 218.19999999925494,
+        "centroidDeltaPixels": 5.45788695084147,
+        "noisePixels": 0.6582230109529519,
+        "frames": 23,
+        "cameraActive": true,
+        "camera": "absent"
+      },
+      {
+        "latencyMs": 112.39999999850988,
+        "centroidDeltaPixels": 3.03803732438584,
+        "noisePixels": 0.4188546209813069,
+        "frames": 19,
+        "cameraActive": true,
+        "camera": "absent"
+      },
+      {
+        "latencyMs": 122.5,
+        "centroidDeltaPixels": 3.0751131181528706,
+        "noisePixels": 0.719619485072684,
+        "frames": 22,
+        "cameraActive": true,
+        "camera": "absent"
+      },
+      {
+        "latencyMs": 144.30000000074506,
+        "centroidDeltaPixels": 2.0159834895391953,
+        "noisePixels": 0.29723992226055884,
+        "frames": 21,
+        "cameraActive": true,
+        "camera": "absent"
+      },
+      {
+        "latencyMs": 141.5,
+        "centroidDeltaPixels": 3.9410091900095097,
+        "noisePixels": 0.6452679593224389,
+        "frames": 21,
+        "cameraActive": true,
+        "camera": "absent"
+      },
+      {
+        "latencyMs": 128.60000000149012,
+        "centroidDeltaPixels": 3.899904491720605,
+        "noisePixels": 0.876445902895739,
+        "frames": 26,
+        "cameraActive": true,
+        "camera": "absent"
+      },
+      {
+        "latencyMs": 171.09999999776483,
+        "centroidDeltaPixels": 5.181039961146496,
+        "noisePixels": 0.18591879643935272,
+        "frames": 20,
+        "cameraActive": true,
+        "camera": "absent"
+      },
+      {
+        "latencyMs": 166.59999999776483,
+        "centroidDeltaPixels": 3.8501219490275673,
+        "noisePixels": 0.7602200145134645,
+        "frames": 22,
+        "cameraActive": true,
+        "camera": "absent"
+      },
+      {
+        "latencyMs": 119.59999999776483,
+        "centroidDeltaPixels": 2.183092012670471,
+        "noisePixels": 0.8526841337071005,
+        "frames": 22,
+        "cameraActive": true,
+        "camera": "absent"
+      }
+    ],
+    "cameraInfo": {
+      "width": 640,
+      "height": 480,
+      "nominalFps": 30,
+      "audioTracks": 0
+    },
+    "cameraStoppedAtTeardown": true,
+    "counts": {
+      "observations": 408,
+      "syntheticImages": 0,
+      "unexpectedFrames": 0,
+      "nonLoopbackRequests": 0,
+      "blockedExternalRequests": 0
+    },
+    "errors": [],
+    "modelCalls": 0,
+    "pixelsPersisted": false,
+    "limits": "Same >2px buffer-centroid proxy, readback included. No presence injection or product guard bypass. Different event and camera workload from camera-off arrival cases; not a direct before/after comparison or native/default-arrival acceptance. The cue also activates working/attention; this measures first body response, not an isolated pose channel. Median is ordinary median; sampled p95 is sorted[floor(n*.95)].",
+    "summary": {
+      "medianMs": 142.90000000037253,
+      "sampledP95Ms": 218.19999999925494,
+      "minMs": 112.39999999850988,
+      "maxMs": 218.19999999925494,
+      "maxNoisePixels": 0.876445902895739
+    }
+  },
+  "outcome": "Stop after two non-improving optimization rounds. Product runtime unchanged; remaining performance/native/manual gates stay open."
+}
