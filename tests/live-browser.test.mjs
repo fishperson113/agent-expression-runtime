@@ -45,3 +45,21 @@ it('draws a facial resting body, changes declared features on activity and freez
     expect(await page.locator('video').evaluate(video => video.srcObject)).toBe(null);
   } finally { await browser?.close(); await server.close(); }
 }, 45000);
+
+it('keeps the body larger than the optional camera, with reachable controls on narrow screens', async () => {
+  const server = await createServer({ server: { host: '127.0.0.1', port: 0 } }); await server.listen(); let browser;
+  try {
+    browser = await chromium.launch({ headless: true, ...(process.platform === 'win32' ? { channel: 'msedge' } : {}),
+      args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+    const page = await browser.newPage({ viewport: { width: 1360, height: 950 } });
+    await page.goto(server.resolvedUrls.local[0] + 'live.html');
+    const body = await page.locator('#body').boundingBox(), camera = await page.locator('.camera-stage').boundingBox();
+    expect(body.width).toBeGreaterThan(camera.width * 3); expect(body.height).toBeGreaterThan(600);
+    await page.locator('.camera-panel>summary').click();
+    expect(await page.locator('#camera-start').isVisible()).toBe(false);
+    expect(await page.locator('#cancel').isVisible()).toBe(true);
+    await page.setViewportSize({ width: 375, height: 812 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    expect(await page.locator('#body').boundingBox()).toMatchObject({ width: 343 });
+  } finally { await browser?.close(); await server.close(); }
+}, 45000);
