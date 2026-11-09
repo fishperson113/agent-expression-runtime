@@ -1,0 +1,126 @@
+{
+  "sourceSha": "cae41252cef5e88d185214da34c37cb87531f5bd",
+  "runtimeBase": "2b6b8ad",
+  "execution": "two virtual 20-minute controls after production hand-observer integration; not a wall/browser run",
+  "pollMs": 100,
+  "particles": 64,
+  "realModelCalls": 0,
+  "mediaCalls": 0,
+  "rows": [
+    {
+      "rate": 0,
+      "latency": 2000,
+      "seed": 0,
+      "mode": "fresh",
+      "frames": 24000,
+      "validSourceFrames": 24000,
+      "sourceValidityRatio": 1,
+      "rawScoreChanges": 0,
+      "semanticOpportunities": 1,
+      "sourceEligibleOpportunities": 1,
+      "candidateEligible": 1,
+      "providerRequested": 1,
+      "authorizationDenied": 0,
+      "decisionsReturned": 1,
+      "admitted": 1,
+      "firstStateSink": 1,
+      "firstChangedStateSink": 1,
+      "phases": {
+        "applied": 1,
+        "completed": 1
+      },
+      "eventTypes": {
+        "user_arrived": 1
+      },
+      "verdicts": {
+        "accepted": 1
+      },
+      "preflightCleanupVerdicts": {},
+      "revocations": {
+        "enabled": 1
+      },
+      "firstRequestRevocations": {},
+      "leaseRevocations": {
+        "expired": 1
+      },
+      "actualCancelReasons": {},
+      "sourceStatusFrames": {
+        "tracking": 24000
+      },
+      "observedRequestTtlsMs": [
+        5000
+      ],
+      "outstandingAtEnd": 0,
+      "actualGpuFramesMeasured": false,
+      "longestAppliedSilence": {
+        "milliseconds": 1196200,
+        "from": 3800,
+        "to": 1200000,
+        "semanticOpportunities": 0
+      },
+      "longestCompletedSilence": {
+        "milliseconds": 1195600,
+        "from": 4400,
+        "to": 1200000,
+        "semanticOpportunities": 0
+      }
+    },
+    {
+      "rate": 0.5,
+      "latency": 2000,
+      "seed": 0,
+      "mode": "fresh",
+      "frames": 24000,
+      "validSourceFrames": 24000,
+      "sourceValidityRatio": 1,
+      "rawScoreChanges": 599,
+      "semanticOpportunities": 600,
+      "sourceEligibleOpportunities": 600,
+      "candidateEligible": 80,
+      "providerRequested": 80,
+      "authorizationDenied": 0,
+      "decisionsReturned": 80,
+      "admitted": 0,
+      "firstStateSink": 0,
+      "firstChangedStateSink": 0,
+      "phases": {},
+      "eventTypes": {
+        "user_arrived": 1,
+        "expression_changed": 599
+      },
+      "verdicts": {
+        "revoked": 80
+      },
+      "preflightCleanupVerdicts": {},
+      "revocations": {
+        "enabled": 1,
+        "semantic_changed": 80
+      },
+      "firstRequestRevocations": {
+        "semantic_changed": 80
+      },
+      "leaseRevocations": {},
+      "actualCancelReasons": {},
+      "sourceStatusFrames": {
+        "tracking": 24000
+      },
+      "observedRequestTtlsMs": [
+        5000
+      ],
+      "outstandingAtEnd": 0,
+      "actualGpuFramesMeasured": false,
+      "longestAppliedSilence": {
+        "milliseconds": 1200000,
+        "from": 0,
+        "to": 1200000,
+        "semanticOpportunities": 600
+      },
+      "longestCompletedSilence": {
+        "milliseconds": 1200000,
+        "from": 0,
+        "to": 1200000,
+        "semanticOpportunities": 600
+      }
+    }
+  ]
+}

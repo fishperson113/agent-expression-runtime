@@ -45,7 +45,8 @@ as desired product behavior. Private native method wrapping counts revocation
 reasons on the isolated diagnostic instance and calls the original unchanged;
 future internal API changes may require updating this harness.
 
-An independent browser/fake-provider wall-time gate remains separate. It must
-cover its entire elapsed duration, distinguish quiet and active opportunities,
-and attribute real frame proxies separately from Scheduler application. A rolling
-60-second recorder or this virtual matrix cannot replace that gate.
+The separate [real-wall browser/broker report](reactive-wall-evidence.md) now
+covers a full 20-minute synthetic run at source `354d642`, with quiet/active
+opportunity cohorts and actual owned frame proxies. This virtual report was
+regenerated at `dc66412`; the snapshots must not be conflated. Neither a rolling
+60-second recorder nor the virtual matrix substitutes for the wall measurement.
