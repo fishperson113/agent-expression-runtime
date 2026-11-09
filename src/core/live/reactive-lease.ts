@@ -1,8 +1,9 @@
+import { freezeHandReadSet, matchesHandReadSet } from './decision-types';
 import type { ReactiveOwnership, ReactiveRequest, ReactiveState } from './decision-types';
 
 export type ReactiveLease = Readonly<ReactiveRequest & ReactiveOwnership & { generation: number }>;
 export type LeaseRevokeReason = 'expired' | 'session_changed' | 'epoch_changed' | 'intent_changed' |
-  'presence_changed' | 'track_lost' | 'semantic_changed' | 'revoked';
+  'presence_changed' | 'hand_changed' | 'track_lost' | 'semantic_changed' | 'revoked';
 
 /** A synchronous execution boundary. The caller checks before admission and every tick. */
 export class ReactiveLeaseGuard {
@@ -16,7 +17,9 @@ export class ReactiveLeaseGuard {
   acquire(request: ReactiveRequest, ownership: ReactiveOwnership, generation: number): boolean {
     if (this.active || this.actions.size >= 256 || this.actions.has(ownership.actionId) || generation !== this.revision || ownership.requestId !== request.requestId ||
       !Number.isFinite(request.deadline) || !Number.isFinite(ownership.validUntil) || ownership.validUntil > request.deadline) return false;
-    const owner = Object.freeze({ ...request, ...ownership, generation,
+    let hand;
+    try { if (Object.hasOwn(request, 'handReadSet')) hand = freezeHandReadSet(request.handReadSet); } catch { return false; }
+    const owner = Object.freeze({ ...request, ...ownership, generation, ...(hand ? { handReadSet: hand } : {}),
       requiredTrackIds: Object.freeze([...request.requiredTrackIds]) });
     if (this.reason(owner)) return false;
     this.actions.add(owner.actionId); this.active = owner; return true;
@@ -43,6 +46,7 @@ export class ReactiveLeaseGuard {
     if (state.epoch !== owner.epoch) return 'epoch_changed';
     if (state.intentRevision !== owner.intentRevision) return 'intent_changed';
     if (owner.presenceRevision !== undefined && state.presenceRevision !== owner.presenceRevision) return 'presence_changed';
+    if (!matchesHandReadSet(owner.handReadSet, state.handState)) return 'hand_changed';
     if (!owner.requiredTrackIds.every(track => state.trackIds.includes(track))) return 'track_lost';
   }
 }

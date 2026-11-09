@@ -1,11 +1,26 @@
 import type { LiveCompiled } from './control-types';
 
+export type HandReadSet = Readonly<{ stateRevision: number; sourceGeneration: number; primaryTrackId: string | null }>;
+export function freezeHandReadSet(value: unknown): HandReadSet {
+  if (!value || typeof value !== 'object' || ![Object.prototype, null].includes(Object.getPrototypeOf(value))) throw Error('hand_readset');
+  const fields = Object.getOwnPropertyDescriptors(value), keys = Reflect.ownKeys(fields);
+  if (keys.length !== 3 || keys.some(key => !['stateRevision', 'sourceGeneration', 'primaryTrackId'].includes(String(key)) || !Object.hasOwn(fields[key as string], 'value'))) throw Error('hand_readset');
+  const stateRevision = fields.stateRevision.value, sourceGeneration = fields.sourceGeneration.value, primaryTrackId = fields.primaryTrackId.value;
+  if (![stateRevision, sourceGeneration].every(value => Number.isSafeInteger(value) && value >= 0) ||
+    (primaryTrackId !== null && (typeof primaryTrackId !== 'string' || !/^[a-zA-Z0-9_-]{1,64}$/.test(primaryTrackId)))) throw Error('hand_readset');
+  return Object.freeze({ stateRevision, sourceGeneration, primaryTrackId });
+}
+export function matchesHandReadSet(expected: HandReadSet | undefined, state: HandReadSet | undefined): boolean {
+  return expected === undefined || !!state && expected.stateRevision === state.stateRevision &&
+    expected.sourceGeneration === state.sourceGeneration && expected.primaryTrackId === state.primaryTrackId;
+}
+
 export type ReactiveRequest = Readonly<{
   schemaVersion: 1; sessionId: string; epoch: string; requestId: string;
-  intentRevision: number; presenceRevision?: number; deadline: number; requiredTrackIds: readonly string[];
+  intentRevision: number; presenceRevision?: number; handReadSet?: HandReadSet; deadline: number; requiredTrackIds: readonly string[];
 }>;
 export type ReactiveState = {
-  sessionId: string; epoch: string; intentRevision: number; presenceRevision?: number; trackIds: readonly string[];
+  sessionId: string; epoch: string; intentRevision: number; presenceRevision?: number; handState?: HandReadSet; trackIds: readonly string[];
 };
 export type ReactiveAdapter = {
   decide(request: ReactiveRequest, signal: AbortSignal): Promise<unknown>;
