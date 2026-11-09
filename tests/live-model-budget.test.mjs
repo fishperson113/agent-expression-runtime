@@ -77,3 +77,10 @@ it('fails closed at the deadline or concurrent lock and preserves the original f
   expect(() => reserveModelTurn(path, 'parallel', Date.parse('2026-11-08T18:00:00Z'))).toThrow();
   expect(readFileSync(path, 'utf8')).toBe(original);
 });
+
+it('generates unique blind codes without exposing prompt IDs or presentation order', async () => {
+  const { blindCodes } = await import('../integrations/live-holdout-video.mjs');
+  const codes = blindCodes(20);
+  expect(new Set(codes).size).toBe(20);
+  expect(codes.every(code => /^V-[A-F0-9]{8}$/.test(code))).toBe(true);
+});

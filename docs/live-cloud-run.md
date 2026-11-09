@@ -645,3 +645,49 @@ Runtime remains unchanged; no device-personal access, network/security/trust or
 credential changes. Model reservations remain 53/120; deadline unchanged at
 2026-11-09 06:17:35 UTC. Remaining physical/native/human/voice gates require
 appropriate real evidence and were not certified by these Cloud tests.
+
+## Phase 2026-11-09 — blind video delivery and compact UI
+
+Fresh Cloud executor, main 88012b0; branch codex/blind-video-minimal-ui. Prior
+executor's transient ledger/captures are unavailable here. Conservatively carry
+53/120 reservations forward (checkpoint 20), with no reconstruction of missing
+turn records. New phase hard deadline: 2026-11-09 13:45:00 UTC. Never reset the
+120-turn lifetime cap. Stop Cloud performance optimization as assigned.
+
+Record actual canvas video during fresh frozen holdout turns; never animate old
+screenshots into purported model evidence. Random blind codes and scoring CSV
+exclude prompt/ordinal; answer key and raw recordings stay in a separate private
+directory. Human recognition/emotion/theme acceptance remains pending owner
+scoring tonight; do not revise expressions before that test.
+
+Reference sword_formation was inspected as a layout reference only: large scene,
+small optional camera/control surface. GitHub root has no license; no source or
+assets copied. Maintain keyboard controls, reduced motion and camera-off default.
+
+Delivery checkpoint: Cloud app-server initially could not open its SQLite runtime
+inside the read-only home sandbox. Approved outer execution enabled only the
+normal runtime writes. A counted attempt then failed, and one counted diagnostic
+returned `unauthorized`: refresh token invalidated by logout/account change,
+with zero MCP calls. `codex login status` alone incorrectly appeared signed in.
+Do not retry inference until the owner reconnects Codex in this Cloud environment.
+Current lifetime reservations: **55/120**, including both failures; 0 new valid
+holdout clips. The prior 20 screenshot samples cannot reconstruct model motion.
+No credentials, trust settings or home hook configuration were changed.
+
+Recorder apparatus check (deterministic fixture, not model holdout): actual
+WebGL canvas stream produced a 2.753-second H.264 clip, 64 decoded frames/64 unique
+frame hashes, 606x454 padded from odd 605x453, one video stream and no audio.
+Camera inactive, zero browser script errors. Frame uniqueness is an encoding/
+motion sanity check, not semantic recognition. Compact layout passed desktop,
+375px overflow, camera disclosure and reduced-motion/keyboard regressions.
+263 JS tests pass, architecture and production build pass. Chunk-size warning
+remains. Strict my-harness passes; R10/R11 are unknown in Codex.
+
+Human kit flow after reconnect: run the guarded holdout once; share only `blind/`
+(20 MP4s, local gallery, scoring CSV), never the parent run directory or private
+answer key. Clips retain the actual performance from one second before the first
+expression tool receipt until at least 10.5 seconds after turn completion; a turn
+without an expression remains visible as a no-expression result. Failed turns
+stay private and stop the run. Owner scores theme/emotion and clarity independently
+before comparing the separate prompt key; the >=6/10 gate stays pending. ffmpeg
+is required and checked before any inference reservation.
