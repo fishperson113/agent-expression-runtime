@@ -1,3 +1,4 @@
+import { freezeHandReadSet } from './decision-types';
 import { eventKinds, validateObservation } from './observation';
 import { causalRevocationReasons, type CausalKind } from './causal-recorder-types';
 const id = (value: unknown, max = 64) => typeof value === 'string' && new RegExp(`^[a-zA-Z0-9_-]{1,${max}}$`).test(value);
@@ -39,9 +40,10 @@ function references(value: unknown, limit: number) {
 }
 function requestPayload(value: unknown) {
   const payload = object(value, ['request', 'observationRefs', 'eventRefs']);
-  const request = object(payload.request, ['schemaVersion', 'sessionId', 'epoch', 'requestId', 'intentRevision', 'deadline', 'requiredTrackIds'], ['presenceRevision']);
+  const request = object(payload.request, ['schemaVersion', 'sessionId', 'epoch', 'requestId', 'intentRevision', 'deadline', 'requiredTrackIds'], ['presenceRevision', 'handReadSet']);
   requireValue(request.schemaVersion === 1 && ['sessionId', 'epoch', 'requestId'].every(key => id(request[key])) && integer(request.intentRevision) && number(request.deadline));
   if ('presenceRevision' in request) requireValue(integer(request.presenceRevision));
+  if ('handReadSet' in request) freezeHandReadSet(request.handReadSet);
   requireValue(Array.isArray(request.requiredTrackIds) && request.requiredTrackIds.length <= 16 && request.requiredTrackIds.every((value: unknown) => id(value)) && new Set(request.requiredTrackIds).size === request.requiredTrackIds.length);
   references(payload.observationRefs, 4); references(payload.eventRefs, 8); return payload;
 }

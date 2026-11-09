@@ -1,3 +1,4 @@
+import { freezeHandReadSet, matchesHandReadSet } from './decision-types';
 import { LiveCompiler } from './compiler';
 import { strictObject } from './observation';
 import type { DecisionAdmission, DecisionResult, ReactiveAdapter, ReactiveRequest, ReactiveState } from './decision-types';
@@ -7,13 +8,14 @@ const time = (value: unknown): value is number => typeof value === 'number' && N
 function freezeRequest(value: ReactiveRequest): ReactiveRequest {
   const fields = ['schemaVersion', 'sessionId', 'epoch', 'requestId', 'intentRevision', 'deadline', 'requiredTrackIds'];
   if (Object.hasOwn(value, 'presenceRevision')) fields.push('presenceRevision');
+  if (Object.hasOwn(value, 'handReadSet')) fields.push('handReadSet');
   strictObject(value, fields);
   if (Object.hasOwn(value, 'presenceRevision') && (!Number.isSafeInteger(value.presenceRevision) || value.presenceRevision! < 0)) throw Error('request');
   if (value.schemaVersion !== 1 || ![value.sessionId, value.epoch, value.requestId].every(id) ||
     !Number.isSafeInteger(value.intentRevision) || value.intentRevision < 0 || !time(value.deadline) ||
     !Array.isArray(value.requiredTrackIds) || value.requiredTrackIds.length > 16 ||
     !value.requiredTrackIds.every(id) || new Set(value.requiredTrackIds).size !== value.requiredTrackIds.length) throw Error('request');
-  return Object.freeze({ ...value, requiredTrackIds: Object.freeze([...value.requiredTrackIds]) });
+  return Object.freeze({ ...value, ...(Object.hasOwn(value, 'handReadSet') ? { handReadSet: freezeHandReadSet(value.handReadSet) } : {}), requiredTrackIds: Object.freeze([...value.requiredTrackIds]) });
 }
 function decision(value: unknown, request: ReactiveRequest) {
   const object = strictObject(value, ['schemaVersion', 'requestId', 'decisionId', 'mode', 'validUntil', 'action']);
@@ -26,7 +28,7 @@ function decision(value: unknown, request: ReactiveRequest) {
   return object;
 }
 
-/** Offline track-membership and optional presence-revision read-set; no production provider/renderer is connected.
+/** Offline track-membership and optional semantic read-sets; no production provider/renderer is connected.
  * A host retains at most 256 receipts for its lifetime; capacity requires a new host.
  * Admission is synchronous. Execution-time leases and per-tick validation belong to the caller. */
 export class ReactiveDecisionHost {
@@ -48,6 +50,7 @@ export class ReactiveDecisionHost {
     return generation === this.generation && time(now) && now < until && now < request.deadline &&
       state.sessionId === request.sessionId && state.epoch === request.epoch && state.intentRevision === request.intentRevision &&
       (request.presenceRevision === undefined || state.presenceRevision === request.presenceRevision) &&
+      matchesHandReadSet(request.handReadSet, state.handState) &&
       request.requiredTrackIds.every(track => state.trackIds.includes(track));
   }
   async run(value: ReactiveRequest, adapter: ReactiveAdapter, admit: DecisionAdmission): Promise<DecisionResult> {
