@@ -2,6 +2,54 @@
 
 The current implementation includes pane attachment, native interaction hooks, contextual planning, continuous presence, model-authored performances, adaptive Braille and prepared idle scenes. See [current behavior](expression-planner.md), [review remediation](review-progress.md) and [research/evidence limits](related-work.md#10-cập-nhật-braille-theo-thời-gian-và-idle-scene-tự-do). Test counts below are historical observations, not the current suite size or a fresh certification.
 
+## Bounded contention follow-up — 2026-11-09
+
+Runtime stays `318af9c`. Two additional proposed graphics no-op reductions were
+isolated under /tmp and tested in two alternating paired repeats each. Neither
+produced a consistent gain, so neither was shipped. Model, confidence, resolution,
+2,000 particles, normal motion and the existing acceptance thresholds stayed fixed.
+[Complete sanitized results and candidate patches](evidence/cloud-contention-followup.json)
+retain both successful and unsuccessful observations.
+
+| Candidate | Inference change, pairs 1 / 2 | Render change, pairs 1 / 2 | Decision |
+|---|---|---|---|
+| Skip clears when landmark overlay is already blank | -3.01% / +0.67% | -1.35% / +1.69% | Clear calls fell 469/443 -> 0, without consistent performance gain; reject |
+| Remove unused depth attachment/test | -4.59% / -0.19% | -2.16% / +0.69% | No gain; reject despite pixel equivalence |
+
+Each window used 10-second warm-up + 20 seconds on nominal 30 FPS fake 640x480
+no-face input, CPU vision/SwiftShader, fixed bird geometry and 1360x950 viewport.
+Actual browser elapsed time, completed worker samples, submitted frames and rAF
+intervals were measured together; bounded storage had no truncation. All eight
+windows kept camera active and 2,000 drawn/simulated particles, with zero page
+errors, unexpected frames or browser external/blocked requests. The small mixed
+changes are not evidence of an improvement. Two rounds is the requested limit;
+no third optimization was attempted.
+
+The depth variant was checked separately in 12 framebuffer cases, including
+2,000/10,000 particles, overlap/depth variation, multiple point sizes, brightness
+and scales. Both contexts rendered nonblank foreground; all RGBA channels matched
+exactly, with actual context depth true/false respectively. No image buffers were
+persisted. That establishes this fixture's pixel equivalence, not a speed benefit.
+
+One further Cloud gate probe kept real CPU vision running on the fake no-face
+source and injected the supported `user_message` turn cue, with a declared body-y
+0.3 / 600 ms `turn_changed` reflex. Ten trials measured >2 px green-weighted buffer
+centroid motion: median **142.9 ms**, sampled p95 **218.2 ms**, max baseline noise
+0.8765 px. The cue also activates local working/attention. This is a different
+event/workload from earlier camera-off arrival tests, so it is not a direct
+before/after comparison or a substitute for default/native acceptance. Readback
+overhead is included; the <150 ms p95 gate remains unconfirmed under this load.
+Camera stayed active, stopped explicitly afterward, with zero audio tracks,
+model calls, persisted pixels, errors or browser egress. No presence injection or
+synthetic-camera UI guard bypass was used.
+
+The previous four-core/software-graphics diagnostic remains the best identified
+resource limit. These bounded trials found no further safe, demonstrated gain;
+backend/hardware changes and altered authored-motion semantics were not attempted.
+Product runtime, persistent security/trust/device settings and credentials were unchanged.
+Reservations remain 53/120, deadline 2026-11-09 06:17:35 UTC; physical/native,
+human semantic and voice gates remain open.
+
 ## Vision pacing and reflex envelope — 2026-11-09
 
 [PR #41](https://github.com/fishperson113/agent-expression-runtime/pull/41) removes

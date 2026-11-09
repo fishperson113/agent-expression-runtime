@@ -611,3 +611,37 @@ Physical accuracy/throughput, native GPU/Herdr/hooks/voice and human semantics
 remain pending. R9 reports the large numeric evidence addition; data was not
 compressed/deleted to evade that informational warning. Hard harness rules remain
 required, with R10/R11 unknown in Codex.
+
+
+## Checkpoint 20 — two bounded contention rounds, no new runtime change
+
+On runtime 318af9c, tested two isolated hypotheses in alternating baseline/candidate
+pairs (two repeats each, 10 s warm-up + 20 s/window): skip clears of an already
+blank overlay; remove unused depth attachment/test from the single Points layer.
+Neither had consistent gains. Overlay inference deltas -3.01/+0.67%, render
+-1.35/+1.69%; no-depth inference -4.59/-0.19%, render -2.16/+0.69%. Overlay clear
+calls really fell 469/443 -> 0. Twelve nonblank depth/overlap/size/brightness/scale
+framebuffer fixtures had zero RGBA differences, but that did not establish a
+speedup. Both candidates remain unshipped; no third optimization round attempted.
+
+All eight windows kept the same fake 640x480 nominal 30-FPS no-face source, CPU
+vision/SwiftShader, bird geometry, 2,000 drawn/simulated particles and normal motion.
+No model/confidence/quality/cadence/acceptance reduction. Zero page errors,
+unexpected frames or browser external/blocked requests; camera active throughout.
+[Results, exact patches and limits](evidence/cloud-contention-followup.json) are
+preserved without selecting only favorable windows.
+
+Additional first-response diagnostic with real inference on the fake source used
+the supported turn cue and declared body-y 0.3 / 600 ms turn_changed reflex:
+10 trials, median 142.9 ms, sampled p95 218.2 ms to >2 px buffer-centroid change,
+max noise 0.8765 px. Includes readback and local working/attention; a different
+case from camera-off arrival, not a causal before/after comparison. No presence
+injection or synthetic-camera guard bypass. Camera explicitly stopped, zero audio,
+model calls, persisted pixels, errors or browser egress. Default/native first-motion
+and sustained performance gates remain open.
+
+Stopped the optimization search after the two non-improving rounds as requested.
+Runtime remains unchanged; no device-personal access, network/security/trust or
+credential changes. Model reservations remain 53/120; deadline unchanged at
+2026-11-09 06:17:35 UTC. Remaining physical/native/human/voice gates require
+appropriate real evidence and were not certified by these Cloud tests.
