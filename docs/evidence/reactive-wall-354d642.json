@@ -1,0 +1,254 @@
+{
+  "sourceSha": "354d6428ea29255229a9a24c67332583bc7635bc",
+  "execution": "real-wall-browser-broker-synthetic-provider",
+  "mode": "--run-approved",
+  "plan": {
+    "quietMs": 600000,
+    "activeMs": 600000
+  },
+  "hostElapsedMs": 1200064.9946040001,
+  "browserElapsedMs": 1200128.8000000007,
+  "durationEligible": true,
+  "fakeProviderLatencyMs": 2000,
+  "fakeProviderProgram": "shapeQuality rise=.15 advance=0 grow=1 spread=1 duration600ms (same as virtualmatrix)",
+  "realModelCalls": 0,
+  "cameraOrMicrophoneCalls": 0,
+  "gpu": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+  "pageErrors": 0,
+  "pollCount": 11605,
+  "actualPollGapMs": {
+    "count": 11604,
+    "min": 98.20586300001014,
+    "max": 2241.3713969999226,
+    "p50": 100.10968500003219,
+    "p95": 109.94521900001564
+  },
+  "actualProviderLatencyMs": {
+    "count": 41,
+    "min": 1999.5739300000714,
+    "max": 2043.134831000003,
+    "p50": 2001.4447329998948,
+    "p95": 2017.7130290000932
+  },
+  "providerByOpportunityCohort": {
+    "quiet": {
+      "requested": 1,
+      "returned": 1
+    },
+    "active": {
+      "requested": 40,
+      "returned": 40
+    }
+  },
+  "providerOutstandingAtEnd": {
+    "quiet": 0,
+    "active": 0
+  },
+  "brokerAtEnd": {
+    "active": 0,
+    "uncertain": false,
+    "paused": false,
+    "browserUnavailable": false,
+    "uniqueRequests": 41,
+    "pendingUserMessages": 0,
+    "queuedUserMessages": 0
+  },
+  "brokerCodes": {},
+  "browser": {
+    "elapsedMs": 1200128.8000000007,
+    "wallStart": 1794253780025,
+    "plannedQuietMs": 600000,
+    "plannedActiveMs": 600000,
+    "phases": {
+      "quiet": {
+        "sourceFrames": 11451,
+        "validSourceFrames": 11451,
+        "rawScoreChanges": 0,
+        "semanticOpportunities": 1,
+        "sourceValidSemanticOpportunities": 1,
+        "brokerPollCallbacks": 5807,
+        "takeRequestCalls": 5787,
+        "candidates": 1,
+        "authorized": 1,
+        "authorizationDenied": 0,
+        "admissionCallbacks": 1,
+        "rendererApplyCalls": 29654,
+        "rendererFrameAdvances": 29654,
+        "contextLostCalls": 0,
+        "eventTypes": {
+          "user_arrived": 1
+        },
+        "decisions": {
+          "accepted": 1
+        },
+        "revocations": {
+          "enabled": 1
+        },
+        "firstRequestRevocations": {},
+        "leaseRevocations": {
+          "expired": 1
+        },
+        "ownedTraceEvents": {
+          "admitted": 1,
+          "applied": 1,
+          "frame_submitted": 1,
+          "frame_changed_proxy": 1,
+          "completed": 1
+        },
+        "uniqueOwnedRequests": {
+          "admitted": 1,
+          "applied": 1,
+          "frame_submitted": 1,
+          "frame_changed_proxy": 1,
+          "completed": 1
+        },
+        "elapsedMs": 600000,
+        "sourceValidityRatio": 1,
+        "opportunityToOwnedTraceMs": {
+          "admitted": {
+            "count": 1,
+            "min": 3072.0999999996275,
+            "max": 3072.0999999996275,
+            "mean": 3072.0999999996275,
+            "p50": 3072,
+            "p95": 3072,
+            "overflowBinAboveMs": 5000
+          },
+          "applied": {
+            "count": 1,
+            "min": 3073,
+            "max": 3073,
+            "mean": 3073,
+            "p50": 3073,
+            "p95": 3073,
+            "overflowBinAboveMs": 5000
+          },
+          "frame_submitted": {
+            "count": 1,
+            "min": 3074.2000000011176,
+            "max": 3074.2000000011176,
+            "mean": 3074.2000000011176,
+            "p50": 3074,
+            "p95": 3074,
+            "overflowBinAboveMs": 5000
+          },
+          "frame_changed_proxy": {
+            "count": 1,
+            "min": 3074.2000000011176,
+            "max": 3074.2000000011176,
+            "mean": 3074.2000000011176,
+            "p50": 3074,
+            "p95": 3074,
+            "overflowBinAboveMs": 5000
+          },
+          "completed": {
+            "count": 1,
+            "min": 3667.7000000011176,
+            "max": 3667.7000000011176,
+            "mean": 3667.7000000011176,
+            "p50": 3667,
+            "p95": 3667,
+            "overflowBinAboveMs": 5000
+          }
+        },
+        "longestAppliedSilence": {
+          "milliseconds": 595886.4000000004,
+          "from": 4113.5999999996275,
+          "to": 600000,
+          "semanticOpportunities": 0
+        },
+        "longestCompletedSilence": {
+          "milliseconds": 595291.6999999993,
+          "from": 4708.300000000745,
+          "to": 600000,
+          "semanticOpportunities": 0
+        }
+      },
+      "active": {
+        "sourceFrames": 11448,
+        "validSourceFrames": 11448,
+        "rawScoreChanges": 300,
+        "semanticOpportunities": 299,
+        "sourceValidSemanticOpportunities": 299,
+        "brokerPollCallbacks": 5798,
+        "takeRequestCalls": 5006,
+        "candidates": 40,
+        "authorized": 40,
+        "authorizationDenied": 0,
+        "admissionCallbacks": 0,
+        "rendererApplyCalls": 29888,
+        "rendererFrameAdvances": 29888,
+        "contextLostCalls": 0,
+        "eventTypes": {
+          "expression_changed": 299
+        },
+        "decisions": {
+          "revoked": 40
+        },
+        "revocations": {
+          "semantic_changed": 40
+        },
+        "firstRequestRevocations": {
+          "semantic_changed": 40
+        },
+        "leaseRevocations": {},
+        "ownedTraceEvents": {},
+        "uniqueOwnedRequests": {},
+        "elapsedMs": 600128.8000000007,
+        "sourceValidityRatio": 1,
+        "opportunityToOwnedTraceMs": {},
+        "longestAppliedSilence": {
+          "milliseconds": 600128.8000000007,
+          "from": 600000,
+          "to": 1200128.8000000007,
+          "semanticOpportunities": 299
+        },
+        "longestCompletedSilence": {
+          "milliseconds": 600128.8000000007,
+          "from": 600000,
+          "to": 1200128.8000000007,
+          "semanticOpportunities": 299
+        }
+      }
+    },
+    "mediaCalls": 0,
+    "aggregateOverflow": 0,
+    "sourceGapMs": {
+      "count": 22898,
+      "min": 0.30000000074505806,
+      "max": 1497.0999999996275,
+      "mean": 52.409136169097756,
+      "p50": 50,
+      "p95": 79,
+      "overflowBinAboveMs": 5000
+    },
+    "sourceNominalHz": 20,
+    "activeNominalRawHz": 0.5,
+    "activeNominalTransitionsBeforeMeasuredEnd": 300,
+    "sourceDefinition": "Uniform synthetic478 landmarks, identity head matrix, x=.5+.2sin(elapsed/1000), raw bilateral smile0/1 each2000ms after active phase starts; real debounce.",
+    "censoredAtEnd": {
+      "browserTransport": 0,
+      "transportCohort": null,
+      "leaseOwner": 0,
+      "schedulerBusy": false
+    },
+    "finalStatus": {
+      "sourceValid": true,
+      "uncertain": false,
+      "dispatches": 41,
+      "reason": "revoked",
+      "queueDepth": 0,
+      "userGeometryLocked": false,
+      "contextLost": false,
+      "particles": 2000,
+      "documentHidden": false
+    }
+  },
+  "interpretation": [
+    "Quiet includes one initial arrival positivecontrol; subsequent fresh unchanged semantics should not cause inference.",
+    "Semantic opportunity=actual FaceObservations event, not raw frames/position or ambient renderer motion.",
+    "Trace funnels count only reactive request+decision+action attributed events; frame hashes remain proxies, not relevance or enjoyment.",
+    "Real source20Hz/broker100ms are nominal; actual gaps/sourceframe counts reported. No detector accuracy/native GPU acceptance.",
+    "Pending provider/browser work is censored at window end. Cleanup is outside measured counters."
+  ]
+}

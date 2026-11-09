@@ -60,7 +60,7 @@ The source-loss control stops synthetic observations for 2 s per 20 s. The user-
 - Numerical sink calls and changed state are not actual GPU frame submissions, semantic meaning, enjoyment or native performance.
 - Synthetic periodic/jitter input does not establish natural incidence or real model latency. No policy change is recommended from this matrix alone.
 
-The independent real-wall 20-minute browser/fake-provider gate is **pending**. It must cover the entire elapsed run and report quiet/active opportunities separately; a rolling 60-second recorder is insufficient.
+The separate [real-wall browser/broker report](reactive-wall-evidence.md) records a full 20-minute synthetic run at source `354d642`, with whole-window quiet/active opportunity cohorts and owned frame proxies. This virtual report was regenerated at `dc66412`; do not conflate the snapshots or substitute a rolling 60-second recorder for either method.
 
 ## Reproduce
 

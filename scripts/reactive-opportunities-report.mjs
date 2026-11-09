@@ -71,7 +71,7 @@ export function opportunityReport(metadata, result) {
     '- Silence refers only to attributed reactive Scheduler application; ambient presence/local reflexes may still animate.',
     '- Numerical sink calls and changed state are not actual GPU frame submissions, semantic meaning, enjoyment or native performance.',
     '- Synthetic periodic/jitter input does not establish natural incidence or real model latency. No policy change is recommended from this matrix alone.', '',
-    'The independent real-wall 20-minute browser/fake-provider gate is **pending**. It must cover the entire elapsed run and report quiet/active opportunities separately; a rolling 60-second recorder is insufficient.', '',
+    `The separate [real-wall browser/broker report](reactive-wall-evidence.md) records a full 20-minute synthetic run at source \`354d642\`, with whole-window quiet/active opportunity cohorts and owned frame proxies. This virtual report was regenerated at \`${metadata.sourceSha.slice(0, 7)}\`; do not conflate the snapshots or substitute a rolling 60-second recorder for either method.`, '',
     '## Reproduce', '', '```sh', 'npm ci', 'node scripts/reactive-opportunities.mjs --output .runtime/reactive-opportunities',
     'node scripts/reactive-opportunities.mjs --quick --output .runtime/reactive-opportunities-quick', '```', '',
     'The launcher bundles actual repository imports into a disposable temporary file, then removes it. No bundled or archived runtime copy is committed. Exit failure indicates a harness/build/accounting error, never a target reaction rate. The diagnostic does not assert zero reactions as desired behavior.', '',
