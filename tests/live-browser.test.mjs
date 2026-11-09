@@ -52,7 +52,7 @@ it('draws a facial resting body, changes declared features on activity and freez
   } finally { await browser?.close(); await server.close(); }
 }, 45000);
 
-it('shows equal call panels with camera and honest activity together, accessible on mobile', async () => {
+it('shows a large Fisch panel beside a narrower camera and activity panel with camera and honest activity together, accessible on mobile', async () => {
   const server = await createServer({ server: { host: '127.0.0.1', port: 0 } }); await server.listen(); let browser; const errors = [];
   try {
     browser = await chromium.launch({ headless: true, ...(process.platform === 'win32' ? { channel: 'msedge' } : {}),
@@ -62,8 +62,9 @@ it('shows equal call panels with camera and honest activity together, accessible
     await page.goto(server.resolvedUrls.local[0] + 'live.html', { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => Boolean(window.fischLive));
     const body = await page.locator('.body-stage').boundingBox(), camera = await page.locator('.camera-stage').boundingBox();
-    expect(Math.abs(body.width - camera.width)).toBeLessThan(2);
-    expect(body.x).toBeLessThan(camera.x); expect(Math.abs(body.height-camera.height)).toBeLessThan(2);
+    const left = await page.locator('.body-panel').boundingBox(), right = await page.locator('.camera-panel').boundingBox();
+    expect(left.width / right.width).toBeCloseTo(2, 1);
+    expect(body.x).toBeLessThan(camera.x); expect(body.height).toBeGreaterThan(camera.height * 1.5);
     expect(await page.locator('.camera-panel #agent-activity').count()).toBe(1);
     expect(await page.locator('#agent-activity').getAttribute('aria-label')).toBeTruthy();
     expect(await page.locator('#enable-reactivity').isChecked()).toBe(false);
