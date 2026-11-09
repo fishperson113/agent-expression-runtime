@@ -4,6 +4,7 @@ import { openLive, createLivePane } from '../integrations/live-launch.mjs';
 import { OutputActivity } from '../integrations/output-activity.mjs';
 import { openControl } from '../integrations/terminal-ipc.mjs';
 import { runTerminalCodex } from '../integrations/live-terminal.mjs';
+import { liveShutdown, liveShutdownCode, closeLiveOwned } from '../integrations/live-shutdown.mjs';
 
 export async function selectLiveHost({ env = process.env, cwd = process.cwd(), call = herdrCall, agentPane } = {}) {
   if (!agentPane) return { kind: 'terminal', cwd };
@@ -58,28 +59,30 @@ async function activityLoop(live, pane, call, signal, proxy) {
 export async function runLiveSession({ hands, assets, agentPane, call = herdrCall, headless = false, signal, launchCodex = true, runHost = runTerminalCodex, open = openLive } = {}) {
   if (signal?.aborted) return 130;
   const host = await selectLiveHost({ call, agentPane });
-  const abort = new AbortController(), stop = () => abort.abort();
-  signal?.addEventListener('abort', stop, { once: true });
-  process.once('SIGINT', stop); process.once('SIGTERM', stop);
-  let live, control;
+  const abort = new AbortController(), stop = kind => abort.abort(liveShutdown(kind));
+  const userAbort = () => stop('abort'), fail = () => stop('failure');
+  signal?.addEventListener('abort', userAbort, { once: true });
+  process.once('SIGINT', userAbort); process.once('SIGTERM', userAbort);
+  let live, control, failed = false;
   try {
     live = await open({ headless, signal: abort.signal, hands, assets });
-    live.page.once('close', stop); live.gateway.once('exit', stop);
-    await live.page.exposeFunction('fischLiveStop', stop);
-    if (abort.signal.aborted) return 130;
+    live.page.once('close', fail); live.page.once('crash', fail); live.gateway.once('exit', fail);
+    await live.page.exposeFunction('fischLiveStop', reason => stop(reason === 'ui' ? 'ui' : 'failure'));
+    if (abort.signal.aborted) return liveShutdownCode(abort.signal.reason) ?? 1;
     if (host.kind === 'terminal') {
       console.log('Fisch Live ready. Camera is off. Codex runs in this terminal; exit Codex or close the body to stop.');
       return await runHost({ live, cwd: host.cwd, signal: abort.signal });
     }
     const source = host.source;
     const pane = launchCodex ? await createLivePane(call, source, live.base, live.token) : source;
-    control = await openControl(pane.pane_id, liveControl(live, stop));
+    control = await openControl(pane.pane_id, liveControl(live, () => stop('ui')));
     console.log(`Fisch Live ready. Codex pane: ${pane.pane_id}. Camera is off; look is synthetic-only.`);
     console.log('Type in the dedicated Codex pane. The previous session is unchanged. Close the browser or use Dừng toàn bộ to stop Live.');
     await activityLoop(live, pane, call, abort.signal, process.env.FISCH_LIVE_RHYTHM === 'proxy');
-    return 0;
-  } finally {
-    stop(); process.removeListener('SIGINT', stop); process.removeListener('SIGTERM', stop);
-    signal?.removeEventListener('abort', stop); await control?.close(); await live?.close();
+    return abort.signal.aborted ? liveShutdownCode(abort.signal.reason) ?? 1 : 0;
+  } catch (error) { failed = true; throw error; }
+  finally {
+    stop('cleanup'); process.removeListener('SIGINT', userAbort); process.removeListener('SIGTERM', userAbort);
+    signal?.removeEventListener('abort', userAbort); await closeLiveOwned([() => control?.close(), () => live?.close()], failed);
   }
 }
