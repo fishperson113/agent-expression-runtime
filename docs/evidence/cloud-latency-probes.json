@@ -1,0 +1,38 @@
+{
+  "sourceMain": "8c0ec0aa8ff1f455a833dd1cef7368ffdd4cf58a",
+  "outputProbe": {
+    "status": "completed",
+    "deltaCount": 24,
+    "deltaCharacters": 77,
+    "firstReplyStateMs": 45.95332699999926,
+    "firstRenderedReplyProxyMs": 65.87315699999999,
+    "postDeltaZeroMs": 127.07365600000048,
+    "cameraUsed": false,
+    "errorCode": null,
+    "used": 51,
+    "interpretation": "Node elapsed upper bounds to browser state and next submitted frame; render proxy, not pixel or lip-sync validation"
+  },
+  "localReflexProbe": {
+    "confirmedEventToCentroidChangeMs": 172.70000000018626,
+    "centroidDeltaPixels": 3.588535735521191,
+    "maxPreEventJitterPixels": 0.18394890892807325,
+    "observedFrames": 51,
+    "cameraUsed": false,
+    "environment": "Cloud Linux headless SwiftShader, synthetic observations, declared local body-y reflex; no model calls",
+    "interpretation": "Upper bound from injection that confirms arrival (debounce excluded) to >2px green-weighted body centroid change in the rendered WebGL buffer; not human semantic or physical-camera latency"
+  },
+  "modelBudget": {
+    "used": 51,
+    "limit": 120,
+    "deadline": "2026-11-09T06:17:35.373Z",
+    "latestReservationAt": "2026-11-09T02:28:06.780Z"
+  },
+  "limits": [
+    "Output timings are Node upper bounds to browser activity and next submitted frame; not pixel presentation or lip-sync.",
+    "Output threshold was met in one short real-model sample, not certified for every future turn.",
+    "Reflex timing includes WebGL buffer readback and a >2px centroid criterion; it does not certify <150ms first motion.",
+    "The one-second arrival debounce is excluded from the reflex measurement.",
+    "No raw assistant text, tool payload, image buffer, camera pixels or credentials are retained in this report.",
+    "TUI inference remains pending explicit project trust; physical/native and human semantic gates remain pending."
+  ]
+}

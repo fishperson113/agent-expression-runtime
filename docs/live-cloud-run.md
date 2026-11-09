@@ -509,3 +509,27 @@ still blocked at project trust; no trust/security change was authorized or made.
 Physical-camera accuracy/throughput, native Windows GPU/Herdr, native hook trust/
 context, Vietnamese /voice and human recognition/distraction remain pending.
 No owner Windows machine, real camera/microphone or policy workaround was used.
+
+
+## Checkpoint 17 — remaining Cloud latency samples and final counter
+
+On main 8c0ec0a, one additional counted short synthetic conversation completed
+with actual signed-in model streaming: 24 agent-message deltas / 77 code units,
+replying state after 45.95 ms and a subsequent submitted frame after 65.87 ms;
+output state returned to zero 127.07 ms after the last delta. These are Node-clock
+upper bounds to browser state/frame proxies, not pixel-presentation or lip-sync,
+and certify only this sample. No runtime change or short-reply failure was found.
+
+A no-model local-reflex probe used typed synthetic presence and a declared body-y
+pose. WebGL buffer centroid moved >2 pixels 172.7 ms after the injection confirming
+arrival (one-second debounce excluded); pre-event centroid jitter was 0.184 px.
+This instrumented proxy includes readback overhead and does not establish the
+<150 ms first-motion target. No image buffers were persisted or exported.
+
+[Sanitized samples](evidence/cloud-latency-probes.json) preserve both results.
+Authoritative reservations are now 51/120; deadline remains 2026-11-09 06:17:35 UTC.
+The earlier 50/120 artifacts now explicitly label their historical counter
+checkpoint. No new code, camera/audio capture, credential/security settings or
+owner-PC use occurred. Actual TUI inference remains pending explicit project
+trust; no such approval has been received and the CLI was closed at that gate.
+The remaining performance, physical/native and human gates stay open.
