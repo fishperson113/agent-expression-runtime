@@ -1,6 +1,7 @@
 import type { FaceSample } from './observation';
 
 export class VisionCamera {
+  hands = false;
   private stream?: MediaStream;
   private worker?: Worker;
   private active = false;
@@ -22,7 +23,7 @@ export class VisionCamera {
       this.worker.onmessage = event => this.message(event.data, generation);
       this.worker.onerror = () => { if (generation === this.generation) this.fail('vision_failed'); };
       this.timeout = setTimeout(() => this.fail('vision_timeout'), 20000);
-      this.worker.postMessage({ type: 'init', delegate: this.delegate });
+      this.worker.postMessage({ type: 'init', delegate: this.delegate, ...(this.hands ? { hands: true } : {}) });
       const stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
       if (!this.active || generation !== this.generation) { stream.getTracks().forEach(track => track.stop()); return; }
       this.stream = stream; this.video.srcObject = stream;

@@ -160,3 +160,47 @@ submit tiếp theo và 127 ms về zero sau delta cuối, trong một câu trả
 Đây không phải lip-sync/pixel-presentation hoặc chứng nhận mọi lượt. Probe local
 reflex tới centroid >2 px đo 172,7 ms có overhead readback; target first-motion
 <150 ms chưa được chứng nhận. Xem [bằng chứng latency](evidence/cloud-latency-probes.json).
+
+## Compact filming stage and optional hand gestures
+
+Use **Toàn màn hình** for the particle stage; Escape restores the controls. Motion
+reduction/off remain available before entering. This is a visual body demo, not
+a verified voice/JARVIS assistant. Codex conversation still runs in its terminal.
+
+Prepare the optional local gesture model once with
+`FISCH_PREPARE_HANDS=1 node scripts/prepare-live-assets.mjs` (PowerShell: set the
+environment variable first). Enable **Cử chỉ tay · thử nghiệm** while camera is
+off, then start camera explicitly. Stop camera to change that choice. Face-only
+mode does not initialize the gesture recognizer. A missing gesture model leaves
+face tracking available and reports hand failure; it never starts a model call.
+
+Seven static poses are supported: open palm, closed fist, pointing up, thumb up,
+thumb down, victory, I-love-you. The first sufficiently confident hand wins (up to
+two detected hands); 0.75 confidence, 250 ms continuous evidence, 500 ms maximum
+sample gap, 1.8 s reaction cooldown. A one-second local body transform expands/
+contracts, rises or tilts the body; explicit agent controls retain priority.
+Reduced/off modes scale/suppress reactions. Stop, cancellation and session changes
+clear pending gesture state. These poses are playful controls, not inferred
+intent/emotion, sign-language translation, whole-body tracking or waving detection.
+No camera images, hand landmarks or gesture categories go to Codex or persistence.
+
+Model provenance checked 2026-11-09: Google-hosted Gesture Recognizer float16 v1,
+SHA-256 `97952348cf6a6a4915c2ea1496b4b37ebabc50cbbf80571435643c455f2b0482`.
+[Official task/model download](https://developers.google.com/edge/mediapipe/solutions/vision/gesture_recognizer),
+[Apache-2.0 project license](https://github.com/google-ai-edge/mediapipe/blob/master/LICENSE)
+and [model asset declaration with notice license](https://github.com/google-ai-edge/mediapipe/blob/master/mediapipe/model_maker/models/gesture_recognizer/BUILD)
+cover the SDK/model resources; assets are downloaded separately, not relicensed as
+Fisch MIT code. [Google model card](https://storage.googleapis.com/mediapipe-assets/gesture_recognizer/model_card_hand_gesture_classification_with_faireness_2022.pdf)
+limits it to static single-hand poses and discloses lighting/motion-blur limits.
+Additional inference consumes local CPU; no 24 Hz or physical-hand accuracy claim.
+Synthetic tests check gating, expiry, cooldown, all seven labels and motion modes;
+actual human-camera validation remains an owner task. No real camera/mic used in
+Cloud verification and no substitute videos are presented as model holdout clips.
+
+Cloud functional check: both pinned models initialized in the local worker and
+returned zero faces/hands for an explicitly painted blank synthetic frame, with
+`handsFailed=false`. Synthetic category -> actual WebGL body signature changed;
+motion-off signature stayed frozen. Fullscreen entered/exited. Zero page errors,
+external/blocked browser requests or active camera stream. This validates plumbing,
+not human hand accuracy or production latency. 266 JS tests, architecture,
+production build and strict harness pass; R10/R11 remain unknown in Codex.

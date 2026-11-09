@@ -21,7 +21,7 @@ Object.assign(window, { fischLive: { pair: (base: string, token: string) => brid
     if (value.turn === 'interrupted' && lastActivity !== 'interrupted') void bridge.cancel();
     lastActivity = value.turn;
     body.output = value.output; body.activity(value.turn); events(observations.turn(value.turn, Date.now()));
-    element('activity').textContent = `${value.turn} / nhịp chữ: ${value.quality}`;
+    element('activity').textContent = ({ idle: 'Đang chờ', working: value.output > 0 ? 'Đang trả lời' : 'Đang suy nghĩ', waiting: 'Chờ bạn', interrupted: 'Đã ngắt' })[value.turn];
   }, fixture: (mode: string) => fixture(mode), metrics: () => ({ ...body.metrics, syntheticFixture: synthetic,
     camera: observations.snapshot.camera, cameraSeq: observations.snapshot.seq,
     cameraStatus: element('camera-status').textContent, cameraActive: !!element<HTMLVideoElement>('camera').srcObject,
@@ -49,6 +49,12 @@ function sample(value: FaceSample) {
   const elapsed = (performance.now() - sampleAt) / 1000;
   element('vision-metrics').textContent = `${value.delegate} / ${(sampleCount / elapsed).toFixed(1)} mẫu/s / ${(inferenceMs / sampleCount).toFixed(0)} ms inference`;
   element('summary').textContent = observations.snapshot.summary;
+  if (camera.hands) {
+    const now = performance.now(); body.hands.update(value.hands ?? [], now);
+    const gesture = body.hands.label(now);
+    const text = value.handsFailed ? 'Không tải được nhận diện tay; khuôn mặt vẫn chạy.' : gesture ? 'Cử chỉ: ' + gesture : 'Tay: đang theo dõi tại máy';
+    if (element('hand-status').textContent !== text) element('hand-status').textContent = text;
+  }
   drawLandmarks(value);
 }
 function drawLandmarks(value: FaceSample) {
@@ -71,12 +77,18 @@ function cameraStatus(status: string, source = 'vision') {
   const active = status === 'starting' || status.startsWith('ready-') || status === 'recovering-CPU';
   element<HTMLButtonElement>('camera-start').disabled = active || synthetic;
   element<HTMLButtonElement>('camera-stop').disabled = !active;
+  element<HTMLInputElement>('enable-hands').disabled = active || synthetic;
+  if (!status.startsWith('ready-')) body.hands.reset();
+  if (!active) { body.hands.reset(); element('hand-status').textContent = 'Cử chỉ tay đang tắt'; }
   element('camera-placeholder').hidden = active;
   if (!status.startsWith('ready-')) { observations.status(status === 'starting' || status === 'recovering-CPU' ? 'starting' : status === 'denied' ? 'denied' : status === 'stopped' ? 'stopped' : 'error', Date.now()); body.observe(observations.snapshot); }
 }
+element('enable-hands').onchange = () => { camera.hands = element<HTMLInputElement>('enable-hands').checked; body.hands.reset(); };
+element('fullscreen').onclick = () => { void element('body').parentElement!.requestFullscreen().catch(() => { element('fault').textContent = 'Trình duyệt chưa cho phép toàn màn hình.'; }); };
 element('camera-start').onclick = () => { sampleCount = 0; sampleAt = performance.now(); inferenceMs = 0; void camera.start(); };
 if (synthetic) {
   element<HTMLButtonElement>('camera-start').disabled = true;
+  element<HTMLInputElement>('enable-hands').disabled = true;
   element('camera-placeholder').textContent = 'Fixture tổng hợp. Không mở camera hoặc microphone.';
   element('camera-status').textContent = 'Dữ liệu tổng hợp / không camera';
 }
@@ -93,7 +105,7 @@ const timer = setInterval(() => {
 }, 500);
 function stop() {
   if (stopped) return; stopped = true;
-  camera.stop(); cameraStatus('stopped', 'shutdown'); clearInterval(timer); bridge.stop(); body.dispose();
+  camera.stop(); body.hands.reset(); cameraStatus('stopped', 'shutdown'); clearInterval(timer); bridge.stop(); body.dispose();
   element<HTMLButtonElement>('camera-start').disabled = true; element('connection').textContent = 'Đã dừng phiên Live';
   void (window as any).fischLiveStop?.();
 }

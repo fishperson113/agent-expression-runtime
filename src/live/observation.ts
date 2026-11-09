@@ -1,6 +1,6 @@
 import { unavailableUser, type Observation, type LiveTurn, type LiveEventKind, type Expressions } from '../core/live/types';
 
-export type FaceSample = { landmarks: { x: number; y: number; z: number }[];
+export type FaceSample = { hands?: { categoryName: string; score: number }[]; handsFailed?: boolean; landmarks: { x: number; y: number; z: number }[];
   scores: Record<string, number>; matrix: number[]; durationMs: number; delegate: string };
 const clamp = (value: number, min = 0, max = 1) => Math.max(min, Math.min(max, value));
 type Cue = { type: LiveEventKind; at: number };

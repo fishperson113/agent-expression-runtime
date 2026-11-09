@@ -1,3 +1,4 @@
+import { HandGestures } from './gestures';
 import { ThreeRenderer } from '../adapters/three-renderer';
 import { Scheduler } from '../core/runtime/scheduler';
 import { LiveCompiler, referencedParts } from '../core/live/compiler';
@@ -12,6 +13,7 @@ import { faceProgram, faceWrites, isFace } from '../core/live/face';
 import { SceneTrace } from '../core/live/trace';
 
 export class LiveBody {
+  readonly hands = new HandGestures();
   readonly renderer: ThreeRenderer;
   readonly scheduler: Scheduler;
   readonly controls = new LiveCompositor();
@@ -59,7 +61,7 @@ export class LiveBody {
       const value = from + (write.value - from) * 0.18; this.faceBlend.set(key, value);
       face.push({ ...write, value });
     }
-    const layers = [this.defaults.sample(time, snapshot, this.output, blocked), face, this.controls.sample(time, snapshot, this.output, blocked)];
+    const layers = [this.defaults.sample(time, snapshot, this.output, blocked), face, this.hands.sample(time, this.controls.mode).filter(write => !blocked.has(write.target.part + ':' + write.target.prop)), this.controls.sample(time, snapshot, this.output, blocked)];
     const writes = new Map(composeWrites(layers).map(write => [write.target.part + ':' + write.target.prop, write]));
     const rendered = { ...state, liveMatrices: transformMatrices([...writes.values()], parts) } as PresenceState;
     if (rendered.presencePose) {
@@ -99,7 +101,7 @@ export class LiveBody {
     }
   }
   epoch(epoch: string, reset = false) {
-    this.trace.reset();
+    this.trace.reset(); this.hands.reset();
     this.controls.reset(); this.scheduler.cancel(epoch);
     if (reset) { this.compiler.compiler.reset(); this.partIds = ''; }
     else this.compiler.compiler.discardDefinitions();
