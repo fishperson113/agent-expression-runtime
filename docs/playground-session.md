@@ -1,8 +1,9 @@
 # Session playground desired-state engine
 
-This independent engine journals agent-authored co-create/remix snapshots, undo,
-reset and optional inert goals. It emits a bounded **unexecuted two-command plan**, with no runtime/server/launcher
-wiring or user-facing exposure yet.
+The desired-state engine journals agent-authored co-create/remix snapshots, undo,
+reset and optional inert goals. Live MCP exposes `playground_state` and
+`playground_edit` through its existing controller; the engine emits a bounded
+two-command plan which the controller applies and verifies.
 No language/gesture-to-shape lookup, model call, media access or persistence exists.
 A canonical scene contains arbitrary schema-valid `parts`, explicit `style`
 (`color`, `pointSize`, `brightness`, `dispersion`) and `flow` (`field`, `strength`).
@@ -57,18 +58,45 @@ command size <=32 KiB, unique committed/pending scene records <=128 KiB. Inputs
 and outputs are cloned; schema validation and duplicate-ID checks precede mutation.
 The runtime compiler is final authority. `dispose()` clears private state/ownership.
 
-## Remaining parent integration blocker
+## Live MCP integration
 
-Use the existing `integrations/mcp-server.mjs` session and serialized mutation
-queue; a second MCP/controller is invalid. Do not expose admit/feedback/uncertain
-as model-callable confirmation tools. Subscribe to authenticated
-`GET /v1/sessions/{id}/events` SSE before sending. Send body then baseline, bind
-both receipts by phase, and replay a bounded early-feedback buffer after binding.
-Do not substitute snapshot/frame/debug evidence for applied status. Mark desync
-on gap/close/transport uncertainty. Before disposal and explicit new recovery,
-the host must confirm old-epoch invalidation via cancel/session close, so delayed
-old requests cannot land after new work. Never silently replay across sessions.
-User-facing tools/UI and end-to-end dual-receipt/SSE tests remain parent work.
-Tests cover synthetic journal remixes/bounds, failure/cancel/uncertainty, cloning,
-compiler validation and real Scheduler persistence. They establish neither atomic
-visual execution, a 20-minute elapsed soak nor human enjoyment.
+Start normal `fisch live`. Ask the agent to co-create a particle creation, change
+your own choice, undo it or reset to the first creation. The agent authors full
+geometry through `playground_edit`; no phrase or hand pose directly selects an
+effect. No additional controller, browser, login or media consent is created.
+`playground_state` defaults to redacted counters and revision. Only an explicit
+`includeScene:true` returns a private scene clone to the authorized agent.
+
+One manager binds the existing authenticated gateway session. It subscribes to
+`GET /v1/sessions/{id}/events` before submitting body then baseline in the same
+mutation queue, with distinct stable request IDs. It buffers at most 64 early
+feedback events until their receipts bind. The queue releases after sends, while
+the tool waits separately for completion, allowing cancellation and ordinary
+content to remain responsive. Overall application deadline is three seconds.
+Only exact session/epoch/sequence applied-then-completed evidence commits both
+phases. Snapshot, admitted/pending, frame hashes and foreign tuples never count.
+An HTTP pending receipt waits for its matching authenticated SSE accepted event;
+neither phase is reposted, and acceptance alone never commits history.
+
+The SSE client uses authenticated loopback HTTP, bounded UTF-8 framing and no
+reconnect. Gap, close, malformed stream, timeout, cancellation and transport loss
+fail closed; uncertainty never causes automatic replay. A new ordinary mutation
+after interruption first revokes the captured old owner, preventing delayed old
+HTTP requests from overwriting newer work. A temporary ordinary expression after
+a completed creation leaves its selected history intact while ownership stays
+valid. UI cancel, reload or changed ownership requires explicit recovery.
+
+`playground_edit` supports `operation:create|remix|undo|reset|recover` and requires
+the revision just read; only create/remix accept a scene. Explicit recover closes
+the old controller and verifies a changed owner/epoch before clearing private
+history. It does not automatically restore the old creation. Confirmation and
+feedback methods are host-only, never model-callable tools. Session close stops
+the SSE reader and pending timer. Goals/scenes are never written to disk or logs.
+
+Tests cover journal bounds, real Scheduler style persistence, HTTP/SSE framing,
+actual MCP mutation flows and fault/recovery paths. A dedicated gateway CI step
+builds the standalone Rust executable and requires the real browser/MCP tests;
+missing gateway cannot silently skip those acceptance checks. These checks do
+not establish atomic visible execution, a real 20-minute human session, native
+GPU performance, camera accuracy or enjoyment. The guided deck and blind human
+evaluation remain separate protocols.

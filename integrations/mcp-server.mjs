@@ -4,6 +4,9 @@ import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { createLiveTools, liveInputSchema, liveToolDefinitions, liveResource, restingFaceExpression } from './live-tools.mjs';
+import { createPlaygroundController } from './playground-controller.mjs';
+import { subscribePlaygroundFeedback } from './playground-feedback.mjs';
+import { playgroundToolDefinitions } from './playground-tools.mjs';
 const base = process.env.AER_BASE_URL,
   token = process.env.AER_PAIRING_TOKEN;
 if (!base || !token) {
@@ -73,6 +76,7 @@ function tools() {
     { name: 'cancel_expression', description: 'Cancel body work and reset posture; keep the agent running.',
       inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
     ...(live ? liveToolDefinitions() : []),
+    ...(live ? playgroundToolDefinitions(protocol) : []),
   ] };
 }
 function resources(params) {
@@ -153,6 +157,10 @@ async function invoke(params) {
 }
 async function toolCall(params) {
   try {
+    if (live && ['express', 'cancel_expression', 'return_to_face'].includes(params?.name)) {
+      const owner = playground.interrupt('user_interrupt');
+      if (owner) await revokePlayground(owner);
+    }
     if (live && params?.name === 'return_to_face') {
       if (!params.arguments || typeof params.arguments !== 'object' || Array.isArray(params.arguments) || Object.keys(params.arguments).length) throw Error('invalid_arguments');
       params = { name: 'express', arguments: { body: restingFaceExpression() } };
@@ -177,7 +185,48 @@ async function toolCall(params) {
   }
 }
 let calls = Promise.resolve();
+let playgroundGeneration = 0;
 const liveCall = createLiveTools(request, async () => { await connect(); return session; }, () => { session = undefined; });
+const playground = createPlaygroundController({
+  currentSession: async () => { await connect(); return { id: session.id, epoch: session.epoch }; },
+  send: (args, owner) => {
+    if (stopping || !session || session.id !== owner.id || session.epoch !== owner.epoch) throw Error('playground_session_changed');
+    return send(args);
+  },
+  subscribe: (owner, onFeedback, onLost) => subscribePlaygroundFeedback({ base, token, sessionId: owner.id, onFeedback, onLost }),
+  invalidate: async owner => {
+    await revokePlayground(owner);
+    if (stopping) throw Error('playground_closed');
+    await connect(); return { id: session.id, epoch: session.epoch };
+  },
+});
+async function revokePlayground(owner) {
+  if (!owner || typeof owner.id !== 'string') throw Error('playground_session_changed');
+  try { await request(`/v1/sessions/${encodeURIComponent(owner.id)}`, undefined, 'DELETE'); }
+  catch (error) { if (!['session', 'session_closed', 'http_404'].includes(error.message)) throw error; }
+  if (session?.id === owner.id) session = undefined;
+}
+const playgroundReply = value => ({ ...(['uncertain', 'rejected'].includes(value.status) ? { isError: true } : {}),
+  content: [{ type: 'text', text: JSON.stringify(value) }] });
+const playgroundError = error => ({ isError: true, content: [{ type: 'text', text: JSON.stringify({ status: 'rejected',
+  code: /^playground_[a-z_]+$/.test(error?.message) ? error.message : 'playground_failed' }) }] });
+async function playgroundRead(args = {}) {
+  try {
+    if (!args || typeof args !== 'object' || Array.isArray(args) || Object.keys(args).some(key => key !== 'includeScene') ||
+        (args.includeScene !== undefined && typeof args.includeScene !== 'boolean')) throw Error('playground_arguments');
+    return playgroundReply(await playground.read(args.includeScene ?? false));
+  } catch (error) { return playgroundError(error); }
+}
+async function playgroundEdit(args) {
+  const generation = playgroundGeneration;
+  const started = calls.then(() => {
+    if (generation !== playgroundGeneration) throw Error('playground_user_interrupt');
+    return playground.begin(args);
+  });
+  calls = started.catch(() => {});
+  try { return playgroundReply(await (await started).result); }
+  catch (error) { return playgroundError(error); }
+}
 async function handle(message) {
   const { method, params } = message;
   if (method === 'initialize') return {
@@ -195,6 +244,12 @@ async function handle(message) {
   if (method === 'resources/read') return resources(params);
   if (method === 'tools/call') {
     if (live && ['observe', 'look'].includes(params?.name)) return liveCall(params.name, params.arguments);
+    if (live && params?.name === 'playground_state') return playgroundRead(params.arguments);
+    if (live && (['express', 'cancel_expression', 'return_to_face'].includes(params?.name) ||
+        (params?.name === 'playground_edit' && params.arguments?.operation === 'recover'))) {
+      playgroundGeneration++; playground.interrupt('user_interrupt');
+    }
+    if (live && params?.name === 'playground_edit') return playgroundEdit(params.arguments);
     const result = calls.then(() => toolCall(params));
     calls = result.catch(() => {});
     return result;
@@ -205,6 +260,7 @@ let inFlight = 0;
 let stopping=false;
 async function releaseOnExit(){
   if(stopping)return;stopping=true;process.stdin.pause();
+  await playground.close();
   await calls.catch(()=>{});
   await connecting?.catch(()=>{});
   const held=session;

@@ -38,3 +38,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo test --locked --no-default-features --bin fisch-gateway --manifest-path src-tauri/Cargo.toml
       - run: cargo check --locked --no-default-features --bin fisch-gateway --manifest-path src-tauri/Cargo.toml
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: cargo build --locked --no-default-features --bin fisch-gateway --manifest-path src-tauri/Cargo.toml
+      - run: npx vitest run --maxWorkers=2 tests/playground-mcp.test.mjs
+        env:
+          FISCH_PLAYGROUND_REQUIRE_GATEWAY: '1'
