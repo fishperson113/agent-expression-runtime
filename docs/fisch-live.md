@@ -212,3 +212,41 @@ hands on a painted blank synthetic frame, handsFailed=false. Fullscreen works;
 zero page errors, external requests or active camera stream. Semantic responses
 to real hand observations remain unverified because Cloud model auth is blocked.
 No real camera/mic or owner-PC access. No voice gate is pending for this scope.
+
+
+## Reactive call workspace (2026-11-09)
+
+The two equal call panels put Fisch on the left and your opt-in local camera plus
+actual agent activity on the right. The resting particle body is a fish-inspired
+face, not a copy of the reference photo. The bounded log shows observed events,
+turns and tool lifecycle, never private model thoughts or raw tool arguments.
+
+Ordinary `fisch live` now runs Codex through the official app-server relay in the
+launching terminal, including a Herdr, tmux or other multiplexer pane. It no longer
+automatically creates a separate Herdr pane. Start it in a free shell pane; existing
+agent sessions are left alone. `fisch run` keeps its existing panel workflow.
+Explicit `fisch live --agent <pane>` retains the legacy Herdr adapter; its camera
+reflexes work, but agent-triggered camera reactions are unavailable there and the
+control stays disabled. No keystrokes are injected into an unrelated agent.
+
+Camera starts off. Expand the observation controls and enable camera reactions
+only if wanted. Stable typed geometric events may then start a Codex turn using
+the official standalone `toolOutput` mechanism. No image, landmark array or audio
+is sent by this path. Existing MCP observations/privacy controls still apply.
+Events coalesce for 750ms after local debounce, expire after five seconds, and
+start at most once every 15 seconds/four times per minute. Unchanging input and
+idle timers do not start inference. A reaction has a 30-second watchdog.
+
+User turns have priority: only a Fisch-owned reaction may be interrupted. Pending
+user input waits for confirmed cancellation; after ten seconds without certainty,
+an explicit error says that input was not sent and must be retried. No silent
+replay occurs. Stop, camera opt-out, Cancel, reload and thread selection invalidate
+pending reactions. A lost/uncertain model request pauses automatic reactions.
+Existing permissions are preserved; the event instructions restrict the model to
+Fisch observation/expression tools, rather than granting a new security policy.
+
+Protocol reference: https://learn.chatgpt.com/docs/app-server . Installed Codex
+0.167.0 schema confirms `TurnStartParams.toolOutput` / `TurnToolOutput`.
+Deterministic tests and camera-off visual checks are separate from real-camera,
+native-GPU performance and model-expression acceptance; do not treat them as the
+same certification. Native verification details are recorded in the PR.
