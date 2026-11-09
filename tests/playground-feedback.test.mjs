@@ -1,4 +1,4 @@
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { createServer } from 'node:http';
 import { setTimeout as delay } from 'node:timers/promises';
 import { subscribePlaygroundFeedback } from '../integrations/playground-feedback.mjs';
@@ -83,12 +83,31 @@ it.each([401, 302, 200])('rejects unauthenticated, redirected or non-SSE startup
 });
 
 it('bounds response startup without imposing that deadline on healthy streaming', async () => {
-  const fixture = await server(() => {});
-  await expect(subscribePlaygroundFeedback({ base: fixture.base, token: 'synthetic-token', sessionId,
-    onFeedback() {}, onLost() {}, startTimeoutMs: 25 })).rejects.toThrow('playground_sse_start_timeout');
-  const f = await open(undefined, { startTimeoutMs: 25 }); await delay(60);
-  event(f.state.response, 'feedback', message('applied'));
-  await expect.poll(() => f.feedback.length).toBe(1); expect(f.lost).toEqual([]);
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  try {
+    let blockedSignal;
+    const blocked = subscribePlaygroundFeedback({ base: 'http://127.0.0.1', token: 'synthetic-token', sessionId,
+      onFeedback() {}, onLost() {}, startTimeoutMs: 25, fetchImpl: (_url, { signal }) => {
+        blockedSignal = signal;
+        return new Promise((_, reject) => signal.addEventListener('abort', () => reject(Error('aborted')), { once: true }));
+      } });
+    const expired = expect(blocked).rejects.toThrow('playground_sse_start_timeout');
+    await vi.advanceTimersByTimeAsync(24); expect(blockedSignal.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1); await expired; expect(blockedSignal.aborted).toBe(true);
+
+    let stream, healthySignal, delivered;
+    const body = new ReadableStream({ start(controller) { stream = controller; } });
+    const feedback = [], lost = [], received = new Promise(resolve => { delivered = resolve; });
+    const stop = await subscribePlaygroundFeedback({ base: 'http://127.0.0.1', token: 'synthetic-token', sessionId,
+      startTimeoutMs: 25, onFeedback: value => { feedback.push(value); delivered(); }, onLost: value => lost.push(value),
+      fetchImpl: async (_url, { signal }) => { healthySignal = signal; return new Response(body, { headers: { 'Content-Type': 'text/event-stream' } }); } });
+    stops.push(stop); expect(vi.getTimerCount()).toBe(0);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(healthySignal.aborted).toBe(false); expect(lost).toEqual([]);
+    stream.enqueue(new TextEncoder().encode(`event: feedback\ndata: ${JSON.stringify(message('applied'))}\n\n`));
+    await received; expect(feedback).toEqual([message('applied')]);
+    stop(); expect(healthySignal.aborted).toBe(true); expect(lost).toEqual([]);
+  } finally { vi.useRealTimers(); }
 });
 
 it('rejects remote or credential-bearing endpoints and malformed ownership before fetch', async () => {
