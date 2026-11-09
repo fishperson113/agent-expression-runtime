@@ -5,7 +5,10 @@ import { LiveBody } from './body';
 import { FaceObservations, type FaceSample } from './observation';
 import { VisionCamera } from './vision';
 import { LiveBridge } from './bridge';
-import type { LiveEventKind } from '../core/live/types';
+import { eventKinds } from '../core/live/observation';
+import { HandEventSource } from './hand-event-source';
+import type { SessionEvent } from '../core/live/reactive-session-types';
+import type { LiveEventKind, LiveSourceEvent } from '../core/live/types';
 import { ReactiveSession } from '../core/live/reactive-session';
 import { drawLandmarkOverlay } from './landmark-overlay';
 import { LiveRecording } from './recording';
@@ -17,15 +20,16 @@ const recording = new LiveRecording(() => body.scheduler.epoch, synthetic ? 'syn
 body.trace.setSink(recording.record);
 const hands = new HandGestures();
 const observations = new FaceObservations(crypto.randomUUID());
+const handEvents = new HandEventSource(() => performance.now());
+let handEventVersion = 0, reactiveAvailable = false;
 const cameraTransitions: { status: string; source: string; at: number }[] = [];
 const bridge = new LiveBridge(body, observations, () => resetReactive(), () => observeReactive());
 const reactive = new ReactiveSession({ now: () => performance.now(), wallNow: () => Date.now(), epoch: () => body.scheduler.epoch,
   id: () => crypto.randomUUID(), canAdmit: () => !document.hidden && body.canReactive(),
-  admit: (compiled, owner) => body.admitReactive(compiled, owner), cancel: (owner, reason) => body.cancelReactive(owner, reason), record: recording.record });
+  admit: (compiled, owner) => body.admitReactive(compiled, owner), cancel: (owner, reason) => body.cancelReactive(owner, reason), record: recording.record, handState: () => handEvents.handState() });
 body.attachReactive(reactive);
 let lastActivity = 'idle';
-let semanticSequence = 0;
-const semanticEvents: { type: LiveEventKind; at: number; seq: number }[] = [];
+const semanticEvents: SessionEvent[] = [];
 const activityLog: { text: string; at: number }[] = [];
 function logActivity(text: string) {
   if (typeof text !== 'string' || !text.trim() || stopped) return;
@@ -39,7 +43,7 @@ function logActivity(text: string) {
 Object.assign(window, { fischLive: { pair: (base: string, token: string) => bridge.connect(base, token),
   selectThread: () => { hands.reset(); resetReactive(); logActivity('Đã chọn phiên Codex.'); return bridge.cancel(); },
   logActivity,
-  configureReactive: (available: boolean) => configureReactive(available),
+  configureReactive: (available: boolean, handVersion = 0) => configureReactive(available, handVersion),
   setReactiveUserBusy: (busy: boolean) => reactive.setUserBusy(busy),
   reactiveUserIntent: () => { semanticEvents.length = 0; body.prepareUserMutation(); },
   takeReactiveRequest: () => reactive.takeRequest(), authorizeReactiveRequest: (id: string) => reactive.authorize(id),
@@ -56,7 +60,7 @@ Object.assign(window, { fischLive: { pair: (base: string, token: string) => brid
     if (lastActivity !== value.turn) logActivity(({ idle: 'Lượt Codex đã kết thúc.', working: 'Codex bắt đầu xử lý.',
       waiting: 'Codex đang chờ bạn.', interrupted: 'Lượt Codex đã bị ngắt.' })[value.turn]);
     lastActivity = value.turn;
-    body.output = value.output; body.activity(value.turn); events(observations.turn(value.turn, Date.now()));
+    body.output = value.output; body.activity(value.turn); events(handEvents.publish(observations.turn(value.turn, Date.now())));
     element('activity').textContent = ({ idle: 'Đang chờ', working: value.output > 0 ? 'Đang trả lời' : 'Đang xử lý', waiting: 'Chờ bạn', interrupted: 'Đã ngắt' })[value.turn];
   }, fixture: (mode: string, handX?: number) => fixture(mode, handX), metrics: () => ({ ...body.metrics, syntheticFixture: synthetic,
     camera: observations.snapshot.camera, cameraSeq: observations.snapshot.seq,
@@ -65,20 +69,20 @@ Object.assign(window, { fischLive: { pair: (base: string, token: string) => brid
     simulatedParticles: body.scheduler.state.particlePositions?.length ? body.scheduler.state.particlePositions.length / 3 : 2000 }), event: (type: string) => {
     if (type === 'user_message') { semanticEvents.length = 0; reactive.userIntent(); }
     const turn = type === 'user_message' ? 'working' : type === 'needs_user' ? 'waiting' : type === 'interrupted' ? 'interrupted' : 'idle';
-    body.activity(turn); events(observations.turn(turn, Date.now()));
+    body.activity(turn); events(handEvents.publish(observations.turn(turn, Date.now())));
     if (type === 'interrupted') void bridge.cancel();
   } } });
-const recent: { type: LiveEventKind; at: number }[] = [];
+const recent: LiveSourceEvent[] = [];
 let sampleCount = 0, sampleAt = performance.now(), inferenceMs = 0, stopped = false;
 const camera = new VisionCamera(element<HTMLVideoElement>('camera'), sample, cameraStatus,
   new URLSearchParams(location.search).get('vision') === 'cpu' ? 'CPU' : 'GPU');
 
-function events(values: { type: LiveEventKind; at: number }[]) {
+function events(values: LiveSourceEvent[]) {
   bridge.events(values);
   for (const event of values) {
-    recent.unshift(event); body.event(event.type);
-    if (['user_arrived', 'user_left', 'looked_away', 'looked_back', 'expression_changed'].includes(event.type)) {
-      semanticEvents.push({ ...event, seq: ++semanticSequence }); semanticEvents.splice(0, Math.max(0, semanticEvents.length - 20));
+    recent.unshift(event); if (eventKinds.includes(event.type as LiveEventKind)) body.event(event.type as LiveEventKind);
+    if ('eventVersion' in event || ['user_arrived', 'user_left', 'looked_away', 'looked_back', 'expression_changed'].includes(event.type)) {
+      semanticEvents.push({ ...event, seq: event.sourceSeq! }); semanticEvents.splice(0, Math.max(0, semanticEvents.length - 20));
       logActivity('Quan sát local: ' + event.type);
     }
   }
@@ -89,7 +93,8 @@ function events(values: { type: LiveEventKind; at: number }[]) {
 }
 function sample(value: FaceSample) {
   sampleCount++; inferenceMs += value.durationMs;
-  events(observations.update(value, Date.now()));
+  const faceEvents = observations.update(value, Date.now());
+  events(handEvents.sample(observations.snapshot, faceEvents));
   const elapsed = (performance.now() - sampleAt) / 1000;
   element('vision-metrics').textContent = `${value.delegate} / ${(sampleCount / elapsed).toFixed(1)} mẫu/s / ${(inferenceMs / sampleCount).toFixed(0)} ms inference`;
   element('summary').textContent = observations.snapshot.summary;
@@ -106,19 +111,19 @@ function drawLandmarks(value: FaceSample) {
   drawLandmarkOverlay(element<HTMLCanvasElement>('landmarks'), value.landmarks, element<HTMLInputElement>('show-landmarks').checked);
 }
 function fixture(mode: string, handX = 0.25) {
-  if (!synthetic || stopped || !['present', 'present-hand', 'absent', 'denied', 'error', 'stale'].includes(mode) || !Number.isFinite(handX) || handX < 0 || handX > 1) throw Error('synthetic_fixture_unavailable');
-  if (mode === 'present' || mode === 'present-hand' || mode === 'absent') sample({
-    ...(mode === 'present-hand' ? { handObservation: { v: 1 as const, trackingState: 'tracked' as const, coordinateSpace: 'image-normalized' as const,
+  if (!synthetic || stopped || !['present', 'present-hand', 'hand-only', 'hand-lost', 'absent', 'denied', 'error', 'stale'].includes(mode) || !Number.isFinite(handX) || handX < 0 || handX > 1) throw Error('synthetic_fixture_unavailable');
+  if (mode === 'present' || mode === 'present-hand' || mode === 'hand-only' || mode === 'hand-lost' || mode === 'absent') sample({
+    ...(mode === 'present-hand' || mode === 'hand-only' || mode === 'hand-lost' ? { handObservation: { v: 1 as const, trackingState: mode === 'hand-lost' ? 'lost' as const : 'tracked' as const, coordinateSpace: 'image-normalized' as const,
       landmarkSchema: 'mediapipe-hand-21' as const, zMeaning: 'wrist-relative-image-width' as const, mirrored: false as const, sourceWidth: 640, sourceHeight: 480,
-      entities: [{ detectionId: 0, handedness: 'Left' as const, confidence: 0.9, landmarks: Array.from({ length: 21 }, () => ({ x: handX, y: 0.5, z: 0 })) }] } } : {}),
-    landmarks: mode !== 'absent' ? Array.from({ length: 478 }, () => ({ x: 0.5, y: 0.5, z: 0 })) : [],
+      entities: mode === 'hand-lost' ? [] : [{ detectionId: 0, handedness: 'Left' as const, confidence: 0.9, landmarks: Array.from({ length: 21 }, () => ({ x: handX, y: 0.5, z: 0 })) }] } } : {}),
+    landmarks: mode === 'present' || mode === 'present-hand' ? Array.from({ length: 478 }, () => ({ x: 0.5, y: 0.5, z: 0 })) : [],
     scores: { mouthSmileLeft: 0.4, mouthSmileRight: 0.4 }, matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
     durationMs: 0, delegate: 'SYNTHETIC / no inference' });
-  else { observations.status(mode as 'denied' | 'error' | 'stale', Date.now() - (mode === 'stale' ? 2000 : 0)); observeReactive(); }
+  else { handEvents.reset(); observations.status(mode as 'denied' | 'error' | 'stale', Date.now() - (mode === 'stale' ? 2000 : 0)); observeReactive(); }
   element('camera-status').textContent = 'Dữ liệu tổng hợp / không camera';
 }
 function cameraStatus(status: string, source = 'vision') {
-  if (!status.startsWith('ready-')) semanticEvents.length = 0;
+  if (!status.startsWith('ready-')) { semanticEvents.length = 0; handEvents.reset(); }
   logActivity('Camera: ' + status);
   cameraTransitions.push({ status, source, at: Date.now() }); cameraTransitions.splice(0, Math.max(0, cameraTransitions.length - 20));
   const messages: Record<string, string> = { starting: 'Đang khởi tạo camera…', denied: 'Chưa có quyền camera', camera_failed: 'Không mở được camera',
@@ -135,7 +140,7 @@ function cameraStatus(status: string, source = 'vision') {
   if (!active) recording.stop();
 }
 element('enable-reactivity').onchange = () => {
-  semanticEvents.length = 0; reactive.enable(element<HTMLInputElement>('enable-reactivity').checked); observeReactive();
+  semanticEvents.length = 0; updateHandProducer(); reactive.enable(element<HTMLInputElement>('enable-reactivity').checked); observeReactive();
   logActivity(element<HTMLInputElement>('enable-reactivity').checked ? 'Đã bật bộ quyết định từ quan sát local.' : 'Đã tắt bộ quyết định từ camera.');
 };
 element('enable-hands').onchange = () => { camera.hands = element<HTMLInputElement>('enable-hands').checked; hands.reset(); };
@@ -169,11 +174,14 @@ element('stop-all').onclick = stop;
 window.addEventListener('pagehide', stop);
 
 function observeReactive() { body.observe(observations.snapshot); reactive.observe(observations.snapshot, semanticEvents); }
-function resetReactive() { reactive.reset(); semanticEvents.length = 0; }
-function configureReactive(available: boolean) {
+function resetReactive() { handEvents.reset(); reactive.reset(); semanticEvents.length = 0; }
+function updateHandProducer() { handEvents.configure(reactiveAvailable && handEventVersion === 1 && element<HTMLInputElement>('enable-reactivity').checked); }
+function configureReactive(available: boolean, handVersion = 0) {
   const enabled = available === true && !stopped;
+  reactiveAvailable = enabled; handEventVersion = handVersion;
   reactive.configure(enabled); element<HTMLInputElement>('enable-reactivity').disabled = !enabled;
   if (!enabled) element<HTMLInputElement>('enable-reactivity').checked = false;
+  updateHandProducer();
   element('reactivity-status').textContent = !enabled ? 'Phản ứng tự động chưa có bộ quyết định được kết nối.'
     : body.userSceneOwned ? 'Đang giữ hình bạn tạo; phản ứng tự động tạm nhường quyền.' : 'Bộ quyết định đã kết nối; phản ứng camera là tùy chọn.';
 }

@@ -109,7 +109,7 @@ export class LiveReactiveBroker {
         } catch {} }
         api.activity(activity);
         for (const text of entries) api.logActivity?.(text);
-        api.configureReactive(available); api.setReactiveUserBusy(busy);
+        api.configureReactive(available, 1); api.setReactiveUserBusy(busy);
         let token = null; try { token = api.recordingCaptureToken?.() ?? null; } catch {}
         return { candidate: take ? api.takeReactiveRequest() : null, captureToken: token };
       }, { activity, entries, busy: this.busy(), available, take: available && !this.active && !this.busy(), receipts: queuedReceipts });

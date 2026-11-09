@@ -227,3 +227,10 @@ it('rejects steer ownership after error, wrong-thread, completed and changed-thr
     expect(f.rejected.at(-1).error.message).toBe('reactive_steer_invalid'); expect(f.forwarded).toHaveLength(1); f.broker.close();
   }
 });
+
+it('advertises the supported hand-event contract explicitly without resetting availability on repeated polls', async () => {
+  const f = fixture({ decide: async () => null }), configured = [];
+  f.api.configureReactive = (...args) => configured.push(args);
+  await f.broker.poll({}); await f.broker.poll({});
+  expect(configured).toEqual([[true, 1], [true, 1]]); f.broker.close();
+});

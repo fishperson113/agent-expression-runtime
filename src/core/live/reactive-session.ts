@@ -1,15 +1,17 @@
 import type { CausalKind, CausalPayloads } from './causal-recorder-types';
 import { ReactiveDecisionHost } from './decision-host';
 import { ReactiveLeaseGuard, type LeaseRevokeReason } from './reactive-lease';
-import { validateObservation } from './observation';
-import type { DecisionResult, ReactiveRequest, ReactiveState } from './decision-types';
+import { handEventKinds, validateObservation, validateSourceEvent } from './observation';
+import { freezeHandReadSet, matchesHandReadSet, type HandReadSet, type DecisionResult, type ReactiveRequest, type ReactiveState } from './decision-types';
 import type { Observation } from './types';
-import type { ReactiveWindow, SessionEvent, SessionOptions } from './reactive-session-types';
+import type { ReactiveWindow, ReactiveWindowEvent, SessionEvent, SessionOptions } from './reactive-session-types';
 
 const faceEvents = new Set(['user_arrived', 'user_left', 'looked_away', 'looked_back', 'expression_changed']);
 const revokeReasons: Record<string, LeaseRevokeReason> = { presence_changed: 'presence_changed', session_changed: 'session_changed',
-  epoch_changed: 'epoch_changed', semantic_changed: 'semantic_changed', user_intent: 'intent_changed', user_busy: 'intent_changed', deadline: 'expired', source_expired: 'expired', track_lost: 'track_lost' };
-const key = (type: string) => type.startsWith('user_') ? 'presence' : type.startsWith('looked_') ? 'orientation' : 'expression';
+  epoch_changed: 'epoch_changed', hand_changed: 'hand_changed', semantic_changed: 'semantic_changed', user_intent: 'intent_changed', user_busy: 'intent_changed', deadline: 'expired', source_expired: 'expired', track_lost: 'track_lost' };
+const isHand = (event: SessionEvent): event is import('./types').HandWireEvent & { seq: number } => 'eventVersion' in event;
+const key = (event: SessionEvent) => isHand(event) ? (event.type === 'hand_appeared' || event.type === 'hand_lost' ? 'hand_presence' : `hand_motion:${event.trackId}`)
+  : event.type.startsWith('user_') ? 'presence' : event.type.startsWith('looked_') ? 'orientation' : 'expression';
 function frozen<T>(value: T): T {
   if (value && typeof value === 'object') { for (const child of Object.values(value)) frozen(child); Object.freeze(value); }
   return value;
@@ -36,6 +38,7 @@ export class ReactiveSession {
   private lastWall = -Infinity;
   private epoch = '';
   private sourceValid = false;
+  private handGeneration?: number;
   private transport?: Transport;
   private uncertain = false;
   private count = 0;
@@ -86,7 +89,20 @@ export class ReactiveSession {
   }
   private readCurrent(): ReactiveState {
     return { sessionId: this.healthy() ? this.snapshot!.sessionId : 'unavailable', epoch: this.options.epoch(),
-      intentRevision: this.intentRevision, presenceRevision: this.presenceRevision, trackIds: this.tracks() };
+      intentRevision: this.intentRevision, presenceRevision: this.presenceRevision, handState: this.handState(), trackIds: this.tracks() };
+  }
+  private handState(): HandReadSet | undefined {
+    try { const state = this.options.handState?.(); return state === undefined ? undefined : freezeHandReadSet(state); } catch { return; }
+  }
+  private handEligible(event: SessionEvent, state = this.handState()) {
+    return !isHand(event) || !!state && event.sourceGeneration === state.sourceGeneration && event.stateRevision <= state.stateRevision &&
+      (event.type === 'hand_lost' ? state.primaryTrackId === null : state.primaryTrackId === event.trackId);
+  }
+  private syncHandSource() {
+    const state = this.handState(), generation = state?.sourceGeneration;
+    if (this.handGeneration !== generation && ([...this.pending.values()].some(isHand) || this.transport?.request.handReadSet || this.guard.owner?.handReadSet)) this.revoke('hand_changed');
+    this.handGeneration = generation;
+    for (const [name, event] of this.pending) if (!this.handEligible(event, state)) this.pending.delete(name);
   }
   observe(value: Observation, events: SessionEvent[]) {
     this.tick();
@@ -112,15 +128,26 @@ export class ReactiveSession {
     for (const event of events.slice(-8)) {
       if (!event || !Number.isSafeInteger(event.seq) || event.seq < 0 || event.seq <= this.seen) continue;
       this.seen = event.seq;
-      if (!this.enabled || !this.available || !this.sourceValid || !faceEvents.has(event.type) || !this.fresh(event.at, 5000)) continue;
-      const candidate = { sessionId: this.snapshot!.sessionId, observationSeq: this.snapshot!.seq, seq: event.seq, type: event.type, at: event.at };
+      let source;
+      try { const { seq, ...value } = event; source = validateSourceEvent(value);
+        if (source.sourceSeq !== undefined && source.sourceSeq !== seq || 'observationSeq' in source && source.observationSeq > this.snapshot!.seq) throw Error('event');
+      } catch { this.revoke('invalid_events'); continue; }
+      if (!this.enabled || !this.available || !this.sourceValid || (!faceEvents.has(source.type) && !handEventKinds.includes(source.type as never)) || !this.fresh(source.at, 5000)) continue;
+      const candidate = { ...source, sessionId: this.snapshot!.sessionId, observationSeq: 'observationSeq' in source ? source.observationSeq : this.snapshot!.seq, seq: event.seq } as PendingEvent;
       this.record('event', candidate);
+      if (!this.handEligible(candidate)) continue;
       if (this.guard.owner || this.transport?.generation === this.guard.generation) this.revoke('semantic_changed');
       if (!this.pending.size) this.firstAt = this.options.now();
-      this.pending.set(key(event.type), candidate);
+      this.pending.set(key(candidate), candidate);
+      while (this.pending.size > 8) this.pending.delete(this.pending.keys().next().value!);
     }
   }
+  private windowEvent(event: PendingEvent): ReactiveWindowEvent {
+    const { sessionId, seq, observationSeq, ...source } = event;
+    return 'eventVersion' in source ? { ...source, id: seq, observationSeq } : { id: seq, type: source.type, at: source.at };
+  }
   tick() {
+    this.syncHandSource();
     const now = this.options.now(), wall = this.options.wallNow(), epoch = this.options.epoch();
     if (!Number.isFinite(now) || !Number.isFinite(wall) || now < 0 || now < this.lastNow || wall < this.lastWall) this.revoke('clock_discontinuity');
     if (epoch !== this.epoch) { this.epoch = epoch; this.revoke('epoch_changed'); }
@@ -138,13 +165,14 @@ export class ReactiveSession {
       now - this.lastStart < 15000 || this.starts.length >= 4 || this.count >= 256) return null;
     const requestId = this.options.id();
     if (![requestId, this.snapshot!.sessionId, this.options.epoch()].every(id => /^[a-zA-Z0-9_-]{1,64}$/.test(id)) || this.ids.has(requestId)) { this.revoke('invalid_request_id'); return null; }
+    const candidates = [...this.pending.values()], hand = candidates.some(isHand) ? this.handState() : undefined;
+    if (candidates.some(isHand) && !hand) { this.revoke('hand_changed'); return null; }
     this.ids.add(requestId);
     const request: ReactiveRequest = frozen({ schemaVersion: 1, sessionId: this.snapshot!.sessionId, epoch: this.options.epoch(),
       requestId, intentRevision: this.intentRevision, presenceRevision: this.presenceRevision,
-      deadline: now + 5000, requiredTrackIds: this.tracks() });
-    const candidates = [...this.pending.values()];
+      deadline: now + 5000, requiredTrackIds: this.tracks(), ...(hand ? { handReadSet: hand } : {}) });
     const observationWindow: ReactiveWindow = frozen({ schemaVersion: 1, request,
-      events: candidates.map(event => ({ id: event.seq, type: event.type, at: event.at })), observations: structuredClone(this.history) });
+      events: candidates.map(event => this.windowEvent(event)), observations: structuredClone(this.history) });
     this.record('request', { request, observationRefs: observationWindow.observations.map(value => ({ sessionId: value.sessionId, seq: value.seq })),
       eventRefs: candidates.map(value => ({ sessionId: value.sessionId, seq: value.seq })) });
     this.pending.clear(); this.lastStart = now; this.starts.push(now); this.count++;
@@ -176,7 +204,7 @@ export class ReactiveSession {
     const request = transport.request, state = this.readCurrent();
     if (this.options.now() >= request.deadline || state.sessionId !== request.sessionId || state.epoch !== request.epoch ||
       state.intentRevision !== request.intentRevision || state.presenceRevision !== request.presenceRevision ||
-      !request.requiredTrackIds.every(track => state.trackIds.includes(track))) return this.authorization(transport, false, 'stale');
+      !matchesHandReadSet(request.handReadSet, state.handState) || !request.requiredTrackIds.every(track => state.trackIds.includes(track))) return this.authorization(transport, false, 'stale');
     transport.authorized = true; this.lastReason = 'authorized'; return this.authorization(transport, true, 'authorized');
   }
   async deliver(id: string, data: unknown): Promise<DecisionResult | null> { return this.settle(id, data, false); }
