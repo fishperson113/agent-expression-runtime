@@ -28,6 +28,9 @@ jobs:
           cache: npm
       - uses: dtolnay/rust-toolchain@stable
       - run: npm ci
+      - name: Verify safe checkout update commands
+        shell: pwsh
+        run: ./tests/live-update-windows.ps1
       - name: Verify linked CLI in a spaced Windows workspace
         shell: pwsh
         run: |
