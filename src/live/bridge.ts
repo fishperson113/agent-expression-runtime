@@ -13,13 +13,13 @@ export class LiveBridge {
   private timer?: ReturnType<typeof setInterval>;
   private connected = false;
   private stopped = false;
-  constructor(private body: LiveBody, private observations: FaceObservations) {}
+  constructor(private body: LiveBody, private observations: FaceObservations, private resetReactive = () => {}, private observeReactive = () => {}) {}
   async connect(base: string, token: string) {
     if (this.connection) throw Error('live_already_paired');
     this.connection = new HttpGatewayConnection(base, token);
     await this.connection.subscribe(event => {
-      if (event.kind === 'epoch') this.body.epoch(event.epoch, !!event.id);
-      if (event.kind === 'closed') this.body.epoch(event.epoch, true);
+      if (event.kind === 'epoch') { this.resetReactive(); this.body.epoch(event.epoch, !!event.id); }
+      if (event.kind === 'closed') { this.resetReactive(); this.body.epoch(event.epoch, true); }
       if (event.kind === 'expression') {
         const result = this.body.admit(event.record);
         void this.connection?.complete(event.id, result.status, result.code);
@@ -30,13 +30,13 @@ export class LiveBridge {
     const socket = this.socket = new WebSocket(url);
     socket.onopen = () => socket.send(JSON.stringify({ type: 'hello', token, sessionId: this.observations.snapshot.sessionId }));
     socket.onmessage = event => { void this.receive(JSON.parse(event.data)); };
-    socket.onclose = () => { this.connected = false; if (!this.stopped) element('connection').textContent = 'Mất kết nối Live'; };
+    socket.onclose = () => { this.resetReactive(); this.connected = false; if (!this.stopped) element('connection').textContent = 'Mất kết nối Live'; };
     socket.onerror = () => { element('fault').textContent = 'Không nối được gateway Live.'; };
     this.timer = setInterval(() => this.publish(), 100);
   }
   events(events: { type: LiveEventKind; at: number }[]) { this.pending.push(...events); this.pending = this.pending.slice(-16); }
   async cancel() {
-    this.body.epoch(crypto.randomUUID());
+    this.resetReactive(); this.body.epoch(crypto.randomUUID());
     try { await this.connection?.revoke(); }
     catch { element('fault').textContent = 'Đã dừng tại renderer; nối lại Live trước biểu đạt mới.'; }
   }
@@ -46,6 +46,7 @@ export class LiveBridge {
     const snapshot = this.observations.snapshot;
     const outgoing = Date.now() - snapshot.capturedAt > 1500 ? { ...snapshot, capturedAt: Date.now(), camera: 'stale',
       user: unavailableUser(), summary: 'Quan sát đã cũ; trạng thái người dùng chưa biết.' } : snapshot;
+    if (outgoing.camera === 'stale') delete outgoing.hands;
     this.socket.send(JSON.stringify({ type: 'observation', snapshot: outgoing, events: this.pending.splice(0) }));
     this.sent = this.observations.snapshot.seq;
   }
@@ -53,6 +54,7 @@ export class LiveBridge {
     if (message.type === 'ready') {
       this.connected = true;
       if (this.observations.snapshot.camera !== 'tracking') this.observations.status(this.observations.snapshot.camera, Date.now());
+      this.observeReactive();
       element('connection').textContent = 'Đã nối gateway / look tổng hợp';
     }
     if (message.type !== 'look' || message.synthetic !== true) return;

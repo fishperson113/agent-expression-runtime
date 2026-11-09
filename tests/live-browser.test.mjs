@@ -73,6 +73,8 @@ it('shows a large Fisch panel beside a narrower camera and activity panel with c
     expect(await page.locator('#enable-reactivity').getAttribute('aria-describedby')).toBe('reactivity-privacy');
     expect(await page.locator('#enable-reactivity').isDisabled()).toBe(true);
     await page.evaluate(() => window.fischLive.activity({ turn: 'idle', output: 0, quality: 'codex-agent-message-delta' }));
+    expect(await page.locator('#enable-reactivity').isDisabled()).toBe(true);
+    await page.evaluate(() => window.fischLive.configureReactive(true));
     await page.locator('#enable-reactivity').check(); await page.locator('#enable-reactivity').uncheck();
     expect(await page.evaluate(() => window.fischLive.reactivity().events)).toEqual([]);
     const session = await page.evaluate(() => window.fischLive.reactivity().sessionId);
