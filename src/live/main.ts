@@ -8,17 +8,20 @@ import { LiveBridge } from './bridge';
 import type { LiveEventKind } from '../core/live/types';
 import { ReactiveSession } from '../core/live/reactive-session';
 import { drawLandmarkOverlay } from './landmark-overlay';
+import { LiveRecording } from './recording';
 
 mountLive(element('app'));
 const synthetic = new URLSearchParams(location.search).get('fixture') === 'synthetic';
 const body = new LiveBody(element<HTMLCanvasElement>('body'), text => { element('body-status').textContent = text; });
+const recording = new LiveRecording(() => body.scheduler.epoch, synthetic ? 'synthetic' : 'live-structured');
+body.trace.setSink(recording.record);
 const hands = new HandGestures();
 const observations = new FaceObservations(crypto.randomUUID());
 const cameraTransitions: { status: string; source: string; at: number }[] = [];
 const bridge = new LiveBridge(body, observations, () => resetReactive(), () => observeReactive());
 const reactive = new ReactiveSession({ now: () => performance.now(), wallNow: () => Date.now(), epoch: () => body.scheduler.epoch,
   id: () => crypto.randomUUID(), canAdmit: () => !document.hidden && body.canReactive(),
-  admit: (compiled, owner) => body.admitReactive(compiled, owner), cancel: (owner, reason) => body.cancelReactive(owner, reason) });
+  admit: (compiled, owner) => body.admitReactive(compiled, owner), cancel: (owner, reason) => body.cancelReactive(owner, reason), record: recording.record });
 body.attachReactive(reactive);
 let lastActivity = 'idle';
 let semanticSequence = 0;
@@ -42,6 +45,8 @@ Object.assign(window, { fischLive: { pair: (base: string, token: string) => brid
   takeReactiveRequest: () => reactive.takeRequest(), authorizeReactiveRequest: (id: string) => reactive.authorize(id),
   deliverReactiveDecision: (id: string, data: unknown) => reactive.deliver(id, data), failReactiveDecision: (id: string) => reactive.fail(id),
   reactiveStatus: () => reactive.status(),
+  startRecording: () => recording.start(), stopRecording: () => recording.stop(), clearRecording: () => recording.clear(),
+  recordingSnapshot: () => recording.snapshot(),
   reactivity: () => ({ sessionId: 'legacy-reactivity-disabled', enabled: false, stopped: true,
     camera: 'stopped', capturedAt: Date.now(), events: [] }),
   activity: (value: { turn: 'idle' | 'working' | 'waiting' | 'interrupted'; output: number; quality: string }) => {
@@ -126,6 +131,7 @@ function cameraStatus(status: string, source = 'vision') {
   if (!active) { hands.reset(); element('hand-status').textContent = 'Cử chỉ tay đang tắt'; }
   element('camera-placeholder').hidden = active;
   if (!status.startsWith('ready-')) { observations.status(status === 'starting' || status === 'recovering-CPU' ? 'starting' : status === 'denied' ? 'denied' : status === 'stopped' ? 'stopped' : 'error', Date.now()); observeReactive(); }
+  if (!active) recording.stop();
 }
 element('enable-reactivity').onchange = () => {
   semanticEvents.length = 0; reactive.enable(element<HTMLInputElement>('enable-reactivity').checked); observeReactive();
@@ -146,6 +152,7 @@ element<HTMLSelectElement>('motion').value = matchMedia('(prefers-reduced-motion
 element('motion').onchange = () => { if (element<HTMLSelectElement>('motion').value === 'off') resetReactive(); body.motion(element<HTMLSelectElement>('motion').value as 'normal' | 'reduced' | 'off'); };
 body.motion(element<HTMLSelectElement>('motion').value as 'normal' | 'reduced');
 const timer = setInterval(() => {
+  recording.tick();
   element('world-state').textContent = JSON.stringify(observations.snapshot, null, 2);
   const metrics = body.metrics;
   element('scene-trace').textContent = JSON.stringify(metrics.diagnostics, null, 2);
@@ -153,7 +160,7 @@ const timer = setInterval(() => {
 }, 500);
 function stop() {
   if (stopped) return; logActivity('Đã dừng phiên Live.'); resetReactive(); reactive.configure(false); stopped = true;
-  camera.stop(); hands.reset(); cameraStatus('stopped', 'shutdown'); clearInterval(timer); bridge.stop(); body.dispose();
+  recording.dispose(); camera.stop(); hands.reset(); cameraStatus('stopped', 'shutdown'); clearInterval(timer); bridge.stop(); body.dispose();
   element<HTMLButtonElement>('camera-start').disabled = true; element('connection').textContent = 'Đã dừng phiên Live';
   void (window as any).fischLiveStop?.();
 }
@@ -171,5 +178,5 @@ function configureReactive(available: boolean) {
 }
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) return;
-  resetReactive(); camera.stop(); cameraStatus('stopped', 'hidden');
+  resetReactive(); recording.clear(); camera.stop(); cameraStatus('stopped', 'hidden');
 });

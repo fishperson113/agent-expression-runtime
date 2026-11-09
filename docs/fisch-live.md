@@ -182,8 +182,11 @@ Perception recognizes seven static poses: open palm, closed fist, pointing up,
 thumb up, thumb down, victory, I-love-you. The first sufficiently confident hand
 wins (up to two detected hands); 0.75 confidence, 250 ms stable evidence, 500 ms
 maximum sample gap. Only a stable, bounded pose description is appended to the
-typed observation's summary for Codex to read on its next turn; images and hand
-landmarks remain local and unpersisted. Losing the pose clears its description.
+typed observation's summary for Codex to read on its next turn. Structured hand
+landmarks also have a validated observation contract; an explicitly enabled,
+configured observer may receive that structured window. Raw images stay local.
+Losing the pose clears its description. The optional diagnostic recorder below
+can briefly retain structured coordinates after separate opt-in.
 Cancel, session changes and camera stop clear perception state.
 
 There is **no gesture-to-effect table**, intent classifier or phrase-to-geometry
@@ -212,6 +215,36 @@ hands on a painted blank synthetic frame, handsFailed=false. Fullscreen works;
 zero page errors, external requests or active camera stream. Semantic responses
 to real hand observations remain unverified because Cloud model auth is blocked.
 No real camera/mic or owner-PC access. No voice gate is pending for this scope.
+
+## Local causal diagnostic recording
+
+Under **Quan sát và chẩn đoán**, **Ghi 60 giây** explicitly starts an in-memory
+debug capture. It is off by default and does not start camera, observer inference
+or networking. It stores quantitative observations without summaries, eligible
+events and their observation references, frozen request references, authorization,
+decision outcome metadata, effective revocations and existing execution/frame
+proxies. It excludes raw media, chat/activity text, prompts and provider output.
+Coordinates and IDs still require care when sharing an exported file.
+
+Capture stops on its record/byte quota and marks the preserved prefix incomplete.
+It never evicts causal parents to make a truncated suffix look complete. Starting
+mid-session may reference pre-capture parents; those gaps are marked rather than
+backfilling observations captured before opt-in. **Dừng ghi** retains the prefix
+until its original 60-second expiry; **Xóa bản ghi**, full stop, page close and
+backgrounding clear it. Expiry is enforced on recorder access and the page's
+periodic tick; suspended browser execution cannot guarantee an exact deletion
+instant. Nothing is automatically written to disk or uploaded.
+
+**Xuất JSON** downloads the current bounded snapshot only when clicked. That copy
+is user-managed and does not inherit the in-memory expiry. A new capture replaces
+the previous one. Developer automation can use `fischLive.startRecording()`,
+`stopRecording()`, `clearRecording()` and `recordingSnapshot()`; recording cannot
+restart after full stop.
+
+The versioned manifest separates wall-clock observation/event timestamps from
+monotonic request deadlines and execution times, retaining clock anchors. Unknown
+build hashes remain unknown. This is a causal debug journal, not a complete
+deterministic replay bundle, particle trajectory or camera-to-photon measurement.
 
 
 ## Reactive call workspace (2026-11-09)
