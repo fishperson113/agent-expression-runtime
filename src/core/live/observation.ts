@@ -19,8 +19,10 @@ function nullableVector(value: unknown, fields: string[], min: number, max: numb
 }
 
 function validateHands(value: unknown) {
-  const hand = strictObject(value, ['v', 'trackingState', 'coordinateSpace', 'landmarkSchema',
-    'zMeaning', 'mirrored', 'sourceWidth', 'sourceHeight', 'entities']);
+  const fields = ['v', 'trackingState', 'coordinateSpace', 'landmarkSchema',
+    'zMeaning', 'mirrored', 'sourceWidth', 'sourceHeight', 'entities'];
+  if (value && typeof value === 'object' && 'primaryTrackId' in value) fields.push('primaryTrackId');
+  const hand = strictObject(value, fields);
   if (hand.v !== 1 || hand.coordinateSpace !== 'image-normalized' || hand.landmarkSchema !== 'mediapipe-hand-21' ||
     hand.zMeaning !== 'wrist-relative-image-width' || hand.mirrored !== false ||
     !['tracked', 'lost', 'unavailable', 'error'].includes(hand.trackingState)) throw Error('live_hand_schema');
@@ -29,9 +31,16 @@ function validateHands(value: unknown) {
   }
   if (!Array.isArray(hand.entities) || hand.entities.length > 2 ||
     (hand.trackingState === 'tracked') !== (hand.entities.length > 0)) throw Error('live_hand_state');
-  const ids = new Set<number>();
+  const ids = new Set<number>(), tracks = new Set<string>();
+  const tracked = 'primaryTrackId' in hand;
   for (const value of hand.entities) {
-    const entity = strictObject(value, ['detectionId', 'handedness', 'confidence', 'landmarks']);
+    const fields = ['detectionId', 'handedness', 'confidence', 'landmarks'];
+    if (tracked) fields.push('trackId');
+    const entity = strictObject(value, fields);
+    if (tracked) {
+      if (typeof entity.trackId !== 'string' || !/^hand_[0-9]+_[0-9]+$/.test(entity.trackId) || entity.trackId.length > 64 || tracks.has(entity.trackId)) throw Error('live_hand_track');
+      tracks.add(entity.trackId);
+    }
     finite(entity.detectionId, 0, 1); finite(entity.confidence, 0, 1);
     if (!Number.isInteger(entity.detectionId) || ids.has(entity.detectionId) ||
       !['Left', 'Right', 'Unknown'].includes(entity.handedness)) throw Error('live_hand_entity');
@@ -42,6 +51,7 @@ function validateHands(value: unknown) {
       for (const key of ['x', 'y', 'z']) finite(point[key], -4, 4);
     }
   }
+  if (tracked && hand.primaryTrackId !== null && !tracks.has(hand.primaryTrackId)) throw Error('live_hand_primary');
 }
 
 export function validateObservation(value: unknown): Observation {

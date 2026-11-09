@@ -44,7 +44,8 @@ it('preserves versioned structured hand observations without inventing face pres
     entities: [{ detectionId: 0, handedness: 'Left' as const, confidence: 0.9,
       landmarks: Array.from({ length: 21 }, (_, i) => ({ x: i / 21, y: 0.5, z: -0.1 })) }] };
   observations.update({ ...sample(false), handObservation }, 1000);
-  expect(validateObservation(observations.snapshot).hands).toEqual(handObservation);
+  expect(validateObservation(observations.snapshot).hands?.entities[0]).toMatchObject(handObservation.entities[0]);
+  expect(observations.snapshot.hands?.primaryTrackId).toBe(observations.snapshot.hands?.entities[0].trackId);
   expect(new Ajv().compile(schema)(observations.snapshot)).toBe(true);
   expect(observations.snapshot.user.present).toBe(false);
   const invalid = structuredClone(observations.snapshot);
