@@ -15,20 +15,25 @@ export function matchesHandReadSet(expected: HandReadSet | undefined, state: Han
     expected.sourceGeneration === state.sourceGeneration && expected.primaryTrackId === state.primaryTrackId;
 }
 
-export type ReactiveRequest = Readonly<{
-  schemaVersion: 1; sessionId: string; epoch: string; requestId: string;
-  intentRevision: number; presenceRevision?: number; handReadSet?: HandReadSet; deadline: number; requiredTrackIds: readonly string[];
-}>;
+export type SemanticSnapshot = Readonly<{ orientation: number | null; expression: number | null; handMotion: number | null; handIdentity: number }>;
+export type SemanticPrerequisite = 'orientation' | 'expression' | 'hand_motion';
+type RequestFields = Readonly<{ sessionId: string; epoch: string; requestId: string; intentRevision: number;
+  presenceRevision?: number; handReadSet?: HandReadSet; deadline: number; requiredTrackIds: readonly string[] }>;
+export type ReactiveRequestV1 = RequestFields & Readonly<{ schemaVersion: 1 }>;
+export type ReactiveRequestV2 = RequestFields & Readonly<{ schemaVersion: 2; presenceRevision: number; semanticSnapshot: SemanticSnapshot }>;
+export type ReactiveRequest = ReactiveRequestV1 | ReactiveRequestV2;
 export type ReactiveState = {
   sessionId: string; epoch: string; intentRevision: number; presenceRevision?: number; handState?: HandReadSet; trackIds: readonly string[];
+  sourceHealthy?: boolean; semanticSnapshot?: SemanticSnapshot;
 };
 export type ReactiveAdapter = {
   decide(request: ReactiveRequest, signal: AbortSignal): Promise<unknown>;
 };
 export type DecisionReason = 'observed' | 'accepted' | 'busy' | 'duplicate' | 'capacity' |
   'invalid_request' | 'invalid_decision' | 'stale' | 'revoked' | 'transport_unknown' | 'admission_failed';
-export type DecisionResult = { reason: DecisionReason; requestId: string; decisionId?: string; transportToken?: number };
-export type ReactiveOwnership = Readonly<{
+export type DecisionMetadata = { decisionVersion?: 2; prerequisites?: readonly SemanticPrerequisite[]; executionValidUntil?: number };
+export type DecisionResult = DecisionMetadata & { reason: DecisionReason; requestId: string; decisionId?: string; transportToken?: number };
+export type ReactiveOwnership = Readonly<DecisionMetadata & {
   requestId: string; decisionId: string; actionId: string; validUntil: number;
 }>;
 /** Trusted synchronous admission only; implementations must not await. */
