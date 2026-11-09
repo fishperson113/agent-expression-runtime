@@ -1,19 +1,18 @@
 {
   "roles": {"leftEye":"eye_left","rightEye":"eye_right","leftBrow":"brow_left","rightBrow":"brow_right","mouth":"mouth"},
   "parts": [
-    {"id":"outline","kind":"curve","points":[[0,1,0],[-0.65,0.8,0],[-0.94,0.25,0],[-0.9,-0.45,0],[-0.52,-0.92,0],[0,-1,0],[0.52,-0.92,0],[0.9,-0.45,0],[0.94,0.25,0],[0.65,0.8,0],[0,1,0]],"radius":0.022,"weight":1.4},
-    {"id":"eye_left","kind":"ellipsoid","center":[-0.32,0.24,0.03],"scale":[0.075,0.115,0.025],"weight":0.7},
-    {"id":"eye_right","kind":"ellipsoid","center":[0.32,0.24,0.03],"scale":[0.075,0.115,0.025],"weight":0.7},
-    {"id":"brow_left","kind":"curve","points":[[-0.5,0.48,0],[-0.34,0.54,0],[-0.18,0.5,0]],"radius":0.025,"weight":0.45},
-    {"id":"brow_right","kind":"curve","points":[[0.18,0.5,0],[0.34,0.54,0],[0.5,0.48,0]],"radius":0.025,"weight":0.45},
-    {"id":"mouth","kind":"curve","points":[[-0.36,-0.27,0.03],[-0.2,-0.41,0.03],[0,-0.45,0.03],[0.2,-0.41,0.03],[0.36,-0.27,0.03]],"radius":0.03,"weight":1.2}
+    {"id":"outline","kind":"curve","points":[[0.975,0.93,0.0],[0.3,1.41,-0.15],[-0.72,1.305,-0.225],[-1.335,0.66,-0.15],[-1.41,-0.225,-0.15],[-0.975,-1.035,0.0],[-0.105,-1.2,0.15],[0.825,-0.885,0.225],[1.245,-0.285,0.15],[1.305,0.405,0.0],[0.975,0.93,0.0]],"radius":0.0312,"weight":1.2},
+    {"id":"eye_left","kind":"curve","points":[[-0.225,0.36,0.18],[-0.3,0.66,0.18],[-0.585,0.765,0.18],[-0.885,0.645,0.18],[-0.975,0.345,0.18],[-0.84,0.06,0.18],[-0.54,-0.015,0.18],[-0.285,0.105,0.18],[-0.225,0.36,0.18]],"radius":0.0438,"weight":1.2},
+    {"id":"eye_right","kind":"curve","points":[[1.215,0.45,0.27],[1.155,0.705,0.27],[0.93,0.795,0.27],[0.705,0.69,0.27],[0.645,0.435,0.27],[0.72,0.195,0.27],[0.96,0.12,0.27],[1.17,0.225,0.27],[1.215,0.45,0.27]],"radius":0.0438,"weight":1},
+    {"id":"pupil_left","kind":"ellipsoid","center":[-0.465,0.375,0.21],"scale":[0.1275,0.165,0.0525],"weight":0.5},
+    {"id":"pupil_right","kind":"ellipsoid","center":[1.02,0.45,0.3],"scale":[0.0975,0.135,0.0525],"weight":0.4},
+    {"id":"brow_left","kind":"curve","points":[[-1.05,0.6,0.06],[-0.9,0.885,0.06],[-0.57,0.975,0.06],[-0.18,0.735,0.06]],"radius":0.0225,"weight":0.4},
+    {"id":"brow_right","kind":"curve","points":[[0.6,0.795,0.12],[0.915,0.96,0.12],[1.23,0.735,0.12]],"radius":0.0225,"weight":0.35},
+    {"id":"mouth","kind":"curve","points":[[0.18,-0.57,0.375],[0.315,-0.375,0.375],[0.69,-0.33,0.375],[1.035,-0.435,0.375],[1.11,-0.6,0.375],[0.93,-0.765,0.375],[0.54,-0.81,0.375],[0.255,-0.72,0.375],[0.18,-0.57,0.375]],"radius":0.0688,"weight":1.5},
+    {"id":"gill","kind":"curve","points":[[-1.08,0.555,0.0],[-1.185,0.045,0.0],[-0.975,-0.495,0.0],[-0.54,-0.795,0.0],[-0.18,-0.825,0.0]],"radius":0.0275,"weight":0.65},
+    {"id":"gill_inner","kind":"curve","points":[[-0.99,-0.06,0.015],[-0.75,-0.45,0.015],[-0.42,-0.585,0.015]],"radius":0.0225,"weight":0.35},
+    {"id":"dorsal","kind":"curve","points":[[-1.305,0.6,-0.15],[-1.575,1.125,-0.15],[-1.065,0.96,-0.15],[-1.2,1.53,-0.15],[-0.735,1.23,-0.15],[-0.66,1.695,-0.15],[-0.3,1.365,-0.15],[0.075,1.68,-0.15],[0.36,1.365,-0.15]],"radius":0.025,"weight":0.65},
+    {"id":"fin","kind":"curve","points":[[-1.275,-0.195,-0.15],[-1.725,-0.51,-0.15],[-1.74,-0.93,-0.15],[-1.02,-0.705,-0.15],[-1.65,-0.66,-0.15]],"radius":0.025,"weight":0.5}
   ],
-  "states": {
-    "idle": [],
-    "attention": [{"role":"leftEye","prop":"scaleY","value":1.3},{"role":"rightEye","prop":"scaleY","value":1.3},{"role":"leftBrow","prop":"y","value":0.09},{"role":"rightBrow","prop":"y","value":0.09}],
-    "working": [{"role":"leftEye","prop":"scaleY","value":0.6},{"role":"rightEye","prop":"scaleY","value":0.6},{"role":"leftBrow","prop":"rotateZ","value":-0.23},{"role":"rightBrow","prop":"rotateZ","value":0.23},{"role":"mouth","prop":"scaleX","value":0.55},{"role":"mouth","prop":"scaleY","value":0.4}],
-    "replying": [{"role":"mouth","prop":"scaleY","value":1.3,"outputGain":0.7},{"role":"leftBrow","prop":"y","value":0.05},{"role":"rightBrow","prop":"y","value":0.05}],
-    "waiting": [{"role":"leftBrow","prop":"y","value":0.12},{"role":"rightBrow","prop":"rotateZ","value":-0.15},{"role":"mouth","prop":"scaleX","value":0.7}],
-    "interrupted": [{"role":"mouth","prop":"scaleY","value":0.35},{"role":"leftEye","prop":"scaleY","value":0.85},{"role":"rightEye","prop":"scaleY","value":0.85}]
-  }
+  "states": {"idle":[],"attention":[{"role":"leftEye","prop":"scaleY","value":1.3},{"role":"rightEye","prop":"scaleY","value":1.3},{"role":"leftBrow","prop":"y","value":0.09},{"role":"rightBrow","prop":"y","value":0.09}],"working":[{"role":"leftEye","prop":"scaleY","value":0.6},{"role":"rightEye","prop":"scaleY","value":0.6},{"role":"leftBrow","prop":"rotateZ","value":-0.23},{"role":"rightBrow","prop":"rotateZ","value":0.23},{"role":"mouth","prop":"scaleX","value":0.55},{"role":"mouth","prop":"scaleY","value":0.4}],"replying":[{"role":"mouth","prop":"scaleY","value":1.3,"outputGain":0.7},{"role":"leftBrow","prop":"y","value":0.05},{"role":"rightBrow","prop":"y","value":0.05}],"waiting":[{"role":"leftBrow","prop":"y","value":0.12},{"role":"rightBrow","prop":"rotateZ","value":-0.15},{"role":"mouth","prop":"scaleX","value":0.7}],"interrupted":[{"role":"mouth","prop":"scaleY","value":0.35},{"role":"leftEye","prop":"scaleY","value":0.85},{"role":"rightEye","prop":"scaleY","value":0.85}]}
 }

@@ -4,32 +4,37 @@ import { chromium } from '@playwright/test';
 
 it('opens a keyboard-accessible Live page without camera capture and preserves reduced motion', async () => {
   const server = await createServer({ server: { host: '127.0.0.1', port: 0 } }); await server.listen();
-  let browser;
+  let browser; const errors = [];
   try {
     browser = await chromium.launch({ headless: true, ...(process.platform === 'win32' ? { channel: 'msedge' } : {}),
       args: ['--enable-webgl', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
     const page = await browser.newPage({ reducedMotion: 'reduce' });
-    await page.goto(server.resolvedUrls.local[0] + 'live.html');
+    page.on('pageerror', error => errors.push(error.message));
+    await page.goto(server.resolvedUrls.local[0] + 'live.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => Boolean(window.fischLive));
     await expect.poll(() => page.locator('#motion').inputValue()).toBe('reduced');
-    expect(await page.getByRole('button', { name: 'Bật camera', exact: true }).isEnabled()).toBe(true);
-    expect(await page.getByRole('button', { name: 'Tắt camera', exact: true }).isEnabled()).toBe(false);
+    expect(await page.locator('#camera-start').isEnabled()).toBe(true);
+    expect(await page.locator('#camera-stop').isEnabled()).toBe(false);
     expect(await page.locator('video').evaluate(video => video.srcObject)).toBe(null);
     await page.keyboard.press('Tab'); expect(await page.locator('.skip').evaluate(node => node === document.activeElement)).toBe(true);
     await page.setViewportSize({ width: 375, height: 812 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    await page.getByRole('button', { name: 'Dừng toàn bộ' }).click();
+    await page.locator('#stop-all').click();
     expect(await page.locator('#connection').textContent()).toBe('Đã dừng phiên Live');
+    expect(errors).toEqual([]);
   } finally { await browser?.close(); await server.close(); }
 }, 45000);
 
 it('draws a facial resting body, changes declared features on activity and freezes motion-off', async () => {
   const server = await createServer({ server: { host: '127.0.0.1', port: 0 } }); await server.listen();
-  let browser;
+  let browser; const errors = [];
   try {
     browser = await chromium.launch({ headless: true, ...(process.platform === 'win32' ? { channel: 'msedge' } : {}),
       args: ['--enable-webgl', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
     const page = await browser.newPage();
-    await page.goto(server.resolvedUrls.local[0] + 'live.html');
+    page.on('pageerror', error => errors.push(error.message));
+    await page.goto(server.resolvedUrls.local[0] + 'live.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => Boolean(window.fischLive));
     await page.waitForFunction(() => window.fischLive?.metrics().scene === 'face');
     const metrics = await page.evaluate(() => window.fischLive.metrics());
     expect(metrics.parts).toContain('mouth'); expect(metrics.parts).toContain('eye_left');
@@ -43,23 +48,46 @@ it('draws a facial resting body, changes declared features on activity and freez
     await page.waitForTimeout(450);
     expect((await canvas.screenshot()).equals(frozen)).toBe(true);
     expect(await page.locator('video').evaluate(video => video.srcObject)).toBe(null);
+    expect(errors).toEqual([]);
   } finally { await browser?.close(); await server.close(); }
 }, 45000);
 
-it('keeps the body larger than the optional camera, with reachable controls on narrow screens', async () => {
-  const server = await createServer({ server: { host: '127.0.0.1', port: 0 } }); await server.listen(); let browser;
+it('shows a large Fisch panel beside a narrower camera and activity panel with camera and honest activity together, accessible on mobile', async () => {
+  const server = await createServer({ server: { host: '127.0.0.1', port: 0 } }); await server.listen(); let browser; const errors = [];
   try {
     browser = await chromium.launch({ headless: true, ...(process.platform === 'win32' ? { channel: 'msedge' } : {}),
       args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
     const page = await browser.newPage({ viewport: { width: 1360, height: 950 } });
-    await page.goto(server.resolvedUrls.local[0] + 'live.html');
-    const body = await page.locator('#body').boundingBox(), camera = await page.locator('.camera-stage').boundingBox();
-    expect(body.width).toBeGreaterThan(camera.width * 3); expect(body.height).toBeGreaterThan(600);
-    await page.locator('.camera-panel>summary').click();
-    expect(await page.locator('#camera-start').isVisible()).toBe(false);
-    expect(await page.locator('#cancel').isVisible()).toBe(true);
+    page.on('pageerror', error => errors.push(error.message));
+    await page.goto(server.resolvedUrls.local[0] + 'live.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => Boolean(window.fischLive));
+    const body = await page.locator('.body-stage').boundingBox(), camera = await page.locator('.camera-stage').boundingBox();
+    const left = await page.locator('.body-panel').boundingBox(), right = await page.locator('.camera-panel').boundingBox();
+    expect(left.width / right.width).toBeCloseTo(2, 1);
+    expect(body.x).toBeLessThan(camera.x); expect(body.height).toBeGreaterThan(camera.height * 1.5);
+    expect(await page.locator('.camera-panel #agent-activity').count()).toBe(1);
+    expect(await page.locator('#agent-activity').getAttribute('aria-label')).toBeTruthy();
+    expect(await page.locator('#enable-reactivity').isChecked()).toBe(false);
+    await page.locator('.camera-options>summary').click();
+    expect(await page.locator('#enable-reactivity').isVisible()).toBe(true);
+    expect(await page.locator('#enable-reactivity').getAttribute('aria-describedby')).toBe('reactivity-privacy');
+    expect(await page.locator('#enable-reactivity').isDisabled()).toBe(true);
+    await page.evaluate(() => window.fischLive.activity({ turn: 'idle', output: 0, quality: 'codex-agent-message-delta' }));
+    await page.locator('#enable-reactivity').check(); await page.locator('#enable-reactivity').uncheck();
+    expect(await page.evaluate(() => window.fischLive.reactivity().events)).toEqual([]);
+    const session = await page.evaluate(() => window.fischLive.reactivity().sessionId);
+    await page.locator('#cancel').click();
+    expect(await page.evaluate(() => window.fischLive.reactivity().sessionId)).not.toBe(session);
+    await page.evaluate(() => window.fischLive.activity({ turn: 'working', output: 0, quality: 'fixture' }));
+    await page.waitForTimeout(600);
+    const logs = await page.locator('#agent-activity li').count();
+    await page.evaluate(() => window.fischLive.activity({ turn: 'working', output: 0, quality: 'fixture' }));
+    await page.waitForTimeout(600); expect(await page.locator('#agent-activity li').count()).toBe(logs);
+    expect(await page.locator('video').evaluate(video => video.srcObject)).toBe(null);
     await page.setViewportSize({ width: 375, height: 812 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    expect(await page.locator('#body').boundingBox()).toMatchObject({ width: 343 });
+    expect((await page.locator('.camera-panel').boundingBox()).y).toBeGreaterThan((await page.locator('.body-panel').boundingBox()).y);
+    expect(await page.locator('#cancel').isVisible()).toBe(true);
+    expect(errors).toEqual([]);
   } finally { await browser?.close(); await server.close(); }
 }, 45000);
