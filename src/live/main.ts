@@ -38,7 +38,7 @@ Object.assign(window, { fischLive: { pair: (base: string, token: string) => brid
   logActivity,
   configureReactive: (available: boolean) => configureReactive(available),
   setReactiveUserBusy: (busy: boolean) => reactive.setUserBusy(busy),
-  reactiveUserIntent: () => { semanticEvents.length = 0; reactive.userIntent(); },
+  reactiveUserIntent: () => { semanticEvents.length = 0; body.prepareUserMutation(); },
   takeReactiveRequest: () => reactive.takeRequest(), authorizeReactiveRequest: (id: string) => reactive.authorize(id),
   deliverReactiveDecision: (id: string, data: unknown) => reactive.deliver(id, data), failReactiveDecision: (id: string) => reactive.fail(id),
   reactiveStatus: () => reactive.status(),

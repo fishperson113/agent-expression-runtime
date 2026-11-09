@@ -284,3 +284,5 @@ Hình do người dùng hoặc tác vụ co-create gửi qua đường admission
 sau khi animation kết thúc; bộ quyết định quan sát không được thay thế nó.
 Trả về avatar chuẩn qua `return_to_face`, hoặc reset/cancel rõ ràng, mới nhường lại
 quyền này. Gửi thêm một chuyển động ngắn không tự xóa lease của binding trước đó.
+Các handler điều khiển trực tiếp phải gọi `LiveBody.prepareUserMutation()` trước
+khi chờ I/O; `LiveBody.admit()` luôn kiểm tra lại hàng rào này trước compilation.

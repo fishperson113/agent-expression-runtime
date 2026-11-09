@@ -87,7 +87,7 @@ export class LiveBody {
     return new Set((state.ownedProperties ?? []).flatMap(property => (mapping[property] ?? []).map(prop => 'body:' + prop)));
   }
   admit(record: any) {
-    this.reactive?.userIntent();
+    this.prepareUserMutation();
     const at = performance.now();
     this.trace.record(record?.seq, 'received', at, undefined, record?.epoch);
     try {
@@ -104,6 +104,7 @@ export class LiveBody {
     }
   }
   attachReactive(session: ReactiveSession) { this.reactive = session; }
+  prepareUserMutation() { this.reactive?.userIntent(); }
   get userSceneOwned() { return this.userGeometryLocked; }
   canReactive() { return !this.userGeometryLocked && this.controls.mode !== 'off' && performance.now() >= this.userLeaseUntil && !this.scheduler.busy; }
   private userGeometry(compiled: LiveCompiled, at: number) {
