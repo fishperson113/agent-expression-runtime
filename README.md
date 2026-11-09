@@ -39,7 +39,7 @@ On first launch, Fisch installs locked project dependencies, builds the browser 
 
 Use `fisch live --hands` to also prepare the optional hand model, or `fisch live --no-assets` to skip vision downloads. Camera and hand tracking still require explicit browser controls. If a model download fails, Live continues camera-off and retries next launch.
 
-This opens the particle face in a browser and Codex in your terminal. In Herdr, it uses an optional dedicated pane. Click **Bật camera** when you want local face tracking; the camera starts off. Real camera images stay on your machine. Talk to Codex normally.
+This opens the particle face in a browser and Codex in your terminal. Inside Herdr or another multiplexer, Codex runs in the pane where you launched Live. The explicit `--agent <pane>` legacy adapter remains available. Click **Bật camera** when you want local face tracking; the camera starts off. Real camera images stay on your machine. Talk to Codex normally.
 
 Prefer the terminal body? Keep Codex or Claude open in a neighboring Herdr pane and run:
 

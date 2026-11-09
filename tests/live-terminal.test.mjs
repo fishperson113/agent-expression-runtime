@@ -92,3 +92,13 @@ it('waits for controller handoff before forwarding selection and following event
     expect(messages.map(message => message.id ?? message.method)).toEqual([1, 'following']);
   } finally { release(); socket.terminate(); await transport.close(); }
 });
+
+it('uses the current terminal relay inside Herdr unless a legacy pane is explicit', async () => {
+  const env = { HERDR_PANE_ID: 'shell', HERDR_SOCKET_PATH: 'local-socket' };
+  const host = await selectLiveHost({ env, cwd: '/project', call: () => { throw Error('must not inspect other panes'); } });
+  expect(host).toEqual({ kind: 'terminal', cwd: '/project' });
+  const legacy = await selectLiveHost({ env, agentPane: 'legacy', call: async () => ({
+    snapshot: { agents: [{ agent: 'codex', pane_id: 'legacy', cwd: '/other' }], panes: [] },
+  }) });
+  expect(legacy).toEqual({ kind: 'herdr', source: { agent: 'codex', pane_id: 'legacy', cwd: '/other' } });
+});

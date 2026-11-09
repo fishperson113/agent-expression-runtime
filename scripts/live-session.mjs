@@ -6,7 +6,7 @@ import { openControl } from '../integrations/terminal-ipc.mjs';
 import { runTerminalCodex } from '../integrations/live-terminal.mjs';
 
 export async function selectLiveHost({ env = process.env, cwd = process.cwd(), call = herdrCall, agentPane } = {}) {
-  if (!agentPane && !env.HERDR_PANE_ID && !env.HERDR_SOCKET_PATH) return { kind: 'terminal', cwd };
+  if (!agentPane) return { kind: 'terminal', cwd };
   try {
     const { snapshot } = await call('session.snapshot');
     return { kind: 'herdr', source: selectLiveSource(snapshot, agentPane, env.HERDR_PANE_ID) };

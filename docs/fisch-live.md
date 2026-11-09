@@ -10,11 +10,11 @@ Chạy đúng một lệnh:
 fisch live
 ```
 
-Lệnh chuẩn bị build/gateway, mở browser và Codex trong terminal hiện tại với MCP tạm thời. Workspace là thư mục đang gọi; không cần provider/pane ID hoặc mở Codex trước. Nếu Herdr thật sự sẵn sàng, adapter mở tab Fisch Live riêng. Phiên cũ không bị thay thế. Login hiện có được dùng lại; không có planner phụ. Cấu hình global không bị viết lại. Nếu asset thị giác chưa tải được, Live vẫn dùng được camera-off; chuẩn bị asset trước khi bật camera.
+Lệnh chuẩn bị build/gateway, mở browser và Codex trong terminal hiện tại với MCP tạm thời. Workspace là thư mục đang gọi; không cần provider/pane ID hoặc mở Codex trước. Trong Herdr hoặc multiplexer khác, Codex chạy ngay trong pane khởi chạy Live; chỉ `--agent <pane>` mới dùng adapter cũ. Phiên cũ không bị thay thế. Login hiện có được dùng lại; không có planner phụ. Cấu hình global không bị viết lại. Nếu asset thị giác chưa tải được, Live vẫn dùng được camera-off; chuẩn bị asset trước khi bật camera.
 
 Sau `npm link`, lệnh `fisch` có trên PATH. Với checkout mới, chạy bước link một lần sau chuẩn bị; sau đó luôn dùng `fisch live`. `fisch run` vẫn mở bản trong panel. Tùy chọn `--agent` chỉ dành cho debug/chọn workspace nguồn tường minh, không cần trong luồng thường ngày.
 
-Launcher mở Edge/Chromium với trang Live và camera mặc định **tắt**. Chọn **Bật camera** để xử lý tại máy. Quan sát video/landmark ở bên trái, cơ thể ở bên phải. Tiếp tục gõ vào Codex trong terminal/pane Live. MCP có thể hỏi quyền tool lần đầu; cấp quyền theo ý bạn. Launcher không sửa global Codex/Herdr config hoặc bypass hook trust.
+Launcher mở Edge/Chromium với trang Live và camera mặc định **tắt**. Chọn **Bật camera** để xử lý tại máy. Fisch ở panel trái; camera và nhật ký hoạt động agent ở panel phải. Tiếp tục gõ vào Codex trong terminal/pane Live. MCP có thể hỏi quyền tool lần đầu; cấp quyền theo ý bạn. Launcher không sửa global Codex/Herdr config hoặc bypass hook trust.
 
 Đóng cửa sổ browser, chọn **Dừng toàn bộ**, hoặc Ctrl+C tại launcher để dừng camera/gateway/renderer. Đường terminal đóng cả Codex do chính phiên Live sở hữu; các agent không liên quan giữ nguyên. Browser, gateway và agent có đường cleanup độc lập. Herdr giữ vòng đời pane riêng; tool Live không còn dùng được sau khi gateway dừng. Chạy lại Live tạo pairing token mới.
 
@@ -212,3 +212,51 @@ hands on a painted blank synthetic frame, handsFailed=false. Fullscreen works;
 zero page errors, external requests or active camera stream. Semantic responses
 to real hand observations remain unverified because Cloud model auth is blocked.
 No real camera/mic or owner-PC access. No voice gate is pending for this scope.
+
+
+## Reactive call workspace (2026-11-09)
+
+The 2:1 call layout puts a large Fisch panel on the left and your smaller opt-in
+local camera plus actual agent activity together on the right. The resting particle body is a fish-inspired
+face, not a copy of the reference photo. The bounded log shows observed events,
+turns and tool lifecycle, never private model thoughts or raw tool arguments.
+
+Ordinary `fisch live` now runs Codex through the official app-server relay in the
+launching terminal, including a Herdr, tmux or other multiplexer pane. It no longer
+automatically creates a separate Herdr pane. Start it in a free shell pane; existing
+agent sessions are left alone. `fisch run` keeps its existing panel workflow.
+Explicit `fisch live --agent <pane>` retains the legacy Herdr adapter; its camera
+reflexes work, but agent-triggered camera reactions are unavailable there and the
+control stays disabled. No keystrokes are injected into an unrelated agent.
+
+Camera starts off. Expand the observation controls and enable camera reactions
+only if wanted. Stable typed geometric events may then start a Codex turn using
+the official standalone `toolOutput` mechanism. No image, landmark array or audio
+is sent by this path. Existing MCP observations/privacy controls still apply.
+Events coalesce for 750ms after local debounce, expire after five seconds, and
+start at most once every 15 seconds/four times per minute. Unchanging input and
+idle timers do not start inference. A reaction has a 30-second watchdog.
+
+User turns have priority: only a Fisch-owned reaction may be interrupted. Pending
+user input waits for confirmed cancellation; after ten seconds without certainty,
+an explicit error says that input was not sent and must be retried. No silent
+replay occurs. Stop, camera opt-out, Cancel, reload and thread selection invalidate
+pending reactions. A lost/uncertain model request pauses automatic reactions.
+Existing permissions are preserved; the event instructions restrict the model to
+Fisch observation/expression tools, rather than granting a new security policy.
+
+Protocol reference: https://learn.chatgpt.com/docs/app-server . Installed Codex
+0.167.0 schema confirms `TurnStartParams.toolOutput` / `TurnToolOutput`.
+Deterministic tests and camera-off visual checks are separate from real-camera,
+native-GPU performance and model-expression acceptance; do not treat them as the
+same certification. Native verification details are recorded in the PR.
+
+
+Verification for the reactive increment: 28 focused relay/reactivity tests pass.
+Linux CI on `c53c335` passed 293 JavaScript tests (4 skipped), production build,
+architecture and browser smoke. Windows browser-under-Vitest attempts timed out;
+standalone camera-off screenshot rendering succeeded, so no full Windows-browser
+pass is claimed. One real `gpt-6.1-sol` synthetic event turn started/completed and
+successfully called `observe`, with zero approval requests or camera/audio/image
+capture. It chose no `express` call: model-authored reaction animation remains an
+open acceptance check. Conservative cumulative model-test usage is 97/120.
