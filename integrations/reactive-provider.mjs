@@ -1,3 +1,4 @@
+import { beginReactiveReceipt } from './reactive-receipt.mjs';
 import { freezeReactiveWindow } from './reactive-window.mjs';
 import { parseReactiveResponse, reactiveDecisionSchema } from './reactive-decision.mjs';
 
@@ -41,14 +42,31 @@ async function boundedJson(response) {
     throw failure('reactive_response_read_unknown', false);
   } finally { await reader.cancel().catch(() => {}); }
 }
-export function reactiveResponsesAdapter(config, { reserve, fetch: request = fetch } = {}) {
+async function performReactiveRequest(request, address, options, frozen, receipt) {
+  let payload, outcome = 'transport_unknown';
+  try {
+    let response;
+    try { response = await request(address, options); } catch { throw failure('reactive_transport_unknown', false); }
+    if (!response.ok) {
+      outcome = 'http_error'; await response.body?.cancel().catch(() => {}); throw failure('reactive_provider_error', true);
+    }
+    outcome = 'invalid_response'; payload = await boundedJson(response);
+    let decision;
+    try { decision = parseReactiveResponse(payload, frozen.request); } catch { throw failure('reactive_decision_invalid', true); }
+    outcome = 'completed'; return decision;
+  } catch (error) {
+    if (error instanceof ReactiveProviderError && error.transportSettled === false) outcome = 'transport_unknown';
+    throw error;
+  } finally { receipt?.(outcome, payload); }
+}
+export function reactiveResponsesAdapter(config, { reserve, fetch: request = fetch, now = () => performance.now() } = {}) {
   if (!config?.enabled) return null;
   if (typeof reserve !== 'function') throw Error('reactive_budget_required');
   const address = endpoint(config.endpoint), model = config.model, key = config.key;
   if (typeof model !== 'string' || !model.length || model.length > 128 ||
       (new URL(address).hostname === 'api.openai.com' && !key) ||
       (key !== undefined && (typeof key !== 'string' || !key.length || /[\r\n]/.test(key)))) throw Error('reactive_config_invalid');
-  return { async decide(window, signal) {
+  return { async decide(window, signal, onReceipt) {
     let frozen;
     try { frozen = freezeReactiveWindow(window); } catch { throw failure('reactive_window_invalid', true); }
     const body = JSON.stringify({ model, store: false, tools: [], tool_choice: 'none', max_output_tokens: 6000,
@@ -59,12 +77,8 @@ export function reactiveResponsesAdapter(config, { reserve, fetch: request = fet
     try { reserved = await reserve(Object.freeze({ requestId: frozen.request.requestId })); } catch { throw failure('reactive_budget_denied', true); }
     if (reserved !== true) throw failure('reactive_budget_denied', true);
     if (signal?.aborted) throw failure('reactive_aborted', true);
-    let response;
-    try { response = await request(address, { method: 'POST', signal, redirect: 'error',
-      headers: { 'Content-Type': 'application/json', ...(key ? { Authorization: 'Bearer ' + key } : {}) }, body }); }
-    catch { throw failure('reactive_transport_unknown', false); }
-    if (!response.ok) { await response.body?.cancel().catch(() => {}); throw failure('reactive_provider_error', true); }
-    const payload = await boundedJson(response);
-    try { return parseReactiveResponse(payload, frozen.request); } catch { throw failure('reactive_decision_invalid', true); }
+    const receipt = beginReactiveReceipt(onReceipt, { requestId: frozen.request.requestId, address, body }, now);
+    return performReactiveRequest(request, address, { method: 'POST', signal, redirect: 'error',
+      headers: { 'Content-Type': 'application/json', ...(key ? { Authorization: 'Bearer ' + key } : {}) }, body }, frozen, receipt);
   } };
 }
