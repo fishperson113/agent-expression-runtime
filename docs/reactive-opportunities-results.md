@@ -1,5 +1,9 @@
 # Reactive opportunity diagnostics — full virtual diagnostic
 
+These diagnostics exercise the default **V1** contract. The opt-in V2 causal and
+execution changes have separate [real-wall verification](reactive-v2-evidence.md);
+the historical measurements below are retained rather than relabeled.
+
 77 scenarios × **20 virtual minutes**; this is not a real-wall soak, model measurement or human session.
 
 Runtime checkout: `dc6641203f246b09d5e80343cff62326ce51aee4`. Baseline reference: `354d6428ea29255229a9a24c67332583bc7635bc`. Executed source files match baseline: **false**.
