@@ -62,8 +62,11 @@ the explicit strict checker before committing/finishing. It uses the upstream
 evaluator, exits nonzero for blocking rules and fails on unexpected errors;
 upstream's `check` remains an informational, fail-open command.
 
-The separate GitHub workflow checks the committed PR range against its merge
-base in a disposable local clone, without resetting the working checkout. Root
+The separate GitHub workflow checks out the event’s exact PR head SHA and checks
+its committed range against the event base’s merge base in a disposable local
+clone, without resetting the working checkout. GitHub’s synthetic merge commit
+can include concurrent main changes, which must not count toward this PR’s
+change budget. Rule thresholds and blocking behavior remain unchanged. Root
 docs configuration is applied there too. R10/R11 remain unknown without a client
 transcript; CI's tests provide separate evidence. This is a change-budget gate,
 not proof of business correctness or native acceptance.
