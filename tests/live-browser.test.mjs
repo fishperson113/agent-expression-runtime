@@ -61,7 +61,7 @@ it('shows equal call panels with camera and honest activity together, accessible
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(server.resolvedUrls.local[0] + 'live.html', { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => Boolean(window.fischLive));
-    const body = await page.locator('#body').boundingBox(), camera = await page.locator('.camera-stage').boundingBox();
+    const body = await page.locator('.body-stage').boundingBox(), camera = await page.locator('.camera-stage').boundingBox();
     expect(Math.abs(body.width - camera.width)).toBeLessThan(2);
     expect(body.x).toBeLessThan(camera.x); expect(Math.abs(body.height-camera.height)).toBeLessThan(2);
     expect(await page.locator('.camera-panel #agent-activity').count()).toBe(1);
