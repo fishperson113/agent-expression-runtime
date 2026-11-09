@@ -533,3 +533,31 @@ checkpoint. No new code, camera/audio capture, credential/security settings or
 owner-PC use occurred. Actual TUI inference remains pending explicit project
 trust; no such approval has been received and the CLI was closed at that gate.
 The remaining performance, physical/native and human gates stay open.
+
+
+## Checkpoint 18 — restrictive TUI and corrected fake-source limit
+
+On main b370a68, official invocation-only overrides selected untrusted project,
+read-only sandbox and on-request approvals. The actual remote TUI completed one
+model turn with working/replying, admitted/applied and frame-change proxies. Zero
+config-write requests; home config hash unchanged; no persisted folder trust or
+home hook installation. The first trailing-slash cwd mismatch stopped before
+inference; normalized cwd fixed the restrictive test. Reservations now 53/120,
+including that conservative startup reservation; deadline unchanged at
+2026-11-09 06:17:35 UTC. No trust/security/network/credential changes were made.
+[Audit and exact controls](codex-project-trust.md) explain what the dialog would
+persist and why it is unnecessary for this bounded test. Default startup and
+native hook delivery remain distinct owner/native checks.
+
+New no-model profiling found default fake video capped at 20 FPS. Older detector
+numbers remain observed facts but cannot certify 24 Hz with that input. A verified
+30-FPS configuration delivered 27.905 Hz in an independent source-only probe;
+ordinary-motion inference returned 285 samples/20 s (14.25 Hz; HUD 13.0), mean
+50.28 ms/p95 77 ms inference, mean 51.64 ms post-to-result. Still below target.
+The 20-FPS default-motion and motion-off diagnostic means were 45.09/26.36 ms;
+transport residual ~1–2 ms. This supports investigating CPU/render contention,
+not weakening workload or claiming native performance. No physical media, audio,
+persisted pixels, errors or browser egress occurred; owned resources closed.
+[Sanitized evidence](evidence/cloud-trust-and-timing.json) retains the distinct
+windows and input limits. Human semantics, native/physical/voice, sustained render
+and first-motion gates remain open. No new product code was changed.

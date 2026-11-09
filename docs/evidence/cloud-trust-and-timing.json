@@ -1,0 +1,153 @@
+{
+  "source": "b370a68",
+  "date": "2026-11-09",
+  "reservations": 53,
+  "limit": 120,
+  "deadline": "2026-11-09T06:17:35.373Z",
+  "scope": "Cloud Linux software GPU, fake camera only; no physical microphone/camera; numeric metadata only",
+  "terminal": {
+    "host": "real Codex remote TUI / Cloud Linux / no Herdr",
+    "invocationTrust": "untrusted",
+    "sandbox": "read-only",
+    "approval": "on-request",
+    "cameraUsed": false,
+    "working": true,
+    "replying": true,
+    "admitted": true,
+    "applied": true,
+    "frameChangedProxy": true,
+    "configWriteRequests": 0,
+    "userConfigUnchanged": true,
+    "reservations": 53
+  },
+  "defaultSource": {
+    "width": 640,
+    "height": 480,
+    "configuredFrameRate": 20,
+    "observedVideoHz": 20.003540626690924,
+    "audioTracks": 0,
+    "pixelsPersisted": false,
+    "fakeOptions": "default"
+  },
+  "configured30Source": {
+    "width": 640,
+    "height": 480,
+    "configuredFrameRate": 30,
+    "observedVideoHz": 27.905055838016732,
+    "audioTracks": 0,
+    "pixelsPersisted": false,
+    "fakeOptions": "fps=30"
+  },
+  "defaultMotion20Source": {
+    "source": "b370a68",
+    "environment": "Cloud SwiftShader, real Face Landmarker CPU on Chromium fake no-face capture, no physical camera/mic",
+    "windowSeconds": 20,
+    "samples": 264,
+    "inferenceMs": {
+      "mean": 45.094696969753414,
+      "p50": 47.40000000037253,
+      "p95": 70.40000000037253,
+      "min": 10.099999999627471,
+      "max": 95.90000000037253
+    },
+    "postMessageToResultMs": {
+      "mean": 46.72613636360532,
+      "p50": 49.30000000074506,
+      "p95": 73.80000000074506,
+      "min": 10.599999999627471,
+      "max": 96.19999999925494
+    },
+    "hud": "CPU / 12.2 m\u1eabu/s / 47 ms inference",
+    "camera": "absent",
+    "active": true,
+    "counts": {
+      "observations": 298,
+      "syntheticImages": 0,
+      "unexpectedFrames": 0,
+      "nonLoopbackRequests": 0,
+      "blockedExternalRequests": 0
+    },
+    "errors": [],
+    "modelTurns": 0,
+    "pixelsPersisted": false,
+    "limits": "20-second numeric timing probe; serial no-face detector workload, not tracking/real-person/native acceptance"
+  },
+  "motionOffDiagnostic20Source": {
+    "source": "b370a68",
+    "environment": "Cloud SwiftShader, real Face Landmarker CPU on Chromium fake no-face capture, no physical camera/mic",
+    "diagnosticMotionMode": "off",
+    "windowSeconds": 20,
+    "samples": 361,
+    "detectedFaceSamples": 0,
+    "inferenceMs": {
+      "mean": 26.356232687005377,
+      "p50": 24.199999999254942,
+      "p95": 49.69999999925494,
+      "min": 7.599999999627471,
+      "max": 94.90000000037253
+    },
+    "postMessageToResultMs": {
+      "mean": 27.218005540164143,
+      "p50": 25.799999998882413,
+      "p95": 50.5,
+      "min": 9.200000001117587,
+      "max": 95.09999999962747
+    },
+    "hud": "CPU / 16.7 m\u1eabu/s / 29 ms inference",
+    "camera": "absent",
+    "active": true,
+    "counts": {
+      "observations": 298,
+      "syntheticImages": 0,
+      "unexpectedFrames": 0,
+      "nonLoopbackRequests": 0,
+      "blockedExternalRequests": 0
+    },
+    "errors": [],
+    "modelTurns": 0,
+    "pixelsPersisted": false,
+    "limits": "20-second numeric timing probe; serial no-face detector workload, not tracking/real-person/native acceptance"
+  },
+  "defaultMotion30Source": {
+    "source": "b370a68",
+    "environment": "Cloud SwiftShader, real Face Landmarker CPU on Chromium fake no-face capture, no physical camera/mic",
+    "configuredFakeSourceFps": 30,
+    "windowSeconds": 20,
+    "samples": 285,
+    "inferenceMs": {
+      "mean": 50.27999999998954,
+      "p50": 50.19999999925494,
+      "p95": 77,
+      "min": 19.59999999962747,
+      "max": 107
+    },
+    "postMessageToResultMs": {
+      "mean": 51.643508771891916,
+      "p50": 51.19999999925494,
+      "p95": 79.59999999962747,
+      "min": 19.799999998882413,
+      "max": 107.30000000074506
+    },
+    "hud": "CPU / 13.0 m\u1eabu/s / 51 ms inference",
+    "camera": "absent",
+    "active": true,
+    "counts": {
+      "observations": 295,
+      "syntheticImages": 0,
+      "unexpectedFrames": 0,
+      "nonLoopbackRequests": 0,
+      "blockedExternalRequests": 0
+    },
+    "errors": [],
+    "modelTurns": 0,
+    "pixelsPersisted": false,
+    "limits": "20-second numeric timing probe; serial no-face detector workload, not tracking/real-person/native acceptance"
+  },
+  "limitations": [
+    "Default fake camera input was capped at 20 FPS; earlier throughput results cannot certify 24 Hz.",
+    "30 FPS configured source measured 27.905 Hz in a separate source-only probe, not simultaneous inference.",
+    "285 results in 20 seconds gives 14.25 Hz; HUD is a separate rolling window.",
+    "Motion-off diagnostic changes workload and is not default-mode acceptance.",
+    "No human tracking, accuracy, native GPU, hook delivery or voice certification."
+  ]
+}

@@ -2,10 +2,45 @@
 
 The current implementation includes pane attachment, native interaction hooks, contextual planning, continuous presence, model-authored performances, adaptive Braille and prepared idle scenes. See [current behavior](expression-planner.md), [review remediation](review-progress.md) and [research/evidence limits](related-work.md#10-cập-nhật-braille-theo-thời-gian-và-idle-scene-tự-do). Test counts below are historical observations, not the current suite size or a fresh certification.
 
+## Restrictive TUI and source-rate audit — 2026-11-09
+
+Current reservations **53/120**, deadline 2026-11-09 06:17:35 UTC. The real Cloud
+remote TUI completed a model turn with session-only untrusted/read-only/on-request
+settings, no trust acceptance, zero configuration writes and unchanged home config.
+Working/replying, admitted/applied and frame-change proxies passed; camera stayed
+off. [Trust semantics and repository audit](codex-project-trust.md) document the
+supported restrictive alternative. Default undecided launch can still show the
+dialog; persistent folder trust and native hooks were not granted or certified.
+
+[Numeric evidence](evidence/cloud-trust-and-timing.json) corrects an input-rate
+limitation: earlier fake video was 640×480 at **20 FPS**, so those observations
+cannot certify 24 Hz. Chromium's official
+[fake-device parser](https://github.com/chromium/chromium/blob/main/media/capture/video/fake_video_capture_device_factory.cc)
+supports `fps=30`; an independent source-only test confirmed 30 FPS settings and
+27.905 delivered video callbacks/s. With that setting and ordinary motion enabled,
+real CPU Face Landmarker returned **285 samples / 20 s = 14.25 Hz** (rolling HUD
+13.0 Hz). Mean inference was 50.28 ms, p95 77.0 ms; mean frame-post-to-result
+51.64 ms. This still misses 24 Hz; source-only rate is not simultaneous inference
+rate or physical-camera evidence.
+
+A default-20-FPS timing sample gave 264 results/20 s, mean inference 45.09 ms and
+post-to-result 46.73 ms. Motion-off diagnostic gave 361/20 s and means 26.36/27.22
+ms. This suggests software rendering/CPU scheduling contention in this workload;
+it does not establish a fixed intrinsic model cost. Worker transport residual is
+small in these samples. Motion-off is not default acceptance. No runtime quality,
+threshold or workload was changed to claim a pass. All new camera probes retained
+zero audio tracks/persisted pixels, page errors and browser external requests;
+no additional model calls were used for profiling.
+
+Earlier sections below retain their historical checkpoints; this section supersedes
+their statement that successful TUI inference is blocked by folder trust. Physical
+accuracy/throughput, native GPU/Herdr/hooks/voice, human semantics, sustained render
+performance and the <150 ms reflex target remain open.
+
 ## Cloud latency probes — 2026-11-09
 
 One additional short synthetic conversation completed with a real signed-in model
-on main `8c0ec0a`. Current reservations are **51/120**, deadline unchanged at
+on main `8c0ec0a`. Reservations at that checkpoint were **51/120**, deadline unchanged at
 2026-11-09 06:17:35 UTC. [Sanitized latency evidence](evidence/cloud-latency-probes.json)
 contains no assistant text, images, credentials or raw tool payloads.
 
