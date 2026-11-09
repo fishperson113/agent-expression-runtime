@@ -7,6 +7,8 @@ use std::{sync::{Arc, Mutex}, time::{Duration, Instant, SystemTime, UNIX_EPOCH}}
 use tokio::sync::{mpsc, oneshot, Semaphore};
 #[path = "live_observation.rs"]
 pub mod observation;
+#[path = "live_ingress.rs"]
+mod ingress;
 #[cfg(test)]
 #[path = "live_gateway_tests.rs"]
 mod tests;
@@ -56,7 +58,7 @@ async fn connection(mut socket: WebSocket, gateway: Gateway) {
     let (sender, mut outgoing) = mpsc::channel(4);
     { let mut inner = gateway.live.inner.lock().unwrap(); *inner = Inner { session, sender: Some(sender), ..Inner::default() }; }
     let _ = socket.send(Message::Text(json!({"type":"ready","lookMode":"synthetic-only"}).to_string().into())).await;
-    let mut last = Instant::now() - Duration::from_secs(1);
+    let mut pacer = ingress::ObservationPacer::new();
     loop {
         tokio::select! {
             message = socket.recv() => {
@@ -64,7 +66,7 @@ async fn connection(mut socket: WebSocket, gateway: Gateway) {
                 if text.len() > 250000 { break; }
                 let Ok(value) = serde_json::from_str::<Value>(text.as_str()) else { break; };
                 if value["type"] == "observation" {
-                    if last.elapsed() < Duration::from_millis(60) { continue; } last = Instant::now();
+                    pacer.wait().await;
                 }
                 if !receive(&gateway.live, value) { break; }
             }

@@ -96,3 +96,40 @@ fn observation_json_preserves_finite_landmark_bits() {
         assert_eq!(returned["snapshot"]["hands"]["entities"][0]["landmarks"][0]["x"].as_f64().unwrap().to_bits(), number.to_bits());
     }
 }
+
+#[test]
+fn old_discard_policy_has_a_deterministic_source_gap_counterexample() {
+    let mut store = observation::Observations::default(); let mut last = None;
+    for (seq, arrival) in [(528, 0_u64), (529, 40), (530, 100)] {
+        if last.is_some_and(|at| arrival - at < 60) { continue; }
+        last = Some(arrival);
+        assert!(store.ingest(snapshot(seq, 1000 + arrival), vec![json!({"type":"expression_changed","at":1000+arrival,"sourceSeq":seq})], "test", 1000 + arrival));
+    }
+    let events = store.read(0, 1100)["events"].as_array().unwrap().clone();
+    assert_eq!(events.iter().map(|event| event["sourceSeq"].as_u64().unwrap()).collect::<Vec<_>>(), vec![528, 530]);
+    assert_eq!(events.iter().map(|event| event["id"].as_u64().unwrap()).collect::<Vec<_>>(), vec![1, 2]);
+}
+
+#[tokio::test(start_paused = true)]
+async fn paced_burst_preserves_exact_events_and_sixty_ms_admission_spacing() {
+    let mut pacer = ingress::ObservationPacer::new(); let mut store = observation::Observations::default();
+    let start = tokio::time::Instant::now(); let mut admitted = Vec::new();
+    for (seq, arrival) in [(528, 0_u64), (529, 40), (530, 100)] {
+        tokio::time::sleep_until(start + Duration::from_millis(arrival)).await;
+        let event = json!({"type":"expression_changed","at":1000+arrival,"sourceSeq":seq});
+        let packet = snapshot(seq, 1000 + arrival);
+        pacer.wait().await;
+        let at = start.elapsed().as_millis() as u64; admitted.push(at);
+        assert!(store.ingest(packet, vec![event.clone()], "test", 1000 + at));
+        let read = store.read(seq - 528, 1000 + at);
+        for field in ["type", "at", "sourceSeq"] { assert_eq!(read["events"][0][field], event[field]); }
+        assert_eq!(read["snapshot"]["seq"], seq);
+        assert_eq!(read["snapshot"]["capturedAt"], 1000 + arrival);
+    }
+    assert_eq!(admitted, vec![0, 60, 120]);
+    let events = store.read(0, 1120)["events"].as_array().unwrap().clone();
+    assert_eq!(events.iter().map(|event| event["sourceSeq"].as_u64().unwrap()).collect::<Vec<_>>(), vec![528, 529, 530]);
+    assert_eq!(events.iter().map(|event| event["id"].as_u64().unwrap()).collect::<Vec<_>>(), vec![1, 2, 3]);
+    assert!(!store.ingest(snapshot(530, 1120), vec![], "test", 1120));
+    assert!(!store.ingest(snapshot(531, 1120), vec![], "other", 1120));
+}
