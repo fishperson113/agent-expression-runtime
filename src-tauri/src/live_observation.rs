@@ -30,24 +30,37 @@ pub fn validate(value: &Value, session: &str, now: u64) -> bool {
     user["present"] == true || ["position", "head", "facingScreen", "expression", "mouthMoving"].iter().all(|key| user[*key].is_null())
 }
 fn hands(value: &Value) -> bool {
-    if !keys(value, &["v", "trackingState", "coordinateSpace", "landmarkSchema", "zMeaning", "mirrored", "sourceWidth", "sourceHeight", "entities"])
+    let tracked = value.get("primaryTrackId").is_some();
+    let mut fields = vec!["v", "trackingState", "coordinateSpace", "landmarkSchema", "zMeaning", "mirrored", "sourceWidth", "sourceHeight", "entities"];
+    if tracked { fields.push("primaryTrackId"); }
+    if !keys(value, &fields)
         || value["v"] != 1 || value["coordinateSpace"] != "image-normalized" || value["landmarkSchema"] != "mediapipe-hand-21"
         || value["zMeaning"] != "wrist-relative-image-width" || value["mirrored"] != false { return false; }
     if !["tracked", "lost", "unavailable", "error"].iter().any(|state| value["trackingState"] == *state) { return false; }
     if !["sourceWidth", "sourceHeight"].iter().all(|key| value[*key].as_u64().is_some_and(|n| (1..=16384).contains(&n))) { return false; }
     let Some(entities) = value["entities"].as_array() else { return false; };
     if entities.len() > 2 || (value["trackingState"] == "tracked") != !entities.is_empty() { return false; }
-    let mut ids = Vec::new();
+    let mut ids = Vec::new(); let mut tracks = Vec::new();
     for entity in entities {
-        if !keys(entity, &["detectionId", "handedness", "confidence", "landmarks"])
+        let mut fields = vec!["detectionId", "handedness", "confidence", "landmarks"];
+        if tracked { fields.push("trackId"); }
+        if !keys(entity, &fields)
             || !entity["detectionId"].as_u64().is_some_and(|id| id <= 1 && !ids.contains(&id))
             || !["Left", "Right", "Unknown"].iter().any(|name| entity["handedness"] == *name)
             || !number(&entity["confidence"], 0., 1.) { return false; }
         ids.push(entity["detectionId"].as_u64().unwrap());
+        if tracked {
+            let Some(id) = entity["trackId"].as_str() else { return false; };
+            if !track_id(id) || tracks.contains(&id) { return false; } tracks.push(id);
+        }
         if !entity["landmarks"].as_array().is_some_and(|points| points.len() == 21 && points.iter().all(|point|
             keys(point, &["x", "y", "z"]) && ["x", "y", "z"].iter().all(|key| number(&point[*key], -4., 4.)))) { return false; }
     }
-    true
+    !tracked || value["primaryTrackId"].is_null() || value["primaryTrackId"].as_str().is_some_and(|id| tracks.contains(&id))
+}
+fn track_id(id: &str) -> bool {
+    let parts: Vec<_> = id.split('_').collect();
+    id.len() <= 64 && parts.len() == 3 && parts[0] == "hand" && parts[1..].iter().all(|part| !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit()))
 }
 pub fn event_type(value: &Value) -> bool {
     ["user_arrived", "user_left", "looked_away", "looked_back", "expression_changed", "mouth_started", "mouth_stopped", "turn_changed"].iter().any(|kind| value == kind)

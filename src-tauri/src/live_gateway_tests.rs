@@ -56,6 +56,29 @@ fn structured_hands_survive_gateway_reads_and_expire_with_measurement() {
 }
 
 #[test]
+fn tracked_hands_require_unique_ids_and_visible_primary_reference() {
+    let mut value = snapshot(1, 1000);
+    value["hands"] = json!({"v":1,"trackingState":"tracked","coordinateSpace":"image-normalized",
+        "landmarkSchema":"mediapipe-hand-21","zMeaning":"wrist-relative-image-width","mirrored":false,
+        "sourceWidth":640,"sourceHeight":480,"primaryTrackId":"hand_1_1",
+        "entities":[{"detectionId":0,"trackId":"hand_1_1","handedness":"Left","confidence":0.9,
+            "landmarks":vec![json!({"x":0.2,"y":0.5,"z":-0.1});21]}]});
+    assert!(observation::validate(&value, "test", 1000));
+    let mut store = observation::Observations::default();
+    assert!(store.ingest(value.clone(), vec![], "test", 1000));
+    assert_eq!(store.read(0, 1000)["snapshot"]["hands"], value["hands"]);
+    value["hands"]["primaryTrackId"] = json!("hand_9_9");
+    assert!(!observation::validate(&value, "test", 1000));
+    value["hands"]["primaryTrackId"] = Value::Null;
+    assert!(observation::validate(&value, "test", 1000));
+    let mut duplicate = value["hands"]["entities"][0].clone(); duplicate["detectionId"] = json!(1);
+    value["hands"]["entities"].as_array_mut().unwrap().push(duplicate);
+    assert!(!observation::validate(&value, "test", 1000));
+    value["hands"]["entities"] = json!([]); value["hands"]["trackingState"] = json!("lost");
+    assert!(observation::validate(&value, "test", 1000));
+}
+
+#[test]
 fn observation_json_preserves_finite_landmark_bits() {
     let numbers = [0.09523809523809523_f64, 0.19047619047619047, 0.38095238095238093,
         0.9523809523809523, -0.23809523809523814, f64::MIN_POSITIVE, f64::from_bits(1)];

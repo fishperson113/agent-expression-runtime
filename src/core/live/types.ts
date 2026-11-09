@@ -30,7 +30,7 @@ export type HandObservation = {
   v: 1; trackingState: 'tracked' | 'lost' | 'unavailable' | 'error';
   coordinateSpace: 'image-normalized'; landmarkSchema: 'mediapipe-hand-21';
   zMeaning: 'wrist-relative-image-width'; mirrored: false;
-  sourceWidth: number; sourceHeight: number;
-  entities: { detectionId: number; handedness: 'Left' | 'Right' | 'Unknown'; confidence: number;
+  sourceWidth: number; sourceHeight: number; primaryTrackId?: string | null;
+  entities: { detectionId: number; trackId?: string; handedness: 'Left' | 'Right' | 'Unknown'; confidence: number;
     landmarks: { x: number; y: number; z: number }[] }[];
 };
