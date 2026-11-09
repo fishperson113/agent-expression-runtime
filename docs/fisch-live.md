@@ -57,7 +57,7 @@ Live ưu tiên vision GPU. Một số probe trong lượt Windows/AMD lịch s�
 
 Nếu GPU báo rõ SwiftShader (dựng hình bằng phần mềm), Live chọn CPU cho thị giác ngay từ đầu; probe Cloud tổng hợp đo CPU nhanh hơn đường GPU software. UI vẫn ghi delegate thực tế. GPU native hoặc không đọc được metadata vẫn giữ lựa chọn GPU và cơ chế fallback hiện có. Đây không phải chứng nhận đạt 24 Hz hay accuracy người thật.
 
-Bằng chứng Cloud cuối: detector dùng video giả không có khuôn mặt đo khoảng 13,09 Hz trên CPU, vẫn chưa đạt 24 Hz; soak quan sát tổng hợp 30 phút pass bộ nhớ/ổn định nhưng FPS/frame-time liên tục chưa đạt. Xem [kết quả và giới hạn](validation.md#final-cloud-performance-verification--2026-11-09).
+Bằng chứng Cloud: probe cũ khoảng 13,09 Hz dùng nguồn giả mặc định 20 FPS. Probe mới cấu hình nguồn 30 FPS đạt 14,25 mẫu/giây trên CPU, vẫn chưa đạt 24 Hz; soak quan sát tổng hợp 30 phút pass bộ nhớ/ổn định nhưng FPS/frame-time liên tục chưa đạt. Xem [kết quả và giới hạn](validation.md#final-cloud-performance-verification--2026-11-09).
 
 Để chọn CPU từ đầu khi cần:
 
@@ -101,7 +101,7 @@ Mặt nghỉ được biên dịch từ curve/ellipsoid với role mắt, lông 
 
 ## Hooks và nhịp chữ
 
-Đường terminal nối UI Codex đang có qua relay loopback có xác thực vào app-server stdio. Chỉ agent-message delta của thread/turn đang theo dõi tạo nhịp; tool/reasoning/spinner không tạo nhịp, và decay về 0 trong 600 ms. Developer instructions được bổ sung, không thay thế chính sách hiện có. Remote UI/WebSocket phụ thuộc phiên bản CLI và còn thử nghiệm; xem [tài liệu chính thức](https://learn.chatgpt.com/docs/app-server). Không tuyên bố lip-sync hoặc speech detection. CLI/body đã khởi chạy trên Cloud, nhưng model reply vẫn bị policy mạng chặn.
+Đường terminal nối UI Codex đang có qua relay loopback có xác thực vào app-server stdio. Chỉ agent-message delta của thread/turn đang theo dõi tạo nhịp; tool/reasoning/spinner không tạo nhịp, và decay về 0 trong 600 ms. Developer instructions được bổ sung, không thay thế chính sách hiện có. Remote UI/WebSocket phụ thuộc phiên bản CLI và còn thử nghiệm; xem [tài liệu chính thức](https://learn.chatgpt.com/docs/app-server). Không tuyên bố lip-sync hoặc speech detection. Model thật đã trả lời qua TUI trên Cloud với cấu hình tạm thời untrusted/read-only; không đổi trust lưu bền. Xem [audit folder trust](codex-project-trust.md).
 
 Runner của Fisch đã cài/trust có thể giao lifecycle qua private IPC của pane Live. Launcher không tự sửa/cấp trust; `/hooks` vẫn thuộc quyền người dùng. Module context hook có deadline 180 ms, nhưng native context injection chưa được xác nhận. Đường được hỗ trợ hiện tại là **observe-first qua MCP**.
 
