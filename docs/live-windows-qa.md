@@ -110,9 +110,9 @@ Thoát Codex, đóng cửa sổ body, Ctrl+C ở launcher, hoặc Dừng toàn b
 phiên sở hữu gateway/browser/relay. Dừng biểu đạt chỉ hủy biểu đạt, không đóng
 Codex. Windows cleanup dùng `taskkill /PID <owned-pid> /T /F`, không kill theo tên
 mọi `node.exe`/`codex.exe`. Khởi chạy lại sinh token/session mới; không tái sử dụng
-pairing URL hay replay thao tác chưa chắc đã hoàn tất. Hiện route Linux trả mã 1
-khi child bị dừng chủ động; đây là giới hạn exit-status, dù kiểm thử xác nhận tài
-nguyên đã đóng sạch. Chưa chuẩn hóa thành kết thúc thành công. Nếu báo setup đang chạy,
+pairing URL hay replay thao tác chưa chắc đã hoàn tất. Nút Dừng toàn bộ trả mã 0
+sau khi cleanup thành công; abort/Ctrl+C trả 130. Đóng trang vẫn khác 0 vì chưa
+phân biệt được đóng chủ động với browser lỗi. Nếu báo setup đang chạy,
 kiểm tra phiên sở hữu trước; không xóa lock của tiến trình còn sống.
 
 ## Camera và observer là hai lựa chọn riêng
@@ -154,3 +154,19 @@ launcher, setup, terminal, reactive-provider và model-budget; không gọi mode
 Các test launcher-route dùng Native/app-server **fixture có kịch
 bản**, MCP/gateway/browser thật trên Linux: không phải nghiệm thu model thật hoặc
 trải nghiệm vui 10–20 phút của Dương. Audit này không truy cập máy cá nhân.
+
+## Mã kết thúc Live
+
+Nguyên nhân dừng đã quan sát đầu tiên được giữ lại: nút **Dừng toàn bộ** trả 0;
+abort từ launcher, SIGINT hoặc SIGTERM trả 130. Mã thoát tự nhiên của Native
+client được giữ nguyên. Gateway/app-server, broker hoặc đánh giá trang bị lỗi
+phải kết thúc khác 0. Mỗi lần cleanup dùng chung một promise: chờ toàn bộ tài
+nguyên sở hữu, kể cả khi một bước lỗi. Lỗi chính giữ ưu tiên; nếu chỉ cleanup
+lỗi thì trả lỗi cố định `live_cleanup_failed`, không in lỗi phụ hay lý do abort.
+Nếu cleanup child lỗi mà child không phát sự kiện exit, host vẫn báo lỗi thay
+vì chờ vô hạn; kết quả lỗi không chứng nhận process đã được hệ điều hành đóng.
+
+Sự kiện page-close/pagehide không chứng minh người dùng chủ động đóng cửa sổ
+thay vì browser bị lỗi, nên giữ mã khác 0. Dùng nút **Dừng toàn bộ** để báo dừng
+chủ động thành công. Đây là contract lifecycle; Windows UI/process-tree thực
+vẫn pending như ma trận trên.

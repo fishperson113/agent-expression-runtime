@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 import { stopChild } from '../scripts/start-session.mjs';
+import { closeLiveOwned } from './live-shutdown.mjs';
 
 export function liveInstructions(message, instructions) {
   if (!['thread/start', 'thread/resume'].includes(message.method)) return message;
@@ -38,11 +39,11 @@ function relayOutput(child, connection, onEvent, close) {
   }
 }
 
-export async function openCodexTransport({ host, args, cwd, env, instructions, onEvent = () => {}, onRequest = () => {} }) {
+export async function openCodexTransport({ host, args, cwd, env, instructions, onEvent = () => {}, onRequest = () => {}, onFailure = () => {} }) {
   const token = randomBytes(32).toString('hex'), expected = Buffer.from('Bearer ' + token);
   const server = createServer((_req, res) => { res.writeHead(404); res.end(); });
   const sockets = new WebSocketServer({ noServer: true, maxPayload: 1048576 });
-  let child, client, closed = false;
+  let child, client, closed = false, closing;
   const rpc = new LiveRequests(message => {
     if (closed || !child?.stdin.writable || child.stdin.writableLength > 1048576) throw Error('relay_unavailable');
     child.stdin.write(JSON.stringify(message) + '\n');
@@ -54,10 +55,11 @@ export async function openCodexTransport({ host, args, cwd, env, instructions, o
     }
     sockets.handleUpgrade(request, socket, head, connection => { client = connection; attach(connection); });
   });
-  const close = async () => {
-    if (closed) return; closed = true; rpc.close();
-    client?.terminate(); sockets.close(); server.close(); await stopChild(child);
-  };
+  const close = () => closing ??= closeLiveOwned([() => {
+    closed = true; rpc.close(); client?.terminate();
+  }, () => new Promise((resolve, reject) => sockets.close(error => error ? reject(error) : resolve())),
+  () => new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve())), () => stopChild(child)]);
+  const fail = () => { if (closed) return; try { onFailure(); } finally { void close().catch(() => {}); } };
   function attach(connection) {
     child = spawn(host.command, [...host.args, 'app-server', '--stdio', ...args], { cwd, env, windowsHide: true,
       detached: process.platform !== 'win32', stdio: ['pipe', 'pipe', 'pipe'] });
@@ -66,17 +68,17 @@ export async function openCodexTransport({ host, args, cwd, env, instructions, o
       const outgoing = rpc.accept(message);
       if (outgoing === false) return false;
       await onEvent(outgoing); return outgoing;
-    }, close);
+    }, fail);
     connection.on('message', bytes => {
       try {
         if (child.stdin.writableLength > 1048576) throw Error('relay_backpressure');
         const message = liveInstructions(JSON.parse(bytes.toString()), instructions);
         if (onRequest(message) !== false) rpc.client(message);
       }
-      catch { void close(); }
+      catch { fail(); }
     });
-    connection.once('close', () => { void close(); });
-    child.once('error', () => { void close(); }); child.once('exit', () => { void close(); });
+    connection.once('close', () => { void close().catch(() => {}); });
+    child.once('error', fail); child.once('exit', fail);
   }
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
   return { url: 'ws://127.0.0.1:' + server.address().port, token, close, reject: (message, error) => {

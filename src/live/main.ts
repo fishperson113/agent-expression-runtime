@@ -173,14 +173,14 @@ const timer = setInterval(() => {
   element('scene-trace').textContent = JSON.stringify(metrics.diagnostics, null, 2);
   element('render-metrics').textContent = `${metrics.particles.toLocaleString()} hạt / ${metrics.meanFps.toFixed(0)} FPS / p95 ${metrics.frameP95.toFixed(1)} ms`;
 }, 500);
-function stop() {
+function stop(reason: 'ui' | 'pagehide') {
   if (stopped) return; logActivity('Đã dừng phiên Live.'); resetReactive(); reactive.configure(false); stopped = true;
   recording.dispose(); camera.stop(); hands.reset(); cameraStatus('stopped', 'shutdown'); clearInterval(timer); bridge.stop(); body.dispose(); playground.dispose(); liveSetup.dispose();
   element<HTMLButtonElement>('camera-start').disabled = true; element('connection').textContent = 'Đã dừng phiên Live';
-  void (window as any).fischLiveStop?.();
+  void (window as any).fischLiveStop?.(reason);
 }
-element('stop-all').onclick = stop;
-window.addEventListener('pagehide', stop);
+element('stop-all').onclick = () => stop('ui');
+window.addEventListener('pagehide', () => stop('pagehide'));
 
 function observeReactive() { body.observe(observations.snapshot); reactive.observe(observations.snapshot, semanticEvents); }
 function resetReactive() { handEvents.reset(); reactive.reset(); semanticEvents.length = 0; }

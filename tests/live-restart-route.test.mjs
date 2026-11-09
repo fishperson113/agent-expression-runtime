@@ -126,6 +126,7 @@ for (const mode of ['ui', 'page-close', 'abort']) {
       else if (mode === 'page-close') await first.live.page.close();
       else first.abort();
       const stopExitCode = await first.running; await closed(first);
+      expect(stopExitCode).toBe({ ui: 0, 'page-close': 1, abort: 130 }[mode]);
       console.log(JSON.stringify({ restartRoute: mode, intentionalStopExitCode: stopExitCode }));
       second = await launch(); await fresh(second, first);
     } finally { await second?.close(); await first?.close(); }
