@@ -88,6 +88,11 @@ export class LiveReactivity {
     if (['thread/start', 'thread/resume', 'thread/fork'].includes(method)) {
       this.selectionId = message.id; this.reset(); this.enabled = false; this.yield();
     }
+    if (method === 'turn/steer' && threadId === this.reactionThread && (this.starting || this.active || this.uncertain)) {
+      this.yield();
+      this.reject(message, { code: -32000, message: 'Fisch did not send this steering input because the turn belongs to an automatic camera reaction. Wait for it to stop, then send a new user turn.' });
+      return false;
+    }
     if (method !== 'turn/start') return true;
     this.pending.clear();
     if (message.id !== undefined) {
