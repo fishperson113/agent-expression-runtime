@@ -98,3 +98,13 @@ it('keeps every generated strict decision schema object closed with all fields r
   }
   visit(reactiveDecisionSchema);
 });
+it('marks only preflight and completed failures as transport-settled', async () => {
+  const settled = [adapter(mock(response()), async () => false).decide(window()),
+    adapter(mock({ status: 'incomplete' })).decide(window()),
+    adapter(async () => new Response('unavailable', { status: 503 })).decide(window())];
+  for (const promise of settled) await expect(promise).rejects.toMatchObject({ transportSettled: true });
+  const unknown = [adapter(async () => { throw Error('network'); }).decide(window()),
+    adapter(mock('x'.repeat(65537))).decide(window()),
+    adapter(async () => new Response(new ReadableStream({ start(controller) { controller.error(Error('read')); } }))).decide(window())];
+  for (const promise of unknown) await expect(promise).rejects.toMatchObject({ transportSettled: false });
+});
