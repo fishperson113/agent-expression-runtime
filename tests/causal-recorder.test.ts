@@ -115,3 +115,68 @@ it('strictly projects provider receipts with a known request parent and rejects 
   const g = setup(); g.recorder.start(begin); expect(g.recorder.append('provider_receipt', receipt)).toBe(true);
   expect(g.recorder.status()?.reasons).toEqual(['missing_parent']);
 });
+const scopedRequest = () => ({ ...request(), request: { ...request().request, schemaVersion: 2 as const,
+  semanticSnapshot: { orientation: null, expression: 4, handMotion: null, handIdentity: 7 } } });
+it('preserves explicit request versions and nullable semantic state without replacing unknowns or losing parent refs', () => {
+  const f = setup(); f.recorder.start(begin); f.recorder.append('observation', observation());
+  f.recorder.append('event', { sessionId: 'session', observationSeq: 1, seq: 1, type: 'user_arrived', at: 10000 });
+  expect(f.recorder.append('request', request())).toBe(true);
+  const value = scopedRequest(); value.request.requestId = 'scoped_request';
+  expect(f.recorder.append('request', value)).toBe(true);
+  const records = f.recorder.snapshot().records.filter(record => record.kind === 'request');
+  expect(records[0].payload).toEqual(request()); expect(records[1].payload).toEqual(value);
+  expect(f.recorder.status()?.incomplete).toBe(false);
+  value.request.semanticSnapshot.expression = 999;
+  expect((f.recorder.snapshot().records.at(-1)?.payload as any).request.semanticSnapshot).toEqual({ orientation: null, expression: 4, handMotion: null, handIdentity: 7 });
+  expect(f.recorder.status()?.clock).toMatchObject({ requestDeadline: 'host-monotonic-ms', admissionValidUntil: 'host-monotonic-ms', executionValidUntil: 'host-monotonic-ms', observationCapturedAt: 'wall-ms' });
+});
+it('rejects unknown request versions, nullable hand identity, missing version-two axes and version-one semantic additions', () => {
+  const f = setup(); f.recorder.start(begin);
+  const invalid = [ { ...request(), request: { ...request().request, schemaVersion: 3 } },
+    { ...request(), request: { ...request().request, semanticSnapshot: scopedRequest().request.semanticSnapshot } } ];
+  for (const value of invalid) expect(f.recorder.append('request', value as any)).toBe(false);
+  for (const axis of ['orientation', 'expression', 'handMotion', 'handIdentity']) {
+    const value = scopedRequest() as any; delete value.request.semanticSnapshot[axis]; expect(f.recorder.append('request', value)).toBe(false);
+  }
+  for (const patch of [{ handIdentity: null }, { handIdentity: -1 }, { handMotion: Infinity }, { expression: 0.5 }, { orientation: NaN }, { hidden: 'PRIVATE' }]) {
+    const value = scopedRequest(); Object.assign(value.request.semanticSnapshot, patch); expect(f.recorder.append('request', value)).toBe(false);
+  }
+  const missing = scopedRequest() as any; delete missing.request.presenceRevision; expect(f.recorder.append('request', missing)).toBe(false);
+  expect(f.recorder.snapshot().records).toEqual([]); expect(JSON.stringify(f.recorder.snapshot())).not.toContain('PRIVATE');
+});
+it('stores trusted scoped outcome metadata with a separate execution expiry and no raw decision body', () => {
+  const f = setup(); f.recorder.start(begin); f.recorder.append('observation', observation());
+  f.recorder.append('event', { sessionId: 'session', observationSeq: 1, seq: 1, type: 'user_arrived', at: 10000 });
+  f.recorder.append('request', scopedRequest());
+  const accepted = { requestId: 'request', decisionId: 'scoped_decision', actionId: 'scoped_action', reason: 'accepted' as const,
+    mode: 'express' as const, validUntil: 150, decisionVersion: 2 as const, prerequisites: ['expression' as const], executionValidUntil: 900 };
+  expect(f.recorder.append('decision', accepted)).toBe(true);
+  expect(f.recorder.snapshot().records.at(-1)?.payload).toEqual(accepted);
+  expect(f.recorder.append('decision', { requestId: 'request', reason: 'observed', mode: 'observe', decisionVersion: 2, prerequisites: [] })).toBe(true);
+  expect(f.recorder.append('decision', { requestId: 'request', reason: 'stale', decisionVersion: 2, prerequisites: ['expression'] })).toBe(true);
+  expect(f.recorder.status()?.incomplete).toBe(false);
+  expect((f.recorder.snapshot().records[3].payload as any).executionValidUntil).toBeGreaterThan(accepted.validUntil);
+});
+it('rejects forged outcome versions, dependency lists, failed-admission execution authority and raw-output metadata', () => {
+  const f = setup(); f.recorder.start(begin);
+  const base = { requestId: 'request', reason: 'accepted', decisionVersion: 2, prerequisites: [] };
+  for (const patch of [{ decisionVersion: 1 }, { decisionVersion: 3 }, { prerequisites: ['orientation', 'orientation'] }, { prerequisites: ['PRIVATE'] },
+    { prerequisites: [null] }, { executionValidUntil: NaN }, { executionValidUntil: -1 },
+    { reason: 'admission_failed', executionValidUntil: 1000 }, { reason: 'observed', executionValidUntil: 1000 },
+    { reason: 'invalid_decision' }, { raw: 'PRIVATE' }, { body: { text: 'PRIVATE' } }, { output: 'PRIVATE' }])
+    expect(f.recorder.append('decision', { ...base, ...patch } as any)).toBe(false);
+  const missing = { ...base } as any; delete missing.prerequisites; expect(f.recorder.append('decision', missing)).toBe(false);
+  const legacy = { requestId: 'request', reason: 'accepted', executionValidUntil: 1000 };
+  expect(f.recorder.append('decision', legacy as any)).toBe(false);
+  expect(f.recorder.append('decision', { schemaVersion: 2, requestId: 'request', decisionId: 'raw', mode: 'express', validUntil: 5000,
+    prerequisites: [], action: { body: 'PRIVATE' } } as any)).toBe(false);
+  expect(f.recorder.snapshot().records).toEqual([]); expect(JSON.stringify(f.recorder.snapshot())).not.toContain('PRIVATE');
+});
+it('keeps scoped recording bounded and does not backfill a request captured after its source evidence', () => {
+  const f = setup({ ttlMs: 50 }); f.recorder.start(begin);
+  expect(f.recorder.append('request', scopedRequest())).toBe(true);
+  expect(f.recorder.status()).toMatchObject({ incomplete: true, reasons: ['missing_parent'], droppedRecords: 0 });
+  expect(f.recorder.snapshot().records.map(record => record.kind)).toEqual(['request']);
+  f.recorder.stop(); f.advance(50); expect(f.recorder.snapshot().records).toEqual([]);
+  expect(f.recorder.status()?.ended).toBe('expired');
+});

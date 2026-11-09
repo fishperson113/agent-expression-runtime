@@ -75,3 +75,51 @@ there is no additional browser call competing with user cancellation. Receipts
 from an old or inactive capture are discarded rather than backfilled into a new
 opt-in run. Late transport metadata can be recorded after action revocation, but
 cannot apply a decision, revive a lease or forward anything to native chat.
+
+## Version-two semantic and temporal metadata
+
+The capture envelope remains `schemaVersion:1`; each stored reactive request keeps
+its explicit request `schemaVersion:1` or `schemaVersion:2`. Version one retains
+its legacy strict fields. Version two requires `presenceRevision` and the exact
+`semanticSnapshot` axes `orientation`, `expression`, `handMotion` and `handIdentity`.
+Orientation, expression and hand motion are nonnegative safe integers or explicit
+null (unknown), never an implicitly substituted zero. Hand identity is always a
+required nonnull safe integer tracking-history revision, even when no hand is
+currently available; it cannot be omitted or treated as a wildcard. Unknown versions,
+missing axes and extra fields fail closed. This history counter does not identify
+a person or establish biometric identity.
+
+Only trusted, schema-validated host outcome/ownership metadata may supply
+`decisionVersion:2` and the unique prerequisite list: `orientation`, `expression`
+and/or `hand_motion`. An empty list records an explicitly generic dependency
+choice; it is not permission to waive presence, intent, epoch, track membership,
+source validity or hand identity. Invalid request/output paths must not peek at
+raw provider data to fabricate these fields. The recorder accepts no raw action,
+body, provider output or natural-language explanation.
+
+Version one retains its existing coupled validity behavior; separate execution
+expiry is version-two-only metadata. For version two, admission and execution are
+distinct temporal phases. The browser's five-second
+request deadline and decision `validUntil` bound admission. After successful
+admission, the host derives `executionValidUntil` from its own monotonic admit
+clock plus validated program duration and at most 100 ms completion allowance,
+with a maximum 1,100 ms execution lease. The model does not choose this timestamp.
+Only accepted outcomes can record that execution timestamp; failed admission or
+observe does not acquire execution authority. Execution validity may extend past
+the admission cutoff without reopening admission or reviving a revoked owner.
+
+Manifest clock labels distinguish request deadline, admission `validUntil` and
+host-derived `executionValidUntil`; all use the browser host monotonic clock.
+Their values must not be converted using observation wall timestamps or Node
+provider-duration deltas. Recorder projection validates metadata shape and finite
+values, while the trusted host enforces the duration arithmetic and prerequisites
+on each execution tick. A recorder append is neither authorization nor proof of
+execution. Root wiring must pass trusted host results rather than raw-output fields.
+
+Version-two behavior requires explicit integration opt-in. The coordinated
+provider selects it with `FISCH_REACTIVE_CONTRACT_VERSION=2`; backend/model/endpoint
+and the existing approved budget remain independently required. This recorder
+does not select that switch or a provider, turn on the observer, alter the budget
+or enable a camera. Prefix quotas, 60-second default TTL, missing-parent detection and the ban
+on pre-consent backfill remain unchanged for both request versions. These records
+remain bounded debugging evidence, not an M5, real-model or naturalness claim.
