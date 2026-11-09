@@ -44,3 +44,39 @@ Observe requires null action. Express uses the finite existing expression-plan
 DSL subset, including generated assemblies; no keyword-to-effect table exists.
 This is not the complete Live-control DSL. The shared LiveCompiler and causal
 host must still validate and admit the final decision before any execution.
+
+Provider failures now carry a `ReactiveProviderError` with a fixed code and
+transportSettled flag. Preflight denial, complete invalid response and an HTTP
+error response are settled; network/read/abort during fetch and over-limit
+streams remain unknown. Neither a settled error nor success implies zero cost.
+The broker trusts this class rather than inferring settlement from error text.
+
+`LiveReactiveBroker` is the trusted Node/browser bridge, not an HTTP server. It
+pulls one request, obtains a consume-once browser authorization immediately
+before dispatch, then gives only observationWindow to the separate provider.
+A failed authorization delivers null and makes no provider call. User input
+awaits browser revocation before its original native RPC is forwarded. Native
+input remains independent when provider transport is unknown. Native steer must
+match the selected native thread and expected turn before and after the barrier.
+
+Reactive transport stays occupied across browser revocation. Its 30-second
+watchdog aborts only that provider and latches uncertainty; it never interrupts a
+native turn. Definitive errors deliver null to release the browser request.
+Unknown errors call failReactiveDecision and block new provider requests. Budget
+denial pauses automatic dispatch instead of retrying every poll. Returned data
+never becomes a native chat message or app-server turn. Queue, request receipts,
+native pending IDs and completed-turn history are bounded and held only in
+memory. Close invalidates late callbacks, aborts active transport and rejects
+queued unsent input. Wiring and live acceptance remain separate work.
+
+Every broker page evaluation has a 10-second bound (tests can inject a shorter
+positive timeout), with at most four outstanding waits. Any browser error or
+timeout permanently latches browserUnavailable for that broker: no further page
+evaluations, reactive dispatch or controlled native forwarding occurs. Waiting
+native requests receive explicit RPC errors; late barrier resolution cannot
+forward them. Initialize and other noncontrolled native RPCs still pass through.
+Close rejects outstanding waits and clears their timers. Recovery requires a
+broker/browser restart and reconciliation of unresolved provider transport; a
+later successful page promise does not automatically reopen the failed broker.
+Already-issued Playwright calls cannot be recalled, so browser generation, TTL
+and consent checks remain mandatory for any callback that eventually arrives.
