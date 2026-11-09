@@ -17,8 +17,38 @@ function nullableVector(value: unknown, fields: string[], min: number, max: numb
   const vector = strictObject(value, fields);
   for (const key of fields) finite(vector[key], min, max);
 }
+
+function validateHands(value: unknown) {
+  const hand = strictObject(value, ['v', 'trackingState', 'coordinateSpace', 'landmarkSchema',
+    'zMeaning', 'mirrored', 'sourceWidth', 'sourceHeight', 'entities']);
+  if (hand.v !== 1 || hand.coordinateSpace !== 'image-normalized' || hand.landmarkSchema !== 'mediapipe-hand-21' ||
+    hand.zMeaning !== 'wrist-relative-image-width' || hand.mirrored !== false ||
+    !['tracked', 'lost', 'unavailable', 'error'].includes(hand.trackingState)) throw Error('live_hand_schema');
+  for (const key of ['sourceWidth', 'sourceHeight']) {
+    finite(hand[key], 1, 16384); if (!Number.isInteger(hand[key])) throw Error('live_hand_dimensions');
+  }
+  if (!Array.isArray(hand.entities) || hand.entities.length > 2 ||
+    (hand.trackingState === 'tracked') !== (hand.entities.length > 0)) throw Error('live_hand_state');
+  const ids = new Set<number>();
+  for (const value of hand.entities) {
+    const entity = strictObject(value, ['detectionId', 'handedness', 'confidence', 'landmarks']);
+    finite(entity.detectionId, 0, 1); finite(entity.confidence, 0, 1);
+    if (!Number.isInteger(entity.detectionId) || ids.has(entity.detectionId) ||
+      !['Left', 'Right', 'Unknown'].includes(entity.handedness)) throw Error('live_hand_entity');
+    ids.add(entity.detectionId);
+    if (!Array.isArray(entity.landmarks) || entity.landmarks.length !== 21) throw Error('live_hand_landmarks');
+    for (const value of entity.landmarks) {
+      const point = strictObject(value, ['x', 'y', 'z']);
+      for (const key of ['x', 'y', 'z']) finite(point[key], -4, 4);
+    }
+  }
+}
+
 export function validateObservation(value: unknown): Observation {
-  const object = strictObject(value, ['v', 'sessionId', 'seq', 'capturedAt', 'camera', 'user', 'turn', 'summary']);
+  const fields = ['v', 'sessionId', 'seq', 'capturedAt', 'camera', 'user', 'turn', 'summary'];
+  if (value && typeof value === 'object' && 'hands' in value) fields.push('hands');
+  const object = strictObject(value, fields);
+  if ('hands' in object) validateHands(object.hands);
   if (object.v !== 1 || typeof object.sessionId !== 'string' || !/^[a-zA-Z0-9_-]{1,80}$/.test(object.sessionId)) throw Error('live_version_session');
   finite(object.seq, 0, Number.MAX_SAFE_INTEGER); finite(object.capturedAt, 0, Number.MAX_SAFE_INTEGER);
   if (!Number.isInteger(object.seq) || !['starting', 'tracking', 'absent', 'denied', 'error', 'stopped', 'stale'].includes(object.camera)) throw Error('live_camera');
@@ -59,7 +89,7 @@ export class ObservationStore {
     const ageMs = this.snapshot ? Math.max(0, now - this.snapshot.capturedAt) : null;
     const stale = ageMs === null || ageMs > this.maxAgeMs || this.snapshot?.camera === 'stale';
     const snapshot = this.snapshot ? structuredClone(this.snapshot) : null;
-    if (snapshot && stale) { snapshot.camera = 'stale'; snapshot.user = unavailableUser(); snapshot.summary = 'Quan sát đã cũ; chưa biết trạng thái người dùng.'; }
+    if (snapshot && stale) { delete snapshot.hands; snapshot.camera = 'stale'; snapshot.user = unavailableUser(); snapshot.summary = 'Quan sát đã cũ; chưa biết trạng thái người dùng.'; }
     return { snapshot, receivedAt: this.receivedAt, ageMs, stale, events: this.events.filter(event => event.id > cursor),
       cursor: this.next, gap: this.events.length > 0 && cursor < this.events[0].id - 1 };
   }

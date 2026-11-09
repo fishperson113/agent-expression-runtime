@@ -1,4 +1,5 @@
 import { FaceLandmarker, FilesetResolver, GestureRecognizer } from '@mediapipe/tasks-vision';
+import type { HandObservation } from '../core/live/types';
 import { selectVisionDelegate } from './vision-delegate';
 
 let hands: GestureRecognizer | undefined, handsFailed = false;
@@ -28,9 +29,24 @@ function detect(frame: ImageBitmap, at: number) {
   try {
     const start = performance.now(), result = landmarker!.detectForVideo(frame, at);
     let categories: { categoryName: string; score: number }[] = [];
-    try { categories = hands?.recognizeForVideo(frame, at).gestures.map(items => items[0]).filter(Boolean) ?? []; }
+    let handObservation: HandObservation | undefined;
+    try {
+      const result = hands?.recognizeForVideo(frame, at);
+      categories = result?.gestures.map(items => items[0]).filter(Boolean) ?? [];
+      if (result) handObservation = {
+        v: 1, trackingState: result.landmarks.length ? 'tracked' : 'lost',
+        coordinateSpace: 'image-normalized', landmarkSchema: 'mediapipe-hand-21',
+        zMeaning: 'wrist-relative-image-width', mirrored: false, sourceWidth: frame.width, sourceHeight: frame.height,
+        entities: result.landmarks.map((landmarks, detectionId) => ({ detectionId,
+          handedness: result.handedness[detectionId]?.[0]?.categoryName === 'Left' ? 'Left' : result.handedness[detectionId]?.[0]?.categoryName === 'Right' ? 'Right' : 'Unknown',
+          confidence: result.handedness[detectionId]?.[0]?.score ?? 0,
+          landmarks: landmarks.map(({ x, y, z }) => ({ x, y, z })) })) };
+    }
     catch { handsFailed = true; hands?.close(); hands = undefined; }
-    self.postMessage({ type: 'sample', sample: { hands: categories, handsFailed, landmarks: result.faceLandmarks[0] ?? [],
+    if (handsFailed) handObservation = { v: 1, trackingState: 'error', coordinateSpace: 'image-normalized',
+      landmarkSchema: 'mediapipe-hand-21', zMeaning: 'wrist-relative-image-width', mirrored: false,
+      sourceWidth: frame.width, sourceHeight: frame.height, entities: [] };
+    self.postMessage({ type: 'sample', sample: { ...(handObservation ? { handObservation } : {}), hands: categories, handsFailed, landmarks: result.faceLandmarks[0] ?? [],
       scores: Object.fromEntries((result.faceBlendshapes[0]?.categories ?? []).map(item => [item.categoryName, item.score])),
       matrix: result.facialTransformationMatrixes[0]?.data ?? [], durationMs: performance.now() - start, delegate } });
   } finally { frame.close(); }
