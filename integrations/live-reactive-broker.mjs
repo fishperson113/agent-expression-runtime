@@ -1,4 +1,5 @@
 import { ReactiveProviderError } from './reactive-provider.mjs';
+import { freezeReactiveCandidate } from './reactive-window.mjs';
 
 const controlled = new Set(['turn/start', 'turn/steer', 'thread/start', 'thread/resume', 'thread/fork', 'turn/interrupt']);
 export class LiveReactiveBroker {
@@ -100,6 +101,11 @@ export class LiveReactiveBroker {
     finally { this.polling = false; }
   }
   start(candidate) {
+    try { candidate = freezeReactiveCandidate(candidate); } catch {
+      const rejected = candidate?.request?.requestId;
+      const id = typeof rejected === 'string' && rejected.length <= 64 ? rejected : '';
+      void this.deliver(id, null).catch(() => { this.paused = true; }); return;
+    }
     const id = candidate.request.requestId;
     if (this.requests.has(id) || this.requests.size >= 256) {
       if (this.requests.size >= 256) this.paused = true;

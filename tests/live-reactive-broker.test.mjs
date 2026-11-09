@@ -18,7 +18,15 @@ function fixture(provider = null, options = {}) {
   } };
   const broker = new LiveReactiveBroker({ page, provider, output, forward: message => { order.push('forward'); forwarded.push(message); },
     reject: (message, error) => rejected.push({ message, error }), log: code => logs.push(code), ...options });
-  const candidate = id => ({ request: { requestId: id }, observationWindow: { schemaVersion: 1, events: [{ type: id === 'left' ? 'user_left' : 'user_arrived' }] } });
+  const candidate = id => {
+    const request = { schemaVersion: 1, sessionId: 's', epoch: 'e', requestId: id, intentRevision: 0,
+      presenceRevision: 1, deadline: 1000, requiredTrackIds: [] };
+    return { request, observationWindow: { schemaVersion: 1, request: { ...request },
+      events: [{ id: 1, type: id === 'left' ? 'user_left' : 'user_arrived', at: 100 }],
+      observations: [{ v: 1, sessionId: 's', seq: 1, capturedAt: 100, camera: 'absent', turn: 'idle', summary: 'local',
+        user: { present: false, quality: { score: 0, basis: 'unavailable' }, position: null, head: null,
+          expression: null, facingScreen: null, mouthMoving: null } }] } };
+  };
   return { broker, page, state, api, output, forwarded, rejected, logs, deliveries, failures, candidates, candidate, order, calls };
 }
 it('routes arrival/left only to separate provider data and never selected native thread', async () => {
@@ -156,4 +164,34 @@ it('close rejects outstanding browser waits and clears timers before late callba
     f.broker.close(); await flush(); expect(f.rejected).toHaveLength(1); expect(vi.getTimerCount()).toBe(0);
     release(true); await flush(); expect(f.forwarded).toEqual([]); expect(f.broker.waiters.size).toBe(0);
   } finally { vi.useRealTimers(); }
+});
+
+it('rejects mismatched causal envelopes and invalid outer context before authorization or provider cost', async () => {
+  const patches = [{ requestId: 'other' }, { epoch: 'other' }, { sessionId: 'other' }, { schemaVersion: 2 },
+    { intentRevision: 1 }, { deadline: 1001 }, { presenceRevision: 2 },
+    { requiredTrackIds: ['different'] }, { privateContext: 'PRIVATE_CODING_CANARY' }, { requestId: 'invalid:id' }];
+  for (const patch of patches) {
+    let calls = 0, authorizations = 0; const f = fixture({ decide: async () => { calls++; return {}; } });
+    f.state.authorize = async () => { authorizations++; return true; };
+    const candidate = f.candidate('r'); candidate.request = { ...candidate.request, ...patch };
+    f.candidates.push(candidate); await f.broker.poll({}); await flush();
+    expect(calls).toBe(0); expect(authorizations).toBe(0); expect(f.deliveries).toHaveLength(1);
+    expect(f.deliveries[0].data).toBe(null); expect(f.logs.join('')).not.toContain('PRIVATE_CODING_CANARY'); f.broker.close();
+  }
+});
+it('rejects missing presence and empty observation/event windows before dispatch', async () => {
+  for (const change of [candidate => { delete candidate.observationWindow.request.presenceRevision; },
+    candidate => { candidate.observationWindow.events = []; }, candidate => { candidate.observationWindow.observations = []; }]) {
+    let calls = 0; const f = fixture({ decide: async () => { calls++; return {}; } });
+    const candidate = f.candidate('r'); change(candidate); f.candidates.push(candidate);
+    await f.broker.poll({}); await flush(); expect(calls).toBe(0); expect(f.deliveries[0].data).toBe(null); f.broker.close();
+  }
+});
+it('freezes the authorized payload before an asynchronous authorization wait', async () => {
+  let release, received; const f = fixture({ decide: async value => { received = value; return {}; } });
+  f.state.authorize = () => new Promise(resolve => { release = resolve; });
+  const candidate = f.candidate('r'); f.candidates.push(candidate); await f.broker.poll({}); await flush();
+  candidate.observationWindow.request.epoch = 'changed'; candidate.observationWindow.events[0].type = 'user_left';
+  release(true); await flush(); expect(received.request.epoch).toBe('e'); expect(received.events[0].type).toBe('user_arrived');
+  expect(Object.isFrozen(received.request)).toBe(true); f.broker.close();
 });

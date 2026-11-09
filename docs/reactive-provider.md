@@ -22,7 +22,7 @@ uncertainty latch and obtain genuine settlement evidence before reopening it.
 observations. Events use numeric `id` (map existing gateway `seq` explicitly),
 a supported geometric event type and timestamp. Maximums: eight events, four
 observations, sixteen required tracks and 64 KiB serialized sanitized window.
-The optional request presenceRevision is a nonnegative integer. Existing Live
+The production request presenceRevision is a nonnegative integer. Existing Live
 observation JSON schema validates structured fields. Observation summary is
 removed; unknown context fields such as transcript/history are rejected.
 The complete sanitized window is copied and recursively frozen before reserve.
@@ -95,3 +95,12 @@ credentials or the ledger path as browser metadata. `nativeLiveEnvironment(env)`
 returns a copy excluding every `FISCH_REACTIVE_*` variable before launching the
 native Codex child. It preserves other existing environment variables without
 modifying global settings, login state, or the caller's environment.
+
+The Node broker validates the complete candidate and compares its outer request
+with observationWindow.request before browser authorization or provider use.
+Schema/session/epoch/request IDs, intent/presence revision, deadline and required
+track set must match; unknown request fields fail closed. The copied candidate
+is frozen so authorization cannot race a changed transport payload. Production
+windows require presenceRevision and at least one event and observation. Invalid
+windows consume no provider reservation or network request. Legacy offline host
+contracts can retain optional presence independently of this production boundary.
