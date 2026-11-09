@@ -17,7 +17,7 @@ function setup() {
   return { camera, video, workers, create, bitmap, tick: () => callback(), sample: () => workers.at(-1).onmessage({ data: { type: 'sample', sample: {} } }) };
 }
 afterEach(() => { vi.unstubAllGlobals(); });
-it('processes the freshest available frame after a slow result without queuing or repeating video frames', async () => {
+it('processes the freshest available frame after a slow result without queuing or repeating a delivered media timestamp', async () => {
   const t = setup(); await t.camera.start(); t.workers[0].onmessage({ data: { type: 'ready', delegate: 'CPU' } });
   t.tick(); await Promise.resolve(); expect(t.create).toHaveBeenCalledTimes(1);
   t.video.currentTime = 2; t.tick(); t.video.currentTime = 3; t.tick();
@@ -52,4 +52,10 @@ it('releases an untransferred bitmap on post failure and accepts a later fresh f
   t.tick(); await Promise.resolve(); expect(t.bitmap.close).toHaveBeenCalledOnce();
   t.video.currentTime = 2; t.tick(); await Promise.resolve(); expect(t.create).toHaveBeenCalledTimes(2);
   expect(t.workers[0].postMessage.mock.calls.at(-1)[0].type).toBe('frame'); t.camera.stop();
+});
+
+it('ignores a retired worker error after a newer camera session starts', async () => {
+  const t = setup(); await t.camera.start(); const old = t.workers[0];
+  await t.camera.start(); old.onerror();
+  expect(t.workers[1].terminate).not.toHaveBeenCalled(); expect(t.video.srcObject).not.toBeNull(); t.camera.stop();
 });

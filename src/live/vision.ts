@@ -20,7 +20,7 @@ export class VisionCamera {
     try {
       this.worker = new Worker(new URL('./vision.worker.ts', import.meta.url), { type: 'module' });
       this.worker.onmessage = event => this.message(event.data, generation);
-      this.worker.onerror = () => this.fail('vision_failed');
+      this.worker.onerror = () => { if (generation === this.generation) this.fail('vision_failed'); };
       this.timeout = setTimeout(() => this.fail('vision_timeout'), 20000);
       this.worker.postMessage({ type: 'init', delegate: this.delegate });
       const stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });

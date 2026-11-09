@@ -2,6 +2,93 @@
 
 The current implementation includes pane attachment, native interaction hooks, contextual planning, continuous presence, model-authored performances, adaptive Braille and prepared idle scenes. See [current behavior](expression-planner.md), [review remediation](review-progress.md) and [research/evidence limits](related-work.md#10-cập-nhật-braille-theo-thời-gian-và-idle-scene-tự-do). Test counts below are historical observations, not the current suite size or a fresh certification.
 
+## Vision pacing and reflex envelope — 2026-11-09
+
+[PR #41](https://github.com/fishperson113/agent-expression-runtime/pull/41) removes
+idle waiting between a slow detector result and the next fresh video frame.
+Callback media timestamps coalesce to the latest available frame; one capture/
+inference remains in flight. Same timestamps are not reprocessed, stop/restart
+checks isolate old work, and failed transfers close their bitmap. A retired
+worker error cannot stop its successor. No model, resolution, particle count or
+confidence threshold was changed. Reflex poses follow their existing sinusoidal
+value envelope directly; ownership still fades and binding/semantic priority,
+cooldown and reduced/off behavior remain intact.
+
+[Sanitized evidence](evidence/cloud-pacing-performance.json) retains all windows.
+The immutable runtime bundles were baseline `8704ecc` and candidate `2ec30c8`;
+a later stale-worker error guard changes only the stop/restart failure path,
+covered by regression tests. No frontend bundle changes or browser-heavy tests
+overlapped either soak.
+
+| Camera-on soak metric | Baseline | Candidate |
+|---|---|---|
+| Duration + warm-up | 1,800.231 + 60 s | 1,800.234 + 60 s |
+| Inference Hz min / median / max | 13.64 / 14.61 / 16.71 | 21.34 / 22.91 / 23.99 |
+| Render FPS min / median / max | 30.95 / 34.06 / 44.85 | 26.69 / 30.87 / 40.83 |
+| Rolling frame p95 range | 38.1–51.0 ms | 39.3–58.3 ms |
+| Page-GC-normalized browser private growth | +19,615,744 B | -14,077,952 B |
+| Cycles / samples | 15 / 60 | 15 / 60 |
+| Errors / unexpected frames / browser egress | 0 / 0 / 0 | 0 / 0 / 0 |
+
+Both runs used 640×480 fake no-face capture, nominal 30 FPS, zero audio tracks,
+actual CPU vision, SwiftShader and 2,000 particles. Every 120 seconds the script
+cancelled, alternated bird/peace geometry and resized the viewport. Camera stayed
+active and was explicitly stopped at teardown. Rate uses observation-sequence
+deltas in 30-second windows with constant idle turn/absent status; render metrics
+cover the last 120 frame intervals at each sample. Memory sums browser-process
+Private_* with page GC before/after; the negative candidate delta is a sample,
+not a guaranteed memory saving. Both pass <100 MB retained growth/stability.
+
+Vision median improves about 56.7%, while render median falls about 9.4%. This is
+a documented software-renderer resource tradeoff. Sustained >=24 inference Hz,
+>=50 render FPS and <=20 ms frame p95 remain unmet. Earlier alternating 20-second
+pairs measured 14.15/14.05 -> 22.80/23.35 Hz, with mean result-to-next-post idle
+20.68/21.62 -> 3.42/2.92 ms. Do not replace measured throughput with nominal camera
+FPS or the differently averaged HUD rate.
+
+| Confirmed-arrival buffer proxy, 10 trials each | Baseline median / sampled p95 | Candidate median / sampled p95 |
+|---|---|---|
+| Default arrival body-y 0.12, 600 ms | 216.2 / 226.9 ms | 160.1 / 168.8 ms |
+| Declared test body-y 0.3, 600 ms | 179.1 / 209.0 ms | 130.2 / 141.6 ms |
+
+The reproducible [latency probe](../scripts/live-reflex-latency.mjs) reloads the
+page before every trial, resetting default cooldown; declared-pose mode creates
+a fresh MCP client rather than replaying a stale session. Both versions use
+24 Hz synthetic observations, 2.1-second absence warm-up and the same >2 px
+green-weighted centroid criterion. All 40 noise floors were <2 px, camera off,
+zero model calls and no pixel persistence. Median is ordinary median; sampled
+p95 is sorted[floor(n*0.95)], conservatively the maximum for n=10. Debounce is
+excluded, readback overhead included. Only the declared fixture meets <150 ms in
+this bounded sample; the default gate stays open. The path still includes the
+authored envelope, ownership crossfade, target-boid spring and frame scheduling.
+No fade, gesture duration, threshold or workload was weakened to claim a pass.
+
+From a prepared checkout, with Chromium/Edge available:
+
+```sh
+node scripts/live-reflex-latency.mjs
+node scripts/live-reflex-latency.mjs --declared-pose
+```
+
+Both commands are camera-off synthetic tests. `--headed` is optional; Cloud
+results above used headless SwiftShader. This does not certify display latency,
+physical-camera accuracy, human semantics, native GPU/Herdr/hooks or voice.
+
+An additional 20-second dev-module CPU diagnostic found 72.08 GPU-process
+CPU-seconds out of 80.46 cgroup CPU-seconds in 20.13 seconds; quota was four CPU
+cores, with throttling in all 202 measured periods and no exposed `/dev/dri`.
+Main-thread sampled idle time was 16.85 seconds; `sampleBody` self time was only
+0.17 seconds. This points to software graphics/media contention, not a measured
+large geometry-loop opportunity. GPU-process time covers shared rendering/media
+work; it is not a per-operation attribution or production acceptance benchmark.
+Two supported CPU input-format trials regressed: worker-side ImageData copy
+14.10 Hz, direct video-to-CPU ImageData 14.90 Hz, versus retained Bitmap control
+23.05 Hz. The direct path added a 22.67 ms mean pre-post gap. Both preserved
+resolution/model/confidence, produced no errors, and stayed isolated under /tmp;
+neither was shipped. No further quality-preserving speedup was demonstrated in
+this Cloud configuration. Raising platform quota, exposing native GPU or replacing
+the pinned SDK/graphics pipeline was not attempted. Current reservations remain 53/120; deadline 2026-11-09 06:17:35 UTC.
+
 ## Restrictive TUI and source-rate audit — 2026-11-09
 
 Current reservations **53/120**, deadline 2026-11-09 06:17:35 UTC. The real Cloud

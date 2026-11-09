@@ -561,3 +561,53 @@ persisted pixels, errors or browser egress occurred; owned resources closed.
 [Sanitized evidence](evidence/cloud-trust-and-timing.json) retains the distinct
 windows and input limits. Human semantics, native/physical/voice, sustained render
 and first-motion gates remain open. No new product code was changed.
+
+
+## Checkpoint 19 — fresh-frame pacing, reflex envelope and Cloud resource limit
+
+[PR #41](https://github.com/fishperson113/agent-expression-runtime/pull/41) keeps one
+capture/inference in flight while consuming the latest delivered media timestamp
+as soon as the worker returns. No repeated timestamp or backlog; stale captures
+close and failed posts release their bitmap. A stale worker error cannot stop a
+new session. Reflex follows its authored sinusoidal envelope without a second
+100 ms value filter; ownership fade, priority, cooldown, leases and reduced/off
+modes remain. No model/resolution/confidence/particle reduction.
+
+Two alternating short pairs measured 14.15/14.05 -> 22.80/23.35 Hz and mean
+result-to-next-post idle 20.68/21.62 -> 3.42/2.92 ms. Two isolated camera-on
+30-minute soaks (+60 s warm-up each), baseline 8704ecc / runtime 2ec30c8, both
+completed 15 topology/cancel/resize cycles and 60 samples with 640x480 nominal
+30-FPS fake no-face input, CPU vision and 2,000 particles. Camera continuous,
+explicitly stopped at teardown, zero audio tracks/persisted images/page errors/unexpected frames or
+browser off-loopback/blocked requests. Private growth after page GC was
++19,615,744 / -14,077,952 B; both pass <100 MB (negative delta is not guaranteed
+saving). Vision median 14.61 -> 22.91 Hz; render median 34.06 -> 30.87 FPS,
+rolling frame p95 ranges 38.1–51.0 -> 39.3–58.3 ms. This is a disclosed resource
+tradeoff; sustained 24 Hz / 50 FPS / <=20 ms remain unmet.
+
+Fresh-page/cooldown-reset latency trials (10 per case/version) measured default
+arrival median/p95 216.2/226.9 -> 160.1/168.8 ms and declared body-y 0.3 pose
+179.1/209.0 -> 130.2/141.6 ms. Same >2 px centroid criterion, 24 Hz synthetic
+observations, debounce excluded/readback included; all 40 noise floors valid.
+Only the declared fixture meets <150 ms in this sample; default remains open.
+The new reproducible camera-off script preserves session-change quarantine by
+creating a fresh client per reload; the initial stale-client request was rejected,
+not replayed. No product safety behavior was relaxed.
+
+A separate dev-module CPU diagnostic measured GPU process 72.08 CPU-seconds in
+20.13 seconds, cgroup 80.46 CPU-seconds, quota four cores, 202/202 periods throttled,
+no exposed /dev/dri; main thread sampled idle 16.85 s. CPU-copy input alternatives
+regressed to 14.10 / 14.90 Hz versus retained Bitmap 23.05 Hz and were not shipped.
+No further safe speedup was demonstrated without changing quality, authored
+motion semantics, the SDK/graphics pipeline or platform resources. Detailed
+[measurements and method](validation.md#vision-pacing-and-reflex-envelope--2026-11-09)
+and [numeric vectors](evidence/cloud-pacing-performance.json) preserve tradeoffs.
+
+Model reservations remain 53/120; deadline remains 2026-11-09 06:17:35 UTC. All
+new probes used zero model calls, no real camera/mic, owner Windows machine,
+credential/security/trust changes or private payload export. The already-passed
+20-turn admission holdout was not rerun for unchanged admission/model behavior.
+Physical accuracy/throughput, native GPU/Herdr/hooks/voice and human semantics
+remain pending. R9 reports the large numeric evidence addition; data was not
+compressed/deleted to evade that informational warning. Hard harness rules remain
+required, with R10/R11 unknown in Codex.
