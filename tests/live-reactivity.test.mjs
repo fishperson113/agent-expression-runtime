@@ -256,3 +256,43 @@ it('never resurrects a completed turn from duplicated late transport notificatio
   expect(f.controller.active).toBeUndefined();
   expect(f.sent).toHaveLength(1);
 });
+it('rejects steering an active automatic reaction without transferring ownership', async () => {
+  const f = fixture(), rejected = []; f.controller.reject = (message, error) => rejected.push({ message, error });
+  await launch(f); await settle(f);
+  const message = { id: 91, method: 'turn/steer', params: { threadId: 't', expectedTurnId: 'r', input: [{ type: 'text', text: 'private' }] } };
+  expect(f.controller.client(message)).toBe(false);
+  expect(rejected[0].message).toBe(message); expect(rejected[0].error.code).toBe(-32000);
+  expect(rejected[0].error.message).toContain('did not send');
+  expect(f.controller.active).toEqual({ threadId: 't', turnId: 'r' });
+  expect(f.controller.revoked).toBe(true); expect(f.forwarded).toEqual([]);
+  expect(f.sent[1].method).toBe('turn/interrupt'); expect(f.logs.join(' ')).not.toContain('private');
+});
+it('rejects steering while automatic start or cancellation outcome is unknown', async () => {
+  const f = fixture(), rejected = []; f.controller.reject = message => rejected.push(message);
+  await launch(f);
+  const message = { id: 92, method: 'turn/steer', params: { threadId: 't', expectedTurnId: 'r', input: [] } };
+  expect(f.controller.client(message)).toBe(false);
+  await settle(f); f.replies.shift()({ error: { code: -1 } }); await Promise.resolve();
+  expect(f.controller.uncertain).toBe(true);
+  expect(f.controller.client({ ...message, id: 93 })).toBe(false);
+  expect(rejected.map(value => value.id)).toEqual([92, 93]); expect(f.forwarded).toEqual([]);
+  expect(f.controller.queued).toEqual([]); expect(f.sent).toHaveLength(2);
+});
+it('allows ordinary user steering and steering unrelated threads unchanged', async () => {
+  const f = fixture(), rejected = []; f.controller.reject = message => rejected.push(message);
+  const message = { id: 94, method: 'turn/steer', params: { threadId: 't', expectedTurnId: 'user', input: [] } };
+  f.output.turn = 'user'; f.output.state = 'working';
+  expect(f.controller.client(message)).toBe(true);
+  f.output.turn = undefined; f.output.state = 'idle'; await launch(f); await settle(f);
+  expect(f.controller.client({ ...message, params: { ...message.params, threadId: 'other' } })).toBe(true);
+  complete(f); expect(f.controller.client(message)).toBe(true);
+  expect(rejected).toEqual([]); expect(f.sent).toHaveLength(1);
+});
+it('rejects steering when the reactive start response has no known turn ID', async () => {
+  const f = fixture(), rejected = []; f.controller.reject = message => rejected.push(message);
+  await launch(f); f.replies.shift()({ result: {} }); await Promise.resolve();
+  expect(f.controller.starting).toBe(false); expect(f.controller.active).toBeUndefined();
+  const message = { id: 95, method: 'turn/steer', params: { threadId: 't', expectedTurnId: 'unknown', input: [] } };
+  expect(f.controller.client(message)).toBe(false); expect(rejected).toEqual([message]);
+  expect(f.forwarded).toEqual([]); expect(f.sent).toHaveLength(1);
+});
