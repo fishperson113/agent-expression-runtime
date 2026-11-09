@@ -60,3 +60,18 @@ partial causal debugging; it is not a generic field-level read-set, full event
 envelope, deterministic controller replay, particle trajectory, perception-accuracy
 measurement or human-naturalness evaluation. No remote agent model request is
 needed to exercise it.
+
+Provider receipts are optional data-only metadata: request/config/prompt/response
+hashes, fixed transport outcome, Node monotonic duration and reported token usage
+(or `unknown`). They contain no model name, endpoint, credential, prompt, response
+body or absolute Node timestamp. A receipt joins an already-recorded request;
+missing parents remain explicit incomplete evidence.
+
+The browser binds receipt capture to its active run and lifecycle generation at
+request collection and the existing dispatch authorization. Starting, stopping,
+clearing, expiry or disposal invalidates old capture authority. The Node broker
+queues at most eight strict receipts and flushes them through its existing poll;
+there is no additional browser call competing with user cancellation. Receipts
+from an old or inactive capture are discarded rather than backfilled into a new
+opt-in run. Late transport metadata can be recorded after action revocation, but
+cannot apply a decision, revive a lease or forward anything to native chat.

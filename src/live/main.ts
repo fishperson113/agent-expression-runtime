@@ -46,7 +46,8 @@ Object.assign(window, { fischLive: { pair: (base: string, token: string) => brid
   deliverReactiveDecision: (id: string, data: unknown) => reactive.deliver(id, data), failReactiveDecision: (id: string) => reactive.fail(id),
   reactiveStatus: () => reactive.status(),
   startRecording: () => recording.start(), stopRecording: () => recording.stop(), clearRecording: () => recording.clear(),
-  recordingSnapshot: () => recording.snapshot(),
+  recordingSnapshot: () => recording.snapshot(), recordingCaptureToken: () => recording.captureToken(),
+  recordProviderReceipt: (token: unknown, payload: unknown) => recording.providerReceipt(token, payload),
   reactivity: () => ({ sessionId: 'legacy-reactivity-disabled', enabled: false, stopped: true,
     camera: 'stopped', capturedAt: Date.now(), events: [] }),
   activity: (value: { turn: 'idle' | 'working' | 'waiting' | 'interrupted'; output: number; quality: string }) => {

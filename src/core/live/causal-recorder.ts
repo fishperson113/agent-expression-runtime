@@ -90,7 +90,7 @@ export class CausalRecorder {
       missing = value.observationRefs.some((ref: any) => !this.observations.has(reference(ref))) || value.eventRefs.some((ref: any) => !this.events.has(reference(ref))) || !value.observationRefs.length || !value.eventRefs.length;
       this.requests.add(value.request.requestId);
     }
-    if (['authorization', 'decision', 'revocation'].includes(record.kind) && value.requestId) missing = !this.requests.has(value.requestId);
+    if (['authorization', 'decision', 'revocation', 'provider_receipt'].includes(record.kind) && value.requestId) missing = !this.requests.has(value.requestId);
     if (['execution', 'frame'].includes(record.kind) && value.origin === 'reactive') missing = !value.requestId || !this.requests.has(value.requestId);
     if (record.kind === 'revocation' && (value.actionId || value.decisionId) && !value.requestId) missing = true;
     if (missing) this.mark('missing_parent', 0);

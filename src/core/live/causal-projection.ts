@@ -52,6 +52,19 @@ function optionalFields(payload: Record<string, any>) {
   if ('origin' in payload) requireValue(['native', 'reactive', 'ambient'].includes(payload.origin));
   if ('epoch' in payload) requireValue(id(payload.epoch, 80));
 }
+function providerReceipt(value: unknown) {
+  const payload = object(value, ['requestId', 'modelConfigHash', 'promptHash', 'requestHash', 'responseHash', 'outcome', 'durationMs', 'usage']);
+  const hash = (value: unknown) => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
+  requireValue(id(payload.requestId) && ['modelConfigHash', 'promptHash', 'requestHash'].every(key => hash(payload[key])));
+  requireValue(payload.responseHash === null || hash(payload.responseHash));
+  requireValue(['completed', 'invalid_response', 'http_error', 'transport_unknown'].includes(payload.outcome));
+  requireValue(payload.durationMs === null || number(payload.durationMs));
+  if (payload.usage !== 'unknown') {
+    const usage = object(payload.usage, ['input_tokens', 'output_tokens', 'total_tokens']);
+    requireValue(Object.values(usage).every(integer));
+  }
+  return payload;
+}
 function metadata(kind: CausalKind, value: unknown) {
   let payload;
   if (kind === 'authorization') {
@@ -71,6 +84,7 @@ function metadata(kind: CausalKind, value: unknown) {
 }
 export function project(kind: CausalKind, value: unknown): unknown {
   inspect(value);
+  if (kind === 'provider_receipt') return structuredClone(providerReceipt(value));
   if (kind === 'observation') { const { summary: _summary, ...snapshot } = validateObservation(value); return snapshot; }
   if (kind === 'request') return structuredClone(requestPayload(value));
   if (kind === 'event') {

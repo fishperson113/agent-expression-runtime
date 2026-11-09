@@ -1,10 +1,20 @@
+import { freezeReactiveReceipt } from './reactive-receipt.mjs';
 import { ReactiveProviderError } from './reactive-provider.mjs';
 import { freezeReactiveCandidate } from './reactive-window.mjs';
 
+function captureToken(value) {
+  try {
+    if (!value || typeof value !== 'object' || ![Object.prototype, null].includes(Object.getPrototypeOf(value))) return null;
+    const fields = Object.getOwnPropertyDescriptors(value);
+    if (Reflect.ownKeys(fields).length !== 2 || typeof fields.runId?.value !== 'string' ||
+      !/^[a-zA-Z0-9_-]{1,80}$/.test(fields.runId.value) || !Number.isSafeInteger(fields.generation?.value) || fields.generation.value < 0) return null;
+    return Object.freeze({ runId: fields.runId.value, generation: fields.generation.value });
+  } catch { return null; }
+}
 const controlled = new Set(['turn/start', 'turn/steer', 'thread/start', 'thread/resume', 'thread/fork', 'turn/interrupt']);
 export class LiveReactiveBroker {
   closed = false; browserUnavailable = false; waiters = new Set(); polling = false; draining = false; active; uncertain = false; paused = false;
-  queue = []; pending = new Map(); turns = new Set(); completed = new Set(); receipts = new Set(); requests = new Set();
+  providerReceipts = []; queue = []; pending = new Map(); turns = new Set(); completed = new Set(); receipts = new Set(); requests = new Set();
   constructor({ page, provider = null, output, forward, reject, log = () => {}, evaluateTimeoutMs = 10000 }) {
     if (!Number.isInteger(evaluateTimeoutMs) || evaluateTimeoutMs < 1 || evaluateTimeoutMs > 10000) throw Error('reactive_timeout_invalid');
     Object.assign(this, { page, provider, output, forward, reject, log, evaluateTimeoutMs });
@@ -90,18 +100,26 @@ export class LiveReactiveBroker {
     if (this.closed || this.browserUnavailable || this.polling) return; this.polling = true;
     try {
       const available = !!this.provider && !this.paused && !this.uncertain;
-      const candidate = await this.evaluate(({ activity, entries, busy, available, take }) => {
-        const api = window.fischLive; api.activity(activity);
+      const queuedReceipts = this.providerReceipts.splice(0, 8);
+      const polled = await this.evaluate(({ activity, entries, busy, available, take, receipts }) => {
+        const api = window.fischLive;
+        for (const item of receipts) { try {
+          const pending = api.recordProviderReceipt?.(item.token, item.receipt);
+          if (pending !== undefined) void Promise.resolve(pending).catch(() => {});
+        } catch {} }
+        api.activity(activity);
         for (const text of entries) api.logActivity?.(text);
         api.configureReactive(available); api.setReactiveUserBusy(busy);
-        return take ? api.takeReactiveRequest() : null;
-      }, { activity, entries, busy: this.busy(), available, take: available && !this.active && !this.busy() });
-      if (!this.closed && !this.browserUnavailable && candidate && !this.active && !this.busy()) this.start(candidate);
+        let token = null; try { token = api.recordingCaptureToken?.() ?? null; } catch {}
+        return { candidate: take ? api.takeReactiveRequest() : null, captureToken: token };
+      }, { activity, entries, busy: this.busy(), available, take: available && !this.active && !this.busy(), receipts: queuedReceipts });
+      const candidate = polled?.candidate, token = captureToken(polled?.captureToken);
+      if (!this.closed && !this.browserUnavailable && candidate && !this.active && !this.busy()) this.start(candidate, token);
       else if (!this.closed && !this.browserUnavailable && candidate) await this.deliver(candidate.request.requestId, null);
     } catch { this.paused = true; this.log('reactive_browser_unavailable'); }
     finally { this.polling = false; }
   }
-  start(candidate) {
+  start(candidate, token = null) {
     try { candidate = freezeReactiveCandidate(candidate); } catch {
       const rejected = candidate?.request?.requestId;
       const id = typeof rejected === 'string' && rejected.length <= 64 ? rejected : '';
@@ -113,12 +131,30 @@ export class LiveReactiveBroker {
       this.log('reactive_request_rejected'); void this.deliver(id, null).catch(() => { this.paused = true; }); return;
     }
     this.requests.add(id);
-    const owned = { id, controller: new AbortController(), terminal: false };
+    const owned = { id, captureToken: token, receiptSeen: false, controller: new AbortController(), terminal: false };
     this.active = owned; void this.authorize(owned, candidate);
+  }
+  receipt(owned, value) {
+    if (this.closed || this.browserUnavailable || owned.receiptSeen || !owned.captureToken) return;
+    try {
+      const receipt = freezeReactiveReceipt(value);
+      if (receipt.requestId !== owned.id) return;
+      owned.receiptSeen = true;
+      if (this.providerReceipts.length < 8) this.providerReceipts.push({ token: owned.captureToken, receipt });
+    } catch {}
   }
   async authorize(owned, candidate) {
     let allowed;
-    try { allowed = await this.evaluate(id => window.fischLive.authorizeReactiveRequest(id), owned.id); }
+    try {
+      const result = await this.evaluate(async id => {
+        const api = window.fischLive, allowed = await api.authorizeReactiveRequest(id);
+        let token = null; try { token = api.recordingCaptureToken?.() ?? null; } catch {}
+        return { allowed, captureToken: token };
+      }, owned.id);
+      allowed = result?.allowed;
+      const current = captureToken(result?.captureToken);
+      if (!current || !owned.captureToken || current.runId !== owned.captureToken.runId || current.generation !== owned.captureToken.generation) owned.captureToken = null;
+    }
     catch { this.paused = true; this.log('reactive_authorization_failed'); }
     if (this.closed || this.browserUnavailable || this.active !== owned) return;
     if (allowed !== true || this.busy()) { owned.terminal = true; await this.finishFailure(owned); return; }
@@ -127,7 +163,8 @@ export class LiveReactiveBroker {
       void this.fail(owned.id);
     }, 30000);
     void Promise.resolve().then(() => {
-      if (!this.closed && !this.browserUnavailable && this.active === owned) return this.provider.decide(candidate.observationWindow, owned.controller.signal);
+      if (!this.closed && !this.browserUnavailable && this.active === owned) return this.provider.decide(candidate.observationWindow, owned.controller.signal,
+        owned.captureToken ? value => this.receipt(owned, value) : undefined);
     })
       .then(value => this.finish(owned, value)).catch(error => this.failed(owned, error));
   }
@@ -159,6 +196,6 @@ export class LiveReactiveBroker {
   close() {
     this.closed = true; this.rejectEvaluations('reactive_user_closed'); clearTimeout(this.active?.timer); this.active?.controller.abort();
     for (const message of this.queue.splice(0)) this.rejectInput(message, 'reactive_user_closed');
-    this.active = undefined; this.pending.clear(); this.turns.clear(); this.completed.clear(); this.receipts.clear(); this.requests.clear();
+    this.active = undefined; this.providerReceipts = []; this.pending.clear(); this.turns.clear(); this.completed.clear(); this.receipts.clear(); this.requests.clear();
   }
 }
