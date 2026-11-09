@@ -28,6 +28,34 @@ jobs:
           cache: npm
       - uses: dtolnay/rust-toolchain@stable
       - run: npm ci
+      - name: Verify linked CLI in a spaced Windows workspace
+        shell: pwsh
+        run: |
+          $repo = (Get-Location).Path
+          $prefix = Join-Path $env:RUNNER_TEMP 'fisch cli prefix'
+          $workspace = Join-Path $env:RUNNER_TEMP 'fisch user workspace'
+          $previousPrefix = $env:NPM_CONFIG_PREFIX
+          $expected = 'Fisch ' + (Get-Content package.json | ConvertFrom-Json).version
+          New-Item -ItemType Directory -Force $workspace | Out-Null
+          try {
+            $env:NPM_CONFIG_PREFIX = $prefix
+            npm.cmd link --ignore-scripts
+            if ($LASTEXITCODE -ne 0) { throw 'npm link failed' }
+            Push-Location $workspace
+            try {
+              $version = & (Join-Path $prefix 'fisch.cmd') --version
+              if ($LASTEXITCODE -ne 0 -or $version -ne $expected) { throw 'Linked version mismatch' }
+              & (Join-Path $prefix 'fisch.cmd') --help
+              if ($LASTEXITCODE -ne 0) { throw 'Linked help failed' }
+              node (Join-Path $repo 'bin/fisch.mjs') --help
+              if ($LASTEXITCODE -ne 0) { throw 'Absolute CLI fallback failed' }
+            } finally { Pop-Location }
+          } finally {
+            npm.cmd unlink --global --prefix $prefix fisch --ignore-scripts
+            $cleanupExit = $LASTEXITCODE
+            $env:NPM_CONFIG_PREFIX = $previousPrefix
+            if ($cleanupExit -ne 0) { throw 'Temporary CLI cleanup failed' }
+          }
       - run: npm run build
       - run: cargo test --locked --manifest-path src-tauri/Cargo.toml
       - run: cargo check --locked --manifest-path src-tauri/Cargo.toml
@@ -45,6 +73,6 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: cargo build --locked --no-default-features --bin fisch-gateway --manifest-path src-tauri/Cargo.toml
-      - run: npx vitest run --maxWorkers=1 tests/playground-mcp.test.mjs tests/playground-route.test.mjs
+      - run: npx vitest run --maxWorkers=1 tests/playground-mcp.test.mjs tests/playground-route.test.mjs tests/live-restart-route.test.mjs
         env:
           FISCH_PLAYGROUND_REQUIRE_GATEWAY: '1'

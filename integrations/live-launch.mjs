@@ -31,7 +31,7 @@ export async function openLive({ hands, assets, headless = false, signal, inspec
     if (signal?.aborted) throw Error('live_start_cancelled');
     browser = await launchLiveBrowser(headless);
     const page = await browser.newPage(livePageOptions(headless));
-    inspect(page);
+    await inspect(page);
     const query = new URLSearchParams();
     if (process.env.FISCH_VISION_DELEGATE === 'CPU') query.set('vision', 'cpu');
     if (synthetic) query.set('fixture', 'synthetic');
