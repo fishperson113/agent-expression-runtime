@@ -33,7 +33,7 @@ export class CausalRecorder {
     catch { return false; }
     this.clear(); this.lastMono = mono; this.lastWall = wall;
     this.manifest = { ...metadata, active: true, incomplete: false, reasons: [], droppedRecords: 0, storedBytes: 0, recordCount: 0,
-      clock: { monotonicOrigin: mono, wallOrigin: wall, observationCapturedAt: 'wall-ms', eventAt: 'wall-ms', requestDeadline: 'host-monotonic-ms', executionAt: 'host-monotonic-ms' },
+      clock: { monotonicOrigin: mono, wallOrigin: wall, observationCapturedAt: 'wall-ms', eventAt: 'wall-ms', requestDeadline: 'host-monotonic-ms', admissionValidUntil: 'host-monotonic-ms', executionValidUntil: 'host-monotonic-ms', executionAt: 'host-monotonic-ms' },
       ...this.limits, maxRecordBytes: 32768, expiresAtMono: mono + this.limits.ttlMs, expiresAtWall: wall + this.limits.ttlMs, ended: 'none' };
     this.updateBytes(); return true;
   }

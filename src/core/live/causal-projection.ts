@@ -1,4 +1,5 @@
 import { freezeHandReadSet } from './decision-types';
+import { freezeSemanticSnapshot, freezePrerequisites } from './decision-contract';
 import { validateSourceEvent, validateObservation } from './observation';
 import { causalRevocationReasons, type CausalKind } from './causal-recorder-types';
 const id = (value: unknown, max = 64) => typeof value === 'string' && new RegExp(`^[a-zA-Z0-9_-]{1,${max}}$`).test(value);
@@ -40,10 +41,13 @@ function references(value: unknown, limit: number) {
 }
 function requestPayload(value: unknown) {
   const payload = object(value, ['request', 'observationRefs', 'eventRefs']);
-  const request = object(payload.request, ['schemaVersion', 'sessionId', 'epoch', 'requestId', 'intentRevision', 'deadline', 'requiredTrackIds'], ['presenceRevision', 'handReadSet']);
-  requireValue(request.schemaVersion === 1 && ['sessionId', 'epoch', 'requestId'].every(key => id(request[key])) && integer(request.intentRevision) && number(request.deadline));
+  const version = payload.request?.schemaVersion;
+  const request = object(payload.request, ['schemaVersion', 'sessionId', 'epoch', 'requestId', 'intentRevision', 'deadline', 'requiredTrackIds',
+    ...(version === 2 ? ['presenceRevision', 'semanticSnapshot'] : [])], ['presenceRevision', 'handReadSet']);
+  requireValue((request.schemaVersion === 1 || request.schemaVersion === 2) && ['sessionId', 'epoch', 'requestId'].every(key => id(request[key])) && integer(request.intentRevision) && number(request.deadline));
   if ('presenceRevision' in request) requireValue(integer(request.presenceRevision));
   if ('handReadSet' in request) freezeHandReadSet(request.handReadSet);
+  if (request.schemaVersion === 2) freezeSemanticSnapshot(request.semanticSnapshot);
   requireValue(Array.isArray(request.requiredTrackIds) && request.requiredTrackIds.length <= 16 && request.requiredTrackIds.every((value: unknown) => id(value)) && new Set(request.requiredTrackIds).size === request.requiredTrackIds.length);
   references(payload.observationRefs, 4); references(payload.eventRefs, 8); return payload;
 }
@@ -67,6 +71,15 @@ function providerReceipt(value: unknown) {
   }
   return payload;
 }
+function scopedDecision(payload: Record<string, any>) {
+  if (!('decisionVersion' in payload)) {
+    requireValue(!('prerequisites' in payload) && !('executionValidUntil' in payload)); return;
+  }
+  requireValue(payload.decisionVersion === 2 && 'prerequisites' in payload);
+  freezePrerequisites(payload.prerequisites);
+  requireValue(['observed', 'accepted', 'stale', 'duplicate', 'admission_failed'].includes(payload.reason));
+  if ('executionValidUntil' in payload) requireValue(payload.reason === 'accepted' && payload.mode !== 'observe' && number(payload.executionValidUntil));
+}
 function metadata(kind: CausalKind, value: unknown) {
   let payload;
   if (kind === 'authorization') {
@@ -74,8 +87,9 @@ function metadata(kind: CausalKind, value: unknown) {
     requireValue(typeof payload.allowed === 'boolean' && ['authorized', 'denied', 'revoked', 'stale', 'unavailable'].includes(payload.reason));
     requireValue(payload.allowed === (payload.reason === 'authorized'));
   } else if (kind === 'decision') {
-    payload = object(value, ['requestId', 'reason'], ['decisionId', 'actionId', 'mode', 'validUntil']); requireValue(reasons.includes(payload.reason));
+    payload = object(value, ['requestId', 'reason'], ['decisionId', 'actionId', 'mode', 'validUntil', 'decisionVersion', 'prerequisites', 'executionValidUntil']); requireValue(reasons.includes(payload.reason));
     if ('mode' in payload) requireValue(['observe', 'express'].includes(payload.mode));
+    scopedDecision(payload);
   } else if (kind === 'revocation') {
     payload = object(value, ['reason'], ['requestId', 'decisionId', 'actionId']); requireValue((causalRevocationReasons as readonly string[]).includes(payload.reason));
   } else if (kind === 'execution') {

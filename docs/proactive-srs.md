@@ -256,3 +256,37 @@ This is whole-decision conservative invalidation, not a generic semantic field
 read-set. Analog changes that do not produce an eligible event are still outside
 that contract. Per-field dependencies, tolerances and selective action repair
 remain future work; no gesture-to-effect rule or model quality claim is added.
+
+## Version-two scoped liveness contract (integration increment)
+
+The conservative invalidation section above describes the version-one path.
+Version two is an explicit opt-in increment, not a claim that the default-off
+provider is configured or that live-model/human acceptance has passed. Requests
+retain their explicit version; version two adds required presence revision and
+four revision axes in `semanticSnapshot`: orientation, expression, hand motion
+and hand identity. The first three permit explicit null for unknown state; hand
+identity is always a required nonnull safe integer history revision, including
+when no hand is currently available. Null is not a wildcard or numeric zero.
+
+A version-two decision declares a unique subset of `orientation`, `expression`
+and `hand_motion` prerequisites. Only validated, brief, generic, nonspatial
+expressions may omit unrelated axes. Presence, intent, epoch, valid source,
+required tracks and hand identity remain critical regardless of that subset.
+Specified dependencies are validated at admission and on execution ticks;
+compatible motion frames do not invalidate an unrelated generic reaction merely
+because a global semantic counter advanced. This remains a finite protocol,
+not a general field-level read-set, language-keyword effect map or action repair.
+
+The five-second request/decision admission cutoff does not double as the lifetime
+of an already accepted action. Host-derived execution validity is bounded by the
+validated program duration plus at most 100 ms, never more than 1,100 ms from
+admission. It can outlive the admission cutoff, but cannot outlive source consent,
+critical dependencies or its execution lease. Node's separate transport watchdog
+and usage-unknown rules do not extend either browser authority phase.
+
+Recorder request projection preserves both versions and exact nullable axes.
+Trusted host metadata may add `decisionVersion:2`, prerequisites and accepted-only
+`executionValidUntil`; raw provider bodies and explanations remain excluded.
+Its bounded, opt-in causal export does not prove complete generic lineage,
+perception accuracy, sustained naturalness or target-device behavior. Existing
+M5/human gates stay open and no new production model requests are implied.
