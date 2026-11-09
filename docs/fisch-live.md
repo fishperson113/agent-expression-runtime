@@ -216,8 +216,8 @@ No real camera/mic or owner-PC access. No voice gate is pending for this scope.
 
 ## Reactive call workspace (2026-11-09)
 
-The two equal call panels put Fisch on the left and your opt-in local camera plus
-actual agent activity on the right. The resting particle body is a fish-inspired
+The 2:1 call layout puts a large Fisch panel on the left and your smaller opt-in
+local camera plus actual agent activity together on the right. The resting particle body is a fish-inspired
 face, not a copy of the reference photo. The bounded log shows observed events,
 turns and tool lifecycle, never private model thoughts or raw tool arguments.
 
