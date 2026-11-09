@@ -83,3 +83,42 @@ it('preserves user geometry after animation completes until an explicit return t
   expect(f.body.metrics.userGeometryLocked).toBe(false); expect(f.body.canReactive()).toBe(true);
   f.body.dispose();
 });
+it('forwards only Native lifecycle receipts despite local epoch and sequence collisions', async () => {
+  const f = setup(), events: { status: string; seq: number }[] = [];
+  f.body.feedback = event => events.push(event);
+  const native = (seq: number) => f.body.admit({ v: 1, epoch: f.body.scheduler.epoch, seq, kind: 'program', track: 'body', policy: 'replace', body: { type: 'wait', durationMs: 10 } });
+  expect(native(1).status).toBe('accepted'); f.advance(11); f.frame();
+  expect(events).toEqual([expect.objectContaining({ seq: 1, status: 'applied' }), expect.objectContaining({ seq: 1, status: 'completed' })]);
+  events.length = 0;
+  const request = f.launch();
+  expect((await f.session.deliver(request.requestId, decision(request, f.now() + 200)))?.reason).toBe('accepted');
+  f.advance(101); f.frame();
+  expect(events).toEqual([]);
+  const local = f.body.trace.snapshot().events.filter(event => event.origin === 'reactive');
+  expect(local.filter(event => ['applied', 'completed'].includes(event.phase))).toEqual([
+    expect.objectContaining({ seq: 1, requestId: request.requestId, decisionId: 'decision', actionId: 'action', phase: 'applied' }),
+    expect.objectContaining({ seq: 1, phase: 'completed' })]);
+  f.advance(100); f.frame(); expect(f.body.metrics.reactiveOwner).toBeNull(); expect(events).toEqual([]);
+  expect(native(2).status).toBe('accepted'); f.advance(11); f.frame();
+  expect(events.map(event => [event.seq, event.status])).toEqual([[2, 'applied'], [2, 'completed']]); f.body.dispose();
+});
+it('isolates reactive cancellation receipts after the current owner has been cleared', async () => {
+  const f = setup(), request = f.launch(), events: unknown[] = [];
+  f.body.feedback = event => events.push(event);
+  await f.session.deliver(request.requestId, decision(request));
+  f.session.userIntent();
+  expect(f.body.metrics.reactiveOwner).toBeNull(); expect(events).toEqual([]);
+  expect(f.body.trace.snapshot().events).toContainEqual(expect.objectContaining({ origin: 'reactive', requestId: request.requestId, phase: 'cancelled' }));
+  f.body.dispose();
+});
+it('validates reactive part references before cancelling or mutating the ambient scene', async () => {
+  const f = setup(), request = f.launch(), cancel = vi.spyOn(f.body.scheduler, 'cancel'), release = vi.spyOn(f.body.controls, 'release');
+  const before = JSON.stringify(f.body.scheduler.state), events: unknown[] = [];
+  f.body.feedback = event => events.push(event);
+  const value = decision(request);
+  value.action.body.configuration.controls.push({ type: 'bind', id: 'missing', signal: 'agent.output', target: { part: 'missing', prop: 'x' }, gain: 1, offset: 0, clamp: [-0.4, 0.4], smoothMs: 40 } as never);
+  expect((await f.session.deliver(request.requestId, value))?.reason).toBe('admission_failed');
+  expect(cancel).not.toHaveBeenCalled(); expect(release).not.toHaveBeenCalled();
+  expect(f.body.metrics.reactiveOwner).toBeNull(); expect(JSON.stringify(f.body.scheduler.state)).toBe(before); expect(events).toEqual([]);
+  f.body.dispose();
+});

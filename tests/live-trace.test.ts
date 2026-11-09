@@ -49,3 +49,19 @@ it('clears pending render attribution on cancellation so old work cannot mark a 
   trace.frame(1, 10, 0); trace.record(2, 'applied', 1); trace.record(2, 'cancelled', 2); trace.frame(2, 11, 3);
   expect(trace.snapshot().events.some(event => event.phase === 'frame_changed_proxy')).toBe(false);
 });
+it('preserves local frame attribution across a colliding Native cancellation', () => {
+  const trace = new SceneTrace(), owner = { origin: 'reactive' as const, requestId: 'r1', decisionId: 'd1', actionId: 'a1' };
+  trace.frame(1, 10, 0); trace.record(1, 'applied', 1, undefined, 'local', owner);
+  trace.record(1, 'cancelled', 2, undefined, 'local', { origin: 'native' }); trace.frame(2, 11, 3);
+  expect(trace.snapshot().events.filter(event => event.phase.startsWith('frame_'))).toEqual([
+    expect.objectContaining({ ...owner, phase: 'frame_submitted' }), expect.objectContaining({ ...owner, phase: 'frame_changed_proxy' })]);
+  trace.record(2, 'applied', 4, undefined, 'local', owner); trace.record(2, 'cancelled', 5, undefined, 'local', owner); trace.frame(3, 12, 6);
+  expect(trace.snapshot().events.filter(event => event.phase.startsWith('frame_'))).toHaveLength(2);
+});
+it('bounds and sanitizes attribution without retaining arbitrary contextual fields', () => {
+  const trace = new SceneTrace();
+  for (let seq = 0; seq < 100; seq++) trace.record(seq, 'received', seq, undefined, 'local', { origin: 'native', requestId: 'bad private context', decisionId: 'x'.repeat(65), actionId: 'safe-id', privateContext: 'secret' } as any);
+  expect(trace.snapshot().events).toHaveLength(64);
+  expect(trace.snapshot().events.at(-1)).toEqual(expect.objectContaining({ origin: 'native', actionId: 'safe-id' }));
+  expect(JSON.stringify(trace.snapshot())).not.toMatch(/private|secret|requestId|decisionId/);
+});

@@ -13,7 +13,8 @@ import type { LiveCompiled } from '../core/live/control-types';
 import type { ReactiveOwnership } from '../core/live/decision-types';
 import type { ReactiveLease, LeaseRevokeReason } from '../core/live/reactive-lease';
 import type { ReactiveSession } from '../core/live/reactive-session';
-import { SceneTrace } from '../core/live/trace';
+import { SceneTrace, type TraceAttribution } from '../core/live/trace';
+import type { Compiled } from '../core/runtime/ir';
 
 export class LiveBody {
   readonly renderer: ThreeRenderer;
@@ -37,13 +38,16 @@ export class LiveBody {
   private reactiveOwner?: ReactiveOwnership;
   private userLeaseUntil = 0;
   private userGeometryLocked = false;
+  private origins = new WeakMap<Compiled, TraceAttribution>();
   output = 0;
   feedback?: (event: { epoch: string; seq: number; status: string }) => void;
   constructor(private canvas: HTMLCanvasElement, private status: (text: string) => void) {
     this.renderer = new ThreeRenderer(canvas, status); this.renderer.quality(2000);
     this.scheduler = new Scheduler({ now: () => performance.now() }, { apply: (state, now) => this.apply(state, now),
       dispose: () => this.renderer.dispose() }, { count: status }, (status, ir) => {
-        this.trace.record(ir.seq, status, performance.now(), undefined, ir.epoch); this.feedback?.({ status, epoch: ir.epoch, seq: ir.seq });
+        const source = this.origins.get(ir) ?? { origin: 'ambient' as const };
+        this.trace.record(ir.seq, status, performance.now(), undefined, ir.epoch, source);
+        if (source.origin === 'native') this.feedback?.({ status, epoch: ir.epoch, seq: ir.seq });
       }, 2000);
     this.defaults.install(validateConfiguration(defaults), performance.now());
     this.restFace(0);
@@ -89,17 +93,17 @@ export class LiveBody {
   admit(record: any) {
     this.prepareUserMutation();
     const at = performance.now();
-    this.trace.record(record?.seq, 'received', at, undefined, record?.epoch);
+    this.trace.record(record?.seq, 'received', at, undefined, record?.epoch, { origin: 'native' });
     try {
       const compiled = record.kind === 'define' ? { program: this.compiler.compiler.prepareDefinition(record, at) } : this.compiler.compile(record, at);
       const result = this.admitCompiled(compiled, at), accepted = ['accepted', 'state', 'defined'].includes(result);
       if (accepted) { this.userLeaseUntil = Math.max(this.userLeaseUntil, this.leaseUntil(compiled, at)); this.userGeometry(compiled, at); }
-      this.trace.record(record.seq, accepted ? 'admitted' : 'rejected', performance.now(), accepted ? undefined : result, record.epoch);
+      this.trace.record(record.seq, accepted ? 'admitted' : 'rejected', performance.now(), accepted ? undefined : result, record.epoch, { origin: 'native' });
       this.status(accepted ? 'Biểu đạt đã được nhận.' : result);
       return { status: accepted ? 'accepted' : 'rejected', code: accepted ? undefined : result, latencyMs: performance.now() - at };
     } catch (error) {
       const code = error instanceof Error ? error.message : 'live_compile_failed';
-      this.trace.record(record?.seq, 'rejected', performance.now(), code, record?.epoch);
+      this.trace.record(record?.seq, 'rejected', performance.now(), code, record?.epoch, { origin: 'native' });
       return { status: 'rejected', code };
     }
   }
@@ -121,13 +125,17 @@ export class LiveBody {
     const start = program.kind === 'program' && program.policy === 'append' ? Math.max(at, this.userLeaseUntil) : at;
     return Math.max(start + duration, at + (compiled.configuration?.lifetimeMs ?? 0));
   }
-  private admitCompiled(compiled: LiveCompiled, at: number) {
+  private validateParts(compiled: LiveCompiled) {
     if (compiled.configuration) {
       const shapes = compiled.program.kind === 'program' ? compiled.program.ops.filter(op => op.property === 'shape') : [];
       const last = shapes.at(-1)?.value;
       const ids = new Set(last === undefined ? this.scheduler.state.particleParts?.map(part => part.id) : typeof last === 'object' ? last.parts.map(part => part.id) : []);
       for (const part of referencedParts(compiled.configuration)) if (!ids.has(part)) throw Error('live_missing_part_' + part);
     }
+  }
+  private admitCompiled(compiled: LiveCompiled, at: number, source: TraceAttribution = { origin: 'native' }) {
+    this.validateParts(compiled);
+    this.origins.set(compiled.program, source);
     const result = this.scheduler.admit(compiled.program), accepted = ['accepted', 'state', 'defined'].includes(result);
     if (compiled.program.kind === 'define' && compiled.program.draft !== undefined) this.compiler.compiler.settleDefinition(compiled.program.draft, accepted);
     if (accepted && compiled.configuration) this.controls.install(compiled.configuration, at);
@@ -135,11 +143,13 @@ export class LiveBody {
   }
   admitReactive(compiled: LiveCompiled, owner: ReactiveOwnership) {
     if (!this.canReactive() || compiled.program.kind !== 'program' || compiled.program.epoch !== this.scheduler.epoch) throw Error('reactive_admission_rejected');
+    this.validateParts(compiled);
     this.reactiveOwner = owner;
     this.scheduler.cancel(this.scheduler.epoch, false); this.controls.release();
-    const result = this.admitCompiled(compiled, performance.now());
+    const source: TraceAttribution = { origin: 'reactive', requestId: owner.requestId, decisionId: owner.decisionId, actionId: owner.actionId };
+    const result = this.admitCompiled(compiled, performance.now(), source);
     if (result !== 'accepted') throw Error('reactive_admission_rejected');
-    this.trace.record(compiled.program.seq, 'admitted', performance.now(), undefined, compiled.program.epoch);
+    this.trace.record(compiled.program.seq, 'admitted', performance.now(), undefined, compiled.program.epoch, source);
   }
   cancelReactive(owner: ReactiveLease, _reason: LeaseRevokeReason) {
     const current = this.reactiveOwner;
@@ -158,7 +168,8 @@ export class LiveBody {
   }
   private restFace(durationMs: number) {
     const record = { v: 1, epoch: this.scheduler.epoch, seq: 0, kind: 'program', track: 'body', policy: 'replace', body: faceProgram(durationMs) };
-    this.scheduler.admit(this.compiler.compile(record, performance.now()).program);
+    const program = this.compiler.compile(record, performance.now()).program;
+    this.origins.set(program, { origin: 'ambient' }); this.scheduler.admit(program);
     this.faceBlend.clear();
     this.scheduler.tick();
   }
