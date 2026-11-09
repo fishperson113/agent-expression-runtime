@@ -4,6 +4,7 @@
   "runtimeSource": "fde1444bc8887bca7cf4e37ef09aa8c632e4d8c1",
   "runtimeMainMerge": "f8ca7477a474d799de4d51ec23ddda110717b624",
   "modelBudget": {
+    "counterCheckpoint": "performance verification, before output-latency reservation 51",
     "used": 50,
     "limit": 120,
     "deadline": "2026-11-09T06:17:35.373Z",

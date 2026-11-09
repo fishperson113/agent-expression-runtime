@@ -2,6 +2,22 @@
 
 The current implementation includes pane attachment, native interaction hooks, contextual planning, continuous presence, model-authored performances, adaptive Braille and prepared idle scenes. See [current behavior](expression-planner.md), [review remediation](review-progress.md) and [research/evidence limits](related-work.md#10-cập-nhật-braille-theo-thời-gian-và-idle-scene-tự-do). Test counts below are historical observations, not the current suite size or a fresh certification.
 
+## Cloud latency probes — 2026-11-09
+
+One additional short synthetic conversation completed with a real signed-in model
+on main `8c0ec0a`. Current reservations are **51/120**, deadline unchanged at
+2026-11-09 06:17:35 UTC. [Sanitized latency evidence](evidence/cloud-latency-probes.json)
+contains no assistant text, images, credentials or raw tool payloads.
+
+| Probe | Result | Interpretation |
+|---|---|---|
+| Real output activity | 24 deltas; replying state 45.95 ms, next submitted frame 65.87 ms; zero 127.07 ms after last delta | Meets <250 ms / <=600 ms in this sample; state/frame proxy, not lip-sync or universal acceptance |
+| Confirmed local arrival | 172.7 ms to >2 px green-weighted rendered centroid change; pre-event jitter 0.184 px | Debounce excluded; includes buffer readback, so <150 ms first-motion target remains unverified |
+
+The reflex probe uses a declared body-y pose and synthetic observations only;
+no physical camera/microphone or image persistence. Project trust/TUI inference,
+physical accuracy/throughput, native hardware/voice and human semantics remain open.
+
 ## Final Cloud performance verification — 2026-11-09
 
 Runtime `fde1444`, merged in [PR #37](https://github.com/fishperson113/agent-expression-runtime/pull/37)
@@ -26,7 +42,7 @@ human semantic recognition, distraction, native hardware and Vietnamese voice.
 
 Runtime `ce03da9`, merged in [PR #35](https://github.com/fishperson113/agent-expression-runtime/pull/35)
 as `d7bf017`. The owner completed official Codex device login after network access
-was restored. Model usage is 50/120, deadline 2026-11-09 06:17:35 UTC.
+was restored. At that checkpoint model reservations were 50/120, deadline 2026-11-09 06:17:35 UTC.
 
 | Gate | Fresh evidence | Limit |
 |---|---|---|

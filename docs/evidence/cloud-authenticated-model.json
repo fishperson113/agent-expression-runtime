@@ -3,6 +3,7 @@
   "runtimeSource": "ce03da9",
   "environment": "Cloud Linux, Chromium headless, SwiftShader; synthetic observations, camera off",
   "modelBudget": {
+    "counterCheckpoint": "authenticated holdout and terminal startup, before output-latency reservation 51",
     "limit": 120,
     "used": 50,
     "usedAfterHoldout": 48,
