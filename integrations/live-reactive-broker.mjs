@@ -228,7 +228,8 @@ export class LiveReactiveBroker {
     if (this.closed || this.browserUnavailable || this.active !== owned || owned.terminal) return;
     clearTimeout(owned.timer); owned.terminal = true;
     const settled = error instanceof ReactiveProviderError && error.transportSettled === true;
-    if (error instanceof ReactiveProviderError && (error.code === 'reactive_budget_denied' || this.provider?.conversationLane && error.code !== 'native_reaction_aborted')) this.paused = true;
+    const recoverable = error instanceof ReactiveProviderError && (error.code === 'native_reaction_aborted' || settled && error.code === 'native_expression_not_allowed');
+    if (error instanceof ReactiveProviderError && (error.code === 'reactive_budget_denied' || this.provider?.conversationLane && !recoverable)) this.paused = true;
     if (settled) { this.log('reactive_decision_failed'); await this.finishFailure(owned); }
     else { this.uncertain = true; this.log('reactive_transport_unknown'); await this.fail(owned.id); }
   }

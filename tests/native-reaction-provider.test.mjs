@@ -396,3 +396,21 @@ it('captures Native expression permission as an immutable fourth provider argume
     broker.close();
   }
 });
+
+it('drops a settled permission mismatch without retrying or permanently muting the conversation lane', async () => {
+  const f = fixture({ response: { reply: 'must not publish', decision: { mode: 'animate', reasonCode: 'wrong_channel', payload: { controls: [], poses: [], lifetimeMs: 1000 } } } });
+  try {
+    const error = await f.provider.decide(window(), new AbortController().signal, undefined, { schemaVersion: 1, expressionAllowed: false }).catch(value => value);
+    expect(error).toBeInstanceOf(ReactiveProviderError); expect(error).toMatchObject({ code: 'native_expression_not_allowed', transportSettled: true });
+    for (const settled of [true, false]) {
+      const delivered = [], failed = [], broker = new LiveReactiveBroker({ page: {}, output: {}, provider: { conversationLane: true }, forward() {}, reject() {} });
+      broker.deliver = async (_id, value) => delivered.push(value); broker.fail = async id => failed.push(id);
+      const owned = { id: 'r', terminal: false, controller: new AbortController() }; broker.active = owned;
+      await broker.failed(owned, settled ? error : new ReactiveProviderError('native_expression_not_allowed', false));
+      expect(broker.paused).toBe(!settled); expect(broker.uncertain).toBe(!settled);
+      expect(delivered).toEqual(settled ? [null] : []); expect(failed).toEqual(settled ? [] : ['r']); broker.close();
+    }
+    expect(f.calls.filter(call => call.method === 'turn/start')).toHaveLength(1);
+    expect(f.provider.uncertain).not.toBe(true);
+  } finally { f.provider.close(); }
+});

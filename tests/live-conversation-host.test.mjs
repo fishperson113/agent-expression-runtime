@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { createLiveReactiveProvider } from '../integrations/live-reactive-provider.mjs';
 import { LiveReactiveBroker } from '../integrations/live-reactive-broker.mjs';
+import { liveTestClient, toolValue } from '../integrations/live-test-client.mjs';
 import { runTerminalCodex } from '../integrations/live-terminal.mjs';
 import { runLiveSession } from '../scripts/live-session.mjs';
 import { openLive } from '../integrations/live-launch.mjs';
@@ -312,4 +313,37 @@ it.skipIf(!nativeGateway)('rejects invalid reaction text before either geometry 
   try{await arrive(f);await expect.poll(()=>f.live.page.evaluate(()=>window.fischLive.reactiveStatus().dispatches),{timeout:10000}).toBe(1);await f.live.page.waitForTimeout(700);
     expect(await f.live.page.locator('.observation-messages').innerText()).toBe('');expect(await f.live.page.evaluate(()=>window.fischLive.metrics().parts)).not.toContain('scripted_reaction');
   }finally{await f.close();}
+},60000);
+
+async function protectUserScene(f) {
+  const client = liveTestClient(f.live.base, f.live.token);
+  try {
+    await client.call('initialize');
+    const result = toolValue(await client.tool('compose_expression', { base: 'none', durationMs: 100,
+      parts: [{ id: 'protected_form', kind: 'ellipsoid', center: [0,0,0], scale: [0.4,0.6,0.2] }] }));
+    expect(result.status).toBe('accepted');
+    await expect.poll(()=>f.live.page.evaluate(()=>{const m=window.fischLive.metrics();return m.userGeometryLocked&&!m.schedulerBusy&&performance.now()>=m.userLeaseUntil;})).toBe(true);
+    return client;
+  } catch (error) { await client.close(); throw error; }
+}
+for (const mode of ['observe','express']) it.skipIf(!nativeGateway)(`keeps a protected custom form while handling a Native ${mode} response`, async()=>{
+  const calls=[], receipts=[];
+  const provider={conversationLane:true,contractVersion:1,confirmPublication:(_request,receipt)=>receipts.push(receipt),
+    decide:async(window,_signal,_receipt,capabilities)=>{calls.push(capabilities);return mode==='express'?authored(window.request):{
+      decision:{schemaVersion:1,requestId:window.request.requestId,decisionId:'caption_'+window.request.requestId,mode:'observe',validUntil:window.request.deadline,action:null},
+      reply:'Lời fixture bên cạnh hình được giữ; không phải model thật.'};}};
+  const f=await nativeBrowserLoop(provider);let client;
+  try{
+    client=await protectUserScene(f);await arrive(f);
+    await expect.poll(()=>calls.length,{timeout:10000}).toBe(1);
+    expect(calls[0]).toEqual({schemaVersion:1,expressionAllowed:false});
+    await expect.poll(()=>receipts.length,{timeout:10000}).toBe(1);
+    expect(receipts[0]).toMatchObject({reason:mode==='observe'?'observed':'admission_failed',chatPublished:mode==='observe'});
+    const text=await f.live.page.locator('.observation-messages').innerText();
+    if(mode==='observe')expect(text).toContain('Lời fixture');else expect(text).toBe('');
+    const metrics=await f.live.page.evaluate(()=>window.fischLive.metrics());
+    expect(metrics.parts).toEqual(['protected_form']);expect(metrics.userGeometryLocked).toBe(true);expect(metrics.reactiveOwner).toBeNull();
+    expect(metrics.diagnostics.events.some(row=>row.origin==='reactive'&&['admitted','applied'].includes(row.phase))).toBe(false);
+    expect(metrics.cameraActive).toBe(false);
+  }finally{await client?.close();await f.close();}
 },60000);
