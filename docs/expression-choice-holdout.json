@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "datasetId": "fisch-unprimed-expression-choice-vi-v1",
+  "frozenAtUtc": "2026-11-10T11:34:15Z",
+  "language": "vi",
+  "provenance": "Independent QA-authored synthetic conversation contexts; no personal data, imagery or external dataset.",
+  "purpose": "Evaluate external-agent visual choice and transitions without user-named shapes, colors or effects. No expected-shape mapping.",
+  "modelInputRule": "Send only each case.message as the user message, with unchanged production instructions/resources. Do not send IDs, manifest, rubric, tags, expected interpretations or prior test outputs as model input. No case-specific coaching or correction after freezing.",
+  "cases": [
+    {
+      "id": "U01",
+      "message": "Cuối cùng toàn bộ kiểm thử đã chạy qua. Mình đã mắc ở lỗi này từ hôm qua, giờ mới có thể thở phào. Cảm ơn vì đã cùng mình gỡ nó."
+    },
+    {
+      "id": "U02",
+      "message": "Mình đang đọc lại tài liệu và muốn tập trung vài phút. Tạm thời chưa cần giải thích hay nhắc thêm; khi cần mình sẽ gọi."
+    },
+    {
+      "id": "U03",
+      "message": "Mình đang phân vân giữa hai cách xử lý, nhưng dữ kiện hiện tại chưa đủ để chọn. Bạn nghĩ mình nên kiểm tra điều gì trước?"
+    },
+    {
+      "id": "U04",
+      "message": "Khoan, mình nói chưa rõ: mình chỉ muốn xem trước thay đổi, chưa cho phép áp dụng. Hãy dừng phần đang làm và xác nhận lại giới hạn đó giúp mình."
+    },
+    {
+      "id": "U05",
+      "message": "Tác vụ kiểm tra vẫn đang chạy và chưa có kết quả mới. Mình đang theo dõi log, nên nếu có gì cần nói thì giữ thật gọn nhé."
+    },
+    {
+      "id": "U06",
+      "message": "Lỗi vừa quay lại sau khi mình tưởng đã sửa xong. Mình chưa cần lời trấn an; hãy giúp mình phân biệt điều đã biết với điều còn đang đoán."
+    },
+    {
+      "id": "U07",
+      "message": "Mình vẫn chưa hiểu vì sao cùng một đầu vào đôi khi lại cho kết quả khác nhau. Bạn có thể giải thích cách kiểm tra nguyên nhân mà không kết luận vội không?"
+    },
+    {
+      "id": "U08",
+      "message": "Ừm, mình cần nghĩ thêm về điều bạn vừa nói. Chưa chốt gì vội nhé; mình sẽ quay lại sau khi tự thử một chút."
+    }
+  ],
+  "evaluationOnly": {
+    "independentSingleCaseMode": "A fresh external-agent thread and fresh Fisch session per case; production capability discovery is allowed. No inherited experiment conversations.",
+    "transitionPairs": [["U01", "U02"], ["U03", "U04"], ["U05", "U06"], ["U07", "U08"]],
+    "transitionMode": "Each pair starts in its own fresh thread/session. Deliver its second message once the first Native turn terminates, preserving the first agent-authored rendered form. Do not insert a requested visual reset or name a visual transition. This second-message condition is conditioned continuation, not an independent single-case trial.",
+    "noForcedExpression": true,
+    "abstentionRule": "No new expression can be appropriate, particularly during requested quiet or uncertainty; record absence explicitly, never as zero latency or automatic failure.",
+    "recognitionRule": "Part names, AST, image captions written by the agent, renderer summaries and receipt completion are not recognition ground truth.",
+    "frozenHoldoutRule": "Do not tune production prompts or thresholds on these cases then report them as untouched holdout. Any revision becomes a new version, and these cases become disclosed exploratory evidence.",
+    "budgetRule": "This artifact authorizes no model call, new credential or budget increase; the executor must verify the existing authorized ledger and reserve before any actual inference.",
+    "interpretation": "Small formative synthetic-context study, not broad real-user generalization or proven naturalness. No numerical human pass threshold is set."
+  }
+}

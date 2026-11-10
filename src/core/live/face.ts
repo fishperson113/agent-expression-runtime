@@ -11,6 +11,12 @@ const canonical = (parts: Part[]) => JSON.stringify([...parts].sort((a, b) => a.
     ? Object.fromEntries(Object.keys(value).sort().map(key => [key, value[key]])) : value);
 const identity = canonical(definition.parts as Part[]);
 export const isFace = (parts: Part[]) => canonical(parts) === identity;
+const faceIds = new Set(definition.parts.map(part => part.id));
+export function hasCanonicalFaceComponent(parts: Part[]) {
+  if (new Set(parts.map(part => part.id)).size !== parts.length) return false;
+  return canonical(parts.filter(part => faceIds.has(part.id))) === identity;
+}
+
 
 export function faceProgram(durationMs = 600): Node {
   return { type: 'parallel', children: [
