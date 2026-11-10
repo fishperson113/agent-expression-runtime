@@ -20,7 +20,7 @@ async function open() {
     navigator.clipboard.writeText=()=>{window.sideEffects++;throw Error('clipboard')};
     window.conversation = mountConversation(container, value => {window.calls.push(value);return new Promise((resolve,reject)=>{window.resolveRequest=resolve;window.rejectRequest=reject;window[value.action+'Resolve']=resolve;window[value.action+'Reject']=reject})});
   })()`);
-  return { page, panel: page.locator('.fisch-conversation'), input: page.getByLabel('Nhắn trong phiên hiện tại', { exact: true }) };
+  return { page, panel: page.locator('#conversation-test .fisch-conversation'), input: page.locator('#conversation-test').getByLabel('Nhắn trong phiên hiện tại', { exact: true }) };
 }
 it('shows only real projected plaintext, counts UTF8 bytes and sends explicitly without side effects', async () => {
   const { page, panel, input } = await open();
