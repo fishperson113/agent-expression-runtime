@@ -284,3 +284,29 @@ it('ignores an old inference poll when delivery started or ownership changed dur
     } finally { f.broker.close(); }
   }
 });
+it.each(['eval_rejected', 'deadline', 'capacity', 'closed'])('records fixed %s diagnostics without changing fail-closed behavior', async reason => {
+  vi.useFakeTimers();
+  const f = fixture(null, { evaluateTimeoutMs: 10 }); const pending = [];
+  try {
+    if (reason === 'closed') f.broker.close();
+    else if (reason === 'eval_rejected') f.page.evaluate = async () => { throw Error('PRIVATE_BROWSER_INPUT'); };
+    else f.page.evaluate = () => new Promise(() => {});
+    if (reason === 'capacity') for (let i = 0; i < 4; i++) pending.push(f.broker.evaluate(() => {}, null, 'poll').catch(error => error));
+    const rejected = f.broker.evaluate(() => {}, { private: 'PRIVATE_BROWSER_INPUT' }, 'publication_fence').catch(error => error);
+    if (reason === 'deadline') await vi.advanceTimersByTimeAsync(10);
+    expect((await rejected).message).toBe('reactive_browser_unavailable'); await Promise.all(pending);
+    expect(f.broker.diagnostics()).toEqual({ reason, operation: 'publication_fence' });
+    expect(JSON.stringify(f.broker.diagnostics())).not.toContain('PRIVATE'); expect(f.broker.waiters.size).toBe(0);
+    expect(f.broker.browserUnavailable).toBe(reason !== 'closed');
+    expect(f.broker.paused).toBe(reason !== 'closed'); expect(f.broker.uncertain).toBe(reason !== 'closed');
+    const copy = f.broker.diagnostics(); copy.reason = 'changed'; expect(f.broker.diagnostics().reason).toBe(reason);
+    await f.broker.evaluate(() => {}, undefined, 'other').catch(() => {}); expect(f.broker.diagnostics().reason).toBe(reason);
+  } finally { f.broker.close(); vi.useRealTimers(); }
+});
+it('labels actual poll rejections and normalizes unknown caller labels without retaining their contents', async () => {
+  const f = fixture(); f.api.activity = () => { throw Error('PRIVATE_PAGE_EXCEPTION'); };
+  await f.broker.poll({}); expect(f.broker.diagnostics()).toEqual({ reason: 'eval_rejected', operation: 'poll' }); f.broker.close();
+  const g = fixture(); g.page.evaluate = async () => { throw Error('PRIVATE'); };
+  await g.broker.evaluate(() => {}, null, 'PRIVATE_UNTRUSTED_LABEL').catch(() => {});
+  expect(g.broker.diagnostics()).toEqual({ reason: 'eval_rejected', operation: 'other' }); g.broker.close();
+});
