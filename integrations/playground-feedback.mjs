@@ -42,7 +42,8 @@ function dispatch(name, text, options, fail) {
   if (value.status === 'closed') { fail('playground_sse_closed'); return; }
   if (value.status === 'pending') return;
   if (!['accepted', 'applied', 'completed', 'cancelled', 'rejected'].includes(value.status)) { fail('playground_sse_invalid_event'); return; }
-  try { options.onFeedback({ session: value.session, epoch: value.epoch, seq: value.seq, status: value.status }); }
+  if (value.requestId !== undefined && value.requestId !== null && (typeof value.requestId !== 'string' || !value.requestId.length || value.requestId.length > 128)) { fail('playground_sse_invalid_event'); return; }
+  try { options.onFeedback({ ...(value.requestId ? { requestId: value.requestId } : {}), session: value.session, epoch: value.epoch, seq: value.seq, status: value.status }); }
   catch { fail('playground_sse_callback'); }
 }
 

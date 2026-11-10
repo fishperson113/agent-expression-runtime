@@ -154,3 +154,21 @@ before continuing; uncertain recovery requires explicit user intent and clears
 history. It is not an automatic restore operation. This change documents existing
 behavior; it does not add canvas vision, automatic scene recovery or establish
 that real-model expressions became easier to recognize.
+
+### Playground admission over two response paths
+
+The gateway feedback stream includes the original requestId for a known receipt.
+Playground may advance from a matching canonical accepted event while the HTTP
+response remains delayed. Correlation must match the active session, epoch and
+host-generated phase requestId; a frame or completion of an unrelated command
+cannot substitute for admission. Both body and baseline still require applied and
+completed feedback before committed. There is no timeout extension or automatic
+resend. Late transport failure does not erase authoritative acceptance; a
+contradictory explicit receipt faults only the still-active original transaction.
+
+A held body HTTP response reproduced body completion without baseline dispatch
+and a playground timeout on the prior controller. The regression holds that
+response while real Rust feedback and WebGL continue, and requires both phases to
+complete before releasing HTTP. This establishes that failure path, not a claim
+that every timeout or the specific native test had the same transport cause.
+Timeout/uncertain remains an unknown or partial outcome, not proof nothing ran.
