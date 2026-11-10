@@ -57,8 +57,7 @@ it('shows a brighter crisp resting body and local hand responses without a seman
     const page = await browser.newPage({ viewport: { width: 1200, height: 900 } });
     await page.goto(server.resolvedUrls.local[0] + 'live.html?fixture=synthetic');
     await page.waitForFunction(() => !!window.fischLive); await probe(page);
-    await expect.poll(() => page.evaluate(() => window.localProbe.style?.brightness)).toBeCloseTo(0.95);
-    expect(await page.evaluate(() => window.localProbe.style)).toEqual({ brightness: 0.95, pointSize: 2.2, dispersion: 0 });
+    await expect.poll(() => page.evaluate(() => window.localProbe.style)).toEqual({ brightness: 0.95, pointSize: 2.2, dispersion: 0 });
     const prior = await capture(page, 'prior-style'), current = await capture(page, 'live-default');
     expect(prior.lit).toBeGreaterThan(10); expect(current.lit).toBeGreaterThan(10);
     expect(current.excess).toBeGreaterThan(prior.excess); expect(current.error).toBe(0); expect(current.contextLost).toBe(false);
