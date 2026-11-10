@@ -32,12 +32,17 @@ const hands = new HandGestures();
 const observations = new FaceObservations(crypto.randomUUID());
 const handEvents = new HandEventSource(() => performance.now());
 let handEventVersion = 0, reactiveAvailable = false, nativeConversation = false;
+const nativeReplies = new Map<string, { text: string; published: boolean }>();
 const nativeRequests = new Map<string, { request: ReactiveRequest; read: ReturnType<ReactiveSession['nativeReadSet']> }>();
 const cameraTransitions: { status: string; source: string; at: number }[] = [];
 const bridge = new LiveBridge(body, observations, () => resetReactive(), () => observeReactive());
 const reactive = new ReactiveSession({ now: () => performance.now(), wallNow: () => Date.now(), epoch: () => body.scheduler.epoch,
   id: () => crypto.randomUUID(), canAdmit: () => !document.hidden && body.canReactive(),
-  admit: (compiled, owner) => body.admitReactive(compiled, owner), cancel: (owner, reason) => body.cancelReactive(owner, reason), record: recording.record, handState: () => handEvents.handState(), handMotion: () => handEvents.handMotion() });
+  admit: (compiled, owner) => {
+    body.admitReactive(compiled, owner);
+    const pending = nativeReplies.get(owner.requestId);
+    if (pending?.text.trim()) { pending.published = conversation.reaction({ requestId: owner.requestId, text: pending.text }); if (!pending.published) throw Error('reaction_ui_unavailable'); }
+  }, cancel: (owner, reason) => body.cancelReactive(owner, reason), record: recording.record, handState: () => handEvents.handState(), handMotion: () => handEvents.handMotion() });
 body.attachReactive(reactive);
 let lastActivity = 'idle';
 const semanticEvents: SessionEvent[] = [];
@@ -64,9 +69,10 @@ Object.assign(window, { fischLive: { pair: (base: string, token: string) => brid
   deliverNativeReaction: async (id: string, data: any) => {
     const held = nativeRequests.get(id); nativeRequests.delete(id);
     if (data !== null && (typeof data?.reply !== 'string' || data.reply.length > 600)) { await reactive.deliver(id, null); return { reason: 'invalid_reply', chatPublished: false }; }
-    const result = await reactive.deliver(id, data?.decision ?? null);
+    const pending = { text: data?.reply ?? '', published: false }; nativeReplies.set(id, pending);
+    let result; try { result = await reactive.deliver(id, data?.decision ?? null); } finally { nativeReplies.delete(id); }
     const admitted = !!held && !!result && ['accepted', 'observed'].includes(result.reason) && nativeConversation && !stopped && reactive.canPublish(held.request, held.read);
-    const chatPublished = admitted && data?.reply?.trim() ? conversation.reaction({ requestId: id, text: data.reply }) : false;
+    const chatPublished = pending.published || (admitted && result?.reason === 'observed' && pending.text.trim() ? conversation.reaction({ requestId: id, text: pending.text }) : false);
     return { ...result, chatPublished, source: 'native-observation' };
   }, authorizeReactiveRequest: (id: string) => reactive.authorize(id),
   deliverReactiveDecision: (id: string, data: unknown) => reactive.deliver(id, data), failReactiveDecision: (id: string) => reactive.fail(id),
@@ -210,7 +216,7 @@ element('stop-all').onclick = () => stop('ui');
 window.addEventListener('pagehide', () => stop('pagehide'));
 
 function observeReactive() { body.observe(observations.snapshot); reactive.observe(observations.snapshot, semanticEvents); }
-function resetReactive() { nativeRequests.clear(); handEvents.reset(); reactive.reset(); semanticEvents.length = 0; }
+function resetReactive() { nativeReplies.clear(); nativeRequests.clear(); handEvents.reset(); reactive.reset(); semanticEvents.length = 0; }
 function updateHandProducer() { handEvents.configure(reactiveAvailable && handEventVersion === 1 && element<HTMLInputElement>('enable-reactivity').checked); }
 function configureReactive(available: boolean, handVersion = 0, contractVersion = 1, native = false, policy?: { deadlineMs: number; cooldownMs: number; maxPerMinute: number }) {
   nativeConversation = native === true; reactive.configureNativeConversation(nativeConversation, policy);

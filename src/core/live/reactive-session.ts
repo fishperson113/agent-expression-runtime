@@ -49,6 +49,7 @@ export class ReactiveSession {
   private count = 0;
   private nativeConversation = false;
   private nativeOwnerRead?: NativeReadSet;
+  private nativeOwnerUntil = 0;
   private nativePolicy = { deadlineMs: 60000, cooldownMs: 15000, maxPerMinute: 4 };
   private ids = new Set<string>();
   private lastReason: string = 'disabled';
@@ -119,7 +120,7 @@ export class ReactiveSession {
   private revoke(reason: CausalPayloads['revocation']['reason']) {
     const transport = this.transport;
     if (!this.guard.owner && transport?.generation === this.guard.generation) this.record('revocation', { reason, requestId: transport.id });
-    this.nativeOwnerRead = undefined; this.lastReason = reason; this.pending.clear(); this.host.revoke(); this.guard.revoke(revokeReasons[reason] ?? 'revoked');
+    this.nativeOwnerRead = undefined; this.nativeOwnerUntil = 0; this.lastReason = reason; this.pending.clear(); this.host.revoke(); this.guard.revoke(revokeReasons[reason] ?? 'revoked');
   }
   private fresh(at: number, ttl: number) {
     const wall = this.options.wallNow();
@@ -200,6 +201,7 @@ export class ReactiveSession {
     if (!Number.isFinite(now) || !Number.isFinite(wall) || now < 0 || now < this.lastNow || wall < this.lastWall) this.revoke('clock_discontinuity');
     if (epoch !== this.epoch) { this.epoch = epoch; this.revoke('epoch_changed'); }
     this.lastNow = now; this.lastWall = wall;
+    if (this.nativeOwnerUntil && now >= this.nativeOwnerUntil) { if (this.guard.owner) this.guard.revoke('expired'); this.nativeOwnerRead = undefined; this.nativeOwnerUntil = 0; }
     if (this.sourceValid && this.snapshot && !this.fresh(this.snapshot.capturedAt, 1500)) { this.sourceValid = false; this.revoke('source_expired'); }
     if (this.transport && !(this.transport.request.schemaVersion === 2 && this.guard.owner?.requestId === this.transport.id) &&
       now >= this.transport.request.deadline && this.lastReason !== 'deadline') this.revoke('deadline');
@@ -236,10 +238,13 @@ export class ReactiveSession {
     const generation = this.guard.generation;
     const done = this.host.run(request, { decide: () => promise }, (compiled, owner) => {
       if (nativeReadSet && !this.canPublish(request, nativeReadSet)) throw Error('semantic_admission_revoked');
-      if (!this.enabled || !this.available || !this.healthy() || this.userBusy || !this.options.canAdmit() || !this.guard.acquire(request, owner, generation)) throw Error('admission_revoked');
-      this.nativeOwnerRead = nativeReadSet;
-      if (this.transport?.id === owner.requestId) this.transport.owner = owner;
-      try { this.options.admit(compiled, owner); }
+      const until = this.options.now() + Math.max(5000, compiled.program.kind === 'program' ? compiled.program.duration : 0, compiled.configuration?.lifetimeMs ?? 0) + 100;
+      const lease = nativeReadSet ? { ...owner, validUntil: until } : owner;
+      const executionRequest = nativeReadSet ? { ...request, deadline: Math.max(request.deadline, until) } : request;
+      if (!this.enabled || !this.available || !this.healthy() || this.userBusy || !this.options.canAdmit() || !this.guard.acquire(executionRequest, lease, generation)) throw Error('admission_revoked');
+      this.nativeOwnerRead = nativeReadSet; this.nativeOwnerUntil = nativeReadSet ? until : 0;
+      if (this.transport?.id === lease.requestId) this.transport.owner = lease;
+      try { this.options.admit(compiled, lease); }
       catch (error) { this.guard.revoke(); throw error; }
     });
     this.transport = { id: request.requestId, request, nativeReadSet, generation, authorized: false, delivered: false, resolve, reject, done };

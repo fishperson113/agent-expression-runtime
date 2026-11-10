@@ -209,3 +209,14 @@ it('native geometric read-sets reject changed evidence at the final expression a
   expect(f.session.canPublish(candidate.request, read)).toBe(false);
   expect((await f.session.deliver(candidate.request.requestId, express(candidate.request)))?.reason).toBe('admission_failed'); expect(f.admitted).toEqual([]);
 });
+it('native execution ownership expires independently of its slow admission deadline and consent cannot revive it', async () => {
+  const f = fixture(); f.session.configureNativeConversation(true); const { request } = f.launch();
+  for (let i = 0; i < 58; i++) { f.advance(1000); f.observe(); }
+  expect((await f.session.deliver(request.requestId, express(request)))?.reason).toBe('accepted');
+  const lease = (f.admitted[0] as any[])[1]; expect(lease.validUntil).toBeGreaterThan(request.deadline);
+  for (let i = 0; i < 6; i++) { f.advance(1000); f.observe(); f.session.tick(); }
+  expect(f.session.status().owner).toBeNull(); expect(f.cancelled).toHaveLength(1);
+  const g = fixture(); g.session.configureNativeConversation(true); const held = g.launch().request;
+  g.session.enable(false); g.session.enable(true); g.observe(); expect(g.session.canPublish(held)).toBe(false);
+  expect((await g.session.deliver(held.requestId, express(held)))?.reason).toBe('revoked');
+});
