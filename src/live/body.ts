@@ -78,14 +78,15 @@ export class LiveBody {
     const snapshot = this.observation && Date.now() - this.observation.capturedAt <= 1500 ? this.observation : null;
     const blocked = this.blocked(state), face: TransformWrite[] = [];
     const smoothing = 1 - Math.exp(-Math.min(100, Math.max(0, time - this.faceAt)) / 84); this.faceAt = time;
-    if (resting) for (const write of faceWrites(this.faceActivity(time), this.output, this.controls.mode, time)) {
+    const point = this.attention.sample(this.scheduler.epoch, this.activityState,
+      !resting || this.userGeometryLocked || time < this.userLeaseUntil || this.scheduler.busy, this.controls.mode);
+    if (resting) for (const write of faceWrites(this.faceActivity(time), this.output, this.controls.mode, time, point?.strength ?? 0)) {
       const key = write.target.part + ':' + write.target.prop, from = this.faceBlend.get(key) ?? (write.target.prop.startsWith('scale') ? 1 : 0);
       const value = from + (write.value - from) * smoothing; this.faceBlend.set(key, value);
       face.push({ ...write, value });
     }
     const local = this.userGeometryLocked ? [] : this.defaults.sample(time, snapshot, this.output, blocked);
-    const gaze = geometricGazeWrites(this.attention.sample(this.scheduler.epoch, this.activityState,
-      !resting || this.userGeometryLocked || time < this.userLeaseUntil || this.scheduler.busy, this.controls.mode));
+    const gaze = geometricGazeWrites(point);
     const layers = [local, face, gaze, this.controls.sample(time, snapshot, this.output, blocked)];
     const writes = new Map(composeWrites(layers).map(write => [write.target.part + ':' + write.target.prop, write]));
     const rendered = { ...state, liveMatrices: transformMatrices([...writes.values()], parts) } as PresenceState;

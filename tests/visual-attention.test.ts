@@ -60,11 +60,11 @@ it('uses briefer working episodes and bounded reduced motion without changing cu
   const busy = fixture(), idle = fixture();
   for (const f of [busy, idle]) { f.attention.reset('e'); f.attention.observe(f.observation()); f.sample(); f.time(100); f.attention.observe(f.observation()); }
   busy.sample(false, 'normal', 'working'); idle.sample(false, 'normal', 'idle');
-  expect(busy.attention.snapshot().active!.expiresAt).toBe(750);
+  expect(busy.attention.snapshot().active!.expiresAt).toBe(950);
   expect(idle.attention.snapshot().active!.expiresAt).toBe(1200);
   busy.time(250); const normal = busy.sample()!;
   const reduced = busy.sample(false, 'reduced')!; expect(reduced.x).toBeCloseTo(normal.x * 0.08);
-  busy.time(751); expect(busy.sample()).toBeNull();
+  busy.time(951); expect(busy.sample()).toBeNull();
 });
 it('fails closed on clock rewind until an explicit epoch reset', () => {
   const f = fixture(); f.attention.reset('e'); f.attention.observe(f.observation()); f.sample();
