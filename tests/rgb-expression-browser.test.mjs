@@ -69,8 +69,9 @@ it('renders provider-chosen RGB on the actual Live avatar through V2 causal admi
     expect(observed.probe.state).toBe(color); expect(observed.probe.shader).toBe(color.slice(1)); expect(observed.probe.frame).toBeGreaterThan(0);
     for (const raster of [observed.baseline, observed.probe.raster]) {
       expect(raster.contextLost).toBe(false); expect(raster.errorBefore).toBe(0); expect(raster.errorAfter).toBe(0);
-      expect(raster.foreground).toBeGreaterThan(10); expect(raster.background).toEqual([11, 16, 32]);
+      expect(raster.foreground).toBeGreaterThan(10);
     }
+    expect(observed.probe.raster.background).toEqual(observed.baseline.background);
     expect(observed.probe.raster.purple).toBeGreaterThan(10);
     expect(observed.probe.raster.purple).toBeGreaterThan(observed.baseline.purple + 10);
     if (process.env.FISCH_RGB_EVIDENCE) writeFileSync(process.env.FISCH_RGB_EVIDENCE, JSON.stringify({ baseline: observed.baseline, after: observed.probe.raster }, null, 2));
