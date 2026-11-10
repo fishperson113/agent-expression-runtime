@@ -59,8 +59,8 @@ function livingFace(at: number, mode: 'normal' | 'reduced', gaze: number): Trans
 export function geometricGazeWrites(point: { x: number; y: number; strength: number } | null): TransformWrite[] {
   if (!point || ![point.x, point.y, point.strength].every(Number.isFinite)) return [];
   const strength = Math.max(0, Math.min(1, point.strength));
-  return [definition.roles.leftPupil, definition.roles.rightPupil].flatMap((part, index) => [
-    { target: { part, prop: 'x' as const }, value: -(index ? 0.09 : 0.135) * strength + Math.max(-strength, Math.min(strength, point.x)) * 0.12 },
+  return [definition.roles.leftPupil, definition.roles.rightPupil].flatMap(part => [
+    { target: { part, prop: 'x' as const }, value: Math.max(-strength, Math.min(strength, point.x)) * 0.12 },
     { target: { part, prop: 'y' as const }, value: Math.max(-strength, Math.min(strength, point.y)) * 0.075 },
   ]);
 }

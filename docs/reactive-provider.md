@@ -244,7 +244,7 @@ finite wrist coordinates; handedness confidence is not tracking confidence and i
 not used as such. One episode lasts 850 ms during working/replying or 1100 ms otherwise,
 with bounded entry/release envelopes and a six-second cooldown. New compatible
 frames update the target instead of cancelling it. Quiet/cooldown inputs update
-anchors without queueing reactions for later. During an episode, pupils blend toward the eye centers and can travel up to
+anchors without queueing reactions for later. Default pupils rest at the eye centers; during an episode they can travel up to
 0.12 horizontally / 0.075 vertically from those centers. Working eyes open and
 ambient blinking attenuates with the same envelope, leaving the mouth/activity
 state intact. The canonical eye/pupil bounds have a conservative ellipse test;
@@ -281,6 +281,12 @@ with synthetic hand input and simulated Native work/intent callbacks. Replay doe
 not call perception or a model; no real camera/mic is used. Identical virtual-clock
 input yields identical local trajectories in the same runtime. Human naturalness,
 physical-camera quality and actual Codex task acceptance remain separate gates.
+
+The default anatomy centers pupils at x=-0.6/0.93 so both move in the cue direction
+from rest, rather than correcting a pre-existing rightward bias during the glance.
+Old authored/saved assemblies retain their geometry and are not silently converted
+into the new canonical resting face. Entry/release and reduced-motion sign tests
+cover each pupil relative to neutral, alongside endpoint-range checks.
 
 The gaze render test compares before/after at matching working/blink phases and
 body tilt. It isolates already-rendered particle groups with the camera/fitting

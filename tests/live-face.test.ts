@@ -46,3 +46,23 @@ it('keeps recentered glance pupils inside conservative eye ellipses while openin
   expect(writes.find(w => w.target.part === 'pupil_left' && w.target.prop === 'scaleY')!.value).toBe(1);
   expect(geometricGazeWrites({ x: NaN, y: 0, strength: 1 })).toEqual([]);
 });
+it('moves both pupils toward the cue from neutral throughout the entry envelope', () => {
+  for (const direction of [-1, 1]) {
+    let previous = 0;
+    for (const strength of [0, 0.02, 0.04, 0.08, 0.25, 0.5, 1]) {
+      const writes = geometricGazeWrites({ x: direction * 0.7 * strength, y: 0, strength });
+      for (const part of ['pupil_left', 'pupil_right']) {
+        const x = writes.find(w => w.target.part === part && w.target.prop === 'x')!.value;
+        expect(x * direction).toBeGreaterThanOrEqual(previous);
+      }
+      previous = 0.7 * strength * 0.12;
+    }
+  }
+});
+
+it('recognizes only current default anatomy and leaves old authored face geometry alone', () => {
+  const old = structuredClone(faceDefinition.parts) as any[];
+  old.find(p => p.id === 'pupil_left').center[0] = -0.465;
+  old.find(p => p.id === 'pupil_right').center[0] = 1.02;
+  expect(isFace(old)).toBe(false); expect(isFace(faceDefinition.parts as any)).toBe(true);
+});
