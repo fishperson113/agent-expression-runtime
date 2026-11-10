@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "created_utc": "2026-11-10T01:05:24.729902+00:00",
+  "status": "FROZEN BEFORE PREDICTIONS",
+  "rows": 104,
+  "counts": {
+    "train": 40,
+    "dev": 20,
+    "holdout": 32,
+    "ood": 12
+  },
+  "family_counts": {
+    "train": 10,
+    "dev": 5,
+    "holdout": 8,
+    "ood": 3
+  },
+  "dataset_sha256": "9b0e1fb245dfb457476cd850ed62e6cda69d457e95dd37af4c515a703ae0b6f3",
+  "policy_sha256": "9a1ddf6ea51bcaddf040d77c038beaf12f46cd7423e180a199056c4198b5b4eb",
+  "labels": [
+    "observe",
+    "attend",
+    "acknowledge",
+    "playful",
+    "abstain"
+  ],
+  "split_method": "Disjoint semantic scenario families, four correlated numeric variants remain together. No random row split.",
+  "tuning": "Train permitted. Dev only for confidence threshold. Holdout/OOD must not tune.",
+  "limitations": [
+    "engineer authored policy labels not human naturalness",
+    "context seconds_since_response and source_health are experiment metadata, not existing reactive-window wire fields",
+    "face availability explicitly distinguished from measured absence",
+    "numeric variants not independent population samples",
+    "OOD categories deliberately outside supported policy",
+    "confidence values are synthetic measurement-quality variables, not MediaPipe handedness scores or measured tracking confidence"
+  ],
+  "license": "Original synthetic fixture content released under repository MIT license; no third-party media or personal data.",
+  "schema_fields": [
+    "id",
+    "split",
+    "scenarioFamily",
+    "state",
+    "acceptableLabels",
+    "slices",
+    "mustAbstain",
+    "provenance"
+  ]
+}

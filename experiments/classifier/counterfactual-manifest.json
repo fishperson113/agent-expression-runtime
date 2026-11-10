@@ -1,0 +1,15 @@
+{
+  "status": "FROZEN BEFORE ADDITIONAL INFERENCE",
+  "createdUtc": "2026-11-10T01:08:11.190170+00:00",
+  "rows": 16,
+  "pairs": 8,
+  "sha256": "190fcff94c9757e612cb93993d202d53a338189e59e577a0ca0ca9787a6a5801",
+  "originalDatasetUnchangedSha256": "9b0e1fb245dfb457476cd850ed62e6cda69d457e95dd37af4c515a703ae0b6f3",
+  "policy": "same original synthetic policy plus already documented unavailable-channel clarification",
+  "noTuning": true,
+  "limitations": [
+    "eight deliberate paired policy probes, not independent population estimate",
+    "availability probe uses present=false as an unmeasured placeholder when availability=false; it must not be treated as measured absence",
+    "not appended to original holdout and not used for fitting or threshold calibration"
+  ]
+}
