@@ -488,8 +488,11 @@ it.skipIf(!nativeGateway)('rejects observer-authored context even when MAIN gran
   }finally{await client?.close();await f.close();}
 },60000);
 
-it.skipIf(!nativeGateway)('keeps a long public brief above usable chat across desktop and mobile without losing drafts',async()=>{
-  let calls=0;const provider={conversationLane:true,contractVersion:1,decide:async()=>{calls++;throw Error('unexpected_layout_inference');}};
+it.skipIf(!nativeGateway)('keeps a long public brief above usable chat with published fixture captions across desktop and mobile without losing drafts',async()=>{
+  let calls=0;const receipts=[];
+  const provider={conversationLane:true,contractVersion:1,policy:{deadlineMs:60000,cooldownMs:1000,maxPerMinute:4},confirmPublication:(_request,value)=>receipts.push(value),
+    decide:async window=>{calls++;return{decision:{schemaVersion:1,requestId:window.request.requestId,decisionId:'layout_'+window.request.requestId,mode:'observe',validUntil:window.request.deadline,action:null},
+      reply:'Bản chiếu bố cục tổng hợp, không phải lượt model. '.repeat(3)};}};
   const f=await nativeBrowserLoop(provider);let client;
   try{
     await f.call('turn/interrupt',{threadId:'thread-1',turnId:'turn-1'});
@@ -499,7 +502,10 @@ it.skipIf(!nativeGateway)('keeps a long public brief above usable chat across de
       parts:[{id:'layout_form',kind:'ellipsoid',center:[0,0,0],scale:[0.3,0.3,0.1]}]})).status).toBe('accepted');
     const page=f.live.page,input=page.locator('.fisch-conversation textarea'),brief=page.locator('.observer-context');
     await expect.poll(()=>brief.innerText()).toContain(text);
-    await page.evaluate(()=>{const log=document.querySelector('.observation-messages');for(let i=0;i<2;i++){const row=document.createElement('div');row.textContent='Fisch · chủ động: Bản chiếu bố cục tổng hợp, không phải lượt model. '.repeat(3);log.append(row);}});
+    await page.evaluate(()=>{window.__observationMode='present-neutral';});await expect.poll(()=>receipts.length,{timeout:10000}).toBe(1);
+    await page.evaluate(()=>{window.__observationMode='present-smile';});await expect.poll(()=>receipts.length,{timeout:10000}).toBe(2);
+    expect(receipts.every(receipt=>receipt.chatPublished===true)).toBe(true);expect(await page.locator('.observation-messages > div').count()).toBe(2);
+    if(process.env.FISCH_BRIEF_LAYOUT_EVIDENCE)writeFileSync(process.env.FISCH_BRIEF_LAYOUT_EVIDENCE+'/publication.json',JSON.stringify({actualModelCalls:0,mainBackend:'Native protocol fixture',observerBackend:'scripted provider',fakeProviderCalls:calls,captionRows:2,receipts},null,2));
     await input.fill('Bản nháp phải còn nguyên khi brief đếm ngược.');
     for(const[width,height]of[[1360,950],[1440,900],[1280,720],[390,844],[320,568],[844,390],[640,450]]){
       await page.setViewportSize({width,height});
@@ -524,7 +530,7 @@ it.skipIf(!nativeGateway)('keeps a long public brief above usable chat across de
     await expect.poll(()=>brief.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);await page.waitForTimeout(1100);
     expect(await brief.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);expect(await brief.textContent()).toContain(text);
     const reaction=page.locator('.observation-messages');await reaction.focus();await page.keyboard.press('End');await expect.poll(()=>reaction.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);
-    expect(await input.inputValue()).toBe('Bản nháp phải còn nguyên khi brief đếm ngược.');expect(calls).toBe(0);
+    expect(await input.inputValue()).toBe('Bản nháp phải còn nguyên khi brief đếm ngược.');expect(calls).toBe(2);
     const replace=async durationMs=>toolValue(await client.tool('compose_expression',{durationMs:100,observerContext:{text,mode:'open',durationMs},
       parts:[{id:'layout_form',kind:'ellipsoid',center:[0,0,0],scale:[0.3,0.3,0.1]}]}));
     expect((await replace(1000)).status).toBe('accepted');await expect.poll(()=>brief.isVisible(),{timeout:6000}).toBe(false);
