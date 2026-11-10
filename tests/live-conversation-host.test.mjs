@@ -392,3 +392,18 @@ it.skipIf(!nativeGateway)('hands off only an explicitly disposable MAIN form thr
     expect(metrics.diagnostics.events.some(row=>row.origin==='reactive'&&row.phase==='applied')).toBe(true);
   }finally{await client.close();await f.close();}
 },60000);
+
+it('carries explicit disposable handoff through existing live compilation and bounds it', async () => {
+  const { composeExpression } = await import('../integrations/compose-expression.mjs');
+  const { expressionResponseSchema } = await import('../integrations/expression-response.mjs');
+  expect(JSON.stringify(expressionResponseSchema)).not.toContain('observerHandoffMs');
+  const part = () => ({ id: 'authored', kind: 'ellipsoid', center: [0,0,0], scale: [0.3,0.3,0.1] });
+  const { LiveCompiler } = await import('../src/core/live/compiler.ts');
+  const output = composeExpression({ parts: [part()], observerHandoffMs: 30000 });
+  expect(output.body).toMatchObject({ type: 'live', configuration: { controls: [], poses: [], lifetimeMs: 1000, observerHandoffMs: 30000 } });
+  const compiled = new LiveCompiler().compile({ v: 1, epoch: 'test', seq: 1, kind: 'program', track: 'body', ...output }, 0);
+  expect(compiled.configuration?.observerHandoffMs).toBe(30000);
+  for (const ms of [0, 999, 60001, 1000.5, NaN, Infinity])
+    expect(() => composeExpression({ parts: [part()], observerHandoffMs: ms })).toThrow('composition_arguments');
+  expect(composeExpression({ parts: [part()] }).body.type).toBe('parallel');
+});

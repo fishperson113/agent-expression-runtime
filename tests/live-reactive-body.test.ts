@@ -298,18 +298,3 @@ it('rejects a delayed decision at exact handoff expiry and never reuses a supers
   expect(f.body.metrics.observerHandoff).toBeNull(); f.advance(2); f.frame(); expect(f.body.canReactive()).toBe(false);
   expect(await f.session.deliver(request.requestId, decision(request))).toBeNull(); f.body.dispose();
 });
-
-it('carries explicit disposable handoff through existing live compilation and bounds it', async () => {
-  const { composeExpression } = await import('../integrations/compose-expression.mjs');
-  const { expressionResponseSchema } = await import('../integrations/expression-response.mjs');
-  expect(JSON.stringify(expressionResponseSchema)).not.toContain('observerHandoffMs');
-  const part = () => ({ id: 'authored', kind: 'ellipsoid', center: [0,0,0], scale: [0.3,0.3,0.1] });
-  const { LiveCompiler } = await import('../src/core/live/compiler.ts');
-  const output = composeExpression({ parts: [part()], observerHandoffMs: 30000 });
-  expect(output.body).toMatchObject({ type: 'live', configuration: { controls: [], poses: [], lifetimeMs: 1000, observerHandoffMs: 30000 } });
-  const compiled = new LiveCompiler().compile({ v: 1, epoch: 'test', seq: 1, kind: 'program', track: 'body', ...output }, 0);
-  expect(compiled.configuration?.observerHandoffMs).toBe(30000);
-  for (const ms of [0, 999, 60001, 1000.5, NaN, Infinity])
-    expect(() => composeExpression({ parts: [part()], observerHandoffMs: ms })).toThrow('composition_arguments');
-  expect(composeExpression({ parts: [part()] }).body.type).toBe('parallel');
-});
