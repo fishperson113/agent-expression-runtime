@@ -182,6 +182,81 @@ it('provides an actionable fixed restart code after main-frame navigation', () =
   expect(f.conversation.snapshot()).toMatchObject({ available: false, error: 'conversation_restart_required', messages: [] });
 });
 
+it('allows only explicit retry after proven prewrite cancellation rejection', async () => {
+  const f = fixture(), pending = f.send();
+  f.reply(0, { result: { turn: { id: 'turn-a', status: 'inProgress' } } }); await pending;
+  const cancel = f.conversation.cancel({ generation: f.conversation.snapshot().generation });
+  f.fail(1, false); await expect(cancel).rejects.toThrow('conversation_stop_unconfirmed');
+  expect(f.conversation.snapshot()).toMatchObject({ canCancel: true, stopping: false, canSend: false });
+  expect(f.calls).toHaveLength(2);
+  const retry = f.conversation.cancel({ generation: f.conversation.snapshot().generation });
+  expect(f.conversation.snapshot()).toMatchObject({ error: '', stopping: true });
+  expect(f.calls).toHaveLength(3); f.reply(2, { result: {} }); await retry;
+  expect(f.conversation.snapshot()).toMatchObject({ canCancel: false, stopping: true });
+});
+
+it.each([-32600, -32601, -32602])('releases a rejected cancellation attempt for standard RPC error %s', async code => {
+  const f = fixture(), pending = f.send();
+  f.reply(0, { result: { turn: { id: 'turn-a', status: 'inProgress' } } }); await pending;
+  const cancel = f.conversation.cancel({ generation: f.conversation.snapshot().generation });
+  f.reply(1, { error: { code } }); await expect(cancel).rejects.toThrow('conversation_stop_unconfirmed');
+  expect(f.conversation.snapshot()).toMatchObject({ canCancel: true, stopping: false });
+  expect(f.calls).toHaveLength(2);
+});
+
+it('releases a proven unsent stop after a same-thread selection invalidates intent without projecting its error', async () => {
+  const f = fixture(), pending = f.send();
+  f.reply(0, { result: { turn: { id: 'turn-a', status: 'inProgress' } } }); await pending;
+  const cancel = f.conversation.cancel({ generation: f.conversation.snapshot().generation });
+  f.conversation.selectionAttempt();
+  expect(f.calls[1].guard(f.calls[1].message)).toBe(false);
+  f.fail(1, false); await expect(cancel).rejects.toThrow('conversation_stop_unconfirmed');
+  expect(f.conversation.snapshot()).toMatchObject({ canCancel: true, stopping: false, error: '' });
+});
+
+it.each(['unknown', 'application', 'internal'])('keeps %s cancellation outcomes sticky without resending', async outcome => {
+  const f = fixture(), pending = f.send();
+  f.reply(0, { result: { turn: { id: 'turn-a', status: 'inProgress' } } }); await pending;
+  const cancel = f.conversation.cancel({ generation: f.conversation.snapshot().generation });
+  if (outcome === 'unknown') f.fail(1, true);
+  else f.reply(1, { error: { code: outcome === 'internal' ? -32603 : -32000 } });
+  await expect(cancel).rejects.toThrow('conversation_stop_unconfirmed');
+  expect(f.conversation.snapshot()).toMatchObject({ canCancel: false, stopping: true });
+  await f.conversation.cancel({ generation: f.conversation.snapshot().generation });
+  expect(f.calls).toHaveLength(2);
+});
+
+it.each(['terminal', 'thread', 'new_attempt'])('does not let a late cancellation error mutate %s ownership', async change => {
+  const f = fixture(), pending = f.send();
+  f.reply(0, { result: { turn: { id: 'turn-a', status: 'inProgress' } } }); await pending;
+  const cancel = f.conversation.cancel({ generation: f.conversation.snapshot().generation });
+  let next;
+  if (change === 'thread') f.select('thread-b');
+  else {
+    f.event({ method: 'turn/completed', params: { threadId: 'thread-a', turn: { id: 'turn-a', status: 'interrupted' } } });
+    if (change === 'new_attempt') {
+      f.event({ method: 'turn/started', params: { threadId: 'thread-a', turn: { id: 'turn-b' } } });
+      next = f.conversation.cancel({ generation: f.conversation.snapshot().generation });
+    }
+  }
+  const before = f.conversation.snapshot();
+  f.fail(1, false); await expect(cancel).rejects.toThrow('conversation_stop_unconfirmed');
+  expect(f.conversation.snapshot()).toMatchObject({ revision: before.revision, error: before.error, stopping: before.stopping });
+  if (next) { f.reply(2, { result: {} }); await next; }
+});
+
+it('releases the old logical stop for a new canonical owner and clears only its stop error', async () => {
+  const f = fixture(), pending = f.send();
+  f.reply(0, { result: { turn: { id: 'turn-a', status: 'inProgress' } } }); await pending;
+  const cancel = f.conversation.cancel({ generation: f.conversation.snapshot().generation });
+  f.fail(1, true); await expect(cancel).rejects.toThrow('conversation_stop_unconfirmed');
+  expect(f.conversation.snapshot()).toMatchObject({ ownerTurn: 'turn-a', stopping: true });
+  f.event({ method: 'turn/started', params: { threadId: 'thread-a', turn: { id: 'turn-b' } } });
+  expect(f.conversation.snapshot()).toMatchObject({ ownerTurn: 'turn-b', canCancel: true, stopping: false, error: '' });
+  const next = f.conversation.cancel({ generation: f.conversation.snapshot().generation });
+  f.reply(2, { result: {} }); await next;
+});
+
 it('keeps hash navigation usable but revokes queued writes before a same-URL reload', async () => {
   const f = fixture(); let url = 'http://127.0.0.1:123/live.html?mode=live'; const listeners = new Map();
   const frame = { url: () => url }, child = { url: () => url };

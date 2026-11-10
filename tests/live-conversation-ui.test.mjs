@@ -2,7 +2,7 @@ import { beforeAll, afterAll, expect, it } from 'vitest';
 import { createServer } from 'vite';
 import { chromium } from '@playwright/test';
 let server, browser;
-const ready = { generation: 1, revision: 1, available: true, canSend: true, canCancel: false, pending: false, stopping: false, waiting: false, error: '', messages: [] };
+const ready = { generation: 1, revision: 1, ownerTurn: null, available: true, canSend: true, canCancel: false, pending: false, stopping: false, waiting: false, error: '', messages: [] };
 beforeAll(async () => {
   server = await createServer({ server: { host: '127.0.0.1', port: 0 } }); await server.listen();
   browser = await chromium.launch({ headless: true, ...(process.platform === 'win32' ? { channel: 'msedge' } : {}), args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
@@ -22,7 +22,7 @@ it('connects explicit UI send/cancel to the existing binding, clears scopes and 
     await page.evaluate(value => window.fischLive.conversationStatus(value), ready); await input.fill('Một ý tưởng của tôi');
     await panel.getByRole('button', { name: 'Gửi', exact: true }).click(); await expect.poll(() => calls.length).toBe(1);
     expect(calls[0]).toEqual({ action: 'send', generation: 1, text: 'Một ý tưởng của tôi' });
-    await page.evaluate(value => window.fischLive.conversationStatus(value), { ...ready, revision: 2, canSend: false, canCancel: true, messages: [{ id: 'real', turn: 't', role: 'assistant', text: '<img src=x onerror=alert(1)>', status: 'streaming', truncated: false }] });
+    await page.evaluate(value => window.fischLive.conversationStatus(value), { ...ready, revision: 2, canSend: false, canCancel: true, ownerTurn: 'turn-a', messages: [{ id: 'real', turn: 't', role: 'assistant', text: '<img src=x onerror=alert(1)>', status: 'streaming', truncated: false }] });
     expect(await panel.locator('img').count()).toBe(0); await panel.getByRole('button', { name: 'Dừng trả lời', exact: true }).click(); expect(calls[1]).toEqual({ action: 'cancel', generation: 1 });
     await input.fill('Bản nháp cũ'); await page.evaluate(value => window.fischLive.conversationStatus(value), { ...ready, generation: 2, revision: 3 }); expect(await input.inputValue()).toBe('');
     await input.fill('Không giữ sau dừng'); await page.getByRole('button', { name: 'Dừng toàn bộ', exact: true }).click();

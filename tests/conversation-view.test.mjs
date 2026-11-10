@@ -2,7 +2,7 @@ import { beforeAll, afterAll, expect, it } from 'vitest';
 import { createServer } from 'vite';
 import { chromium } from '@playwright/test';
 let server, browser;
-const ready = { generation: 1, revision: 1, available: true, canSend: true, canCancel: false, pending: false, stopping: false, waiting: false, error: '', messages: [] };
+const ready = { generation: 1, revision: 1, ownerTurn: null, available: true, canSend: true, canCancel: false, pending: false, stopping: false, waiting: false, error: '', messages: [] };
 beforeAll(async () => {
   server = await createServer({ server: { host: '127.0.0.1', port: 0 } }); await server.listen();
   browser = await chromium.launch({ headless: true, ...(process.platform === 'win32' ? { channel: 'msedge' } : {}), args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
@@ -47,7 +47,7 @@ it('keeps same-scope drafts, clears successful switches and ignores old results,
     await input.fill('Bản nháp mới'); await page.evaluate(() => window.rejectRequest(Error('PRIVATE_ERROR'))); expect(await input.inputValue()).toBe('Bản nháp mới'); expect(await panel.textContent()).not.toContain('PRIVATE_ERROR');
     await panel.getByRole('button', { name: 'Gửi', exact: true }).click(); await page.evaluate(() => window.rejectRequest(Error('conversation_unknown')));
     await expect.poll(() => panel.getByRole('button', { name: 'Gửi', exact: true }).isDisabled()).toBe(true);
-    await page.evaluate(value => window.conversation.project(value), { ...ready, generation: 2, revision: 5, canSend: false, canCancel: true, error: 'conversation_unknown' });
+    await page.evaluate(value => window.conversation.project(value), { ...ready, generation: 2, revision: 5, canSend: false, canCancel: true, ownerTurn: 'turn-a', error: 'conversation_unknown' });
     await panel.getByRole('button', { name: 'Dừng trả lời', exact: true }).click(); expect((await page.evaluate(() => window.calls)).at(-1)).toEqual({ action: 'cancel', generation: 2 });
     await page.evaluate(() => window.resolveRequest({ status: 'stopping' }));
     await page.evaluate(() => window.conversation.dispose()); expect(await panel.count()).toBe(0);
@@ -73,7 +73,7 @@ it('interrupts a canonical turn while send acknowledgment remains pending', asyn
   try {
     await page.evaluate(value => window.conversation.project(value), ready); await input.fill('Thử một ý tưởng');
     await panel.getByRole('button', { name: 'Gửi', exact: true }).click();
-    await page.evaluate(value => window.conversation.project(value), { ...ready, revision: 2, pending: true, canSend: false, canCancel: true });
+    await page.evaluate(value => window.conversation.project(value), { ...ready, revision: 2, pending: true, canSend: false, canCancel: true, ownerTurn: 'turn-a' });
     await panel.getByRole('button', { name: 'Dừng trả lời', exact: true }).click();
     expect((await page.evaluate(() => window.calls)).map(value => value.action)).toEqual(['send', 'cancel']);
     await page.evaluate(() => { window.cancelResolve({ status: 'stopping' }); window.sendReject(Error('conversation_unknown')); });
@@ -130,5 +130,76 @@ it('keeps the reader position while new real transcript items arrive', async () 
     await panel.locator('ol').evaluate(node => { node.scrollTop = 100; });
     await page.evaluate(value => window.conversation.project(value), { ...ready, revision: 2, messages: [...messages, { ...messages[0], id: 'new', text: 'Câu trả lời mới' }] });
     expect(await panel.locator('ol').evaluate(node => node.scrollTop)).toBe(100);
+  } finally { await page.close(); }
+}, 45000);
+
+it.each(['terminal-first', 'error-first'])('clears only superseded cancellation errors with %s projection', async order => {
+  const { page, panel, input } = await open();
+  try {
+    await page.evaluate(value => window.conversation.project(value), { ...ready, canSend: false, canCancel: true, ownerTurn: 'turn-a' });
+    await panel.getByRole('button', { name: 'Dừng trả lời', exact: true }).click();
+    if (order === 'error-first') {
+      await page.evaluate(() => window.cancelReject(Error('conversation_stop_unconfirmed')));
+      await expect.poll(() => panel.locator('.conversation-status').textContent()).toContain('Chưa xác nhận đã dừng');
+    }
+    await page.evaluate(value => window.conversation.project(value), { ...ready, revision: 3 });
+    if (order === 'terminal-first') await page.evaluate(() => window.cancelReject(Error('conversation_stop_unconfirmed')));
+    await expect.poll(() => panel.locator('.conversation-status').textContent()).toContain('Bạn có thể nhắn');
+    await input.fill('Yêu cầu mới'); await panel.getByRole('button', { name: 'Gửi', exact: true }).click();
+    await page.evaluate(() => window.sendReject(Error('conversation_unknown')));
+    await page.evaluate(value => window.conversation.project(value), { ...ready, revision: 4 });
+    await expect.poll(() => panel.locator('.conversation-status').textContent()).toContain('Không gửi lại');
+    expect(await panel.getByRole('button', { name: 'Gửi', exact: true }).isDisabled()).toBe(true);
+  } finally { await page.close(); }
+}, 45000);
+
+it('keeps a definite stop rejection actionable and an unknown stopping outcome sticky', async () => {
+  const { page, panel } = await open();
+  try {
+    await page.evaluate(value => window.conversation.project(value), { ...ready, canSend: false, canCancel: true, ownerTurn: 'turn-a' });
+    await panel.getByRole('button', { name: 'Dừng trả lời', exact: true }).click();
+    await page.evaluate(() => window.cancelReject(Error('conversation_stop_unconfirmed')));
+    await page.evaluate(value => window.conversation.project(value), { ...ready, revision: 2, canSend: false, canCancel: true, ownerTurn: 'turn-a', error: 'conversation_stop_unconfirmed' });
+    expect(await panel.getByRole('button', { name: 'Dừng trả lời', exact: true }).isDisabled()).toBe(false);
+    await panel.getByRole('button', { name: 'Dừng trả lời', exact: true }).click();
+    await page.evaluate(() => window.cancelReject(Error('conversation_stop_unconfirmed')));
+    await page.evaluate(value => window.conversation.project(value), { ...ready, revision: 3, canSend: false, stopping: true, error: 'conversation_stop_unconfirmed' });
+    expect(await panel.getByRole('button', { name: 'Dừng trả lời', exact: true }).isDisabled()).toBe(true);
+    expect(await panel.locator('.conversation-status').textContent()).toContain('Chưa xác nhận đã dừng');
+  } finally { await page.close(); }
+}, 45000);
+
+it('ignores an old cancellation error when a new owner arrives without transcript or terminal projection', async () => {
+  const { page, panel } = await open();
+  try {
+    await page.evaluate(value => window.conversation.project(value), { ...ready, canSend: false, canCancel: true, ownerTurn: 'turn-a' });
+    await panel.getByRole('button', { name: 'Dừng trả lời', exact: true }).click();
+    await page.evaluate(() => { window.oldCancelReject = window.cancelReject; });
+    await page.evaluate(value => window.conversation.project(value), { ...ready, revision: 2, canSend: false, canCancel: true, ownerTurn: 'turn-b' });
+    await panel.getByRole('button', { name: 'Dừng trả lời', exact: true }).click();
+    await page.evaluate(() => window.oldCancelReject(Error('conversation_stop_unconfirmed')));
+    expect(await panel.locator('.conversation-status').textContent()).not.toContain('Chưa xác nhận đã dừng');
+    expect(await panel.getByRole('button', { name: 'Dừng trả lời', exact: true }).isDisabled()).toBe(true);
+    await page.evaluate(() => window.cancelResolve({ status: 'stopping' }));
+  } finally { await page.close(); }
+}, 45000);
+
+it.each(['send-last', 'cancel-last'])('keeps send uncertainty when an overlapping cancellation error is superseded (%s)', async order => {
+  const { page, panel, input } = await open();
+  try {
+    await page.evaluate(value => window.conversation.project(value), ready); await input.fill('Một yêu cầu đang chờ');
+    await panel.getByRole('button', { name: 'Gửi', exact: true }).click();
+    await page.evaluate(value => window.conversation.project(value), { ...ready, revision: 2, ownerTurn: 'turn-a', canSend: false, canCancel: true, pending: true });
+    await panel.getByRole('button', { name: 'Dừng trả lời', exact: true }).click();
+    if (order === 'send-last') {
+      await page.evaluate(() => window.cancelReject(Error('conversation_stop_unconfirmed')));
+      await expect.poll(() => panel.locator('.conversation-status').textContent()).toContain('Chưa xác nhận đã dừng');
+    }
+    await page.evaluate(() => window.sendReject(Error('conversation_unknown')));
+    if (order === 'cancel-last') await page.evaluate(() => window.cancelReject(Error('conversation_stop_unconfirmed')));
+    await expect.poll(() => panel.locator('.conversation-status').textContent()).toContain('Không gửi lại');
+    await page.evaluate(value => window.conversation.project(value), { ...ready, revision: 3 });
+    expect(await panel.locator('.conversation-status').textContent()).toContain('Không gửi lại');
+    expect(await panel.getByRole('button', { name: 'Gửi', exact: true }).isDisabled()).toBe(true);
   } finally { await page.close(); }
 }, 45000);

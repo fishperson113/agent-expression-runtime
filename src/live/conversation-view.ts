@@ -1,6 +1,9 @@
 type Message = { id: string; turn: string; role: 'user' | 'assistant'; text: string; status: string; truncated: boolean };
-type Snapshot = { generation: number; revision: number; available: boolean; canSend: boolean; canCancel: boolean; pending: boolean; stopping: boolean; waiting: boolean; error: string; messages: Message[] };
+type Snapshot = { generation: number; revision: number; ownerTurn: string | null; available: boolean; canSend: boolean; canCancel: boolean; pending: boolean; stopping: boolean; waiting: boolean; error: string; messages: Message[] };
 type Request = (value: { action: 'send' | 'cancel'; generation: number; text?: string }) => Promise<unknown>;
+type CancelScope = { generation: number; revision: number; ownerTurn: string | null };
+const cancelSettled = (state: Snapshot, scope: CancelScope) => state.generation === scope.generation &&
+  state.revision > scope.revision && state.ownerTurn !== scope.ownerTurn;
 let mounts = 0;
 const bytes = (value: string) => new TextEncoder().encode(value).length;
 const errors: Record<string, string> = {
@@ -26,9 +29,10 @@ function record(value: unknown): Record<string, unknown> {
 }
 function snapshot(value: unknown): Snapshot | undefined {
   try {
-    const dto = record(value), keys = ['generation', 'revision', 'available', 'canSend', 'canCancel', 'pending', 'stopping', 'waiting', 'error', 'messages'];
+    const dto = record(value), keys = ['generation', 'revision', 'available', 'canSend', 'canCancel', 'pending', 'stopping', 'waiting', 'error', 'messages', 'ownerTurn'];
     if (Object.keys(dto).length !== keys.length || Object.keys(dto).some(key => !keys.includes(key))) return;
     if (!['generation', 'revision'].every(key => Number.isSafeInteger(dto[key]) && (dto[key] as number) >= 0)) return;
+    if (dto.ownerTurn !== null && (typeof dto.ownerTurn !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(dto.ownerTurn))) return;
     if (!keys.slice(2, 8).every(key => typeof dto[key] === 'boolean') || typeof dto.error !== 'string' ||
       (dto.error !== '' && !Object.hasOwn(errors, dto.error)) || !Array.isArray(dto.messages)) return;
     let total = 0;
@@ -61,21 +65,33 @@ function messageText(item: Message) {
   const status: Record<string, string> = { streaming: 'Đang nhận', completed: 'Đã hoàn tất', interrupted: 'Đã ngắt', failed: 'Lượt lỗi', unknown: 'Chưa rõ kết quả' };
   return `${item.role === 'user' ? 'Bạn' : 'Codex'}: ${item.text}\n[${status[item.status]}${item.truncated ? ' · Đã rút gọn phần hiển thị' : ''}]`;
 }
+function projectMessages(ui: ReturnType<typeof elements>, next: Snapshot) {
+  const top = ui.list.scrollTop, bottom = top + ui.list.clientHeight >= ui.list.scrollHeight - 40;
+  const texts = next.messages.map(messageText);
+  if (JSON.stringify([...ui.list.children].map(node => node.textContent)) !== JSON.stringify(texts)) {
+    ui.list.replaceChildren(...texts.map(text => { const node = document.createElement('li'); node.textContent = text; return node; }));
+    ui.list.scrollTop = bottom ? ui.list.scrollHeight : top;
+  }
+}
+function statusText(state: Snapshot | undefined, busy: boolean) {
+  return state?.error ? errors[state.error] : !state?.available ? 'Chọn hoặc bắt đầu phiên trong terminal Native Codex đang chạy cùng Fisch.' :
+    state.waiting ? 'Codex cần bạn xác nhận trong terminal.' : state.stopping ? 'Đang dừng trả lời; chưa xác nhận đã dừng.' :
+    state.pending || busy ? 'Đang gửi; chưa xác nhận kết quả.' : state.canSend ? 'Bạn có thể nhắn trong phiên hiện tại.' : 'Phiên đang bận hoặc đang được chọn trong terminal.';
+}
 export function mountConversation(container: HTMLElement, request: Request) {
   const ui = elements(); container.append(ui.host);
   let state: Snapshot | undefined, disposed = false, attempt = 0, busy = false, cancelling = false, localError = '', lock = false, acknowledged = -1, highGeneration = -1, highRevision = -1, cleared = false;
+  let cancelScope: CancelScope | undefined, localCancelError: CancelScope | undefined;
   function paint() {
     const length = bytes(ui.input.value), invalid = !ui.input.value.trim() || length > 16000;
     ui.count.textContent = `${length} / 16000 byte UTF-8 · chỉ gửi khi bạn bấm Gửi.`;
     ui.input.disabled = disposed || !state?.available;
     ui.send.disabled = !state?.canSend || busy || lock || state?.error === 'conversation_unknown' || state?.revision === acknowledged || invalid;
     ui.cancel.disabled = !state?.canCancel || cancelling;
-    const text = localError || (state?.error ? errors[state.error] : !state?.available ? 'Chọn hoặc bắt đầu phiên trong terminal Native Codex đang chạy cùng Fisch.' :
-      state.waiting ? 'Codex cần bạn xác nhận trong terminal.' : state.stopping ? 'Đang dừng trả lời; chưa xác nhận đã dừng.' :
-      state.pending || busy ? 'Đang gửi; chưa xác nhận kết quả.' : state.canSend ? 'Bạn có thể nhắn trong phiên hiện tại.' : 'Phiên đang bận hoặc đang được chọn trong terminal.');
+    const text = localError || statusText(state, busy);
     if (ui.status.textContent !== text) ui.status.textContent = text;
   }
-  function clear() { cleared = true; attempt++; busy = false; cancelling = false; lock = false; acknowledged = -1; localError = ''; ui.input.value = ''; ui.list.replaceChildren(); state = undefined; paint(); }
+  function clear() { cleared = true; attempt++; busy = false; cancelling = false; cancelScope = localCancelError = undefined; lock = false; acknowledged = -1; localError = ''; ui.input.value = ''; ui.list.replaceChildren(); state = undefined; paint(); }
   function project(value: unknown) {
     if (disposed) return;
     const next = snapshot(value);
@@ -83,18 +99,17 @@ export function mountConversation(container: HTMLElement, request: Request) {
     if (next.generation < highGeneration || next.generation === highGeneration && (next.revision < highRevision || cleared && next.revision === highRevision)) return;
     if (state && next.generation !== state.generation) clear();
     state = next; highGeneration = next.generation; highRevision = next.revision; cleared = false;
-    const top = ui.list.scrollTop, bottom = top + ui.list.clientHeight >= ui.list.scrollHeight - 40;
-    const texts = next.messages.map(messageText);
-    if (JSON.stringify([...ui.list.children].map(node => node.textContent)) !== JSON.stringify(texts)) {
-      ui.list.replaceChildren(...texts.map(text => { const node = document.createElement('li'); node.textContent = text; return node; }));
-      ui.list.scrollTop = bottom ? ui.list.scrollHeight : top;
-    }
+    if (cancelScope && cancelSettled(next, cancelScope)) { cancelScope = undefined; cancelling = false; }
+    if (localCancelError && cancelSettled(next, localCancelError)) { localError = ''; localCancelError = undefined; }
+    projectMessages(ui, next);
     paint();
   }
   async function act(action: 'send' | 'cancel') {
     if (disposed || !state || (action === 'send' ? ui.send.disabled : ui.cancel.disabled)) return;
-    const current = attempt, generation = state.generation, revision = state.revision, text = ui.input.value;
-    if (action === 'send') busy = true; else cancelling = true; localError = ''; paint();
+    const current = attempt, generation = state.generation, revision = state.revision, text = ui.input.value,
+      scope = action === 'cancel' ? { generation, revision, ownerTurn: state.ownerTurn } : undefined;
+    cancelScope = scope; localCancelError = undefined;
+    if (action === 'send') { busy = true; cancelling = false; } else cancelling = true; localError = ''; paint();
     try {
       const reply = record(await request({ action, generation, ...(action === 'send' ? { text } : {}) }));
       if (reply.status !== (action === 'send' ? 'accepted' : 'stopping')) throw Error('conversation_unknown');
@@ -102,10 +117,13 @@ export function mountConversation(container: HTMLElement, request: Request) {
       if (action === 'send') { acknowledged = revision; if (ui.input.value === text) ui.input.value = ''; }
     } catch (error) {
       if (disposed || current !== attempt || state?.generation !== generation) return;
+      if (action === 'cancel' && cancelScope !== scope) return;
+      if (action === 'cancel' && (lock || state.error === 'conversation_unknown')) return;
       const code = error instanceof Error ? error.message : '';
       localError = errors[code] || errors.conversation_unknown;
+      localCancelError = action === 'cancel' ? scope : undefined;
       if (action === 'send' && !['conversation_rejected', 'conversation_invalid_text', 'conversation_changed', 'conversation_unavailable'].includes(code)) lock = true;
-    } finally { if (!disposed && current === attempt) { if (action === 'send') busy = false; else cancelling = false; paint(); } }
+    } finally { if (!disposed && current === attempt) { if (action === 'send') busy = false; else if (cancelScope === scope) cancelling = false; paint(); } }
   }
   ui.input.oninput = paint; ui.form.onsubmit = event => { event.preventDefault(); void act('send'); }; ui.cancel.onclick = () => { void act('cancel'); }; paint();
   return { project, clear, dispose: () => { if (disposed) return; clear(); disposed = true; ui.input.oninput = null; ui.form.onsubmit = null; ui.cancel.onclick = null; ui.host.remove(); } };
