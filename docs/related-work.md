@@ -6,7 +6,7 @@
 
 Báo cáo trả lời câu hỏi: **Fisch đang xây dựng trên những ý tưởng nào, đã áp dụng đến đâu, và còn điều gì phải tự kiểm chứng?** Đây là tài liệu lưu dấu quyết định thiết kế, không phải một systematic literature review hay tuyên bố về tính mới học thuật.
 
-Mốc implementation được đối chiếu: `9863ba3` (07/11/2026), gồm continuous presence, generated performance, adaptive Braille và prepared idle scenes. Các phép đo bên dưới giữ nguyên phạm vi lịch sử; không phải lần kiểm định mới. Phần đề xuất trước implementation đã được bỏ khỏi bản hướng dẫn hiện hành để tránh nhầm với trạng thái HEAD.
+Mốc implementation được đối chiếu: `9863ba3` (07/11/2026), gồm continuous presence, generated performance, adaptive Braille và prepared idle scenes. Các phép đo bên dưới giữ nguyên phạm vi lịch sử; không phải lần kiểm định mới. CLI panel `fisch run` đã được bỏ; renderer/planner cũ chỉ còn dùng trong reference test và script nghiên cứu tường minh. Luồng hiện tại là [Fisch Live](fisch-live.md), với [hướng dẫn chuyển đổi](multiplexer.md). Phần đề xuất trước implementation đã được bỏ khỏi bản hướng dẫn hiện hành để tránh nhầm với trạng thái HEAD.
 
 Ba loại liên hệ được phân biệt trong báo cáo:
 
@@ -233,7 +233,7 @@ API `brailleFrame` vẫn dùng được cho ảnh đơn. Animation cần giữ `
 
 Style mặc định là `adaptive`. Có thể đặt biến môi trường khi khởi chạy `FISCH_BRAILLE_STYLE=peak` để giữ glyph density theo area-peak trước đây; đây là lựa chọn về trình bày, không thay geometry, scene hay số lần gọi model. Biến này hiện đọc từ môi trường shell, không từ `.env`.
 
-`fisch status` có `rendering` để kiểm tra style đang thực sự chạy, exposure, viewport và số lit dots. Đây là metadata để đối chiếu live với video; không phải điểm đánh giá thẩm mỹ.
+Ở panel lịch sử, `fisch status` có `rendering` để kiểm tra style, exposure, viewport và số lit dots. `fisch status` hiện tại chỉ dành cho adapter Herdr Live tường minh và không còn trả các metric này. Đây là metadata để đối chiếu live với video; không phải điểm đánh giá thẩm mỹ.
 
 ### 10.4. Benchmark trên hình động
 
