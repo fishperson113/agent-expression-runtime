@@ -407,3 +407,83 @@ it('carries explicit disposable handoff through existing live compilation and bo
     expect(() => composeExpression({ parts: [part()], observerHandoffMs: ms })).toThrow('composition_arguments');
   expect(composeExpression({ parts: [part()] }).body.type).toBe('parallel');
 });
+
+it('copies only an explicit bounded public interaction brief in Native capabilities',async()=>{
+  const {freezeNativeHostCapabilities}=await import('../integrations/native-reaction-provider.mjs');
+  const context={revision:2,text:'Public shared game',mode:'open'};
+  const result=freezeNativeHostCapabilities({schemaVersion:1,expressionAllowed:false,interactionContext:context});
+  context.text='changed';expect(result.interactionContext.text).toBe('Public shared game');expect(Object.isFrozen(result.interactionContext)).toBe(true);
+  let reads=0;
+  for(const value of [{schemaVersion:1,interactionContext:context},{expressionAllowed:true,interactionContext:context},
+    {schemaVersion:1,expressionAllowed:true,interactionContext:{revision:2,mode:'open',get text(){reads++;return 'hidden';}}},
+    ...[{...context,text:'x'.repeat(241)},{...context,text:'bad\nline'},{...context,private:'hidden'},Object.create(context)]
+      .map(interactionContext=>({schemaVersion:1,expressionAllowed:true,interactionContext}))])
+    expect(()=>freezeNativeHostCapabilities(value)).toThrow('native_host_capabilities_invalid');
+  expect(reads).toBe(0);
+  const {composeExpression}=await import('../integrations/compose-expression.mjs');
+  const {expressionResponseSchema}=await import('../integrations/expression-response.mjs');
+  expect(JSON.stringify(expressionResponseSchema)).not.toContain('observerContext');
+  const parts=[{id:'public_form',kind:'ellipsoid',center:[0,0,0],scale:[0.3,0.3,0.1]}];
+  for(const observerContext of [{text:'',mode:'open',durationMs:1000},{text:'ok',mode:'open',durationMs:60001},{text:'ok',mode:'unknown',durationMs:1000}])
+    expect(()=>composeExpression({parts,observerContext})).toThrow('composition_arguments');
+});
+async function shareInteraction(f,mode='open',durationMs=60000,handoff=false){
+  const client=liveTestClient(f.live.base,f.live.token);await client.call('initialize');
+  const receipt=toolValue(await client.tool('compose_expression',{durationMs:100,...(handoff?{observerHandoffMs:60000}:{}),
+    observerContext:{text:'Public game: continue the shared activity without assuming an answer.',mode,durationMs},
+    parts:[{id:'shared_game_form',kind:'ellipsoid',center:[0,0,0],scale:[0.4,0.6,0.2]}]}));
+  expect(receipt.status).toBe('accepted');return client;
+}
+it.skipIf(!nativeGateway)('shares only explicit public context while retaining independent scene protection',async()=>{
+  const calls=[],receipts=[];
+  const provider={conversationLane:true,contractVersion:1,confirmPublication:(_request,value)=>receipts.push(value),
+    decide:async(window,_signal,_receipt,capabilities)=>{calls.push(capabilities);return {decision:{schemaVersion:1,requestId:window.request.requestId,
+      decisionId:'context_'+window.request.requestId,mode:'observe',validUntil:window.request.deadline,action:null},reply:'Scripted continuation of the public activity.'};}};
+  const f=await nativeBrowserLoop(provider);let client;
+  try{client=await shareInteraction(f);await arrive(f);await expect.poll(()=>receipts.length,{timeout:10000}).toBe(1);
+    expect(calls[0]).toMatchObject({expressionAllowed:false,interactionContext:{mode:'open',text:'Public game: continue the shared activity without assuming an answer.'}});
+    expect(JSON.stringify(calls[0])).not.toContain('Public scripted coding task');
+    expect(await f.live.page.locator('.observer-context').innerText()).toContain('Public game:');
+    expect(receipts[0]).toMatchObject({reason:'observed',chatPublished:true});
+    const metrics=await f.live.page.evaluate(()=>window.fischLive.metrics());expect(metrics.parts).toEqual(['shared_game_form']);expect(metrics.userGeometryLocked).toBe(true);
+  }finally{await client?.close();await f.close();}
+},60000);
+for(const mode of ['observe','express'])it.skipIf(!nativeGateway)(`drops a late ${mode} result whose public interaction context expired`,async()=>{
+  let resolve,request;const receipts=[];
+  const provider={conversationLane:true,contractVersion:1,confirmPublication:(_request,value)=>receipts.push(value),
+    decide:window=>{request=window.request;return new Promise(yes=>{resolve=yes;});}};
+  const f=await nativeBrowserLoop(provider);let client;
+  try{client=await shareInteraction(f,'open',5000,true);await arrive(f);await expect.poll(()=>typeof resolve,{timeout:10000}).toBe('function');
+    await expect.poll(()=>f.live.page.evaluate(()=>window.fischLive.nativeReactionCapabilities().interactionContext??null),{timeout:8000}).toBeNull();
+    const late=mode==='express'?authored(request):{decision:{schemaVersion:1,requestId:request.requestId,decisionId:'late_context',mode:'observe',validUntil:request.deadline,action:null},reply:'STALE_PUBLIC_CONTEXT_CANARY'};
+    const drop=await f.live.page.evaluate(({id,data})=>window.fischLive.deliverNativeReaction(id,data),{id:request.requestId,data:late});
+    expect(drop).toMatchObject({reason:'interaction_context_expired',chatPublished:false});resolve(late);
+    await f.live.page.waitForTimeout(700);
+    expect(await f.live.page.locator('.observation-messages').innerText()).toBe('');
+    const metrics=await f.live.page.evaluate(()=>window.fischLive.metrics());expect(metrics.parts).toEqual(['shared_game_form']);expect(metrics.reactiveOwner).toBeNull();
+    expect(metrics.diagnostics.events.some(row=>row.origin==='reactive'&&row.phase==='admitted')).toBe(false);
+  }finally{await client?.close();await f.close();}
+},60000);
+it.skipIf(!nativeGateway)('enforces a finite explicit quiet window without inventing a quiet request from text',async()=>{
+  let calls=0;const provider={conversationLane:true,contractVersion:1,decide:async()=>{calls++;throw Error('unexpected_quiet_inference');}};
+  const f=await nativeBrowserLoop(provider);let client;
+  try{client=await shareInteraction(f,'quiet',10000);await arrive(f);await f.live.page.waitForTimeout(2500);
+    expect(calls).toBe(0);expect(await f.live.page.locator('.observer-context').innerText()).toContain('tạm yên lặng');
+    await expect.poll(()=>f.live.page.evaluate(()=>window.fischLive.nativeReactionCapabilities().interactionContext??null),{timeout:12000}).toBeNull();
+    expect(calls).toBe(0);expect(await f.live.page.locator('.observation-messages').innerText()).toBe('');
+    expect((await f.live.page.evaluate(()=>window.fischLive.metrics())).parts).toEqual(['shared_game_form']);
+  }finally{await client?.close();await f.close();}
+},60000);
+
+it.skipIf(!nativeGateway)('rejects observer-authored context even when MAIN granted disposable geometry',async()=>{
+  const receipts=[];const provider={conversationLane:true,contractVersion:1,confirmPublication:(_request,value)=>receipts.push(value),
+    decide:async window=>{const result=authored(window.request);result.decision.action.body={type:'live',program:result.decision.action.body,
+      configuration:{controls:[],poses:[],lifetimeMs:1000,observerContext:{text:'FORGED_CONTEXT_CANARY',mode:'open',durationMs:60000}}};return result;}};
+  const f=await nativeBrowserLoop(provider);let client;
+  try{client=await shareInteraction(f,'open',60000,true);await arrive(f);await expect.poll(()=>receipts.length,{timeout:10000}).toBe(1);
+    expect(receipts[0]).toMatchObject({reason:'admission_failed',chatPublished:false});
+    expect(await f.live.page.locator('.observation-messages').innerText()).toBe('');
+    expect(await f.live.page.locator('.observer-context').innerText()).not.toContain('FORGED_CONTEXT_CANARY');
+    const metrics=await f.live.page.evaluate(()=>window.fischLive.metrics());expect(metrics.parts).toEqual(['shared_game_form']);expect(metrics.userGeometryLocked).toBe(true);
+  }finally{await client?.close();await f.close();}
+},60000);
