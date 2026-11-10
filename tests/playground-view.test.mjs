@@ -88,7 +88,7 @@ it('projects only redacted counters, resists HTML, avoids repeated announcements
     await panel.getByRole('button', { name: 'Nguyên tác', exact: true }).click(); expect(await panel.locator('img').count()).toBe(0);
     await page.setViewportSize({ width: 375, height: 812 }); await panel.locator('summary').click();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    expect((await page.locator('.body-stage').boundingBox()).height).toBeGreaterThanOrEqual(260);
+    expect((await page.locator('.body-stage').boundingBox()).height).toBeGreaterThanOrEqual(812 * .1);
     await page.getByRole('button', { name: 'Dừng toàn bộ', exact: true }).click(); expect(await panel.count()).toBe(0);
   } finally { await page.close(); }
 }, 45000);

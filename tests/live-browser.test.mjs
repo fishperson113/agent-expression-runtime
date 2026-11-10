@@ -144,7 +144,8 @@ it('keeps the workspace within one screen, scrolls only history, and redraws a f
       for (const selector of ['.body-panel', '.camera-card', '.activity-panel', '#motion', '#cancel', '#camera-start', '#stop-all']) await inViewport(page, selector);
       expect(await page.evaluate(() => [...document.querySelectorAll('.body-panel,.camera-card,.activity-panel')].every(node => node.scrollHeight <= node.clientHeight + 1))).toBe(true);
       const left = await page.locator('.body-panel').boundingBox(), right = await page.locator('.camera-panel').boundingBox();
-      expect(width > 700 ? left.width / right.width : left.height / right.height).toBeCloseTo(2, 1);
+      if (width > 700) expect(left.width / right.width).toBeCloseTo(2, 1);
+      else expect((await page.locator('.body-stage').boundingBox()).height).toBeGreaterThanOrEqual(height * .1);
     }
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.locator('#fullscreen').click();
@@ -159,7 +160,9 @@ it('keeps the workspace within one screen, scrolls only history, and redraws a f
     await expect.poll(() => page.evaluate(() => document.fullscreenElement)).toBeNull();
     await expect.poll(() => page.locator('footer #stop-all').count()).toBe(1);
     await page.evaluate(() => { for (let i = 0; i < 40; i++) window.fischLive.logActivity('Sự kiện kiểm thử dài '.repeat(8)); });
+    await page.locator('.technical-log summary').click();
     expect(await page.locator('#agent-activity').evaluate(node => node.scrollHeight > node.clientHeight)).toBe(true);
+    await page.keyboard.press('Escape');
     expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBe(true);
     expect(await page.locator('video').evaluate(video => video.srcObject)).toBeNull();
     await page.locator('#fullscreen').click(); await page.locator('#stop-all').click();

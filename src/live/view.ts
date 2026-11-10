@@ -12,7 +12,7 @@ export function mountLive(root: HTMLElement) {
   <details class="camera-options"><summary>Thiết lập</summary><label class="check"><input id="show-landmarks" type="checkbox" checked> Điểm theo dõi</label><label class="check"><input id="enable-hands" type="checkbox"> Cử chỉ tay cho Codex · thử nghiệm</label><p id="hand-status" class="muted" role="status">Cử chỉ tay đang tắt</p>
   <label class="check"><input id="enable-reactivity" type="checkbox" disabled aria-describedby="reactivity-privacy"> Phản ứng theo camera</label><p id="reactivity-status" class="muted" role="status">Phản ứng tự động chưa có bộ quyết định được kết nối.</p><p id="reactivity-privacy" class="muted">Khi bật, quan sát hình học dạng dữ liệu được gửi tới bộ quyết định đã cấu hình, tối đa 4 lần/phút. Không gửi ảnh, âm thanh hoặc nội dung chat/code.</p>
   <p id="summary" class="muted">Chưa có quan sát về người dùng.</p><p id="vision-metrics" class="muted">Thị giác chưa chạy</p></details></div></div>
-  <section class="activity-panel" aria-labelledby="agent-activity-heading"><div class="panel-title"><h2 id="agent-activity-heading">Dòng hoạt động</h2><div id="setup-tools"></div></div><p class="activity-caption">Trò chuyện trong terminal Codex. Sự kiện sẽ hiện ở đây.</p><ol id="agent-activity" aria-label="Nhật ký hoạt động agent, không phải suy nghĩ nội tâm" tabindex="0"></ol><span class="activity-note">Không ghi nội dung hội thoại.</span></section>
+  <section class="activity-panel conversation-panel" aria-label="Trò chuyện trong phiên Codex"><div class="conversation-tools"><div id="setup-tools"></div><details class="technical-log"><summary>Hoạt động kỹ thuật</summary><p>Trạng thái và thao tác, không phải nội dung hội thoại.</p><ol id="agent-activity" aria-label="Nhật ký hoạt động agent, không phải suy nghĩ nội tâm" tabindex="0"></ol></details></div><div id="conversation-tools"></div></section>
   </section></div>
   <footer><span class="privacy-note">Camera tắt mặc định <span aria-hidden="true">·</span> Không thu âm</span><span id="fault" role="status"></span>
   <details class="debug"><summary>Chẩn đoán</summary><p id="body-status" class="muted">Phản xạ local sẵn sàng; chờ Codex chọn cách biểu đạt.</p><p id="render-metrics" class="muted">Đang khởi tạo renderer.</p>
@@ -31,7 +31,7 @@ export function element<T extends HTMLElement = HTMLElement>(id: string): T {
 export function mountDisclosures(root: HTMLElement) {
   const stop = root.querySelector<HTMLButtonElement>('#stop-all')!;
   const home = stop.parentElement!;
-  root.querySelectorAll<HTMLDetailsElement>('.camera-options, .debug, .fisch-playground details, .fisch-live-setup details').forEach(details => {
+  root.querySelectorAll<HTMLDetailsElement>('.camera-options, .debug, .technical-log, .fisch-playground details, .fisch-live-setup details').forEach(details => {
     const summary = details.querySelector('summary')!;
     const dialog = document.createElement('dialog'); dialog.className = 'tool-dialog';
     const header = document.createElement('div'); header.className = 'dialog-heading';
