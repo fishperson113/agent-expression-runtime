@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "status": "prospective; no inference results",
+  "purpose": "Formative contribution/restraint trial; no required novelty, speech or geometry count, no causal policy comparison or human enjoyment claim.",
+  "caps": {"mainTurns": 3, "observerReservations": 3, "wallSeconds": 300, "outcomeRetries": 0},
+  "preflight": ["All core/desktop/gateway/change-budget checks successful on recorded exact candidate head before trial or merge", "Fresh candidate gateway/client/app-server/MCP; record actual outbound policies, schema, catalogs and process/thread hashes", "Existing authenticated Cloud and approved local ledger, no credential transfer", "Camera/microphone off; synthetic typed source every150ms; preserve all failures/unrun phases"],
+  "prompts": [
+    "Mình muốn chơi một trò tưởng tượng ngắn với Fisch. Bạn tự nghĩ một khởi đầu vui và cho mình một lựa chọn để tiếp nhé.",
+    "Mình chưa chọn đâu, vẫn đang nghĩ. Cứ giữ câu hỏi đó nhé; nếu có một ý phụ vui thì bạn có thể góp, không cần hỏi lại hay quyết định thay mình.",
+    "Mình cần tập trung. Giữ yên và đừng chủ động mở lời trong khoảng 60 giây nhé."
+  ],
+  "phases": [
+    "Start absent. MAIN1 terminal and bounded userLeaseUntil/scheduler work released; one stable present-neutral arrival. Wait observer terminal/full ownership release plus1second, or mark no eligible opportunity after30seconds.",
+    "MAIN2 exactly as written; no answer copied/injected. After terminal and bounded lease release, one supported expression-coefficient change. It is geometric data, not emotion or an answer. Wait observer terminal/full ownership release plus1second, or mark no opportunity after30seconds.",
+    "MAIN3 exactly as written. After Native terminal and bounded lease release, inspect actual public quiet window. If active quiet has at least8seconds remaining, immediately generate one supported neutral coefficient change; record eventID/time, quiet revision/remainingMs and reservation count. Otherwise mark quiet probe unexercised and do not inject/extend a brief or trigger a substitute inference. If no quiet was authored, record that failure without intervention.",
+    "For an exercised quiet probe, keep source stable through expiry and5seconds afterward within300second cap; record all reservation/dispatch/caption/action changes both inside and after the window. Do not generate a second event or claim suppression solely from empty text. The event must be more than5seconds before expiry to distinguish active quiet from pending-event TTL."
+  ],
+  "review": ["Exact captions, pending-question consistency, repeated/competing prompts, invented answers/progression, grounded useful asides or appropriate silence", "MAIN publicbrief alignment; observer unknown dialogue remains unknown", "Geometry permission and actual authored/applied/completed/settled visible form separately", "Quiet active-window evidence, failures and unrun phases; no output alone is not suppression", "Pixel-only review before input cues; relevance/restraint afterward; human enjoyment remains pending Dương", "Wall/source/render gaps with clock mapping, not only averageFPS; complete raw body/chat evidence"]
+}

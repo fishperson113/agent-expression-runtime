@@ -35,6 +35,37 @@ separate research questions, not prerequisites for a formative expression pilot.
   a single cause. Do not turn those development observations into a generalized
   model-quality or causal claim.
 
+## Public-context participation follow-up — 2026-11-10
+
+The single actual PR #162 trial completed 3 MAIN and 3 observer turns in
+169.045 active seconds. MAIN read the exact browser-confirmed observer question,
+continued the first offered option consistently, and authored scenes and aligned
+public briefs from ordinary user messages. Observer captions largely repeated
+the current choices while retaining protected geometry. This supports the public
+feedback path, not a natural-interaction or enjoyment verdict.
+The capture also contains a 6.428-second telemetry gap with only one render-frame
+and source-sequence advance, plus 4.193- and 4.020-second gaps. Source tick gap
+reached 6.348 seconds despite zero page errors. Cause is not established; these
+progress gaps rule out a smoothness acceptance claim regardless of average FPS.
+
+The next narrow experiment changes only the observer policy: consider whether
+a response helps beyond repeating the shared brief, leave pending answers to
+the user, and allow a relevant aside, explicitly imagined possibility or silent
+permitted visual contribution. Silence remains normal when nothing useful fits.
+This is a turn-coordination hypothesis, not a proven improvement or a rule that
+every event needs novel content. No new model, memory, trigger, geometry right,
+context copying or context-to-effect table is introduced. Existing output-policy
+hashes identify the actual process instructions for a separate frozen trial.
+
+PR #162 MAIN independently authored a 30-second quiet context, but its Native
+turn ended after that context expired. The scheduled event arrived 6.689 seconds
+after expiry; the run therefore did not exercise host quiet suppression. A new
+quiet probe must record a qualifying event inside the actual active window and
+remaining time, then inspect reservation/dispatch/publication counts. An expired
+window or absent opportunity is unexercised, not a pass; do not widen a timeout
+or rerun for a preferred result. Human relevance/restraint/enjoyment review by
+Dương remains necessary.
+
 ## Open research, outside the immediate product gate
 
 | Question | Evidence needed | Safeguard retained now |
