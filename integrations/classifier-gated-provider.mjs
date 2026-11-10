@@ -8,9 +8,9 @@ function configuration(value) {
   if (!value || typeof value.classify !== 'function' ||
       ![value.modelId, value.modelRevision].every(item => typeof item === 'string' && /^[A-Za-z0-9_./-]{1,128}$/.test(item)) ||
       !unit(value.minConfidence) || !unit(value.minMargin) ||
-      (value.now !== undefined && typeof value.now !== 'function') ||
+      typeof value.now !== 'function' ||
       (value.onClassification !== undefined && typeof value.onClassification !== 'function')) throw Error('classifier_gate_config');
-  return Object.freeze({ ...value, now: value.now ?? (() => performance.now()) });
+  return Object.freeze({ ...value });
 }
 function observe(request) {
   const digest = createHash('sha256').update(`${request.sessionId}:${request.epoch}:${request.requestId}`).digest('hex').slice(0, 32);

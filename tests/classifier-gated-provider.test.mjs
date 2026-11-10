@@ -20,6 +20,15 @@ const provider = version => ({ contractVersion: version, decide: vi.fn(async () 
 const dirs = [];
 afterEach(() => dirs.splice(0).forEach(path => rmSync(path, { recursive: true, force: true })));
 
+it('requires an explicit request-domain clock instead of comparing foreign process uptimes', async () => {
+  const semantic = provider(2), missing = options(); delete missing.now;
+  expect(() => classifierGatedProvider(semantic, missing)).toThrow('classifier_gate_config');
+  const foreignProcessUptime = 9000000, requestClock = () => 1000;
+  expect(foreignProcessUptime).toBeGreaterThan(window().request.deadline);
+  const gate = classifierGatedProvider(semantic, options({ now: requestClock, classify: async () => prediction('observe') }));
+  await expect(gate.decide(window())).resolves.toMatchObject({ mode: 'observe' });
+});
+
 it('returns host-owned no-op for observe, abstain, low confidence, invalid output and classifier failure', async () => {
   for (const version of [1, 2]) for (const classify of [async () => prediction('observe'), async () => prediction('abstain'),
     async () => prediction('attend', 0.4), async () => '{"label":"unsafe"}', async () => { throw Error('local_failure'); }]) {

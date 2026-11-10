@@ -7,10 +7,16 @@ rollout. Existing provider configuration and an approved cumulative budget are
 still required. Missing approval cannot be bypassed by enabling the gate.
 
 The classifier option has `modelId`, `modelRevision`, `minConfidence`,
-`minMargin`, `classify(window, signal)`, optional monotonic `now`, and optional
+`minMargin`, `classify(window, signal)`, required monotonic `now`, and optional
 `onClassification(metadata)`. Its input is the validated frozen observation
 window with natural-language summaries removed. It returns a JSON string in
 the strict five-score [classifier protocol](classifier-shadow.md).
+
+`now()` must use the same clock domain and origin as `window.request.deadline`.
+Browser and Node performance clocks have different origins; passing Node's
+`performance.now` for a browser-origin deadline is invalid without a verified
+mapping. The gate deliberately provides no default clock or inferred mapping.
+The caller owns that mapping; the causal host remains the admission authority.
 
 Observe, abstain, low confidence, invalid output and local classifier errors
 produce a host-owned observe decision with no action and no semantic model
