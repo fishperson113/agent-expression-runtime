@@ -62,6 +62,60 @@ async function authored(client, page, requestId, color, rise) {
   return { requestId, color, rise, result, raster };
 }
 
+async function inspectEngine(client, live) {
+  const inspect = async () => toolValue(await client.tool('inspect_expression', {}));
+  const first = await inspect();
+  expect(first).toMatchObject({ schemaVersion: 1, source: 'fisch-renderer', format: 'structured' });
+  expect(first.summary).toMatchObject({ contextLost: false, color: '#24b7d9', particles: 2000 });
+  expect(first.summary.contentFrame).toBeGreaterThan(0);
+  expect(first.summary.frame).toBeGreaterThanOrEqual(first.summary.contentFrame);
+  expect(first.summary.bounds.min).toHaveLength(3); expect(first.summary.bounds.max.every(Number.isFinite)).toBe(true);
+  expect(first.summary.parts.length).toBeGreaterThan(0);
+  expect(first.summary.parts.reduce((sum, part) => sum + part.particles, 0)).toBe(first.summary.particles);
+  expect(first.summary.parts.filter(part => part.particles > 0).every(part => part.bounds.min.length === 3)).toBe(true);
+  expect(Object.keys(first.summary).sort()).toEqual(['bounds','brightness','capturedAt','color','contentFrame','contextLost','frame','particles','parts','pointSize','signature'].sort());
+  expect(first.evidence).toContain('not pixels');
+  const limited = await client.tool('inspect_expression', {});
+  expect(limited.isError).toBe(true); expect(limited.content[0].text).toContain('render_rate_limited');
+  expect((await fetch(live.base + '/v1/sessions/' + first.session + '/render-output', { method: 'POST', body: '{}' })).status).toBe(401);
+  toolValue(await client.tool('express', { requestId: 'inspect_new_color', body: { type: 'style', color: '#1c73a9', durationMs: 100 } }));
+  await completed(client, 'inspect_new_color'); await new Promise(resolve => setTimeout(resolve, 1100));
+  const second = await inspect();
+  expect(second.summary.color).toBe('#1c73a9'); expect(second.summary.contentFrame).toBeGreaterThan(first.summary.contentFrame);
+  expect(second.requestId).not.toBe(first.requestId); expect(second.epoch).toBe(first.epoch);
+  await new Promise(resolve => setTimeout(resolve, 1100));
+  await live.page.locator('#motion').selectOption('off');
+  await live.page.setViewportSize({ width: 1277, height: 901 });
+  const frozen = await client.tool('inspect_expression', {});
+  expect(frozen.isError).toBe(true); expect(frozen.content[0].text).toContain('render_refresh_unavailable');
+  await live.page.locator('#motion').selectOption('normal');
+  return { first, second, frozen: 'unavailable despite resize', mode: 'structured output, no image/vision/recognition claim' };
+}
+
+async function explicitSceneRecovery(client, live) {
+  const call = async (name, args) => toolValue(await client.tool(name, args));
+  let state = await call('playground_state', {});
+  await call('playground_edit', { operation: 'recover', expectedRevision: state.revision });
+  const scene = { parts: [
+    { id: 'island', kind: 'ellipsoid', center: [-0.4, 0, 0], scale: [0.25, 0.12, 0.1] },
+    { id: 'satellite', kind: 'ellipsoid', center: [0.4, 0.3, 0], scale: [0.1, 0.1, 0.1] }],
+    style: { color: '#79b3e7', pointSize: 2, brightness: 0.8, dispersion: 0 }, flow: { field: 'orbit', strength: 0 } };
+  state = await call('playground_state', {});
+  expect(await call('playground_edit', { operation: 'create', expectedRevision: state.revision, scene })).toMatchObject({ status: 'committed' });
+  const retained = await call('playground_state', { includeScene: true }); expect(retained.scene).toEqual(scene);
+  // This fixture explicitly requests recovery; cancellation never replays a scene.
+  await call('cancel_expression', {});
+  await expect.poll(() => live.page.evaluate(() => window.fischLive.metrics().scene)).toBe('face');
+  state = await call('playground_state', { includeScene: true }); expect(state.recoveryRequired).toBe(true);
+  expect(await call('playground_edit', { operation: 'recover', expectedRevision: state.revision })).toMatchObject({ status: 'recovered' });
+  state = await call('playground_state', { includeScene: true }); expect(state.scene).toBeNull();
+  expect(await call('playground_edit', { operation: 'create', expectedRevision: state.revision, scene: retained.scene })).toMatchObject({ status: 'committed' });
+  const output = await call('inspect_expression', {});
+  expect(output.summary.parts.map(part => part.id).sort()).toEqual(['island', 'satellite']);
+  return { explicitFreshIntent: true, replayOnCancel: false, restoredFromCallerAuthoredClone: true,
+    output, interpretation: 'fresh revision and epoch, not automatic or durable restore, no recognition claim' };
+}
+
 const required = process.env.FISCH_CAPABILITY_REQUIRE_GATEWAY === '1';
 it.skipIf(!existsSync(gatewayExecutable()) && !required)('discovers, authors, executes, cancels and recovers over actual MCP, Rust and WebGL with camera off', async () => {
   expect(existsSync(gatewayExecutable()), 'Build the standalone gateway for required E2E').toBe(true);
@@ -74,6 +128,7 @@ it.skipIf(!existsSync(gatewayExecutable()) && !required)('discovers, authors, ex
     results.push(await authored(client, live.page, 'free_rgb_b', '#db8a24', 0.1));
     results.push(await authored(client, live.page, 'free_rgb_c', '#24b7d9', 0.25));
     expect(results[0].raster.purple).toBeGreaterThan(10);
+    results.push(await inspectEngine(client, live));
     const rejected = await client.tool('express', { requestId: 'invalid_color', body: { type: 'style', color: '#notrgb', durationMs: 100 } });
     expect(rejected.isError).toBe(true);
     toolValue(await client.tool('express', { requestId: 'replaced_work', body: { type: 'wait', durationMs: 8000 } }));
@@ -99,12 +154,13 @@ it.skipIf(!existsSync(gatewayExecutable()) && !required)('discovers, authors, ex
     const stopped = await status(client, 'live_pose_stop');
     expect(stopped.receipt.epoch).toBe(pose.epoch);
     results.push({ requestId: 'live_pose_stop', result: stopped, interpretation: 'stopped early, not an eight-second completion' });
+    results.push(await explicitSceneRecovery(client, live));
     const metrics = await live.page.evaluate(() => ({ metrics: window.fischLive.metrics(), maxRise: window.expressionProbe.maxRise }));
     expect(metrics.maxRise).toBeGreaterThan(0.2);
     expect(metrics.metrics.cameraActive).toBe(false);
     expect(await live.page.locator('video').evaluate(video => video.srcObject)).toBeNull();
     expect(metrics.metrics.diagnostics.events.some(event => event.phase === 'frame_submitted')).toBe(true);
     if (process.env.FISCH_CAPABILITY_EVIDENCE) writeFileSync(process.env.FISCH_CAPABILITY_EVIDENCE,
-      JSON.stringify({ mode: 'scripted_external_agent_actual_mcp_rust_software_webgl', actualModelCalls: 0, humanAcceptance: 'pending', visibilityTool: 'unknown', results, maxRise: metrics.maxRise, cameraActive: false }, null, 2));
+      JSON.stringify({ mode: 'scripted_external_agent_actual_mcp_rust_software_webgl', actualModelCalls: 0, humanAcceptance: 'pending', visibilityTool: 'unknown', inspectionTool: 'structured renderer summary; no image or recognition', results, maxRise: metrics.maxRise, cameraActive: false }, null, 2));
   } finally { await client?.close(); await live.close(); }
 }, 90000);

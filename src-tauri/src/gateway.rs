@@ -357,6 +357,7 @@ impl Gateway {
             .route("/v1/renderer/control-ack", post(renderer_control_ack))
             .route("/v1/sessions/{id}/observe", get(live::observe))
             .route("/v1/sessions/{id}/look", post(live::look))
+            .route("/v1/sessions/{id}/render-output", post(live::render_output::inspect))
             .route("/v1/live/context", get(live::context))
             .layer(DefaultBodyLimit::max(32768))
             .layer(middleware::from_fn_with_state(self.clone(), authorize))

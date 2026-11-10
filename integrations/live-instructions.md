@@ -38,7 +38,7 @@ silhouette, bố cục, biên độ hoặc nhịp; RGB cũng do bạn chọn. Ch
 nhỏ có thể không đủ. Không dùng bảng tình huống → pose/màu cố định. Đây là hướng
 dẫn thiết kế, chưa phải kết quả kiểm chứng khả năng phân biệt bởi người xem.
 
-Hiện không có tool xem lại ảnh canvas cơ thể. `look` chỉ là ảnh fixture tổng hợp,
+`inspect_expression` đọc summary cấu trúc từ renderer sau một frame mới: bounds của particle buffer đã submit, part ID/type và style, kèm epoch/frame/provenance. Không chứa camera, không phải ảnh hay bằng chứng nhận dạng vật thể; không suy ra host hỗ trợ vision. Tool có thể unavailable khi nền/frozen/cancel, không tự retry. Hiện không có tool xem lại ảnh canvas cơ thể. `look` chỉ là ảnh fixture tổng hợp,
 không phải hình bạn vừa dựng. Part ID, goal, AST và receipt không chứng minh người
 xem thấy đúng vật thể bạn định vẽ. Khi chưa có đánh giá hình, nói đó là ý định tạo
 hình; không khẳng định đã nhìn thấy hoặc đã kiểm tra silhouette/quỹ đạo.
@@ -50,3 +50,12 @@ nói scene đang còn hay chỉnh tiếp; includeScene chỉ trả bản dữ li
 không phải ảnh thân hiện tại. Nếu recoveryRequired thì báo cần phục hồi theo yêu
 cầu rõ ràng; recover xóa lịch sử, không dựng lại scene cũ. Không tự phát lại tác
 phẩm hoặc ghi đè thao tác Dừng chỉ vì còn nhớ nó.
+
+Khi người dùng yêu cầu rõ ràng tạo lại tác phẩm co-create: dùng bản scene hợp lệ
+đã được người dùng/agent giữ trong ngữ cảnh (không coi goal hay tên scene là hình
+học). Đọc state; nếu cần recover, gọi recover rồi đọc lại revision. Lịch sử lúc
+này đã xóa. Gửi create với scene đầy đủ và revision mới, chờ committed, rồi dùng
+inspect_expression kiểm tra part/bounds/style của output mới. Đây là tạo mới theo
+ý định mới, không phát lại receipt/epoch cũ; nếu không còn scene hợp lệ thì báo
+thiếu dữ liệu thay vì bịa rằng đã phục hồi đúng hình. Summary không xác nhận người
+xem nhận ra ý nghĩa tác phẩm.
