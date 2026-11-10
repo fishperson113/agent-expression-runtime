@@ -25,7 +25,7 @@ fn coordination(value: &Value) -> bool {
         || !value["remainingMs"].as_f64().is_some_and(|n| n.is_finite() && (0.0..=360000.0).contains(&n)) { return false; }
     let brief = &value["publicBrief"];
     if !brief.is_null() && (!observation::keys(brief, &["revision", "text", "mode"]) ||  !brief["revision"].as_u64().is_some_and(|n| n <= 9007199254740991)
-        || !brief["text"].as_str().is_some_and(|s| !s.trim().is_empty() && s.encode_utf16().count() <= 240 && !s.chars().any(|c| c <= '\u{1f}' || c == '\u{7f}'))
+        || !brief["text"].as_str().is_some_and(|s| !s.trim().is_empty() && s.chars().count() <= 240 && !s.chars().any(|c| c <= '\u{1f}' || c == '\u{7f}'))
         || !brief["mode"].as_str().is_some_and(|s| ["open", "quiet"].contains(&s))) { return false; }
     if brief.is_null() && value["remainingMs"].as_f64() != Some(0.0) { return false; }
     let Some(items) = value["recentPublished"].as_array() else { return false; };

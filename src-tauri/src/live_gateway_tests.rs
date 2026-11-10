@@ -188,6 +188,8 @@ fn public_coordination_rejects_private_fields_and_unbounded_history() {
         ("recentPublished", json!((0..5).map(|n| json!({"requestId":format!("r{n}"),"text":"x".repeat(500),"ageMs":1})).collect::<Vec<_>>()))] {
         let mut invalid = value.clone(); invalid["coordination"][field] = bad; assert!(!receive(&state, invalid));
     }
-    let mut unicode = value.clone(); unicode["coordination"]["publicBrief"] = json!({"revision":1,"text":"\u{85}x","mode":"open"}); assert!(receive(&state, unicode));
+    let mut unicode = value.clone(); unicode["coordination"]["publicBrief"] = json!({"revision":1,"text":"\u{85}x","mode":"open"}); assert!(receive(&state, unicode.clone()));
+    unicode["coordination"]["publicBrief"]["text"] = json!("😀".repeat(240)); assert!(receive(&state, unicode.clone()));
+    unicode["coordination"]["publicBrief"]["text"] = json!("😀".repeat(241)); assert!(!receive(&state, unicode));
     let mut invalid = value; invalid["coordination"]["publicBrief"] = json!({"revision":1,"text":"public","mode":"unknown"}); assert!(!receive(&state, invalid));
 }
