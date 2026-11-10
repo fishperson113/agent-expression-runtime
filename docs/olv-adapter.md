@@ -118,3 +118,33 @@ unbounded and cancellation cooperative. Its complete private core-agent package
 and realtime transport were not exercised. The OLV trial was selected for its
 actual MCP/conversation integration path. These different scopes do not support
 speed or memory comparisons between products.
+
+## Native cancellation attempt lifecycle
+
+The existing Native agent and transport remain in place. Native cancellation now
+uses the same narrow lifecycle principle as the OLV settled-cancellation task:
+release an owned attempt after proven nonexecution, without replaying it. AIRI's
+terminal ownership/cleanup pattern is a design reference, not imported code.
+The sources above retain their upstream attribution; no new dependency is added.
+
+An explicit stop creates one owned `stopping` attempt. A success ACK keeps it
+stopping until the canonical turn terminal event. A trusted transport failure
+with `uncertain === false` proves no write occurred. Standard JSON-RPC invalid
+request, method-not-found and invalid-params errors (-32600/-32601/-32602) also
+reject execution. These outcomes release only the current attempt, enabling a
+new explicit stop; they never schedule an automatic retry. Unknown transport,
+internal and application-specific errors remain stopping, since execution may
+have occurred. Late errors after terminal, thread/intent change or replacement
+attempt cannot mutate the new owner or resurrect its error state.
+
+The internal browser projection includes nullable `ownerTurn`, the canonical
+existing turn ID. The view validates its type and bound; it scopes cancellation
+to generation, revision and owner rather than transcript content. An owner change
+invalidates a pending cancel callback or clears its already-painted cancellation
+error, including when polling skips the terminal snapshot. The backend releases
+the old logical stop slot for a new canonical owner while the old transport
+settles independently. This does not clear send uncertainty, unlock resend, or
+infer completion from an interrupt ACK.
+
+`tests/live-conversation.test.mjs` checks these outcomes against deterministic
+transport fixtures. It does not claim model, physical camera or human acceptance.

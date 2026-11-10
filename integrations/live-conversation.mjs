@@ -9,7 +9,7 @@ const clip = (value, limit) => new TextDecoder().decode(Buffer.from(value.slice(
 
 export class LiveConversation {
   #output; #transport; #broker; #thread; #selection; #generation = 0; #revision = 0;
-  #terminal = new Set(); #intent = 0; #messages = []; #unknown = new Set(); #pending; #stopping; #error = ''; #closed = false; #navigated = false;
+  #terminal = new Set(); #intent = 0; #messages = []; #unknown = new Set(); #pending; #stopping; #stopErrorTurn; #error = ''; #closed = false; #navigated = false;
   constructor({ output, transport, broker }) {
     if (!output || typeof broker?.busy !== 'function' || typeof transport?.submitUser !== 'function' || typeof transport?.interruptUser !== 'function')
       throw failure('conversation_configuration');
@@ -17,7 +17,7 @@ export class LiveConversation {
     this.#thread = output.thread; this.#selection = output.selection;
   }
   #clear() {
-    this.#terminal.clear(); this.#messages = []; this.#stopping = undefined; this.#error = '';
+    this.#terminal.clear(); this.#messages = []; this.#stopping = this.#stopErrorTurn = undefined; this.#error = '';
     this.#generation++; this.#revision++;
   }
   #sync() {
@@ -26,6 +26,12 @@ export class LiveConversation {
       if (this.#selection !== undefined) { this.#intent++; this.#revision++; }
     }
     if (this.#thread !== this.#output.thread) { this.#thread = this.#output.thread; this.#clear(); }
+    const owner = this.#owner();
+    if (owner && this.#stopping && owner !== this.#stopping.turn) { this.#stopping = undefined; this.#revision++; }
+    if (this.#stopErrorTurn && (this.#output.completed?.has(this.#stopErrorTurn) || owner && owner !== this.#stopErrorTurn)) {
+      if (this.#error === 'conversation_stop_unconfirmed') this.#error = '';
+      this.#stopErrorTurn = undefined; this.#revision++;
+    }
   }
   selectionAttempt() { this.#intent++; this.#revision++; }
   navigation() { this.#navigated = true; this.#clear(); this.#error = 'conversation_restart_required'; }
@@ -81,15 +87,26 @@ export class LiveConversation {
     this.#sync(); const turn = this.#owner();
     if (!turn || value?.generation !== this.#generation) throw failure('conversation_no_turn');
     if (this.#stopping?.turn === turn) return Object.freeze({ status: 'stopping' });
+    if (this.#stopErrorTurn === turn && this.#error === 'conversation_stop_unconfirmed') {
+      this.#error = ''; this.#stopErrorTurn = undefined;
+    }
     const job = { generation: this.#generation, intent: this.#intent, thread: this.#thread, turn };
     this.#stopping = job; this.#revision++;
     try {
       const reply = await this.#transport.interruptUser({ threadId: job.thread, turnId: turn },
         message => this.#guard(job, message, true), key => { if (key === job.rpcId) this.#discard(key); });
-      if (reply?.error) throw failure('conversation_stop_unconfirmed');
+      if (reply?.error) throw Object.assign(failure('conversation_stop_unconfirmed'), {
+        uncertain: ![-32600, -32601, -32602].includes(reply.error.code),
+      });
       return Object.freeze({ status: 'stopping' });
-    } catch {
-      if (this.#stopping === job) { this.#error = 'conversation_stop_unconfirmed'; this.#revision++; }
+    } catch (error) {
+      this.#sync();
+      if (this.#stopping === job && job.generation === this.#generation &&
+          job.thread === this.#thread && this.#owner() === job.turn) {
+        if (error?.uncertain === false) this.#stopping = undefined;
+        if (job.intent === this.#intent) { this.#error = 'conversation_stop_unconfirmed'; this.#stopErrorTurn = job.turn; }
+        this.#revision++;
+      }
       throw failure('conversation_stop_unconfirmed');
     }
   }
@@ -134,7 +151,7 @@ export class LiveConversation {
   }
   snapshot() {
     this.#sync();
-    return freeze({ generation: this.#generation, revision: this.#revision, available: !!this.#available(),
+    return freeze({ generation: this.#generation, revision: this.#revision, ownerTurn: this.#owner() ?? null, available: !!this.#available(),
       canSend: !!this.#canSend(), canCancel: !!this.#owner() && !this.#stopping,
       pending: !!this.#pending, stopping: !!this.#stopping, waiting: this.#output.state === 'waiting',
       error: this.#unknown.has(this.#thread) ? 'conversation_unknown' : this.#unknown.size >= 64 ? 'conversation_capacity' : this.#error,
