@@ -27,6 +27,11 @@ holdout evaluation. Either failed cutoff changes the recommendation to abstain.
 These cutoffs are heuristics, not evidence that model probabilities are
 calibrated. An explicit model abstain remains distinguishable in the reason.
 
+`now()` must use the same clock domain and origin as the bound request deadline.
+Do not compare a browser-uptime deadline to Node performance time or wall time.
+A thrown, nonfinite or negative clock fails closed. The adapter requires an
+explicit clock and does not invent a cross-process clock mapping.
+
 `isCurrent(binding)` must synchronously return exactly true to retain a shadow
 recommendation. The caller supplies its existing authority check; this adapter
 does not implement a second causal state machine. Any exception, expired host

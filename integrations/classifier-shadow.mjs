@@ -45,7 +45,7 @@ export class ClassifierShadowAdapter {
     try { prediction = parseClassifierPrediction(text); } catch { return Object.freeze({ status: 'dropped', reason: 'prediction_invalid' }); }
     let now;
     try { now = this.#config.now(); } catch { return Object.freeze({ status: 'dropped', reason: 'clock_failed' }); }
-    if (!Number.isFinite(now) || now >= binding.request.deadline) return Object.freeze({ status: 'dropped', reason: 'deadline' });
+    if (!Number.isFinite(now) || now < 0 || now >= binding.request.deadline) return Object.freeze({ status: 'dropped', reason: 'deadline' });
     let current = false;
     try { current = this.#config.isCurrent(binding) === true; } catch { /* Host validation failure is closed. */ }
     if (!current) return Object.freeze({ status: 'dropped', reason: 'host_revoked' });

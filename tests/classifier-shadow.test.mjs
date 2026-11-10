@@ -45,7 +45,7 @@ it('uses host revocation, not observation-frame equality, and fails closed befor
   let latestPosition = 0;
   const adapter = new ClassifierShadowAdapter(options({ isCurrent: () => latestPosition >= 0 })), binding = adapter.bind(window());
   latestPosition = 0.8; expect(adapter.complete(binding, prediction()).status).toBe('shadow');
-  for (const extra of [{ now: () => 5000 }, { now: () => NaN }, { isCurrent: () => { throw Error('host_failed'); } }]) {
+  for (const extra of [{ now: () => 5000 }, { now: () => -1 }, { now: () => NaN }, { isCurrent: () => { throw Error('host_failed'); } }]) {
     const guarded = new ClassifierShadowAdapter(options(extra));
     expect(guarded.complete(guarded.bind(window()), prediction()).status).toBe('dropped');
   }
