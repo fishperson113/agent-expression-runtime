@@ -108,6 +108,7 @@ export class LiveReactiveBroker {
       const fingerprint = conversation ? JSON.stringify(conversation) : undefined;
       const projection = fingerprint !== this.conversationFingerprint ? conversation : undefined;
       const queuedReceipts = this.providerReceipts.splice(0, 8);
+      const inference = this.active && !this.active.terminal ? this.active : undefined;
       const polled = await this.evaluate(({ activity, entries, busy, available, take, receipts, contractVersion, projection, native, activeId, policy }) => {
         const api = window.fischLive;
         const publish = projection && (projection.token ? api.conversationDocument === projection.token : !projection.snapshot.available);
@@ -121,8 +122,8 @@ export class LiveReactiveBroker {
         if (native) api.configureReactive(available, 1, contractVersion, true, policy); else api.configureReactive(available, 1, contractVersion); api.setReactiveUserBusy(busy);
         let token = null; try { token = api.recordingCaptureToken?.() ?? null; } catch {}
         return { candidate: take ? api.takeReactiveRequest() : null, captureToken: token, conversationApplied: !!publish, activeAllowed: !native || !activeId || api.canContinueNativeReaction?.(activeId) === true };
-      }, { activity, entries, busy, available, take: available && !this.active && !busy, receipts: queuedReceipts, projection, policy: this.provider?.policy, native: this.provider?.conversationLane === true, activeId: this.active?.id ?? null, contractVersion: this.provider?.contractVersion === 2 ? 2 : 1 });
-      if (polled?.activeAllowed === false) { this.active?.controller.abort(); this.provider?.discardPublication?.(this.active?.id); }
+      }, { activity, entries, busy, available, take: available && !this.active && !busy, receipts: queuedReceipts, projection, policy: this.provider?.policy, native: this.provider?.conversationLane === true, activeId: inference?.id ?? null, contractVersion: this.provider?.contractVersion === 2 ? 2 : 1 });
+      if (polled?.activeAllowed === false && inference && this.active === inference && !inference.terminal) { inference.controller.abort(); this.provider?.discardPublication?.(inference.id); }
       if (polled?.conversationApplied) this.conversationFingerprint = fingerprint;
       const candidate = polled?.candidate, token = captureToken(polled?.captureToken);
       const currentBusy = this.reactionBusy() || conversationBusy(conversationSource?.()?.snapshot);

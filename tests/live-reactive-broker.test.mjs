@@ -255,3 +255,32 @@ it('drops history confirmation after stop/epoch rejection, unknown delivery, or 
     expect(provider.confirmPublication).not.toHaveBeenCalled(); f.broker.close();
   }
 });
+
+it('does not cancel consumed requests while publication confirmation is pending', async () => {
+  for (const terminal of [false, true]) {
+    const f = fixture({ conversationLane: true, discardPublication: vi.fn() });
+    const controller = new AbortController(); f.broker.active = { id: 'r', terminal, controller };
+    f.api.canContinueNativeReaction = vi.fn(() => false);
+    try {
+      await f.broker.poll({});
+      expect(controller.signal.aborted).toBe(!terminal);
+      expect(f.api.canContinueNativeReaction).toHaveBeenCalledTimes(terminal ? 0 : 1);
+    } finally { f.broker.close(); }
+  }
+});
+
+it('ignores an old inference poll when delivery started or ownership changed during await', async () => {
+  for (const change of ['delivery', 'replacement']) {
+    const f = fixture({ conversationLane: true }); let release;
+    const inference = { id: 'old', terminal: false, controller: new AbortController() }; f.broker.active = inference;
+    f.page.evaluate = () => new Promise(resolve => { release = resolve; });
+    try {
+      const polling = f.broker.poll({}); await flush();
+      if (change === 'delivery') inference.terminal = true;
+      else f.broker.active = { id: 'new', terminal: false, controller: new AbortController() };
+      release({ activeAllowed: false }); await polling;
+      expect(inference.controller.signal.aborted).toBe(false);
+      expect(f.broker.active.controller.signal.aborted).toBe(false);
+    } finally { f.broker.close(); }
+  }
+});
