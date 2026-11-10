@@ -146,8 +146,9 @@ contrast should be authored through geometry, layout, amplitude, timing and free
 chosen RGB rather than a fixed emotion palette; recognition still needs human
 evaluation.
 
-Conversation memory and rendered body state are separate. Ordinary express is
-transient; playground stores a bounded session-local authored scene. Epoch loss
+Conversation memory and rendered body state are separate. Ordinary express has no saved-creation journal; geometry may remain after its
+program completes until another mutation. Playground stores a bounded
+session-local authored scene. Epoch loss
 invalidates its controller and may return the body to the resting face. Read state
 before continuing; uncertain recovery requires explicit user intent and clears
 history. It is not an automatic restore operation. This change documents existing

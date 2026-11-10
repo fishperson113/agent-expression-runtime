@@ -24,7 +24,7 @@ const workflow = {
     replace: 'Use replace for a new intent; replacement starts from the displayed state.',
     append: 'Use append only for deliberate ordered choreography within the bounded queue.',
     leases: 'Live controls expire and return toward neutral/lower layers; user motion-off and stop remain authoritative.',
-    scenePersistence: 'express is transient body control, not a saved creation. playground_state with includeScene=true returns a session-local authored scene clone, not a screenshot or proof of the current body. Conversation memory is not rendered scene state. Stop/reset/session or epoch changes can return the body to the resting face and invalidate playground ownership. Do not silently replay a remembered scene; inspect playground_state and honor recoveryRequired. recover clears history rather than restoring it. A new creation requires explicit fresh user intent.',
+    scenePersistence: 'express controls the current body without a saved-creation journal or persistence guarantee across stop/reset; geometry may remain after program completion until another mutation. playground_state with includeScene=true returns a session-local authored scene clone, not a screenshot or proof of the current body. Conversation memory is not rendered scene state. Stop/reset/session or epoch changes can return the body to the resting face and invalidate playground ownership. Do not silently replay a remembered scene; inspect playground_state and honor recoveryRequired. recover clears history rather than restoring it. A new creation requires explicit fresh user intent.',
     restore: 'return_to_face restores the declared resting body and clears semantic controls; it is not an emotion preset.',
   },
   recovery: {
