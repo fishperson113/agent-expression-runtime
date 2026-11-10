@@ -13,33 +13,45 @@ function captureToken(value) {
 }
 const controlled = new Set(['turn/start', 'turn/steer', 'thread/start', 'thread/resume', 'thread/fork', 'turn/interrupt']);
 const conversationBusy = value => !!value && (value.pending || value.stopping || value.error === 'conversation_unknown');
+const operations = new Set(['poll', 'authorize', 'deliver', 'user_barrier', 'publication_fence', 'fail', 'other']);
+const failureReasons = new Set(['eval_rejected', 'deadline', 'capacity', 'closed', 'unknown']);
 export class LiveReactiveBroker {
+  #failureDiagnostic;
+  diagnostics() { return this.#failureDiagnostic ? { ...this.#failureDiagnostic } : null; }
+  recordFailure(reason, operation) {
+    this.#failureDiagnostic ??= Object.freeze({ reason: failureReasons.has(reason) ? reason : 'unknown',
+      operation: operations.has(operation) ? operation : 'other' });
+  }
   closed = false; browserUnavailable = false; waiters = new Set(); polling = false; draining = false; active; uncertain = false; paused = false;
   providerReceipts = []; queue = []; pending = new Map(); turns = new Set(); completed = new Set(); receipts = new Set(); requests = new Set();
   constructor({ page, provider = null, output, forward, reject, log = () => {}, evaluateTimeoutMs = 10000 }) {
     if (!Number.isInteger(evaluateTimeoutMs) || evaluateTimeoutMs < 1 || evaluateTimeoutMs > 10000) throw Error('reactive_timeout_invalid');
     Object.assign(this, { page, provider, output, forward, reject, log, evaluateTimeoutMs });
   }
-  evaluate(fn, arg) {
-    if (this.closed || this.browserUnavailable) return Promise.reject(Error('reactive_browser_unavailable'));
-    if (this.waiters.size >= 4) { this.browserFailed(); return Promise.reject(Error('reactive_browser_unavailable')); }
+  evaluate(fn, arg, operation = 'other') {
+    if (this.closed || this.browserUnavailable) {
+      if (this.closed) this.recordFailure('closed', operation);
+      return Promise.reject(Error('reactive_browser_unavailable'));
+    }
+    if (this.waiters.size >= 4) { this.browserFailed('capacity', operation); return Promise.reject(Error('reactive_browser_unavailable')); }
     return new Promise((resolve, reject) => {
       const owned = { reject: error => settle(reject, error) };
       const settle = (callback, value) => {
         if (!this.waiters.delete(owned)) return;
         clearTimeout(owned.timer); callback(value);
       };
-      owned.timer = setTimeout(() => this.browserFailed(), this.evaluateTimeoutMs); this.waiters.add(owned);
+      owned.timer = setTimeout(() => this.browserFailed('deadline', operation), this.evaluateTimeoutMs); this.waiters.add(owned);
       void Promise.resolve().then(() => {
         if (this.waiters.has(owned)) return this.page.evaluate(fn, arg);
-      }).then(value => settle(resolve, value), () => { if (this.waiters.has(owned)) this.browserFailed(); });
+      }).then(value => settle(resolve, value), () => { if (this.waiters.has(owned)) this.browserFailed('eval_rejected', operation); });
     });
   }
   rejectEvaluations(code) {
     for (const owned of [...this.waiters]) owned.reject(Error(code));
   }
-  browserFailed() {
+  browserFailed(reason = 'unknown', operation = 'other') {
     if (this.closed || this.browserUnavailable) return;
+    this.recordFailure(reason, operation);
     this.browserUnavailable = true; this.paused = true; this.uncertain = true;
     clearTimeout(this.active?.timer); if (this.active) this.active.terminal = true;
     this.rejectEvaluations('reactive_browser_unavailable'); this.log('reactive_browser_unavailable');
@@ -68,7 +80,7 @@ export class LiveReactiveBroker {
       while (!this.closed && this.queue.length) {
         const message = this.queue.shift();
         try {
-          await this.evaluate(() => window.fischLive.reactiveUserIntent());
+          await this.evaluate(() => window.fischLive.reactiveUserIntent(), undefined, 'user_barrier');
           if (this.closed || this.browserUnavailable) { this.rejectInput(message, 'reactive_user_closed'); continue; }
           if (message.method === 'turn/steer' && (message.params?.threadId !== this.output.thread ||
             message.params?.expectedTurnId !== this.output.turn)) throw Error('steer_changed');
@@ -122,7 +134,7 @@ export class LiveReactiveBroker {
         if (native) api.configureReactive(available, 1, contractVersion, true, policy); else api.configureReactive(available, 1, contractVersion); api.setReactiveUserBusy(busy);
         let token = null; try { token = api.recordingCaptureToken?.() ?? null; } catch {}
         return { candidate: take ? api.takeReactiveRequest() : null, captureToken: token, conversationApplied: !!publish, activeAllowed: !native || !activeId || api.canContinueNativeReaction?.(activeId) === true };
-      }, { activity, entries, busy, available, take: available && !this.active && !busy, receipts: queuedReceipts, projection, policy: this.provider?.policy, native: this.provider?.conversationLane === true, activeId: inference?.id ?? null, contractVersion: this.provider?.contractVersion === 2 ? 2 : 1 });
+      }, { activity, entries, busy, available, take: available && !this.active && !busy, receipts: queuedReceipts, projection, policy: this.provider?.policy, native: this.provider?.conversationLane === true, activeId: inference?.id ?? null, contractVersion: this.provider?.contractVersion === 2 ? 2 : 1 }, 'poll');
       if (polled?.activeAllowed === false && inference && this.active === inference && !inference.terminal) { inference.controller.abort(); this.provider?.discardPublication?.(inference.id); }
       if (polled?.conversationApplied) this.conversationFingerprint = fingerprint;
       const candidate = polled?.candidate, token = captureToken(polled?.captureToken);
@@ -163,7 +175,7 @@ export class LiveReactiveBroker {
         const api = window.fischLive, allowed = await api.authorizeReactiveRequest(id);
         let token = null; try { token = api.recordingCaptureToken?.() ?? null; } catch {}
         return { allowed, captureToken: token };
-      }, owned.id);
+      }, owned.id, 'authorize');
       allowed = result?.allowed;
       const current = captureToken(result?.captureToken);
       if (!current || !owned.captureToken || current.runId !== owned.captureToken.runId || current.generation !== owned.captureToken.generation) owned.captureToken = null;
@@ -183,10 +195,10 @@ export class LiveReactiveBroker {
       .then(value => this.finish(owned, value)).catch(error => this.failed(owned, error));
   }
   async deliver(id, data) {
-    return this.evaluate(({ id, data, native }) => native ? window.fischLive.deliverNativeReaction(id, data) : window.fischLive.deliverReactiveDecision(id, data), { id, data, native: this.provider?.conversationLane === true });
+    return this.evaluate(({ id, data, native }) => native ? window.fischLive.deliverNativeReaction(id, data) : window.fischLive.deliverReactiveDecision(id, data), { id, data, native: this.provider?.conversationLane === true }, 'deliver');
   }
   async fail(id) {
-    try { await this.evaluate(id => window.fischLive.failReactiveDecision(id), id); }
+    try { await this.evaluate(id => window.fischLive.failReactiveDecision(id), id, 'fail'); }
     catch { this.log('reactive_browser_unavailable'); }
   }
   async finish(owned, value) {
@@ -205,7 +217,7 @@ export class LiveReactiveBroker {
     const current = () => !this.closed && !this.browserUnavailable && this.active === owned && !owned.controller.signal.aborted &&
       !this.reactionBusy() && !conversationBusy(this.conversationSource?.()?.snapshot);
     if (!current()) { this.provider.discardPublication?.(owned.id); return; }
-    const allowed = await this.evaluate(request => window.fischLive.canRememberNativeReaction?.(request) === true, owned.request);
+    const allowed = await this.evaluate(request => window.fischLive.canRememberNativeReaction?.(request) === true, owned.request, 'publication_fence');
     if (!current() || allowed !== true) { this.provider.discardPublication?.(owned.id); return; }
     this.provider.confirmPublication(owned.request, receipt);
   }
