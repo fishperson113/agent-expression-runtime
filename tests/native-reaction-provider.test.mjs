@@ -10,19 +10,20 @@ const window = () => ({ schemaVersion: 1, request: { schemaVersion: 1, sessionId
   observations: [{ v: 1, sessionId: 's', seq: 1, capturedAt: 100, camera: 'absent', turn: 'working', summary: 'PRIVATE_INSTRUCTION_CANARY',
     user: { present: false, quality: { score: 0, basis: 'unavailable' }, position: null, head: null, facingScreen: null, expression: null, mouthMoving: null } }] });
 const retain = { reply: 'Mình thấy bạn vừa quay lại.', decision: { mode: 'retain', reasonCode: 'presence', payload: null } };
-function fixture({ catalog = [], response = retain, pending = false, reserve = async () => {}, confirmedClose = true, nativeError = null, nativeStatus = 'completed', missingConfig = false, featurePatch = {}, requestedModel, effectiveModel } = {}) {
+function fixture({ catalog = [], response = retain, pending = false, pendingAck = false, reserve = async () => {}, confirmedClose = true, nativeError = null, nativeStatus = 'completed', missingConfig = false, featurePatch = {}, requestedModel, effectiveModel } = {}) {
   const calls = [], processes = []; let notify;
   const provider = new NativeReactionProvider({ command: 'codex', reserve, model: requestedModel }, { env: { HOME: '/native-auth', AER_PAIRING_TOKEN: 'SECRET', OPENAI_API_KEY: 'SECRET', PATH: 'native' },
     settleTimeoutMs: 10, rpcFactory: (command, args, cwd, event, failed, env) => {
       notify = event;
-      let confirm; const settled = new Promise(resolve => { confirm = resolve; });
-      const rpc = { settled, closed: false, command, args, env, send: () => {}, close: () => { rpc.closed = true; if (confirmedClose) confirm(); failed('closed'); },
+      let rejectAck; let confirm; const settled = new Promise(resolve => { confirm = resolve; });
+      const rpc = { settled, closed: false, command, args, env, send: () => {}, close: () => { rpc.closed = true; if (confirmedClose) confirm(); rejectAck?.(Error('planner_process_closed')); failed('closed'); },
         request: async (method, params) => {
           calls.push({ method, params });
           if (method === 'config/read') return missingConfig ? {} : { config: { mcp_servers: { fisch_live: {} }, features: { ...Object.fromEntries(['shell_tool', 'apps', 'plugins', 'hooks', 'multi_agent', 'computer_use', 'browser_use', 'image_generation', 'view_image'].map(key => [key, false])), ...featurePatch } } };
           if (method === 'thread/start') return { thread: { id: 'reaction-thread' }, ...(effectiveModel ? { model: effectiveModel } : {}) };
           if (method === 'mcpServerStatus/list') return { data: catalog, nextCursor: null };
           if (method === 'turn/start') {
+            if (pendingAck) return new Promise((_resolve, reject) => { rejectAck = reject; });
             if (!pending) queueMicrotask(() => {
               event('item/completed', { threadId: 'reaction-thread', turnId: 'reaction-turn', item: { type: 'agentMessage', phase: 'commentary', text: 'not a final response' } });
               event('item/completed', { threadId: 'reaction-thread', turnId: 'reaction-turn', item: { type: 'agentMessage', text: JSON.stringify(response) } });
@@ -243,4 +244,15 @@ it('fences a late reaction result as soon as user intent arrives, before the bro
     await broker.finish(owned, { reply: 'must not appear' });
     expect(values).toEqual([null]); expect(broker.active).toBeUndefined(); expect(output.turn).toBe('coding'); broker.close();
   }
+});
+
+it('preserves human abort before turn ACK while separately confirming process closure', async () => {
+  const f = fixture({ pendingAck: true }), controller = new AbortController();
+  try {
+    const run = f.provider.decide(window(), controller.signal);
+    while (!f.calls.some(call => call.method === 'turn/start')) await new Promise(resolve => setImmediate(resolve));
+    controller.abort();
+    await expect(run).rejects.toMatchObject({ message: 'native_reaction_aborted', transportSettled: true });
+    expect(f.provider.diagnostics().lastFailure).toMatchObject({ code: 'native_reaction_aborted', transportSettled: true });
+  } finally { f.provider.close(); }
 });

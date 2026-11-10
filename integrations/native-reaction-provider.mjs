@@ -112,7 +112,7 @@ export class NativeReactionProvider {
       const flight = this.#flight, terminal = !!flight.ackTurnId && flight.terminalTurnId === flight.ackTurnId;
       const settled = !flight.dispatched || terminal || await this.settle(flight.rpc ?? this.rpc);
       if (!settled) this.uncertain = true;
-      const code = error?.code === 'reactive_budget_denied' ? error.code :
+      const code = signal.aborted ? 'native_reaction_aborted' : error?.code === 'reactive_budget_denied' ? error.code :
         /^[a-z][a-z0-9_]{0,80}$/.test(error?.message) ? error.message : 'native_reaction_failed';
       this.recordDiagnostic({ requestId: flight.requestId, threadId: flight.threadId ?? null, turnId: flight.ackTurnId ?? null,
         status: flight.nativeStatus ?? (flight.dispatched ? 'transport_failed' : 'pre_dispatch_rejected'), code, transportSettled: settled, error: flight.nativeError ?? null }, true);
