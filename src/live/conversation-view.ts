@@ -66,13 +66,38 @@ function messageText(item: Message) {
   const status: Record<string, string> = { streaming: 'Đang nhận', completed: 'Đã hoàn tất', interrupted: 'Đã ngắt', failed: 'Lượt lỗi', unknown: 'Chưa rõ kết quả' };
   return `${item.role === 'user' ? 'Bạn' : 'Codex'}: ${item.text}\n[${status[item.status]}${item.truncated ? ' · Đã rút gọn phần hiển thị' : ''}]`;
 }
-function projectMessages(ui: ReturnType<typeof elements>, next: Snapshot) {
-  const top = ui.list.scrollTop, bottom = top + ui.list.clientHeight >= ui.list.scrollHeight - 40;
-  const texts = next.messages.map(messageText);
-  if (JSON.stringify([...ui.list.children].map(node => node.textContent)) !== JSON.stringify(texts)) {
-    ui.list.replaceChildren(...texts.map(text => { const node = document.createElement('li'); node.textContent = text; return node; }));
-    ui.list.scrollTop = bottom ? ui.list.scrollHeight : top;
-  }
+function messageProjection(list: HTMLOListElement) {
+  const measure = () => ({ top: list.scrollTop, height: list.clientHeight, total: list.scrollHeight });
+  let following = true, resizing = false, frame = 0, layout = measure();
+  const settle = () => {
+    capture(); if (following) list.scrollTop = list.scrollHeight;
+    layout = measure(); resizing = false; if (frame) cancelAnimationFrame(frame); frame = 0;
+  };
+  const capture = () => {
+    const next = measure();
+    // A resize-generated scroll must not overwrite the reader's prior follow intent.
+    if (next.height !== layout.height || next.total !== layout.total) { resizing = true; if (!frame) frame = requestAnimationFrame(settle); }
+    if (!resizing) following = next.top + next.height >= next.total - 40;
+    layout = next; return next;
+  };
+  const readerScroll = (event: Event) => {
+    if (event instanceof KeyboardEvent && !['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key)) return;
+    resizing = false; layout = measure(); following = layout.top + layout.height >= layout.total - 40;
+  };
+  const inputs = ['wheel', 'keydown', 'pointerdown', 'touchstart'];
+  for (const type of inputs) list.addEventListener(type, readerScroll, { passive: true });
+  const resize = new ResizeObserver(settle);
+  list.addEventListener('scroll', capture); resize.observe(list);
+  return {
+    project(next: Snapshot) {
+      const before = capture(), texts = next.messages.map(messageText);
+      if (JSON.stringify([...list.children].map(node => node.textContent)) === JSON.stringify(texts)) return;
+      list.replaceChildren(...texts.map(text => { const node = document.createElement('li'); node.textContent = text; return node; }));
+      list.scrollTop = following ? list.scrollHeight : before.top; layout = measure(); resizing = false;
+    },
+    clear() { following = true; resizing = false; if (frame) cancelAnimationFrame(frame); frame = 0; list.replaceChildren(); layout = measure(); },
+    dispose() { resize.disconnect(); if (frame) cancelAnimationFrame(frame); list.removeEventListener('scroll', capture); for (const type of inputs) list.removeEventListener(type, readerScroll); }
+  };
 }
 function statusText(state: Snapshot | undefined, busy: boolean) {
   return state?.error ? errors[state.error] : !state?.available ? 'Chọn hoặc bắt đầu phiên trong terminal Native Codex đang chạy cùng Fisch.' :
@@ -109,9 +134,10 @@ export function mountConversation(container: HTMLElement, request: Request) {
   const ui = elements(); container.append(ui.host);
   let state: Snapshot | undefined, disposed = false, attempt = 0, busy = false, cancelling = false, localError = '', lock = false, acknowledged = -1, highGeneration = -1, highRevision = -1, cleared = false;
   const reactions = reactionView(ui.host, () => disposed);
+  const messages = messageProjection(ui.list);
   let cancelScope: CancelScope | undefined, localCancelError: CancelScope | undefined;
   const paint = () => paintConversation(ui, state, { disposed, busy, cancelling, localError, lock, acknowledged });
-  function clear() { reactions.clear(); cleared = true; attempt++; busy = false; cancelling = false; cancelScope = localCancelError = undefined; lock = false; acknowledged = -1; localError = ''; ui.input.value = ''; ui.list.replaceChildren(); state = undefined; paint(); }
+  function clear() { reactions.clear(); cleared = true; attempt++; busy = false; cancelling = false; cancelScope = localCancelError = undefined; lock = false; acknowledged = -1; localError = ''; ui.input.value = ''; messages.clear(); state = undefined; paint(); }
   function project(value: unknown) {
     if (disposed) return;
     const next = snapshot(value);
@@ -121,7 +147,7 @@ export function mountConversation(container: HTMLElement, request: Request) {
     state = next; highGeneration = next.generation; highRevision = next.revision; cleared = false;
     if (cancelScope && cancelSettled(next, cancelScope)) { cancelScope = undefined; cancelling = false; }
     if (localCancelError && cancelSettled(next, localCancelError)) { localError = ''; localCancelError = undefined; }
-    projectMessages(ui, next);
+    messages.project(next);
     paint();
   }
   async function act(action: 'send' | 'cancel') {
@@ -146,5 +172,5 @@ export function mountConversation(container: HTMLElement, request: Request) {
     } finally { if (!disposed && current === attempt) { if (action === 'send') busy = false; else if (cancelScope === scope) cancelling = false; paint(); } }
   }
   ui.input.oninput = paint; ui.form.onsubmit = event => { event.preventDefault(); void act('send'); }; ui.cancel.onclick = () => { void act('cancel'); }; paint();
-  return { project, clear, reaction: reactions.publish, reactionHistory: reactions.snapshot, dispose: () => { if (disposed) return; clear(); disposed = true; ui.input.oninput = null; ui.form.onsubmit = null; ui.cancel.onclick = null; ui.host.remove(); } };
+  return { project, clear, reaction: reactions.publish, reactionHistory: reactions.snapshot, dispose: () => { if (disposed) return; clear(); disposed = true; messages.dispose(); ui.input.oninput = null; ui.form.onsubmit = null; ui.cancel.onclick = null; ui.host.remove(); } };
 }
