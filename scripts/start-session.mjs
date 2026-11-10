@@ -41,7 +41,7 @@ export async function inspectEnvironment() {
       const host = name === 'Rust' ? { command: 'cargo', args: [] } : await codexCommand();
       const { stdout } = await promisify(execFile)(host.command, [...host.args, '--version'], { windowsHide: true });
       checks.push({ name, ok: true, detail: stdout.trim() });
-    } catch { checks.push({ name, ok: false, detail: name === 'Rust' ? 'Install Rust and platform Tauri prerequisites.' : 'Install Codex CLI and run codex login.' }); }
+    } catch { checks.push({ name, ok: false, detail: name === 'Rust' ? 'Install Rust and its platform compiler prerequisites.' : 'Install Codex CLI and run codex login.' }); }
   }
   const browsers = [process.env.CHROME_PATH, '/usr/bin/chromium', '/usr/bin/google-chrome',
     '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
@@ -51,12 +51,12 @@ export async function inspectEnvironment() {
   try {
     const { chromium } = await import('@playwright/test');
     browsers.push(chromium.executablePath());
-  } catch { /* fisch run installs missing local npm dependencies. */ }
+  } catch { /* fisch live installs missing local npm dependencies. */ }
   const browser = browsers.find(path => path && existsSync(path));
   checks.push({ name: 'Browser', ok: !!browser, detail: browser ?? 'Install Edge/Chrome or set CHROME_PATH.' });
   const installed = existsSync(resolve(root, 'node_modules/vite/package.json'));
   checks.push({ name: 'Dependencies', ok: installed, optional: true,
-    detail: installed ? 'Installed' : 'fisch run will install them.' });
+    detail: installed ? 'Installed' : 'fisch live will install them.' });
   return checks;
 }
 
@@ -137,7 +137,7 @@ async function openBody(origin, base, token, headless) {
       break;
     } catch { /* Try the next installed browser. */ }
   }
-  if (!browser) throw Error('Install Microsoft Edge or Google Chrome, then run fisch run again.');
+  if (!browser) throw Error('Install Microsoft Edge or Google Chrome, then run fisch live again.');
   try {
     const page = await browser.newPage();
     page.setDefaultTimeout(15000);
@@ -231,7 +231,7 @@ export async function runSession({ headless = false, runHost = codexHost } = {})
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   prepareSession().then(() => runSession()).then(code => { process.exitCode = code; }).catch(error => {
-    console.error('Session failed: ' + (error.message.startsWith('Install ') || error.message.includes('failed.') || error.message.startsWith('Could not start ') ? error.message : 'Check Edge/Chrome, Codex login and the gateway build, then run fisch run again.'));
+    console.error('Session failed: ' + (error.message.startsWith('Install ') || error.message.includes('failed.') || error.message.startsWith('Could not start ') ? error.message : 'Check Edge/Chrome, Codex login and the gateway build, then run fisch live again.'));
     process.exitCode = 1;
   });
 }

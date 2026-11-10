@@ -19,7 +19,7 @@ export function sendControl(method, args, paneId = process.env.HERDR_PANE_ID, ti
   return new Promise((resolve, reject) => {
     let buffer = '';
     const socket = net.connect(controlAddress(paneId), () => socket.write(JSON.stringify({ method, args }) + '\n'));
-    const fail = () => { socket.destroy(); reject(Object.assign(Error('No Fisch body attached to this agent pane. Run fisch run in its neighboring pane.'), { public: true })); };
+    const fail = () => { socket.destroy(); reject(Object.assign(Error('No Fisch body attached to this agent pane. These controls require Live\'s dedicated --agent Herdr pane; use the browser controls for normal-terminal fisch live.'), { public: true })); };
     socket.setTimeout(timeoutMs, fail); socket.on('error', fail);
     socket.on('end', () => { if (!buffer.includes('\n')) fail(); });
     socket.on('data', chunk => {

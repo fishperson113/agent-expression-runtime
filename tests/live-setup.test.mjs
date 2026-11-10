@@ -15,11 +15,10 @@ async function fixture() {
   await writeFile(resolve(root, 'input'), 'first');
   return root;
 }
-it('routes optional preparation flags without changing run', async () => {
-  const live = vi.fn(), run = vi.fn();
+it('routes Live preparation flags and the explicit Herdr adapter', async () => {
+  const live = vi.fn();
   await dispatch(['live', '--hands', '--agent', 'pane'], { live });
   expect(live).toHaveBeenCalledWith({ hands: true, agentPane: 'pane' });
-  await dispatch(['run'], { run }); expect(run).toHaveBeenCalledWith();
   expect(parseLiveOptions(['--no-assets'])).toEqual({ assets: false });
   for (const args of [['--hands', '--no-assets'], ['--agent'], ['--bad'], ['--hands', '--hands']]) expect(() => parseLiveOptions(args)).toThrow();
 });
