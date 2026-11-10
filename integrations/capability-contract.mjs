@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { compositionContract } from './compose-expression.mjs';
 
 const manifest = JSON.parse(readFileSync(new URL('../src/contracts/capabilities.json', import.meta.url), 'utf8'));
 const workflow = {
@@ -7,6 +8,8 @@ const workflow = {
   authoring: {
     schemaResource: 'aer://schema/v1', instructionsResource: 'aer://instructions/v1',
     choice: 'Author geometry, motion and any #RRGGBB color from actual context; no fixed emotion, phrase or gesture-to-effect table is required.',
+    geometryContract: compositionContract,
+    geometryTool: 'Live compose_expression v1 accepts agent-authored parts and optional none(default)/resting_face base, style RGB, flow and duration. It expands into the existing DSL/admission path without a semantic template. Use express for advanced motion/choreography. Retaining a form or no call may be appropriate; geometry count is not a relevance metric.',
     composition: 'The face is optional. Author standalone forms, replace the whole body, or combine components. assemble.parts is the complete target geometry; append queues time, not spatial parts. For the default face, clone aer://live/v1 restingFace.parts and add uniquely identified parts within limits. return_to_face is optional and removes added geometry. Compound scenes remain user/agent-owned; only the complete unchanged canonical face component gets local presence animation, below agent controls.',
     legibility: 'When two expressions should read differently at a glance, choose context-appropriate differences in silhouette, spatial arrangement, pose amplitude or timing; RGB is also freely authored. No fixed mapping is prescribed. Tiny eye/mouth changes alone may be hard to distinguish.',
     input: 'Declarative data only: no executable code, shaders, filesystem, network or per-frame commands.',

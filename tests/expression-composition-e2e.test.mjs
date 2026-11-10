@@ -35,14 +35,18 @@ async function capture(page, key) {
   await expect.poll(() => page.evaluate(key => !!window.compositionProbe.captures[key], key)).toBe(true);
   return page.evaluate(key => window.compositionProbe.captures[key], key);
 }
-async function express(client, requestId, parts, color) {
-  const receipt = toolValue(await client.tool('express', { requestId, body: { type: 'parallel', children: [
-    { type: 'assemble', parts, durationMs: 300 }, { type: 'style', color, brightness: 0.95, pointSize: 2.2, dispersion: 0, durationMs: 300 },
-    { type: 'flow', field: 'pulse', strength: 0, durationMs: 300 }] } }));
+async function compose(client, requestId, parts, color, base) {
+  const args = { requestId, parts, ...(base ? { base } : {}), durationMs: 300,
+    style: { color, brightness: 0.95, pointSize: 2.2, dispersion: 0 }, flow: { field: 'pulse', strength: 0 } };
+  const receipt = toolValue(await client.tool('compose_expression', args));
   expect(receipt.status).toBe('accepted');
   await expect.poll(async () => toolValue(await client.tool('expression_status', { requestId })).status, { timeout: 12000 }).toBe('completed');
+  expect(toolValue(await client.tool('compose_expression', args)).seq).toBe(receipt.seq);
+  const changed = await client.tool('compose_expression', { ...args, style: { ...args.style, color: '#123456' } });
+  expect(changed.isError).toBe(true); expect(changed.content[0].text).toContain('request_id_reused');
   return receipt;
 }
+
 function authoredMark(x = 1.65) {
   return [{ id: 'agent_arc', kind: 'curve', radius: 0.035, points: [[x - 0.2, 1.35, 0.35], [x - 0.1, 1.55, 0.35], [x + 0.17, 1.5, 0.35], [x + 0.24, 1.3, 0.35], [x + 0.08, 1.12, 0.35], [x, 0.98, 0.35], [x, 0.8, 0.35]] },
     { id: 'agent_dot', kind: 'ellipsoid', center: [x, 0.58, 0.35], scale: [0.055, 0.055, 0.05] }];
@@ -57,10 +61,10 @@ it.skipIf(!existsSync(gatewayExecutable()) && !required)('supports standalone au
     const resource = await client.call('resources/read', { uri: 'aer://live/v1' });
     const face = JSON.parse(resource.contents[0].text).restingFace.parts;
     const standalone = [{ id: 'agent_flare', kind: 'curve', radius: 0.055, points: [[0, -0.85, 0], [-0.6, -0.3, 0], [-0.5, 0.35, 0], [-0.2, 0.05, 0], [0.15, 1, 0], [0.3, 0.4, 0], [0.65, -0.2, 0], [0.4, -0.7, 0], [0, -0.85, 0]] }];
-    await express(client, 'standalone', standalone, '#f88b37'); const singleEarly = await capture(live.page, 'standalone_early');
+    await compose(client, 'standalone', standalone, '#f88b37'); const singleEarly = await capture(live.page, 'standalone_early');
     await new Promise(resolve => setTimeout(resolve, 500)); const single = await capture(live.page, 'standalone');
     expect(single.raster.authored.lit).toBeGreaterThan(50); expect(single.raster.face.lit).toBe(0); expect(single.parts).toEqual(standalone);
-    const compound = [...face, ...authoredMark()]; await express(client, 'compound', compound, '#59d8c6');
+    const compoundReceipt = await compose(client, 'compound', authoredMark(), '#59d8c6', 'resting_face');
     await live.page.evaluate(() => window.fischLive.activity({ turn: 'idle', output: 0, quality: 'synthetic' }));
     const combinedEarly = await capture(live.page, 'compound_early');
     await new Promise(resolve => setTimeout(resolve, 500)); const combined = await capture(live.page, 'compound');
@@ -71,11 +75,13 @@ it.skipIf(!existsSync(gatewayExecutable()) && !required)('supports standalone au
     await new Promise(resolve => setTimeout(resolve, 500)); const speaking = await capture(live.page, 'activity');
     const height = value => { const b = value.output.parts.find(p => p.id === 'mouth').bounds; return b.max[1] - b.min[1]; };
     expect(height(speaking)).toBeGreaterThan(height(combined) * 1.4);
-    const remixed = [...face, ...authoredMark(1.5)]; await express(client, 'remix', remixed, '#c6a8ff'); const remix = await capture(live.page, 'remix');
+    await compose(client, 'remix', authoredMark(1.5), '#c6a8ff', 'resting_face'); const remix = await capture(live.page, 'remix');
     expect(ordered(remix.parts.filter(p => !p.id.startsWith('agent_')))).toEqual(ordered(face));
     expect(ordered(remix.parts.filter(p => p.id.startsWith('agent_')))).toEqual(ordered(authoredMark(1.5)));
     await client.tool('cancel_expression');
     await expect.poll(() => live.page.evaluate(() => window.fischLive.metrics().scene)).toBe('face');
+    const stale = await client.tool('compose_expression', { requestId: 'retired_compose', expectedEpoch: compoundReceipt.epoch, parts: authoredMark() });
+    expect(stale.isError).toBe(true); expect(stale.content[0].text).toContain('expected_epoch_mismatch');
     const stopped = await capture(live.page, 'stopped'); expect(stopped.parts.some(p => p.id.startsWith('agent_'))).toBe(false);
     await new Promise(resolve => setTimeout(resolve, 500)); expect(await live.page.evaluate(() => window.fischLive.metrics().parts.some(id => id.startsWith('agent_')))).toBe(false);
     expect(await live.page.locator('video').evaluate(video => video.srcObject)).toBeNull();
