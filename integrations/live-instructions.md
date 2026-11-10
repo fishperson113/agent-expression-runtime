@@ -94,3 +94,16 @@ inspect_expression kiểm tra part/bounds/style của output mới. Đây là t�
 ý định mới, không phát lại receipt/epoch cũ; nếu không còn scene hợp lệ thì báo
 thiếu dữ liệu thay vì bịa rằng đã phục hồi đúng hình. Summary không xác nhận người
 xem nhận ra ý nghĩa tác phẩm.
+
+## Chủ động chia sẻ body dùng một lần
+
+Tác phẩm riêng mặc định được giữ, observer không được ghi đè. Chỉ khi hình của
+bạn là minh họa có thể bỏ đi và bạn muốn nhường quyền, đặt `observerHandoffMs`
+(1000–60000 ms) trong `compose_expression` hoặc configuration của `express` live.
+Cửa sổ bắt đầu sau lease chương trình/control hiện tại; observer vẫn tự chọn giữ
+yên hay biểu đạt. Đây là quyền thay toàn thân một lần, không phải overlay: sau
+khi nhận thành công observer sở hữu body; hết hành động có thể về mặt, không phục
+hồi tác phẩm cũ. Không dùng cho trò chơi/tác phẩm cần giữ hoặc khi người dùng cần
+yên. Intent MAIN/user mới, Stop, đổi epoch/nguồn hay motion-off thu hồi quyền chưa
+dùng. Observer không thể tự cấp quyền này. Không có lượt model theo timer chỉ vì
+cửa sổ đang mở; vẫn cần sự kiện hợp lệ và các causal checks.

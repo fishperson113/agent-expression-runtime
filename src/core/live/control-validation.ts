@@ -43,9 +43,13 @@ function control(value: any): LiveControl {
   return value;
 }
 export function validateConfiguration(value: unknown): LiveConfiguration {
-  const object = strictObject(value, ['controls', 'poses', 'lifetimeMs']);
+  const object = strictObject(value, ['controls', 'poses', 'lifetimeMs', ...(value && typeof value === 'object' && 'observerHandoffMs' in value ? ['observerHandoffMs'] : [])]);
   if (!Array.isArray(object.controls) || object.controls.length > 32 || !Array.isArray(object.poses) || object.poses.length > 16) throw Error('live_control_budget');
   finite(object.lifetimeMs, 1000, 300000);
+  if ('observerHandoffMs' in object) {
+    finite(object.observerHandoffMs, 1000, 60000);
+    if (!Number.isInteger(object.observerHandoffMs)) throw Error('live_handoff_duration');
+  }
   const controls = object.controls.map(control), poses: Pose[] = object.poses.map(pose), ids = new Set<string>();
   const writes = new Set<string>(); let bindings = 0, reflexes = 0;
   for (const item of controls) {
@@ -64,5 +68,5 @@ export function validateConfiguration(value: unknown): LiveConfiguration {
     if (spans.some(([a, b]) => start < b && end > a)) throw Error('live_property_conflict');
     spans.push([start, end]); owned.set(key, spans);
   }
-  return structuredClone({ controls, poses, lifetimeMs: object.lifetimeMs });
+  return structuredClone({ controls, poses, lifetimeMs: object.lifetimeMs, ...('observerHandoffMs' in object ? { observerHandoffMs: object.observerHandoffMs } : {}) });
 }

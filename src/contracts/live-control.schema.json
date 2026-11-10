@@ -33,6 +33,6 @@
       "do": { "$ref": "#/$defs/pose" }, "cooldownMs": { "type": "number", "minimum": 500, "maximum": 300000 } } },
     "configuration": { "type": "object", "additionalProperties": false, "required": ["controls", "poses", "lifetimeMs"], "properties": {
       "controls": { "type": "array", "maxItems": 32, "items": { "oneOf": [{ "$ref": "#/$defs/bind" }, { "$ref": "#/$defs/orient" }, { "$ref": "#/$defs/reflex" }] } },
-      "poses": { "type": "array", "maxItems": 16, "items": { "$ref": "#/$defs/pose" } }, "lifetimeMs": { "type": "number", "minimum": 1000, "maximum": 300000 } } }
+      "poses": { "type": "array", "maxItems": 16, "items": { "$ref": "#/$defs/pose" } }, "lifetimeMs": { "type": "number", "minimum": 1000, "maximum": 300000 }, "observerHandoffMs": { "type": "integer", "minimum": 1000, "maximum": 60000, "description": "Explicit one-shot permission to replace this disposable MAIN body after its lease. No overlay or restoration. Window expires; new intent/reset revokes." } } }
   }
 }

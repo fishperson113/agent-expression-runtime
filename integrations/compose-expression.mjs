@@ -17,6 +17,7 @@ export const compositionSchema = {
     base: { enum: ['none', 'resting_face'], default: 'none', description: `none replaces the whole body. resting_face explicitly includes ${face.parts.length} canonical parts counting toward the ${limits.assembly.parts}-part total, plus your parts with noncolliding IDs. Never means the current scene.` },
     durationMs: { ...node('assemble').properties.durationMs, default: 600 },
     easing: node('assemble').properties.easing,
+    observerHandoffMs: { type: 'integer', minimum: 1000, maximum: 60000, description: 'MAIN only: explicitly disposable body, one-shot observer replacement after this program lease; bounded window, no overlay/restoration. Omit to protect your scene.' },
     style: { type: 'object', additionalProperties: false, minProperties: 1, properties: pick(node('style'), ['color', 'brightness', 'pointSize', 'dispersion']) },
     flow: { type: 'object', additionalProperties: false, required: ['field', 'strength'], properties: pick(node('flow'), ['field', 'strength']) },
     requestId: { type: 'string', minLength: 1, maxLength: 128 },
@@ -59,7 +60,8 @@ export function composeExpression(input) {
   if (args.flow) children.push({ type: 'flow', ...args.flow, durationMs, easing });
   const body = { type: 'parallel', children };
   if (!validateProgram(body)) throw Error('composition_program');
-  const result = { body, policy: 'replace', ...(args.requestId ? { requestId: args.requestId } : {}), ...(args.expectedEpoch ? { expectedEpoch: args.expectedEpoch } : {}) };
+  const output = args.observerHandoffMs === undefined ? body : { type: 'live', program: body, configuration: { controls: [], poses: [], lifetimeMs: Math.max(1000, durationMs), observerHandoffMs: args.observerHandoffMs } };
+  const result = { body: output, policy: 'replace', ...(args.requestId ? { requestId: args.requestId } : {}), ...(args.expectedEpoch ? { expectedEpoch: args.expectedEpoch } : {}) };
   if (Buffer.byteLength(JSON.stringify(result), 'utf8') > limits.limits.recordBytes - 512) throw Error('composition_bytes');
   return result;
 }
