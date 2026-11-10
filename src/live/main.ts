@@ -1,3 +1,4 @@
+import type { ReactiveRequest } from '../core/live/decision-types';
 import './style.css';
 import { mountLive, element, mountDisclosures } from './view';
 import { mountPlayground } from './playground-view';
@@ -30,7 +31,8 @@ body.trace.setSink(recording.record);
 const hands = new HandGestures();
 const observations = new FaceObservations(crypto.randomUUID());
 const handEvents = new HandEventSource(() => performance.now());
-let handEventVersion = 0, reactiveAvailable = false;
+let handEventVersion = 0, reactiveAvailable = false, nativeConversation = false;
+const nativeRequests = new Map<string, { request: ReactiveRequest; read: ReturnType<ReactiveSession['nativeReadSet']> }>();
 const cameraTransitions: { status: string; source: string; at: number }[] = [];
 const bridge = new LiveBridge(body, observations, () => resetReactive(), () => observeReactive());
 const reactive = new ReactiveSession({ now: () => performance.now(), wallNow: () => Date.now(), epoch: () => body.scheduler.epoch,
@@ -52,10 +54,21 @@ function logActivity(text: string) {
 Object.assign(window, { fischLive: { pair: (base: string, token: string) => bridge.connect(base, token),
   selectThread: () => { hands.reset(); resetReactive(); logActivity('Đã chọn phiên Codex.'); return bridge.cancel(); },
   logActivity, playgroundStatus: (value: unknown) => playground.project(value), playgroundClear: () => playground.clear(),
-  configureReactive: (available: boolean, handVersion = 0, contractVersion = 1) => configureReactive(available, handVersion, contractVersion),
+  configureReactive: (available: boolean, handVersion = 0, contractVersion = 1, native = false, policy?: { deadlineMs: number; cooldownMs: number; maxPerMinute: number }) => configureReactive(available, handVersion, contractVersion, native, policy),
   setReactiveUserBusy: (busy: boolean) => reactive.setUserBusy(busy),
   reactiveUserIntent: () => { semanticEvents.length = 0; body.prepareUserMutation(); },
-  takeReactiveRequest: () => reactive.takeRequest(), authorizeReactiveRequest: (id: string) => reactive.authorize(id),
+  takeReactiveRequest: () => { const candidate = reactive.takeRequest();
+    if (candidate && nativeConversation) { nativeRequests.set(candidate.request.requestId, { request: candidate.request, read: reactive.nativeReadSet(candidate.observationWindow.events) }); if (nativeRequests.size > 8) nativeRequests.delete(nativeRequests.keys().next().value!); }
+    return candidate; },
+  canContinueNativeReaction: (id: string) => { const held = nativeRequests.get(id); return !!held && reactive.canPublish(held.request, held.read); },
+  deliverNativeReaction: async (id: string, data: any) => {
+    const held = nativeRequests.get(id); nativeRequests.delete(id);
+    if (data !== null && (typeof data?.reply !== 'string' || data.reply.length > 600)) { await reactive.deliver(id, null); return { reason: 'invalid_reply', chatPublished: false }; }
+    const result = await reactive.deliver(id, data?.decision ?? null);
+    const admitted = !!held && !!result && ['accepted', 'observed'].includes(result.reason) && nativeConversation && !stopped && reactive.canPublish(held.request, held.read);
+    const chatPublished = admitted && data?.reply?.trim() ? conversation.reaction({ requestId: id, text: data.reply }) : false;
+    return { ...result, chatPublished, source: 'native-observation' };
+  }, authorizeReactiveRequest: (id: string) => reactive.authorize(id),
   deliverReactiveDecision: (id: string, data: unknown) => reactive.deliver(id, data), failReactiveDecision: (id: string) => reactive.fail(id),
   reactiveStatus: () => reactive.status(),
   startRecording: () => recording.start(), stopRecording: () => recording.stop(), clearRecording: () => recording.clear(),
@@ -197,9 +210,10 @@ element('stop-all').onclick = () => stop('ui');
 window.addEventListener('pagehide', () => stop('pagehide'));
 
 function observeReactive() { body.observe(observations.snapshot); reactive.observe(observations.snapshot, semanticEvents); }
-function resetReactive() { handEvents.reset(); reactive.reset(); semanticEvents.length = 0; }
+function resetReactive() { nativeRequests.clear(); handEvents.reset(); reactive.reset(); semanticEvents.length = 0; }
 function updateHandProducer() { handEvents.configure(reactiveAvailable && handEventVersion === 1 && element<HTMLInputElement>('enable-reactivity').checked); }
-function configureReactive(available: boolean, handVersion = 0, contractVersion = 1) {
+function configureReactive(available: boolean, handVersion = 0, contractVersion = 1, native = false, policy?: { deadlineMs: number; cooldownMs: number; maxPerMinute: number }) {
+  nativeConversation = native === true; reactive.configureNativeConversation(nativeConversation, policy);
   const knownContract = contractVersion === 1 || contractVersion === 2;
   const enabled = available === true && !stopped && knownContract;
   if (knownContract) reactive.configureContract(contractVersion);
@@ -207,8 +221,8 @@ function configureReactive(available: boolean, handVersion = 0, contractVersion 
   reactive.configure(enabled); element<HTMLInputElement>('enable-reactivity').disabled = !enabled;
   if (!enabled) element<HTMLInputElement>('enable-reactivity').checked = false;
   updateHandProducer();
-  element('reactivity-status').textContent = !enabled ? 'Phản xạ cục bộ dùng tín hiệu hợp lệ; observer ngữ nghĩa chưa kết nối.'
-    : body.userSceneOwned ? 'Đang giữ hình bạn tạo; phản ứng tự động tạm nhường quyền.' : 'Bộ quyết định đã kết nối; phản ứng camera là tùy chọn.';
+  element('reactivity-status').textContent = !enabled ? nativeConversation ? 'Lane chủ động chưa sẵn sàng hoặc kết quả chưa rõ; kiểm tra terminal rồi khởi chạy lại Live. Hội thoại chính vẫn độc lập.' : 'Phản xạ cục bộ dùng tín hiệu hợp lệ; observer ngữ nghĩa chưa kết nối.'
+    : body.userSceneOwned ? 'Đang giữ hình bạn tạo; phản ứng tự động tạm nhường quyền.' : nativeConversation ? 'Codex chủ động đã kết nối: dữ liệu hình học có kiểu; không nhận diện cảm xúc/đồ vật. Bật Phản ứng theo camera để bắt đầu.' : 'Bộ quyết định đã kết nối; phản ứng camera là tùy chọn.';
 }
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) return;

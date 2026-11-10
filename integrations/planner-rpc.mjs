@@ -3,16 +3,18 @@ import { terminatePlannerProcess } from './planner-process.mjs';
 
 export class PlannerRpc {
   nextId = 0; pending = new Map(); buffer = ''; closed = false;
-  constructor(command, args, directory, notify, failed) {
+  constructor(command, args, directory, notify, failed, environment = process.env) {
     this.notify = notify; this.failed = failed;
-    const env = Object.fromEntries(Object.entries(process.env).filter(([key]) =>
+    const env = Object.fromEntries(Object.entries(environment).filter(([key]) =>
       !key.startsWith('HERDR_') && !['CODEX_THREAD_ID', 'CODEX_SESSION_ID', 'CLAUDECODE'].includes(key)));
     this.child = spawn(command, args, { cwd: directory, env, windowsHide: true, detached: process.platform !== 'win32',
       stdio: ['pipe', 'pipe', 'pipe'], shell: false });
     this.child.stdout.setEncoding('utf8'); this.child.stdout.on('data', chunk => this.receive(chunk));
     this.child.stderr.on('data', () => {}); this.child.stdin.on('error', () => {});
     this.child.once('error', () => this.close('planner_process_unavailable'));
-    this.child.once('close', () => this.close('planner_process_closed'));
+    this.settled = new Promise(resolve => this.child.once('close', () => {
+      resolve(); this.close('planner_process_closed');
+    }));
   }
   send(message) { if (!this.closed) this.child.stdin.write(JSON.stringify(message) + '\n'); }
   request(method, params, timeoutMs = 10000) {

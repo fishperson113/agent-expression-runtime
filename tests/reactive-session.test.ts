@@ -187,3 +187,25 @@ it('keeps the latest semantic candidate in a finite burst after invalidating an 
   expect(f.session.status().pending).toBe(2); expect(f.session.status().transport).toBe(next.request.requestId);
   expect(f.session.takeRequest()).toBeNull(); expect(f.session.status().dispatches).toBe(1);
 });
+it('native presence lane permits slow inference only while its source and causal prerequisites remain current', async () => {
+  const f = fixture(); f.session.configureNativeConversation(true); const { request } = f.launch();
+  expect(request.deadline - f.now()).toBe(60000);
+  for (let i = 0; i < 30; i++) { f.advance(1000); f.observe(true, 'expression_changed'); }
+  expect(f.session.canPublish(request)).toBe(true);
+  expect((await f.session.deliver(request.requestId, express(request)))?.reason).toBe('accepted');
+  f.block(); expect(f.session.canPublish(request)).toBe(true);
+  f.session.userIntent(); expect(f.session.canPublish(request)).toBe(false);
+  const stale = fixture(); stale.session.configureNativeConversation(true); const held = stale.launch().request;
+  stale.advance(1600); expect(stale.session.canPublish(held)).toBe(false);
+});
+it('native geometric read-sets reject changed evidence at the final expression admission boundary', async () => {
+  const f = fixture(); f.session.configureNativeConversation(true);
+  const base = f.observe(), snapshot = { ...base, seq: 100, user: { ...base.user, expression: { smile: 0.1, browRaise: 0.1, eyesClosed: 0.1, mouthOpen: 0.1 } } };
+  f.session.observe(snapshot, [{ seq: 100, type: 'expression_changed', at: f.wall() }]);
+  f.advance(750); f.session.observe({ ...snapshot, seq: 101, capturedAt: f.wall() }, []);
+  const candidate = f.session.takeRequest()!, read = f.session.nativeReadSet(candidate.observationWindow.events);
+  expect(f.session.authorize(candidate.request.requestId)).toBe(true); expect(f.session.canPublish(candidate.request, read)).toBe(true);
+  f.advance(20); f.session.observe({ ...snapshot, seq: 102, capturedAt: f.wall(), user: { ...snapshot.user, expression: { ...snapshot.user.expression, smile: 0.9 } } }, []);
+  expect(f.session.canPublish(candidate.request, read)).toBe(false);
+  expect((await f.session.deliver(candidate.request.requestId, express(candidate.request)))?.reason).toBe('admission_failed'); expect(f.admitted).toEqual([]);
+});

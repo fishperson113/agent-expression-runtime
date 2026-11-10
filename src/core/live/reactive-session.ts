@@ -4,7 +4,7 @@ import { SemanticAxes } from './semantic-axes';
 import { ReactiveDecisionHost } from './decision-host';
 import { ReactiveLeaseGuard, type LeaseRevokeReason } from './reactive-lease';
 import { handEventKinds, validateObservation, validateSourceEvent } from './observation';
-import { freezeHandReadSet, type HandReadSet, type DecisionResult, type ReactiveRequest, type ReactiveState } from './decision-types';
+import { freezeHandReadSet, type HandReadSet, type DecisionResult, type ReactiveRequest, type ReactiveState, type SemanticSnapshot } from './decision-types';
 import type { Observation } from './types';
 import type { ReactiveWindow, ReactiveWindowEvent, SessionEvent, SessionOptions } from './reactive-session-types';
 
@@ -19,8 +19,9 @@ function frozen<T>(value: T): T {
   return value;
 }
 type PendingEvent = SessionEvent & { sessionId: string; observationSeq: number };
+type NativeReadSet = Partial<SemanticSnapshot> & { handGeometry?: string | null };
 type Transport = { id: string; request: ReactiveRequest; generation: number; authorized: boolean; delivered: boolean; done: Promise<DecisionResult>;
-  authorizationOutcome?: boolean; owner?: import('./decision-types').ReactiveOwnership; resolve: (value: unknown) => void; reject: () => void };
+  nativeReadSet?: NativeReadSet; authorizationOutcome?: boolean; owner?: import('./decision-types').ReactiveOwnership; resolve: (value: unknown) => void; reject: () => void };
 
 /** Pure coordinator. It never contacts a provider or writes to a renderer directly. */
 export class ReactiveSession {
@@ -46,6 +47,9 @@ export class ReactiveSession {
   private transport?: Transport;
   private uncertain = false;
   private count = 0;
+  private nativeConversation = false;
+  private nativeOwnerRead?: NativeReadSet;
+  private nativePolicy = { deadlineMs: 60000, cooldownMs: 15000, maxPerMinute: 4 };
   private ids = new Set<string>();
   private lastReason: string = 'disabled';
   private host: ReactiveDecisionHost;
@@ -67,12 +71,42 @@ export class ReactiveSession {
     if (version === this.contractVersion) return;
     this.contractVersion = version; this.history = []; this.revoke('reset');
   }
+  configureNativeConversation(enabled: boolean, policy = { deadlineMs: 60000, cooldownMs: 15000, maxPerMinute: 4 }) {
+    if (!Number.isInteger(policy.deadlineMs) || policy.deadlineMs < 5000 || policy.deadlineMs > 90000 || !Number.isInteger(policy.cooldownMs) || policy.cooldownMs < 1000 || policy.cooldownMs > 60000 || !Number.isInteger(policy.maxPerMinute) || policy.maxPerMinute < 1 || policy.maxPerMinute > 4) throw Error('native_policy');
+    if (this.nativeConversation === enabled && JSON.stringify(this.nativePolicy) === JSON.stringify(policy)) return;
+    this.intentRevision++; this.nativePolicy = { ...policy }; this.nativeConversation = enabled; this.revoke('reset');
+  }
+  nativeReadSet(events: readonly ReactiveWindowEvent[]): NativeReadSet {
+    const axes = this.axes.snapshot(this.healthy()), read: { -readonly [K in keyof SemanticSnapshot]?: SemanticSnapshot[K] } & { handGeometry?: string | null } = {};
+    for (const event of events) {
+      if (event.type === 'looked_away' || event.type === 'looked_back') read.orientation = axes.orientation;
+      if (event.type === 'expression_changed') read.expression = axes.expression;
+      if (event.type.startsWith('hand_')) { read.handIdentity = axes.handIdentity; read.handGeometry = this.nativeHandGeometry(); if (!['hand_appeared', 'hand_lost'].includes(event.type)) read.handMotion = axes.handMotion; }
+    }
+    return Object.freeze(read);
+  }
+  private nativeHandGeometry(): string | null {
+    if (!this.healthy() || !this.snapshot?.hands || !['tracked', 'lost'].includes(this.snapshot.hands.trackingState)) return null;
+    return JSON.stringify(this.snapshot.hands.entities.map(hand => ({ trackId: hand.trackId ?? null, xCell: Math.floor(hand.landmarks[0].x * 4), yCell: Math.floor(hand.landmarks[0].y * 4) })).sort((a, b) => String(a.trackId).localeCompare(String(b.trackId))));
+  }
+  private matchesNativeReadSet(read: NativeReadSet): boolean {
+    const axes = { ...this.axes.snapshot(this.healthy()), handGeometry: this.nativeHandGeometry() };
+    return Object.entries(read).every(([key, value]) => value !== null && axes[key as keyof typeof axes] === value);
+  }
+  canPublish(request: ReactiveRequest, read: NativeReadSet = {}): boolean {
+    this.tick();
+    return this.matchesNativeReadSet(read) &&
+      this.enabled && this.available && this.healthy() && !this.userBusy && (this.options.canAdmit() || this.guard.owner?.requestId === request.requestId) &&
+      this.options.now() < request.deadline && matchesCriticalState(request, this.readCurrent());
+  }
   configure(available: boolean) {
     this.available = available === true;
     if (!this.available) { this.enabled = false; this.revoke('unavailable'); }
   }
   enable(enabled: boolean) {
-    this.enabled = enabled === true && this.available;
+    const next = enabled === true && this.available;
+    if (this.nativeConversation && next !== this.enabled) this.intentRevision++;
+    this.enabled = next;
     this.history = []; this.revoke(this.enabled ? 'enabled' : 'disabled');
   }
   userIntent() { this.intentRevision++; this.revoke('user_intent'); }
@@ -85,7 +119,7 @@ export class ReactiveSession {
   private revoke(reason: CausalPayloads['revocation']['reason']) {
     const transport = this.transport;
     if (!this.guard.owner && transport?.generation === this.guard.generation) this.record('revocation', { reason, requestId: transport.id });
-    this.lastReason = reason; this.pending.clear(); this.host.revoke(); this.guard.revoke(revokeReasons[reason] ?? 'revoked');
+    this.nativeOwnerRead = undefined; this.lastReason = reason; this.pending.clear(); this.host.revoke(); this.guard.revoke(revokeReasons[reason] ?? 'revoked');
   }
   private fresh(at: number, ttl: number) {
     const wall = this.options.wallNow();
@@ -132,6 +166,7 @@ export class ReactiveSession {
     this.axes.observe(snapshot, this.handState(), this.options.handMotion?.() ?? null);
     if (this.contractVersion === 2 && this.sourceValid && identity !== this.axes.snapshot(this.healthy()).handIdentity) this.revoke('hand_changed');
     this.guard.check();
+    if (this.nativeOwnerRead && this.guard.owner && !this.matchesNativeReadSet(this.nativeOwnerRead)) this.revoke('semantic_changed');
     this.history.push(snapshot); this.history = this.history.filter(item => this.fresh(item.capturedAt, 1500)).slice(-4);
     this.record('observation', { ...snapshot, summary: '' });
     this.events(events);
@@ -149,7 +184,7 @@ export class ReactiveSession {
       const candidate = { ...source, sessionId: this.snapshot!.sessionId, observationSeq: 'observationSeq' in source ? source.observationSeq : this.snapshot!.seq, seq: event.seq } as PendingEvent;
       this.record('event', candidate);
       if (!this.handEligible(candidate)) continue;
-      if (this.contractVersion === 1 && (this.guard.owner || this.transport?.generation === this.guard.generation)) this.revoke('semantic_changed');
+      if (!this.nativeConversation && this.contractVersion === 1 && (this.guard.owner || this.transport?.generation === this.guard.generation)) this.revoke('semantic_changed');
       if (!this.pending.size) this.firstAt = this.options.now();
       this.pending.set(key(candidate), candidate);
       while (this.pending.size > 8) this.pending.delete(this.pending.keys().next().value!);
@@ -171,12 +206,13 @@ export class ReactiveSession {
     for (const [name, event] of this.pending) if (!this.fresh(event.at, 5000)) this.pending.delete(name);
     this.starts = this.starts.filter(at => now - at < 60000);
     this.guard.check();
+    if (this.nativeOwnerRead && this.guard.owner && !this.matchesNativeReadSet(this.nativeOwnerRead)) this.revoke('semantic_changed');
   }
   takeRequest(): { request: ReactiveRequest; observationWindow: ReactiveWindow } | null {
     this.tick(); const now = this.options.now();
     if (!Number.isFinite(now) || now < 0 || !this.available || !this.enabled || this.userBusy || !this.sourceValid || !this.history.length || !this.options.canAdmit() ||
       this.transport || this.uncertain || this.guard.owner || !this.pending.size || now - this.firstAt < 750 ||
-      now - this.lastStart < 15000 || this.starts.length >= 4 || this.count >= 256) return null;
+      now - this.lastStart < (this.nativeConversation ? this.nativePolicy.cooldownMs : 15000) || this.starts.length >= (this.nativeConversation ? this.nativePolicy.maxPerMinute : 4) || this.count >= 256) return null;
     const requestId = this.options.id();
     if (![requestId, this.snapshot!.sessionId, this.options.epoch()].every(id => /^[a-zA-Z0-9_-]{1,64}$/.test(id)) || this.ids.has(requestId)) { this.revoke('invalid_request_id'); return null; }
     const candidates = [...this.pending.values()], knownHand = !!this.snapshot!.hands && ['tracked', 'lost'].includes(this.snapshot!.hands!.trackingState);
@@ -185,26 +221,28 @@ export class ReactiveSession {
     this.ids.add(requestId);
     const request: ReactiveRequest = frozen({ sessionId: this.snapshot!.sessionId, epoch: this.options.epoch(),
       requestId, intentRevision: this.intentRevision, presenceRevision: this.presenceRevision,
-      deadline: now + 5000, requiredTrackIds: this.tracks(), ...(hand ? { handReadSet: hand } : {}),
+      deadline: now + (this.nativeConversation ? this.nativePolicy.deadlineMs : 5000), requiredTrackIds: this.tracks(), ...(hand ? { handReadSet: hand } : {}),
       ...(this.contractVersion === 2 ? { schemaVersion: 2 as const, semanticSnapshot: this.axes.snapshot(this.healthy()) } : { schemaVersion: 1 as const }) });
     const observationWindow: ReactiveWindow = frozen({ schemaVersion: 1, request,
       events: candidates.map(event => this.windowEvent(event)), observations: structuredClone(this.history) });
     this.record('request', { request, observationRefs: observationWindow.observations.map(value => ({ sessionId: value.sessionId, seq: value.seq })),
       eventRefs: candidates.map(value => ({ sessionId: value.sessionId, seq: value.seq })) });
     this.pending.clear(); this.lastStart = now; this.starts.push(now); this.count++;
-    this.dispatch(request); return { request, observationWindow };
+    this.dispatch(request, this.nativeConversation ? this.nativeReadSet(observationWindow.events) : undefined); return { request, observationWindow };
   }
-  private dispatch(request: ReactiveRequest) {
+  private dispatch(request: ReactiveRequest, nativeReadSet?: NativeReadSet) {
     let resolve!: (value: unknown) => void, reject!: () => void;
     const promise = new Promise<unknown>((yes, no) => { resolve = yes; reject = () => no(Error('transport_unknown')); });
     const generation = this.guard.generation;
     const done = this.host.run(request, { decide: () => promise }, (compiled, owner) => {
+      if (nativeReadSet && !this.canPublish(request, nativeReadSet)) throw Error('semantic_admission_revoked');
       if (!this.enabled || !this.available || !this.healthy() || this.userBusy || !this.options.canAdmit() || !this.guard.acquire(request, owner, generation)) throw Error('admission_revoked');
+      this.nativeOwnerRead = nativeReadSet;
       if (this.transport?.id === owner.requestId) this.transport.owner = owner;
       try { this.options.admit(compiled, owner); }
       catch (error) { this.guard.revoke(); throw error; }
     });
-    this.transport = { id: request.requestId, request, generation, authorized: false, delivered: false, resolve, reject, done };
+    this.transport = { id: request.requestId, request, nativeReadSet, generation, authorized: false, delivered: false, resolve, reject, done };
   }
   private authorization(transport: Transport, allowed: boolean, reason: CausalPayloads['authorization']['reason']) {
     if (transport.authorizationOutcome !== allowed) this.record('authorization', { requestId: transport.id, allowed, reason });
@@ -218,6 +256,7 @@ export class ReactiveSession {
     if (!this.healthy()) return this.authorization(transport, false, 'stale');
     if (this.userBusy || !this.options.canAdmit()) return this.authorization(transport, false, 'denied');
     const request = transport.request, state = this.readCurrent();
+    if (transport.nativeReadSet && !this.canPublish(request, transport.nativeReadSet)) return this.authorization(transport, false, 'stale');
     if (this.options.now() >= request.deadline || !matchesCriticalState(request, state)) return this.authorization(transport, false, 'stale');
     transport.authorized = true; this.lastReason = 'authorized'; return this.authorization(transport, true, 'authorized');
   }
@@ -242,6 +281,6 @@ export class ReactiveSession {
   status() {
     return { available: this.available, enabled: this.enabled, userBusy: this.userBusy, sourceValid: this.sourceValid,
       pending: this.pending.size, transport: this.transport?.id ?? null, authorized: this.transport?.authorized ?? false, owner: this.guard.owner?.actionId ?? null,
-      uncertain: this.uncertain, dispatches: this.count, reason: this.lastReason };
+      nativeReadSet: this.transport?.nativeReadSet ?? null, uncertain: this.uncertain, dispatches: this.count, reason: this.lastReason };
   }
 }

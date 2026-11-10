@@ -2,7 +2,8 @@ import { expect, it, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { createLiveReactiveProvider } from '../integrations/live-reactive-provider.mjs';
 import { LiveReactiveBroker } from '../integrations/live-reactive-broker.mjs';
 import { runTerminalCodex } from '../integrations/live-terminal.mjs';
 import { runLiveSession } from '../scripts/live-session.mjs';
@@ -203,3 +204,89 @@ it.skipIf(!existsSync(gatewayExecutable()) && !requireBrowserGateway)('uses the 
     if (process.env.FISCH_CHAT_EXPRESSION_SCREENSHOT) await page.screenshot({ path: process.env.FISCH_CHAT_EXPRESSION_SCREENSHOT });
   } finally { await route.close(); }
 }, 90000);
+
+const nativeGateway = existsSync(gatewayExecutable());
+function mailbox(child) {
+  const rows = []; let text = '';
+  child.stdout.on('data', chunk => { text += chunk; let end; while ((end = text.indexOf('\n')) >= 0) { rows.push(JSON.parse(text.slice(0,end))); text = text.slice(end+1); if(rows.length>128) rows.shift(); } });
+  return async predicate => { let found; await expect.poll(() => { found = rows.find(predicate); return !!found; }, { timeout: 10000 }).toBe(true); return found; };
+}
+async function nativeBrowserLoop(provider) {
+  const live = await openLive({ headless:true, assets:false, production:false, synthetic:true }), abort = new AbortController();
+  let child, inbox, serial = 0;
+  const running = runTerminalCodex({ live, cwd: process.cwd(), signal: abort.signal, reactiveProvider: provider,
+    host: { command:process.execPath, args:[fixture] }, spawnClient: (command,args,settings) => { child=spawn(command,args,{...settings,stdio:['pipe','pipe','pipe']}); child.stderr.resume(); inbox=mailbox(child); return child; } });
+  void running.catch(()=>{});
+  const close=async()=>{ abort.abort(); child?.stdin.end(); await running.catch(()=>{}); await live.close(); };
+  try {
+  await expect.poll(()=>typeof inbox).toBe('function'); await inbox(row=>row.type==='ready');
+  const call=async(method,params={})=>{ const tag=++serial; child.stdin.write(JSON.stringify({method,params,tag})+'\n'); return (await inbox(row=>row.type==='reply'&&row.tag===tag)).value; };
+  await expect.poll(()=>live.page.locator('#enable-reactivity').isEnabled()).toBe(true); await live.page.locator('.camera-options > summary').click(); await live.page.locator('#enable-reactivity').check(); await live.page.keyboard.press('Escape');
+  await call('turn/start',{threadId:'thread-1',input:[{type:'text',text:'Public scripted coding task.'}]});
+  await live.page.evaluate(()=> { window.__observationMode='absent'; window.__observationTimer=setInterval(()=>window.fischLive.fixture(window.__observationMode),150); });
+  return { live,call,close };
+  } catch(error) { await close(); throw error; }
+}
+const authored = request => ({ decision:{schemaVersion:1,requestId:request.requestId,decisionId:'decision_'+request.requestId,mode:'express',validUntil:request.deadline,
+  action:{actionId:'action_'+request.requestId,body:{type:'sequence',children:[{type:'parallel',children:[{type:'assemble',parts:[{id:'scripted_reaction',kind:'ellipsoid',center:[0,0,0],scale:[0.4,0.6,0.2]}],durationMs:600}]}]}}},reply:'Lời chủ động từ fixture: chỉ kiểm tra đường truyền, không phải model thật.' });
+async function arrive(f) { await f.live.page.waitForTimeout(1300); await f.live.page.evaluate(()=>{window.__observationMode='present';}); }
+async function evidence(f, kind) {
+  const metrics=await f.live.page.evaluate(()=>window.fischLive.metrics());
+  const messages=await f.live.page.locator('.observation-messages').innerText();
+  if(process.env.FISCH_NATIVE_OBSERVATION_EVIDENCE){const dir=process.env.FISCH_NATIVE_OBSERVATION_EVIDENCE;mkdirSync(dir,{recursive:true});await f.live.page.screenshot({path:dir+'/'+kind+'.png'});writeFileSync(dir+'/'+kind+'.json',JSON.stringify({kind,metrics,messages,mainBackend:'scripted-native-protocol-fixture',reactionBackend:kind==='actual-native'?'signed-in-codex-app-server':'scripted-provider',cameraOrMic:false},null,2));}
+  return {metrics,messages};
+}
+it.skipIf(!nativeGateway)('observes and publishes a causal reaction while the separate coding turn keeps running',async()=>{
+  let resolve, seen, calls=0;
+  const provider={conversationLane:true,contractVersion:1,decide:window=>{calls++;seen=window;return new Promise(yes=>{resolve=yes;});}};
+  const f=await nativeBrowserLoop(provider);
+  try{
+    await arrive(f); await expect.poll(()=>calls,{timeout:10000}).toBe(1);
+    const before=await f.live.page.evaluate(()=>window.fischLive.metrics()); await f.live.page.waitForTimeout(800);
+    const during=await f.live.page.evaluate(()=>window.fischLive.metrics());expect(during.cameraSeq).toBeGreaterThan(before.cameraSeq);expect(during.render.frame).toBeGreaterThan(before.render.frame);
+    resolve(authored(seen.request));
+    await expect.poll(()=>f.live.page.locator('.observation-messages').innerText(),{timeout:10000}).toContain('Lời chủ động từ fixture');
+    await expect.poll(()=>f.live.page.evaluate(()=>window.fischLive.metrics().parts)).toEqual(['scripted_reaction']);
+    await f.live.page.waitForTimeout(1000);expect(calls).toBe(1);
+    const state=(await f.call('test/snapshot')).result;expect(state.seen.filter(row=>row.method==='turn/interrupt')).toHaveLength(0);
+    const result=await evidence(f,'scripted');expect(result.metrics.cameraActive).toBe(false);
+  }finally{await f.close();}
+},60000);
+it.skipIf(!nativeGateway)('user intent revokes both late reaction text and geometry without interrupting the coding turn',async()=>{
+  let resolve,seen,aborted=false;
+  const provider={conversationLane:true,contractVersion:1,decide:(window,signal)=>{seen=window;signal.addEventListener('abort',()=>{aborted=true;});return new Promise(yes=>{resolve=yes;});}};
+  const f=await nativeBrowserLoop(provider);
+  try{
+    await arrive(f);await expect.poll(()=>typeof resolve,{timeout:10000}).toBe('function');
+    await f.call('turn/steer',{threadId:'thread-1',expectedTurnId:'turn-1',input:[{type:'text',text:'Public user priority intent.'}]});
+    await expect.poll(()=>aborted).toBe(true);resolve(authored(seen.request));await f.live.page.waitForTimeout(700);
+    expect(await f.live.page.locator('.observation-messages').innerText()).toBe('');expect(await f.live.page.evaluate(()=>window.fischLive.metrics().parts)).not.toContain('scripted_reaction');
+    expect((await f.call('test/snapshot')).result.seen.filter(row=>row.method==='turn/interrupt')).toHaveLength(0);
+  }finally{await f.close();}
+},60000);
+const real=process.env.FISCH_RUN_MODEL_TESTS==='1'&&process.env.FISCH_NATIVE_OBSERVATION_REAL==='1';
+it.skipIf(!nativeGateway||!real)('signed-in Codex autonomously chooses a visible conversational reaction from continuous synthetic observations',async()=>{
+  const configured=createLiveReactiveProvider({...process.env,FISCH_REACTIVE_BACKEND:'codex'});expect(configured.provider).toBeTruthy();
+  const f=await nativeBrowserLoop(configured.provider);
+  try{
+    await arrive(f);
+    await expect.poll(()=>f.live.page.locator('.observation-messages').innerText(),{timeout:90000}).not.toBe('');
+    const result=await evidence(f,'actual-native');expect(result.metrics.cameraActive).toBe(false);
+    expect(result.metrics.diagnostics.events.some(row=>row.origin==='reactive'&&['applied','completed'].includes(row.phase))).toBe(true);
+  }finally{if(process.env.FISCH_NATIVE_OBSERVATION_EVIDENCE){const dir=process.env.FISCH_NATIVE_OBSERVATION_EVIDENCE;mkdirSync(dir,{recursive:true});writeFileSync(dir+'/actual-native-diagnostics.json',JSON.stringify(configured.provider.diagnostics(),null,2),{mode:0o600});}await f.close();}
+},120000);
+
+it.skipIf(!nativeGateway||!real)('signed-in Codex interruption revokes the observation lane while the coding turn remains owned',async()=>{
+  const configured=createLiveReactiveProvider({...process.env,FISCH_REACTIVE_BACKEND:'codex'});expect(configured.provider).toBeTruthy();
+  const f=await nativeBrowserLoop(configured.provider);
+  try{
+    await arrive(f);await expect.poll(()=>configured.provider.active?.turnId,{timeout:60000}).toBeTruthy();
+    const before=await f.live.page.evaluate(()=>window.fischLive.metrics());
+    await f.call('turn/steer',{threadId:'thread-1',expectedTurnId:'turn-1',input:[{type:'text',text:'Public user interruption.'}]});
+    await expect.poll(()=>configured.provider.diagnostics().lastFailure?.code,{timeout:10000}).toBe('native_reaction_aborted');
+    await f.live.page.waitForTimeout(700);const after=await f.live.page.evaluate(()=>window.fischLive.metrics());
+    expect(after.cameraSeq).toBeGreaterThan(before.cameraSeq);expect(await f.live.page.locator('.observation-messages').innerText()).toBe('');
+    expect(after.reactiveOwner).toBeNull();expect((await f.call('test/snapshot')).result.seen.filter(row=>row.method==='turn/interrupt')).toHaveLength(0);
+    await evidence(f,'actual-native-interrupted');
+  }finally{if(process.env.FISCH_NATIVE_OBSERVATION_EVIDENCE){const dir=process.env.FISCH_NATIVE_OBSERVATION_EVIDENCE;mkdirSync(dir,{recursive:true});writeFileSync(dir+'/actual-native-interrupted-diagnostics.json',JSON.stringify(configured.provider.diagnostics(),null,2),{mode:0o600});}await f.close();}
+},120000);
