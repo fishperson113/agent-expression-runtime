@@ -1,6 +1,25 @@
 # Fisch Live POC
 
-Fisch Live là trang web local gồm camera debug và cơ thể hạt WebGL, dùng cùng Codex CLI trong terminal thông thường; Herdr là adapter tùy chọn. Bạn trò chuyện trong terminal; Codex đọc quan sát có kiểu bằng MCP và tự chọn cách biểu đạt bằng DSL. Camera và phản xạ local không chờ model.
+Fisch Live là trang web local gồm camera debug và cơ thể hạt WebGL, dùng cùng Codex CLI trong terminal thông thường; Herdr là adapter tùy chọn. Bạn trò chuyện trong terminal hoặc panel hội thoại của cùng phiên Native Codex; Codex đọc quan sát có kiểu bằng MCP và tự chọn cách biểu đạt bằng DSL. Camera và phản xạ local không chờ model.
+
+## Hội thoại cùng agent hiện có
+
+Panel text dùng đường Native mặc định; adapter `--agent` legacy tiếp tục nhập
+trong terminal. Panel chỉ gửi khi bạn bấm **Gửi**, tới thread Native đang được chọn.
+Nó hiển thị user/assistant text thực của turn đang theo dõi, không biến log công cụ
+hoặc reasoning thành lời trả lời. Panel chỉ giữ bản sao trong bộ nhớ phiên, không ghi
+vào local storage hoặc recording; Native Codex giữ lịch sử theo cấu hình hiện có.
+Giới hạn mỗi lần gửi là 16000 byte UTF-8.
+
+**Dừng trả lời** yêu cầu ngắt đúng turn hiện tại; ACK chưa chứng minh turn đã kết
+thúc. Nếu kết quả gửi chưa rõ, không tự gửi lại: kiểm tra terminal hoặc khởi chạy
+lại Live. Chuyển thread thành công xóa lịch sử và bản nháp ở panel; chuyển thất bại
+giữ bản nháp. Reload yêu cầu khởi chạy lại Live để nối lại, không tự replay nội dung.
+**Dừng toàn bộ** xóa panel và đóng tài nguyên thuộc phiên.
+
+Camera mặc định tắt và cần bạn bật riêng. Observer camera không nhận nội dung chat
+hoặc code; phản ứng tự động không được thêm vào thread coding. Agent Native có thể
+chủ động dùng expression tools theo ngữ cảnh hội thoại/công việc của chính nó.
 
 ## Khởi chạy trong terminal đã chuẩn bị
 
@@ -14,7 +33,7 @@ Lệnh chuẩn bị build/gateway, mở browser và Codex trong terminal hiện 
 
 Sau `npm link`, lệnh `fisch` có trên PATH. Với checkout mới, chạy bước link một lần sau chuẩn bị; sau đó luôn dùng `fisch live`. `fisch run` và các CLI `fisch express`/`fisch cancel` đã được bỏ; `npm start` trong checkout cũng khởi chạy Live. Xem [hướng dẫn chuyển từ panel](multiplexer.md). Tùy chọn `--agent` chỉ dành cho debug/chọn workspace nguồn tường minh, không cần trong luồng thường ngày.
 
-Launcher mở Edge/Chromium với trang Live và camera mặc định **tắt**. Chọn **Bật camera** để xử lý tại máy. Fisch ở panel trái; camera và nhật ký hoạt động agent ở panel phải. Tiếp tục gõ vào Codex trong terminal/pane Live. MCP có thể hỏi quyền tool lần đầu; cấp quyền theo ý bạn. Launcher không sửa global Codex/Herdr config hoặc bypass hook trust.
+Launcher mở Edge/Chromium với trang Live và camera mặc định **tắt**. Chọn **Bật camera** để xử lý tại máy. Fisch ở panel trái; camera và hội thoại ở panel phải. Trong terminal/pane Live, chọn hoặc bắt đầu phiên Native Codex trước; sau đó có thể gõ ở panel hội thoại hoặc tiếp tục trong terminal. Nhật ký hoạt động là dữ liệu kỹ thuật riêng, không phải tin nhắn. MCP có thể hỏi quyền tool lần đầu; cấp quyền theo ý bạn. Launcher không sửa global Codex/Herdr config hoặc bypass hook trust.
 
 Đóng cửa sổ browser, chọn **Dừng toàn bộ**, hoặc Ctrl+C tại launcher để dừng camera/gateway/renderer. Đường terminal đóng cả Codex do chính phiên Live sở hữu; các agent không liên quan giữ nguyên. Browser, gateway và agent có đường cleanup độc lập. Herdr giữ vòng đời pane riêng; tool Live không còn dùng được sau khi gateway dừng. Chạy lại Live tạo pairing token mới.
 
@@ -166,10 +185,11 @@ reflex tới centroid >2 px đo 172,7 ms có overhead readback; target first-mot
 
 ## Compact filming stage and optional hand perception
 
-Use **Toàn màn hình** for the particle stage; Escape restores the controls. Motion
-reduction/off remain available before entering. Voice is outside this demo's
-scope; no STT/TTS work or voice acceptance gate is included. Conversation still
-runs in the existing Codex terminal.
+Use **Toàn màn hình** for the particle stage and **Thoát toàn màn hình** to leave.
+Motion reduction/off, expression cancellation and Stop remain reachable in fullscreen. Voice is outside this demo's
+scope; no STT/TTS work or voice acceptance gate is included. Text conversation uses
+the existing Codex agent, through its terminal or the Live conversation panel
+after selecting a Native thread. No extra agent or model is started.
 
 Prepare the optional local gesture model once with
 `FISCH_PREPARE_HANDS=1 node scripts/prepare-live-assets.mjs` (PowerShell: set the

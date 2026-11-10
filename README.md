@@ -2,11 +2,11 @@
 
 A visible particle body for your coding agent.
 
-Fisch turns agent activity into motion and lets Codex create expressions and illustrations with particles. It runs locally in a browser, with Codex in your terminal.
+Fisch turns agent activity into motion and lets Codex create expressions and illustrations with particles. It runs locally in a browser, with the existing Codex agent in your terminal and a same-thread text panel in Live.
 
-![Fisch Live in a blue-black single-screen layout, with the particle body on the left and camera-off and activity panels on the right.](docs/evidence/live-workspace.png)
+![Fisch Live in a blue-black single-screen layout, with the particle body on the left and camera-off and conversation panels on the right.](docs/evidence/live-workspace.png)
 
-*Actual 1440 × 900 browser screenshot, camera off and Codex disconnected. No real camera imagery or simulated conversation; [validation limits](docs/validation.md) still apply.*
+*Actual 1440 × 900 browser screenshot, camera off and Codex disconnected. No real camera imagery or simulated conversation. See [capture details](docs/evidence/live-workspace-provenance.json) and [validation limits](docs/validation.md).*
 
 ## Why Fisch?
 
@@ -43,7 +43,7 @@ On first launch, Fisch installs locked project dependencies, builds the browser 
 
 Use `fisch live --hands` to also prepare the optional hand model, or `fisch live --no-assets` to skip vision downloads. Camera and hand tracking still require explicit browser controls. If a model download fails, Live continues camera-off and retries next launch.
 
-This opens the particle face in a browser and Codex in your terminal. Inside Herdr or another multiplexer, Codex runs in the pane where you launched Live. The explicit `--agent <pane>` legacy adapter remains available. Click **Bật camera** when you want local face tracking; the camera starts off. Real camera images stay on your machine. Talk to Codex normally.
+This opens the particle face in a browser and Codex in your terminal. Inside Herdr or another multiplexer, Codex runs in the pane where you launched Live. The explicit `--agent <pane>` legacy adapter remains available. Click **Bật camera** when you want local face tracking; the camera starts off. Real camera images stay on your machine. Select or start a Native Codex thread in that terminal, then talk in the Live text panel or continue in the terminal.
 
 `npm start` is the checkout-local equivalent of `fisch live`; pass options with `npm start -- --hands`.
 
