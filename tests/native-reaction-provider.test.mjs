@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { PlannerRpc } from '../integrations/planner-rpc.mjs';
 import { tmpdir } from 'node:os';
+import { nativeVisualAuthoringGuide } from '../integrations/native-visual-authoring.mjs';
 import { ReactiveProviderError } from '../integrations/reactive-provider.mjs';
 import { LiveReactiveBroker } from '../integrations/live-reactive-broker.mjs';
 import { NativeReactionProvider, nativeReactionEnvironment, presenceReactionData, reactionObservationData } from '../integrations/native-reaction-provider.mjs';
@@ -53,7 +54,7 @@ it('uses a separate readonly native lane, proves empty MCP catalog before reserv
     const thread = f.calls.find(c => c.method === 'thread/start').params;
     expect(thread.config.mcp_servers.fisch_live.enabled).toBe(false); expect(thread.dynamicTools).toEqual([]);
     expect(thread.developerInstructions).toBe(''); expect(f.processes[0].args).toContain('developer_instructions=""');
-    expect(thread.baseInstructions).not.toContain('PRIVATE'); expect(f.processes[0].args).toContain('shell_tool');
+    expect(thread.baseInstructions).toContain(nativeVisualAuthoringGuide); expect(thread.baseInstructions).not.toContain('PRIVATE'); expect(f.processes[0].args).toContain('shell_tool');
     expect(JSON.stringify(f.calls.find(c => c.method === 'turn/start').params.input)).not.toContain('PRIVATE');
   } finally { f.provider.close(); }
 });
@@ -334,4 +335,22 @@ it('drops pending publication context if staging time becomes nonfinite or rewin
     try { const cue = await contextCue(f, 'bad-clock'); expect(f.provider.confirmPublication(cue.value.request, publication(cue.result))).toBe(false); }
     finally { f.provider.close(); }
   }
+});
+
+it('carries observer-authored curves, patches, free RGB and bounded motion through the existing compose contract', async () => {
+  const motion = { pivot: [0,0,0], translate: [0,0.1,0], rotate: [0,0,0.1], periodMs: 2000, phase: 0 };
+  const parts = [
+    { id: 'authored_stroke', kind: 'curve', points: [[-0.3,0,0],[0,0.4,0],[0.3,0,0]], radius: 0.025, weight: null, motion },
+    { id: 'authored_plane', kind: 'patch', points: [[-0.3,-0.2,0],[0.3,-0.2,0],[0.2,0.1,0],[-0.2,0.1,0]], weight: null, motion: null },
+  ];
+  const response = { reply: '', decision: { mode: 'compose', reasonCode: 'authored_response', payload: { parts, base: 'none', durationMs: 500,
+    easing: 'smoothstep', style: { color: '#71D3A9', brightness: 0.8, pointSize: 4, dispersion: 0.1 }, flow: null } } };
+  const f = fixture({ response });
+  try {
+    const result = await f.provider.decide(window(), new AbortController().signal);
+    const children = result.decision.action.body.children;
+    expect(children.find(node => node.type === 'assemble').parts).toEqual(parts.map(part => Object.fromEntries(Object.entries(part).filter(([,value]) => value !== null))));
+    expect(children.find(node => node.type === 'style')).toMatchObject({ color: '#71D3A9' });
+    expect(result.nativeProvenance.selectedMode).toBe('compose');
+  } finally { f.provider.close(); }
 });

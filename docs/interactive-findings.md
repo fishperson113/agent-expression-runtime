@@ -25,7 +25,7 @@ separate research questions, not prerequisites for a formative expression pilot.
 - The interrupted reaction was fenced locally. Diagnostics and RPC agree on
   `nativeTerminalAcknowledged:false` / `local_process_closed`; this does not
   establish canonical server cancellation, remote cost settlement or zero usage.
-- PR #151 candidate `a304368` adds fresh-thread context from browser-confirmed
+- PR #151, merged `c1b7415` from tested candidate `a304368`, adds fresh-thread context from browser-confirmed
   publications only, bounded to 8 entries, 2,400 reply characters and 5 minutes.
   Its fixed 550-second model profile and results must be reported separately from
   code tests. An admitted action is not evidence of a visible/recognized form.
@@ -59,3 +59,18 @@ relevance/restraint/pleasantness and caption consistency. Record actual visible
 change timing separately from admission, logical completion and full-turn time.
 A geometry count alone is not usefulness or fun. Human acceptance remains an
 explicit formative review, not a synthetic score.
+
+## Observer authoring affordance candidate
+
+Source audit found that MAIN already receives the rich Live authoring bundle,
+while the separate Native observer only receives a generic observation policy.
+The observer schema allows composition but its instructions did not explain
+mechanical shape/base semantics or the unknown current appearance. A small
+observer-only brief now derives supported part kinds and bounds from the existing
+composition schema, explains free RGB/bounded motion and permits retain/silence.
+It does not copy MAIN task context, add tools or prescribe a response to a cue.
+The fixture proves curve/patch/motion/RGB contract roundtrip, not actual model
+choice, recognizable rendering or enjoyment. Test this candidate with actual
+observer input separately from the six public text contexts sent through MAIN.
+An animate payload with empty controls/poses is contract-valid but cannot by
+itself establish new visible movement or expressive usefulness.
