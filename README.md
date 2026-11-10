@@ -55,6 +55,7 @@ Use the Live browser controls for normal sessions. `fisch status` and `fisch sto
 
 ## Learn more
 
+- [Tonight demo](docs/demo-tonight.md) - Native text/expression steps, scoped QA evidence and the separate optional OLV trial
 - [Live guide](docs/fisch-live.md) - camera, controls and privacy
 - [Herdr guide](docs/multiplexer.md) - optional adapter and panel migration
 - [Contributing](docs/my-harness.md) - development and checks

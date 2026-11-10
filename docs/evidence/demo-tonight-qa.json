@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "checkedAtUtc": "2026-11-10T04:43:17.687891+00:00",
+  "mode": "independent_cloud_scripted_agents_real_components_gateway_software_webgl",
+  "native": {
+    "cliCasesPassed": 16,
+    "hostAndUiCasesPassed": 9,
+    "gatewayRequired": true,
+    "skips": 0,
+    "loginReportedAuthenticated": true,
+    "loginOutputDiscarded": true,
+    "realInferenceValidated": false
+  },
+  "olv": {
+    "pythonLifecycleCasesPassed": 13,
+    "actualComponentAndRenderCasesPassed": 2,
+    "trialRequired": true,
+    "skips": 0,
+    "upstreamCommit": "992309c0aa19845960228f880013d4685fde93b5",
+    "pythonProfile": "Linux x86_64 Python 3.12",
+    "mcpSdk": "1.30.0",
+    "rawUnsafeOverlapReproduced": true,
+    "delayedSdkWriteRejected": "expected_epoch_mismatch",
+    "recoveredContextPriorItems": [
+      0,
+      2
+    ],
+    "cyanPixels": 4373,
+    "orangePixels": 2514,
+    "glErrors": [
+      0,
+      0
+    ],
+    "contextLost": false,
+    "staleVioletRendered": false,
+    "realProvider": "not_run",
+    "fullBasicMemoryAgent": "not_run"
+  },
+  "preflight": {
+    "cloudDefaultDoctorExit": 1,
+    "cloudDefaultMissing": "Rust is installed but absent from default PATH",
+    "cloudScopedToolchainDoctorExit": 0,
+    "observerEnvironmentPresence": {
+      "FISCH_REACTIVE_BACKEND": false,
+      "FISCH_REACTIVE_CONTRACT_VERSION": false,
+      "FISCH_REACTIVE_MODEL": false,
+      "FISCH_REACTIVE_URL": false,
+      "FISCH_REACTIVE_API_KEY": false,
+      "FISCH_REACTIVE_BUDGET": false
+    },
+    "observerFactoryReason": "disabled_by_config",
+    "configuredObserverLedger": false,
+    "ledgerBalanceAndDeadline": null,
+    "ledgerWrites": 0,
+    "nativeAuthIsNotObserverAuthorization": true,
+    "budgetAuditScope": "Configured environment only; no ledger contents read or modified",
+    "automaticNativeModelQa": "No approved model-QA budget path supplied; no real generation attempted"
+  },
+  "realModelCalls": 0,
+  "cameraActive": false,
+  "microphoneUsed": false,
+  "limits": [
+    "Native remote/app-server behavior is exercised with scripted child agents, not official real-model inference.",
+    "OLV uses real upstream handlers/MCP with a ServiceContext factory stand-in and scripted provider; its full server, BasicMemoryAgent, voice and persona are not tested.",
+    "Windows user machine, physical GPU, real-model semantics and human 10–20 minute enjoyment are not validated.",
+    "No configured ledger was read; absent configuration is not proof of no ledger elsewhere or of exhaustion."
+  ],
+  "freshOlvRecipe": {
+    "executed": true,
+    "profile": "Cloud Linux x86_64 Python 3.12 with prepared Node/Rust/Playwright prerequisites",
+    "scriptSha256": "470f63642b67b3548ac9805bcad8b5ec59c27788a6c07968f2bf637f374ea2ef",
+    "freshUpstreamCheckout": true,
+    "freshVirtualEnvironment": true,
+    "mcpSdk": "1.30.0",
+    "pipCheck": "passed",
+    "requiredTrial": true,
+    "filesPassed": 2,
+    "testsPassed": 2,
+    "skips": 0,
+    "testDurationSeconds": 9.57,
+    "actualModelCalls": 0,
+    "cameraActive": false,
+    "humanAcceptance": "pending",
+    "windowsRecipeExecuted": false
+  },
+  "baselineMainCommit": "8deb6678f25da0e869cfce564a761daab2ad6698",
+  "releaseGate": {
+    "pullRequest": 131,
+    "reviewedHead": "5cc38b9dcd5c9e16d45dcde0c3d8faaeab5cdb99",
+    "mergedCommit": "884ed870076648fe151b54f20f7be1ebca73054c",
+    "independentFilesPassed": 5,
+    "independentCasesPassed": 67,
+    "skips": 0,
+    "gatewayRequired": true,
+    "findingsClosed": [
+      "Explicit Stop retry after trusted proven-not-sent cancellation failure",
+      "Late cancellation failure feedback does not overwrite a completed or newer Native owner"
+    ],
+    "independentReview": "https://github.com/fishperson113/agent-expression-runtime/pull/131#pullrequestreview-5836983758",
+    "scope": "Human stop-current and scoped feedback; not a safe autonomous delayed-callback cancel API",
+    "researchDrafts": {
+      "airi129": "not_production_wrong_owner_cancel",
+      "xstate130": "not_production_generic_stop_current_unsafe_and_one_gateway_startup_failure_unresolved"
+    }
+  }
+}
