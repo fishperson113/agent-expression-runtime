@@ -13,10 +13,10 @@ async function renderComparison(page) {
       ThreeRenderer.prototype.apply = function(value, at) { original.call(this, value, at); ThreeRenderer.prototype.apply = original; resolve(structuredClone(value)); };
     });
     const records = [];
-    for (const at of [4500, 5040]) for (const x of [-0.7, 0.7]) for (const profile of ['before', 'after']) {
+    for (const at of [4500, 5040]) for (const x of [-0.7, 0, 0.7]) for (const profile of ['before', 'after']) {
       const canvas = document.createElement('canvas'); document.body.append(canvas);
       const renderer = new ThreeRenderer(canvas, () => {}, 42); renderer.resize(500, 500, 1); renderer.quality(2000);
-      const gaze = profile === 'after' ? geometricGazeWrites({ x, y: 0, strength: 1 }) : ['pupil_left', 'pupil_right'].map(part => ({ target: { part, prop: 'x' }, value: x * 0.055 }));
+      const gaze = profile === 'after' ? geometricGazeWrites({ x, y: 0, strength: 1 }) : ['pupil_left', 'pupil_right'].map((part, index) => ({ target: { part, prop: 'x' }, value: (index ? 0.09 : 0.135) + x * 0.055 }));
       const writes = [{ target: { part: 'body', prop: 'rotateY' }, value: 0.25 }, ...faceWrites('working', 0, 'normal', at, profile === 'after' ? 1 : 0), ...gaze];
       renderer.apply({ ...state, liveMatrices: transformMatrices(writes, state.particleParts) }, at);
       const png = canvas.toDataURL('image/png'), positions = renderer.positions.slice(), groups = state.particleGroups;
@@ -52,6 +52,7 @@ it('renders a wider pupil direction range relative to eye outlines through worki
       const relative = (profile, x) => { const c = records.find(r => r.at === at && r.profile === profile && r.x === x).centroids; return c['pupil_' + side].x - c['eye_' + side].x; };
       const before = relative('before', 0.7) - relative('before', -0.7), after = relative('after', 0.7) - relative('after', -0.7);
       expect(before).toBeGreaterThan(0); expect(after).toBeGreaterThan(before * 1.8);
+      const neutral = relative('after', 0); expect(relative('after', 0.7)).toBeGreaterThan(neutral + 3); expect(relative('after', -0.7)).toBeLessThan(neutral - 3);
     }
     for (const record of records) { expect(record.contextLost).toBe(false); expect(Object.values(record.centroids).every(c => c.weight > 0 && Number.isFinite(c.x + c.y))).toBe(true); }
     if (process.env.FISCH_GAZE_EVIDENCE) {
