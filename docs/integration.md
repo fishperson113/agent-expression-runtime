@@ -1,10 +1,10 @@
 # External agent integration · protocol v1
 
-This is the custom-host HTTP/MCP integration introduced by SRS v0.3; the default user workflow is Herdr pane attachment. The desktop runtime never calls a model. Your agent keeps its conversation, model/provider credentials and content stream. It sends only expressions and lifecycle commands to the local runtime.
+This is the custom-host HTTP/MCP integration introduced by SRS v0.3; the default user workflow is browser Live with Codex in the launching terminal. The desktop runtime never calls a model. Your agent keeps its conversation, model/provider credentials and content stream. It sends only expressions and lifecycle commands to the local runtime.
 
 ## Pair a host
 
-For the default Codex/Claude workflow, run **`fisch run`** in a free Herdr pane beside the existing agent. It renders in that pane, discovers the agent and subscribes to lifecycle events. Native message hooks are installed explicitly; no browser or new interactive agent is launched. Follow [the one-command guide](browser-and-hosts.md). The protocol examples below are for developers integrating their own hosts; they are not required launcher steps.
+For the default Codex workflow, run **`fisch live`** from your project directory. It opens the browser body and a new Codex session in the launching terminal with temporary MCP settings. No Herdr installation or global hooks are needed. The old `fisch run` panel is removed; see [current runtime requirements](browser-and-hosts.md) and [migration](multiplexer.md). The protocol examples below are for developers integrating their own hosts; they are not required launcher steps.
 
 Run the Tauri desktop application. The external-agent panel shows its ephemeral `http://127.0.0.1:<port>` address. Click **Show pairing details** and copy the token into your host's environment as `AER_PAIRING_TOKEN`, with the address in `AER_BASE_URL`. The credential is generated on every app launch, kept in memory, never written into a model prompt, URL, replay or application log. Click again to hide it. **Release controller** closes the active session; restarting the app rotates the token.
 

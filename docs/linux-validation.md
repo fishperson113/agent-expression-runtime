@@ -1,6 +1,6 @@
-# Linux validation through WSL2
+# Historical Linux validation through WSL2
 
-The default entry point is `fisch run` inside Herdr next to an existing agent. The commands below are for reproducible Linux validation without mixing Windows and Linux dependencies.
+The current entry point is `fisch live` in a normal terminal; the old `fisch run` panel has been removed. See [current requirements](browser-and-hosts.md). This document retains earlier WSL2/container evidence and its historical test counts. The commands below describe that validation setup without mixing Windows and Linux dependencies.
 
 This machine's only WSL distro is Docker Desktop's internal distro. Validation therefore uses a Debian Linux container on its WSL2 backend, with the repository mounted read-only and copied into `/work` inside Linux. No toolchain is installed into the internal Docker distro. No credentials or Windows `node_modules`/Rust target files are copied.
 
