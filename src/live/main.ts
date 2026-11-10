@@ -35,7 +35,12 @@ let handEventVersion = 0, reactiveAvailable = false, nativeConversation = false;
 const nativeReplies = new Map<string, { text: string; published: boolean; contextRevision: number | null }>();
 const nativeRequests = new Map<string, { request: ReactiveRequest; read: ReturnType<ReactiveSession['nativeReadSet']>; contextRevision: number | null }>();
 const cameraTransitions: { status: string; source: string; at: number }[] = [];
-const bridge = new LiveBridge(body, observations, () => resetReactive(), () => observeReactive());
+const bridge = new LiveBridge(body, observations, () => resetReactive(), () => observeReactive(), () => {
+  const remainingMs = body.observerContextRemainingMs();
+  return { schemaVersion: 1, publicBrief: remainingMs > 0 ? body.observerContext() : null, remainingMs,
+    reactiveAvailable, reactiveEnabled: reactiveAvailable && element<HTMLInputElement>('enable-reactivity').checked && !stopped && !document.hidden,
+    geometryProtected: body.userSceneOwned, expressionAllowed: !stopped && !document.hidden && body.canReactive(), recentPublished: conversation.reactionHistory() };
+});
 const reactive = new ReactiveSession({ now: () => performance.now(), wallNow: () => Date.now(), epoch: () => body.scheduler.epoch,
   id: () => crypto.randomUUID(), canAdmit: () => !document.hidden && body.canReactive(),
   canConverse: () => !document.hidden && body.canConverse(),

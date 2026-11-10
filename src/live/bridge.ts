@@ -14,7 +14,7 @@ export class LiveBridge {
   private connected = false;
   private stopped = false;
   private inspection = 0;
-  constructor(private body: LiveBody, private observations: FaceObservations, private resetReactive = () => {}, private observeReactive = () => {}) {}
+  constructor(private body: LiveBody, private observations: FaceObservations, private resetReactive = () => {}, private observeReactive = () => {}, private coordination?: () => unknown) {}
   async connect(base: string, token: string) {
     if (this.connection) throw Error('live_already_paired');
     this.connection = new HttpGatewayConnection(base, token);
@@ -74,16 +74,16 @@ export class LiveBridge {
   private async inspect(message: any) {
     const socket = this.socket, epoch = this.body.scheduler.epoch;
     if (message.epoch !== epoch || !socket || this.stopped || document.hidden || this.body.controls.mode === 'off') return;
-    const before = this.body.renderer.contentFrame, generation = ++this.inspection;
-    const indicator = element('look-indicator'); indicator.hidden = false;
-    indicator.textContent = 'Kiểm tra output renderer (không camera)';
+    const before = this.body.renderer.contentFrame, generation = message.coordinationOnly === true ? this.inspection : ++this.inspection;
+    const indicator = element('look-indicator');
+    if (message.coordinationOnly !== true) { indicator.hidden = false; indicator.textContent = 'Kiểm tra output renderer (không camera)'; }
     try {
     await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
     if (document.hidden || String(this.body.controls.mode) === 'off' || this.stopped || socket !== this.socket || socket.readyState !== WebSocket.OPEN || this.body.scheduler.epoch !== epoch) return;
     const summary = this.body.renderer.inspectOutput();
     if (summary.contentFrame <= before || summary.contextLost) return;
-    socket.send(JSON.stringify({ type: 'render_output', id: message.id, epoch, summary }));
-    } finally { setTimeout(() => { if (generation === this.inspection) indicator.hidden = true; }, 2000); }
+    socket.send(JSON.stringify({ type: 'render_output', id: message.id, epoch, summary, ...(this.coordination ? { coordination: this.coordination() } : {}) }));
+    } finally { if (message.coordinationOnly !== true) setTimeout(() => { if (generation === this.inspection) indicator.hidden = true; }, 2000); }
   }
   stop() { this.stopped = true; clearInterval(this.timer); this.socket?.close(); this.connection?.dispose(); this.body.feedback = undefined; }
 }
