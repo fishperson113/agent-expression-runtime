@@ -24,6 +24,46 @@ by this fixture. Do not install the full voice/model dependency tree for it.
 SDK 1.6.0 failed Fisch protocol negotiation; SDK 2.3.0 failed upstream timedelta
 timeout handling in the Cloud trial. Pinning working 1.30.0 avoids both failures.
 
+## Automated trial with an owned gateway
+
+For tonight's normal chat/expression demo use [Native Live](demo-tonight.md).
+The optional recipe below mirrors the Linux CI trial, **not** a production OLV
+agent connected to the Live text panel. Run from a prepared, disposable Fisch
+checkout with Node dependencies, Rust and Playwright Chromium available. The
+commands create a fresh temporary upstream checkout and Python environment;
+they do not use or alter an existing Codex login, observer ledger or voice stack.
+
+```sh
+# Linux x86_64; Python 3.12. Run from the Fisch checkout root.
+(
+set -eu
+test -f integrations/olv/requirements.txt
+olv_trial_dir=$(mktemp -d -t fisch-olv-trial-XXXXXX)
+git clone --filter=blob:none --no-checkout https://github.com/Open-LLM-VTuber/Open-LLM-VTuber.git "$olv_trial_dir/upstream"
+git -C "$olv_trial_dir/upstream" sparse-checkout set src prompts
+git -C "$olv_trial_dir/upstream" checkout --detach 992309c0aa19845960228f880013d4685fde93b5
+python3.12 -m venv "$olv_trial_dir/venv"
+"$olv_trial_dir/venv/bin/python" -m pip install -r integrations/olv/requirements.txt
+"$olv_trial_dir/venv/bin/python" -m pip check
+cargo build --locked --no-default-features --bin fisch-gateway --manifest-path src-tauri/Cargo.toml
+export FISCH_OLV_PYTHON="$olv_trial_dir/venv/bin/python"
+export FISCH_OLV_UPSTREAM="$olv_trial_dir/upstream"
+export FISCH_OLV_REQUIRE_TRIAL=1
+export FISCH_OLV_EVIDENCE="$olv_trial_dir/evidence.json"
+npx vitest run --maxWorkers=1 tests/olv-adapter.test.mjs tests/olv-render.test.mjs
+printf 'Evidence: %s\n' "$olv_trial_dir/evidence.json"
+)
+```
+
+Stop at the first failed command; do not continue with a different upstream or
+SDK version. The require flag prevents a missing trial environment from silently
+passing as a skip. The test owns its gateway and pairing token, uses a scripted
+provider and no media, and writes renderer/event evidence to the selected file.
+It is headless: it does not display an OLV chat session or attach OLV to an open
+Native Live page. This recipe has the same validated Linux profile as CI; it is
+not a tested Windows/PowerShell installation procedure. The manual fixture below
+is for an already configured local gateway, not required by this recipe.
+
 ## Run the actual component fixture
 
 Start the normal local Fisch gateway and renderer separately. Set its existing
@@ -104,6 +144,32 @@ an uncooperative provider. A production UI sink also needs its own generation
 guard; this fixture discards all upstream UI controls and never forwards stale UI.
 
 ## Evidence boundaries
+
+Independent Cloud QA at Fisch main `8deb667` on 2026-11-10 passed the actual
+adapter/render pair 2/2 with no skips in 10.27s, using Linux x86_64/Python 3.12,
+`mcp==1.30.0` and a clean pinned upstream; `pip check` passed. Evidence records
+camera off, zero actual model calls, GL error zero, target raster counts of 4373
+cyan and 2514 orange pixels, a delayed SDK write rejected with
+`expected_epoch_mismatch`, and synthetic recovery context counts 0 then 2.
+The separate Python lifecycle suite passed 13/13 using deterministic doubles;
+these counts must not be summed with wrapper tests as independent executions.
+The complete documented setup recipe was also executed from its exact codeblock
+with a fresh upstream checkout and Python venv on prepared Linux Cloud:
+locked install, pip check, gateway build and required trial passed 2/2 without skips
+in 9.57 seconds of test time, excluding installation. The sanitized
+[evidence record](evidence/demo-tonight-qa.json) pins the codeblock hash. This does
+not validate physical GPU, Windows, real-model memory or human fun.
+The current hybrid keeps Fisch's canonical Node bridge, bounded broker and guarded
+expression lifecycle; upstream orchestration is reused through an explicit adapter,
+not installed as a second conversation platform. Model-based Cloud agent QA remains
+unvalidated: an approved budget path has not been supplied. The current Cloud
+observer has its six reactive flags unset, returns `disabled_by_config`, and makes
+zero fetch/reserve/write calls; `FISCH_REACTIVE_BUDGET` has no configured path.
+No historical ledger search or exhaustion claim is implied. Native account auth
+does not supply observer credentials. Basic Native UI chat does not require
+creating/resetting an observer ledger. The real OLV ServiceContext/provider was
+not inspected or run; the successful fixture environment is a different scope.
+
 
 Run `python3 -m unittest discover -s tests -p olv_adapter_test.py` or the Vitest
 wrapper. Deterministic unit tests use fake runtime/transport. Actual component
