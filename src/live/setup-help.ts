@@ -13,10 +13,7 @@ const observerMessages = {
   unavailable: 'Chưa xác nhận cấu hình observer.'
 } as const;
 type Observer = keyof typeof observerMessages;
-const css = `.fisch-live-setup{min-width:0;margin:8px 0;padding:8px;border:1px solid var(--line,#34404a);border-radius:8px}
-.fisch-live-setup p,.fisch-live-setup li{font-size:12px;line-height:1.5;overflow-wrap:anywhere;margin:6px 0}
-.fisch-live-setup summary{cursor:pointer;font-weight:600;outline-offset:4px}.fisch-live-setup ol{padding-left:20px}
-#stop-all{position:fixed;right:16px;bottom:16px;z-index:5;box-shadow:0 0 0 4px var(--bg,#080e14)}`;
+const css = `.fisch-live-setup{min-width:0}.fisch-live-setup p,.fisch-live-setup li{font-size:13px;line-height:1.6;overflow-wrap:anywhere;margin:10px 0}.fisch-live-setup ol{padding-left:20px}`;
 
 function projection(value: unknown): { native?: Native; observer: Observer } {
   try {
@@ -33,8 +30,8 @@ function projection(value: unknown): { native?: Native; observer: Observer } {
 
 function elements() {
   const host = document.createElement('section'); host.className = 'fisch-live-setup'; host.setAttribute('aria-label', 'Kết nối agent và hướng dẫn');
-  host.innerHTML = `<div role="status" aria-live="polite" aria-atomic="true"><p class="setup-native"></p><p class="setup-observer"></p></div>
-    <details><summary>Agent và cách dùng</summary>
+  host.innerHTML = `<details><summary>Kết nối</summary><div role="status" aria-live="polite" aria-atomic="true"><p class="setup-native"></p><p class="setup-observer"></p></div>
+
     <p>Kết nối gateway chỉ nối trang với Fisch; không xác nhận Native Codex đã chọn phiên hoặc observer đã sẵn sàng.</p>
     <ol><li>Trò chuyện trong terminal Native Codex đang chạy cùng Fisch. Chờ Codex chọn phiên trước khi gửi yêu cầu.</li>
     <li>Trong Cùng sáng tạo, chép yêu cầu rồi tự dán vào terminal đó; trang không tự gửi.</li>

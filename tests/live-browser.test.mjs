@@ -19,6 +19,7 @@ it('opens a keyboard-accessible Live page without camera capture and preserves r
     await page.keyboard.press('Tab'); expect(await page.locator('.skip').evaluate(node => node === document.activeElement)).toBe(true);
     await page.setViewportSize({ width: 375, height: 812 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBe(true);
     await page.locator('#stop-all').click();
     expect(await page.locator('#connection').textContent()).toBe('Đã dừng phiên Live');
     expect(errors).toEqual([]);
@@ -78,6 +79,7 @@ it('shows a large Fisch panel beside a narrower camera and activity panel with c
     await page.locator('#enable-reactivity').check();
     expect(await page.evaluate(() => window.fischLive.reactivity())).toMatchObject({ enabled: false, stopped: true, camera: 'stopped', events: [] });
     await page.locator('#enable-reactivity').uncheck();
+    await page.keyboard.press('Escape');
     await page.locator('#cancel').click();
     expect(await page.evaluate(() => window.fischLive.reactiveStatus())).toMatchObject({ pending: 0, owner: null, sourceValid: false });
     await page.evaluate(() => window.fischLive.activity({ turn: 'working', output: 0, quality: 'fixture' }));
@@ -114,5 +116,73 @@ it('fills wide windows without an unused strip and keeps the 2:1 panels', async 
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     expect(await page.locator('video').evaluate(video => video.srcObject)).toBe(null);
     expect(errors).toEqual([]);
+  } finally { await browser?.close(); await server.close(); }
+}, 45000);
+
+async function inViewport(page, selector) {
+  const result = await page.locator(selector).evaluate(node => {
+    const box = node.getBoundingClientRect();
+    return box.x >= 0 && box.y >= 0 && box.right <= innerWidth + 1 && box.bottom <= innerHeight + 1;
+  });
+  expect(result, selector).toBe(true);
+}
+
+it('keeps the workspace within one screen, scrolls only history, and redraws a frozen face on resize', async () => {
+  const server = await createServer({ server: { host: '127.0.0.1', port: 0 } }); await server.listen(); let browser;
+  try {
+    browser = await chromium.launch({ headless: true, ...(process.platform === 'win32' ? { channel: 'msedge' } : {}), args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+    const page = await browser.newPage();
+    await page.goto(server.resolvedUrls.local[0] + 'live.html');
+    await page.waitForFunction(() => window.fischLive?.metrics().render.frame > 3);
+    await page.locator('#motion').selectOption('off');
+    for (const [width, height] of [[1440, 900], [1280, 720], [390, 844], [320, 568], [844, 390], [640, 450]]) {
+      const before = await page.evaluate(() => window.fischLive.metrics().render);
+      await page.setViewportSize({ width, height });
+      await expect.poll(() => page.evaluate(() => window.fischLive.metrics().render.frame)).toBeGreaterThan(before.frame);
+      expect((await page.evaluate(() => window.fischLive.metrics().render)).signature).toBe(before.signature);
+      expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight && document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      for (const selector of ['.body-panel', '.camera-card', '.activity-panel', '#motion', '#cancel', '#camera-start', '#stop-all']) await inViewport(page, selector);
+      expect(await page.evaluate(() => [...document.querySelectorAll('.body-panel,.camera-card,.activity-panel')].every(node => node.scrollHeight <= node.clientHeight + 1))).toBe(true);
+      const left = await page.locator('.body-panel').boundingBox(), right = await page.locator('.camera-panel').boundingBox();
+      expect(width > 700 ? left.width / right.width : left.height / right.height).toBeCloseTo(2, 1);
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.locator('#fullscreen').click();
+    await expect.poll(() => page.evaluate(() => Boolean(document.fullscreenElement))).toBe(true);
+    await page.evaluate(() => document.exitFullscreen());
+    await expect.poll(() => page.evaluate(() => document.fullscreenElement)).toBeNull();
+    await page.evaluate(() => { for (let i = 0; i < 40; i++) window.fischLive.logActivity('Sự kiện kiểm thử dài '.repeat(8)); });
+    expect(await page.locator('#agent-activity').evaluate(node => node.scrollHeight > node.clientHeight)).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBe(true);
+    expect(await page.locator('video').evaluate(video => video.srcObject)).toBeNull();
+  } finally { await browser?.close(); await server.close(); }
+}, 45000);
+
+it('dismisses tools with keyboard and backdrop, preserves drafts, and leaves emergency stop reachable', async () => {
+  const server = await createServer({ server: { host: '127.0.0.1', port: 0 } }); await server.listen(); let browser;
+  try {
+    browser = await chromium.launch({ headless: true, ...(process.platform === 'win32' ? { channel: 'msedge' } : {}), args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+    const page = await browser.newPage({ viewport: { width: 320, height: 568 } }); const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.goto(server.resolvedUrls.local[0] + 'live.html'); await page.waitForFunction(() => Boolean(window.fischLive));
+    for (const selector of ['.camera-options', '.debug', '.fisch-playground details', '.fisch-live-setup details']) {
+      const details = page.locator(selector), summary = details.locator('summary');
+      for (let repeat = 0; repeat < 2; repeat++) {
+        await summary.focus(); await page.keyboard.press('Enter');
+        await expect.poll(() => details.locator('dialog').getAttribute('open')).not.toBeNull();
+        await inViewport(page, 'dialog[open]'); await inViewport(page, '#stop-all');
+        expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBe(true);
+        if (selector.includes('playground')) await details.getByLabel('Ý tưởng').fill('Giữ ý tưởng của tôi');
+        if (repeat === 0) await page.keyboard.press('Escape'); else await page.mouse.click(1, 1);
+        await expect.poll(() => page.locator('dialog[open]').count()).toBe(0);
+        expect(await summary.evaluate(node => node === document.activeElement)).toBe(true);
+      }
+    }
+    await page.locator('.fisch-playground summary').click();
+    expect(await page.getByLabel('Ý tưởng').inputValue()).toBe('Giữ ý tưởng của tôi');
+    await page.locator('#stop-all').click();
+    expect(await page.locator('#connection').textContent()).toBe('Đã dừng phiên Live');
+    expect(await page.locator('dialog[open]').count()).toBe(0);
+    expect(await page.locator('video').evaluate(video => video.srcObject)).toBeNull(); expect(errors).toEqual([]);
   } finally { await browser?.close(); await server.close(); }
 }, 45000);

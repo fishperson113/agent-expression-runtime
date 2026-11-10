@@ -67,6 +67,8 @@ async function soak(call, page) {
 async function holdReaction(page, requests) {
   await page.locator('.camera-options summary').click();
   await page.locator('#enable-reactivity').check();
+  await page.keyboard.press('Escape');
+  expect(await page.locator('.camera-options dialog[open]').count()).toBe(0);
   for (const wait of [1100, 800, 0]) {
     await page.evaluate(() => window.fischLive.fixture('present'));
     if (wait) await page.waitForTimeout(wait);

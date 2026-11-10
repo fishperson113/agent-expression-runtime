@@ -1,5 +1,5 @@
 import './style.css';
-import { mountLive, element } from './view';
+import { mountLive, element, mountDisclosures } from './view';
 import { mountPlayground } from './playground-view';
 import { mountLiveSetup } from './setup-help';
 import { HandGestures } from './gestures';
@@ -16,12 +16,11 @@ import { drawLandmarkOverlay } from './landmark-overlay';
 import { LiveRecording } from './recording';
 
 mountLive(element('app'));
-const playgroundContainer = document.createElement('div');
-element('body').parentElement!.before(playgroundContainer);
+const playgroundContainer = element('playground-tools');
 const playground = mountPlayground(playgroundContainer);
-const setupContainer = document.createElement('div');
-element('agent-activity').before(setupContainer);
+const setupContainer = element('setup-tools');
 const liveSetup = mountLiveSetup(setupContainer);
+mountDisclosures(element('app'));
 const synthetic = new URLSearchParams(location.search).get('fixture') === 'synthetic';
 const body = new LiveBody(element<HTMLCanvasElement>('body'), text => { element('body-status').textContent = text; });
 const recording = new LiveRecording(() => body.scheduler.epoch, synthetic ? 'synthetic' : 'live-structured');

@@ -2,12 +2,10 @@ type Projection = { status: 'unknown' | 'working' | 'stored' | 'empty' | 'uncert
 type Action = 'create' | 'remix' | 'undo' | 'reset' | 'recover';
 const states = ['unknown', 'working', 'stored', 'empty', 'uncertain', 'recovered', 'interrupted'];
 let mounts = 0;
-const css = `.fisch-playground{min-width:0;margin:10px 0;border:1px solid var(--line,#34404a);border-radius:10px;padding:10px;background:var(--panel,#172129)}
-.fisch-playground summary{cursor:pointer;font-weight:600;outline-offset:4px}.fisch-playground .pg-fields{display:grid;gap:8px;margin-top:10px;min-width:0}
-.fisch-playground label{display:grid;gap:5px;font-size:13px}.fisch-playground textarea{box-sizing:border-box;width:100%;max-width:100%;min-width:0;resize:vertical;padding:8px;border:1px solid var(--line,#34404a);border-radius:6px;background:var(--bg,#111a20);color:inherit;font:inherit}
+const css = `.fisch-playground{min-width:0}.fisch-playground .pg-fields{display:grid;gap:8px;min-width:0}
+.fisch-playground label{display:grid;gap:6px;font-size:13px}.fisch-playground textarea{box-sizing:border-box;width:100%;max-width:100%;min-width:0;resize:vertical;padding:10px;border:1px solid var(--line,#34404a);border-radius:8px;background:var(--bg,#111a20);color:inherit;font:inherit}
 .fisch-playground .pg-actions{display:flex;flex-wrap:wrap;gap:8px}.fisch-playground button{white-space:normal;max-width:100%}
-.fisch-playground p{font-size:12px;line-height:1.5;margin:7px 0;overflow-wrap:anywhere}.fisch-playground .pg-error{color:#ffd391}.fisch-playground [hidden]{display:none!important}
-@media(min-width:851px){.body-panel:has(.fisch-playground) .body-stage{height:calc(100dvh - 410px)}}`;
+.fisch-playground p{font-size:12px;line-height:1.6;margin:7px 0;overflow-wrap:anywhere}.fisch-playground .pg-error{color:#ffd391}.fisch-playground [hidden]{display:none!important}`;
 
 function elements() {
   const host = document.createElement('section'), id = `fisch-playground-${++mounts}`; host.className = 'fisch-playground';
@@ -18,7 +16,7 @@ function elements() {
     <p id="${id}-limits">Ý tưởng tối đa 500 ký tự, mục tiêu 160 ký tự. Vui lòng nhập một dòng; nội dung chỉ nằm trong trang này cho đến khi bạn chép.</p>
     <div class="pg-actions" role="group" aria-label="Chép để gửi Codex"><button type="button" data-action="create">Nguyên tác</button><button type="button" data-action="remix">Chỉnh ý tưởng</button><button type="button" data-action="undo">Hoàn tác</button><button type="button" data-action="reset">Về bản đầu</button><button type="button" data-action="recover">Phục hồi</button></div>
     <p class="pg-error" role="alert"></p><textarea class="pg-output" aria-label="Yêu cầu chưa gửi tới Codex" rows="5" readonly hidden></textarea>
-    </div></details><p class="pg-status" role="status" aria-live="polite" aria-atomic="true"></p><p id="${id}-copy" class="pg-copy-state">Chép để gửi Codex · chưa gửi.</p>`;
+    </div><p class="pg-status" role="status" aria-live="polite" aria-atomic="true"></p><p id="${id}-copy" class="pg-copy-state">Chép để gửi Codex · chưa gửi.</p></details>`;
   const style = document.createElement('style'); style.textContent = css; host.prepend(style);
   const get = <T extends HTMLElement>(selector: string) => host.querySelector<T>(selector)!;
   return { host, details: get<HTMLDetailsElement>('details'), summary: get<HTMLElement>('summary'), idea: get<HTMLTextAreaElement>('.pg-idea'),

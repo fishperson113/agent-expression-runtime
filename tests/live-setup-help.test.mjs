@@ -26,8 +26,8 @@ it('separates gateway, selected Native session and configured observer without e
     await page.evaluate(() => window.setupUnderTest.project({ native: 'connected', observer: 'ready' }));
     expect(await panel.textContent()).toContain('chưa xác nhận lượt trả lời');
     expect(await panel.textContent()).toContain('đã cấu hình');
-    expect(await panel.locator('button,input,textarea').count()).toBe(0);
-    const summary = panel.getByText('Agent và cách dùng', { exact: true }); await summary.focus(); await page.keyboard.press('Enter');
+    expect(await panel.locator('input,textarea').count()).toBe(0);
+    const summary = panel.locator('summary'); await summary.focus(); await page.keyboard.press('Enter');
     expect(await panel.locator('details').getAttribute('open')).not.toBeNull();
     expect(await panel.locator('ol > li').count()).toBe(3);
     const guide = panel.getByRole('link', { name: 'Hướng dẫn cấu hình observer' });
