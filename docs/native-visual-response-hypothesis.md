@@ -21,3 +21,11 @@ against the instructions actually attached to the thread; that establishes polic
 attachment, not behavioral quality. A later authorized comparison must report its
 own exact policy hash and outcomes without forcing an expression or retrying to
 obtain a preferred result.
+
+For an authorized trial, restart Live/client/app-server processes and verify the
+policy hash from the actual attached thread instructions; a checkout alone does
+not refresh cached policy. Preserve every silent/retain/visual/text/error outcome.
+A silent visual response does not establish unsolicited conversational-caption
+acceptance; a caption-specific probe can remain unexercised while a separate
+visual receipt is valid. No new inference or budget expansion is authorized by
+this document.
