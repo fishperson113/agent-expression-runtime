@@ -43,7 +43,7 @@ const reactive = new ReactiveSession({ now: () => performance.now(), wallNow: ()
     body.admitReactive(compiled, owner);
     const pending = nativeReplies.get(owner.requestId);
     if (pending?.text.trim()) { pending.published = conversation.reaction({ requestId: owner.requestId, text: pending.text }); if (!pending.published) throw Error('reaction_ui_unavailable'); }
-  }, cancel: (owner, reason) => body.cancelReactive(owner, reason), record: recording.record, handState: () => handEvents.handState(), handMotion: () => handEvents.handMotion() });
+  }, cancel: (owner, reason) => body.cancelReactive(owner, reason), record: recording.record, handState: () => handEvents.handState(), handMotion: () => handEvents.handMotion(), handResetVersion: () => handEvents.resetVersion });
 body.attachReactive(reactive);
 let lastActivity = 'idle';
 const semanticEvents: SessionEvent[] = [];

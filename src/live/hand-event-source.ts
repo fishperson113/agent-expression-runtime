@@ -9,11 +9,13 @@ export class HandEventSource {
   private gate = new HandEventGate();
   private sequence = 0;
   private enabled = false;
+  private resets = 0;
   private capturedAt?: number;
   private sessionId?: string;
   constructor(private now: () => number) {}
   configure(enabled: boolean) { if (enabled !== this.enabled) { this.enabled = enabled; this.reset(); } }
-  reset() { this.gate.reset(); this.capturedAt = undefined; this.sessionId = undefined; }
+  reset() { this.resets++; this.gate.reset(); this.capturedAt = undefined; this.sessionId = undefined; }
+  get resetVersion() { return this.resets; }
   handState(): HandReadSet | undefined {
     if (!this.enabled) return;
     const state = this.gate.state();
