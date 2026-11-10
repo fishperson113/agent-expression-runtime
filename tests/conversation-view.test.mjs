@@ -14,6 +14,10 @@ async function open() {
   await page.goto(server.resolvedUrls.local[0] + 'live.html?fixture=synthetic'); await page.waitForFunction(() => !!window.fischLive);
   await page.evaluate(`(async () => {
     const { mountConversation } = await import('/src/live/conversation-view.ts');
+    const NativeResizeObserver = window.ResizeObserver; window.heldConversationResizes=[];
+    window.ResizeObserver = class extends NativeResizeObserver { constructor(callback) { super((entries, observer) => {
+      if(window.holdConversationResize)window.heldConversationResizes.push(()=>callback(entries,observer));else callback(entries,observer);
+    }); } };
     const container = document.createElement('div'); container.id='conversation-test'; container.style='position:fixed;inset:0;background:#080e14;z-index:20;display:flex';document.body.append(container);
     window.calls=[]; window.sideEffects=0;window.fetch=()=>{window.sideEffects++;throw Error('network')};
     for(const method of ['getItem','setItem','removeItem'])Storage.prototype[method]=()=>{window.sideEffects++;throw Error('storage')};
@@ -38,6 +42,47 @@ it('shows only real projected plaintext, counts UTF8 bytes and sends explicitly 
     expect(await input.inputValue()).toContain('Một hình ảnh'); expect(await page.evaluate(() => window.sideEffects)).toBe(0);
   } finally { await page.close(); }
 }, 45000);
+
+it('honors a new reader scroll while a transcript resize callback is pending', async () => {
+  const { page, panel, input } = await open();
+  try {
+    const messages = Array.from({ length: 20 }, (_, i) => ({ id: 'pending' + i, turn: 't', role: 'assistant', text: 'Đang đọc nội dung cũ '.repeat(20), status: 'completed', truncated: false }));
+    await page.evaluate(value => window.conversation.project(value), { ...ready, messages });
+    const list=panel.locator('ol');await list.focus();await page.keyboard.press('End');
+    await expect.poll(()=>list.evaluate(node=>node.scrollHeight-node.clientHeight-node.scrollTop)).toBeLessThanOrEqual(1);
+    await input.fill('Bản nháp trong lúc bố cục đổi.');await list.focus();
+    await page.evaluate(()=>{window.holdConversationResize=true;const panel=document.querySelector('#conversation-test .fisch-conversation');panel.style.maxHeight=(panel.clientHeight-120)+'px';});
+    await expect.poll(()=>page.evaluate(()=>window.heldConversationResizes.length)).toBeGreaterThan(0);
+    const oldTop=await list.evaluate(node=>node.scrollTop);await page.keyboard.press('PageUp');
+    await expect.poll(()=>list.evaluate(node=>node.scrollTop)).toBeLessThan(oldTop-10);
+    await list.evaluate(node=>new Promise(resolve=>{let last=node.scrollTop,stable=0;const tick=()=>{stable=node.scrollTop===last?stable+1:0;last=node.scrollTop;if(stable===5)resolve();else requestAnimationFrame(tick);};requestAnimationFrame(tick);}));
+    const readerTop=await list.evaluate(node=>node.scrollTop);
+    await page.evaluate(()=>{window.holdConversationResize=false;for(const callback of window.heldConversationResizes.splice(0))callback();});
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    expect(await list.evaluate(node=>node.scrollTop)).toBe(readerTop);
+    await page.evaluate(value=>window.conversation.project(value),{...ready,revision:2,messages:[...messages,{...messages[0],id:'pending-latest',text:'Nội dung đến sau khi người dùng đọc lên.'}]});
+    expect(await list.evaluate(node=>node.scrollTop)).toBe(readerTop);expect(await input.inputValue()).toBe('Bản nháp trong lúc bố cục đổi.');
+  } finally { await page.close(); }
+},45000);
+
+it('settles total-only transcript reflow without losing later reader scrolling', async () => {
+  const { page, panel } = await open();
+  try {
+    const messages=Array.from({length:20},(_,i)=>({id:'reflow'+i,turn:'t',role:'assistant',text:'Nội dung trước khi font đổi '.repeat(20),status:'completed',truncated:false}));
+    await page.evaluate(value=>window.conversation.project(value),{...ready,messages});
+    const list=panel.locator('ol');await list.focus();await page.keyboard.press('End');
+    await expect.poll(()=>list.evaluate(node=>node.scrollHeight-node.clientHeight-node.scrollTop)).toBeLessThanOrEqual(1);
+    const height=await list.evaluate(node=>node.clientHeight);
+    await page.evaluate(value=>{document.querySelector('#conversation-test ol').style.lineHeight='2';window.conversation.project(value);},{...ready,revision:2,messages});
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    expect(await list.evaluate(node=>node.clientHeight)).toBe(height);
+    await page.keyboard.press('PageUp');
+    await list.evaluate(node=>new Promise(resolve=>{let last=node.scrollTop,stable=0;const tick=()=>{stable=node.scrollTop===last?stable+1:0;last=node.scrollTop;if(stable===5)resolve();else requestAnimationFrame(tick);};requestAnimationFrame(tick);}));
+    const readerTop=await list.evaluate(node=>node.scrollTop);
+    await page.evaluate(value=>window.conversation.project(value),{...ready,revision:3,messages:[...messages,{...messages[0],id:'reflow-new',text:'Nội dung đến sau thao tác đọc.'}]});
+    expect(await list.evaluate(node=>node.scrollTop)).toBe(readerTop);
+  } finally { await page.close(); }
+},45000);
 it('keeps same-scope drafts, clears successful switches and ignores old results, unknown prevents resend but allows interrupt', async () => {
   const { page, panel, input } = await open();
   try {

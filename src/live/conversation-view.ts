@@ -68,15 +68,25 @@ function messageText(item: Message) {
 }
 function messageProjection(list: HTMLOListElement) {
   const measure = () => ({ top: list.scrollTop, height: list.clientHeight, total: list.scrollHeight });
-  let following = true, resizing = false, layout = measure();
+  let following = true, resizing = false, frame = 0, layout = measure();
+  const settle = () => {
+    capture(); if (following) list.scrollTop = list.scrollHeight;
+    layout = measure(); resizing = false; if (frame) cancelAnimationFrame(frame); frame = 0;
+  };
   const capture = () => {
     const next = measure();
     // A resize-generated scroll must not overwrite the reader's prior follow intent.
-    if (next.height !== layout.height || next.total !== layout.total) resizing = true;
+    if (next.height !== layout.height || next.total !== layout.total) { resizing = true; if (!frame) frame = requestAnimationFrame(settle); }
     if (!resizing) following = next.top + next.height >= next.total - 40;
     layout = next; return next;
   };
-  const resize = new ResizeObserver(() => { capture(); if (following) list.scrollTop = list.scrollHeight; layout = measure(); resizing = false; });
+  const readerScroll = (event: Event) => {
+    if (event instanceof KeyboardEvent && !['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key)) return;
+    resizing = false; layout = measure(); following = layout.top + layout.height >= layout.total - 40;
+  };
+  const inputs = ['wheel', 'keydown', 'pointerdown', 'touchstart'];
+  for (const type of inputs) list.addEventListener(type, readerScroll, { passive: true });
+  const resize = new ResizeObserver(settle);
   list.addEventListener('scroll', capture); resize.observe(list);
   return {
     project(next: Snapshot) {
@@ -85,8 +95,8 @@ function messageProjection(list: HTMLOListElement) {
       list.replaceChildren(...texts.map(text => { const node = document.createElement('li'); node.textContent = text; return node; }));
       list.scrollTop = following ? list.scrollHeight : before.top; layout = measure(); resizing = false;
     },
-    clear() { following = true; resizing = false; list.replaceChildren(); layout = measure(); },
-    dispose() { resize.disconnect(); list.removeEventListener('scroll', capture); }
+    clear() { following = true; resizing = false; if (frame) cancelAnimationFrame(frame); frame = 0; list.replaceChildren(); layout = measure(); },
+    dispose() { resize.disconnect(); if (frame) cancelAnimationFrame(frame); list.removeEventListener('scroll', capture); for (const type of inputs) list.removeEventListener(type, readerScroll); }
   };
 }
 function statusText(state: Snapshot | undefined, busy: boolean) {
