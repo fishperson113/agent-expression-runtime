@@ -2,7 +2,7 @@
 
 A visible particle body for your coding agent.
 
-Fisch turns agent activity into motion and lets Codex create expressions and illustrations with particles. It runs locally in a browser or a Herdr panel.
+Fisch turns agent activity into motion and lets Codex create expressions and illustrations with particles. It runs locally in a browser, with Codex in your terminal.
 
 ## Why Fisch?
 
@@ -41,16 +41,18 @@ Use `fisch live --hands` to also prepare the optional hand model, or `fisch live
 
 This opens the particle face in a browser and Codex in your terminal. Inside Herdr or another multiplexer, Codex runs in the pane where you launched Live. The explicit `--agent <pane>` legacy adapter remains available. Click **Bật camera** when you want local face tracking; the camera starts off. Real camera images stay on your machine. Talk to Codex normally.
 
-Prefer the terminal body? Keep Codex or Claude open in a neighboring Herdr pane and run:
+`npm start` is the checkout-local equivalent of `fisch live`; pass options with `npm start -- --hands`.
 
-```sh
-fisch run
-```
+### Migrating from the terminal panel
+
+The old `fisch run` terminal-body launcher and its `express`/`cancel` CLI controls have been removed. Start `fisch live` from your project directory instead. It opens a new Codex session in that terminal; it does not attach to an already-running agent. Live's MCP `express`/`cancel_expression` tools remain available to Codex.
+
+Use the Live browser controls for normal sessions. `fisch status` and `fisch stop` remain only for the dedicated Herdr pane created by the explicit `fisch live --agent <pane-id>` adapter. Normal-terminal Live needs no global hooks. To remove old hooks you installed, use `fisch hooks uninstall [codex|claude]`; this preserves unrelated provider hooks.
 
 ## Learn more
 
 - [Live guide](docs/fisch-live.md) - camera, controls and privacy
-- [Panel guide](docs/multiplexer.md) - terminal workflow
+- [Herdr guide](docs/multiplexer.md) - optional adapter and panel migration
 - [Contributing](docs/my-harness.md) - development and checks
 - [Architecture](docs/architecture.md) | [Validation](docs/validation.md) - technical details and POC limits
 
