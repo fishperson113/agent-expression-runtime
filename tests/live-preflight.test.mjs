@@ -52,7 +52,7 @@ it('describes a missing ledger without creating it, a fixture or a model process
 it.each(['no opt-in', 'invalid', 'expired', 'exhausted'])('blocks %s before fixture creation and dispatch, without spending quota', async mode => {
   const f = trial();
   if (mode === 'no opt-in') f.options.env = {};
-  if (mode === 'invalid') f.save({ ...f.budget, limit: 121 });
+  if (mode === 'invalid') f.save({ ...f.budget, limit: Number.MAX_SAFE_INTEGER + 1 });
   if (mode === 'expired') f.advance(100001);
   if (mode === 'exhausted') f.save({ ...f.budget, used: 120 });
   const before = readFileSync(f.budgetPath, 'utf8');
@@ -109,4 +109,15 @@ it('keeps CLI help and unknown arguments outside model dispatch even with opt-in
     expect(flag === '--help' ? child.stdout : child.stderr).toContain(flag === '--help' ? 'Usage:' : 'preflight_arguments_invalid');
     expect(child.stdout + child.stderr).not.toContain('unknown-private-argument');
   }
+});
+
+it('honors a larger explicitly authorized ledger and still stops at its configured limit', async () => {
+  const f = trial(); f.save({ ...f.budget, limit: 1000, used: 999 });
+  const output = vi.spyOn(console, 'log').mockImplementation(() => {});
+  try {
+    expect(await runPreflight(f.options)).toMatchObject({ modelReservationId: 1000 });
+    expect(f.read().limit).toBe(1000); expect(f.read().used).toBe(1000);
+    await expect(runPreflight(f.options)).rejects.toThrow('model_budget_exhausted');
+    expect(f.run).toHaveBeenCalledOnce(); expect(f.read().limit).toBe(1000);
+  } finally { output.mockRestore(); }
 });

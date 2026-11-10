@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "studyId": "fisch-optional-vs-explicit-decision-dev-v1",
+  "status": "Development experiment design, not a holdout. These cases may be inspected and tuned on; disclose that. V1/V2 remain disclosed exploratory evidence.",
+  "purpose": "Separate optional action selection, relevance/abstention judgment, authoring validity and host execution. No geometry quota, semantic preset or requirement to move on every turn.",
+  "budget": "No calls are authorized by this design. Verify and reserve the current authorized budget before actual inference; unknown usage is not zero. Choose a fixed pilot subset before execution.",
+  "armDesign": {
+    "preferredControlledPair": [
+      {
+        "id": "A",
+        "name": "instrumented_optional",
+        "policyDifference": "An explicit decision recorder is available but optional; ordinary physical expression tools remain optional. No requirement to change geometry."
+      },
+      {
+        "id": "B",
+        "name": "explicit_decision_required_action_optional",
+        "policyDifference": "Require exactly one bounded expression decision for each evaluated turn. The decision may be retain, noop, motion or compose. Retain/noop creates no new physical expression. Do not require new geometry or an expressive tool call."
+      }
+    ],
+    "catalogControl": "The SAME recorder and physical tools must be advertised in both arms if attributing differences to the required-decision instruction. Adding a tool only in B changes catalog and policy together; label such a result a bundled exploratory change, not an isolated mandate effect. A separate unchanged-production baseline can be added only with predeclared budget.",
+    "decisionRecorder": "Prefer a bounded dev-only logical recorder that does not itself render. It records mode and a brief public-purpose code/summary, not private chain-of-thought. Motion/compose then uses ordinary explicit existing tool arguments. This permits observing an intention-to-dispatch gap. If a candidate instead makes the decision tool execute a supplied payload, keep that semantics identical across arms and label the host-dispatch factor explicitly.",
+    "decisionModes": {
+      "retain": "Keep the current authored form; zero new expression requests and no implicit return_to_face.",
+      "noop": "No physical expression requested. Record this separately from retain; neither is a missing decision.",
+      "motion": "Explicit existing-part motion arguments; never map a semantic label to a host-selected effect.",
+      "compose": "Explicit agent-authored parts/style/base through the existing validated helper; no shape-name preset or context classifier."
+    },
+    "missingDecision": "Record noncompliance/missing evidence. Never auto-invent an expression or retry the model to fill the slot.",
+    "controls": "Pin model/config/source, use fresh model client/app-server/MCP and verified actual outbound policy/catalog per arm. Same user message and initial engine state within each paired case; fresh conversation per arm. Predeclare/randomize arm and case order. Preserve all failures and repeats. A one-run pilot is descriptive, not proof of a stable model effect."
+  },
+  "measures": [
+    "Decision recorder present/missing; chosen retain/noop/motion/compose, separated from physical tool count.",
+    "For motion/compose decisions: valid authored payload, actual dispatch, admission, application, completion/cancellation/unknown, with request/session/epoch/seq correlation.",
+    "Intent-to-physical-dispatch gap: a recorded motion/compose choice without corresponding tool dispatch. Do not infer this gap from silence alone.",
+    "Argument/schema rejection, capability-unavailable, host transport failure and stale/priority rejection as separate categories.",
+    "First-tool, first-decision, first-physical-expression and full-Native-turn times separately; missing events null with reason, unknown cost never zero.",
+    "Blind actual composite/transition description before context, context relevance/restraint after context, assistant claim honesty last. No shape labels or count quota.",
+    "Noop/retain safety: no new expression POST/seq and no implicit helper/reset; ordinary user-priority revocation may still happen and must be reported independently.",
+    "Tool-call and token/latency overhead of mandatory logical decisions, including quiet contexts. More decisions or geometry is not a quality win."
+  ],
+  "outcomeInterpretation": [
+    {
+      "pattern": "A silent; B explicit retain/noop; blind review accepts restraint",
+      "supports": "Consistent abstention/relevance judgment, not demonstrated physical integration failure. A model explanation alone is not proof of its internal cause."
+    },
+    {
+      "pattern": "A silent; B motion/compose with valid args and successful host application",
+      "supports": "Required explicit-decision policy changes observable action selection in this pilot; utility still needs blind relevance/transition review. It does not prove optional transport was broken."
+    },
+    {
+      "pattern": "B records motion/compose but no physical dispatch",
+      "supports": "Observable decision-to-action integration/compliance gap; inspect exact recorder/turn correlation before attributing cause."
+    },
+    {
+      "pattern": "B dispatches but schema rejects",
+      "supports": "Authoring/contract usability problem, distinguished from absence of expressive intention."
+    },
+    {
+      "pattern": "Valid correlated dispatch but host fails or remains unknown",
+      "supports": "Host/transport/causal execution issue; do not blame semantic relevance or retry unknown actions."
+    },
+    {
+      "pattern": "Positive control succeeds; natural contexts retain/noop",
+      "supports": "Model can access/author/execute the tool when directly asked. Natural abstention remains a model/policy/utility question, not proven unavailable tools."
+    },
+    {
+      "pattern": "B makes inappropriate actions in quiet contexts or increases distraction",
+      "supports": "Required-decision policy may worsen restraint despite higher action count; reject geometry-count gaming."
+    }
+  ],
+  "nextHoldout": "Do not create/reveal the final unseen holdout until candidate behavior/policy is frozen after development. These dev cases and all prior holdouts are ineligible as untouched final tests.",
+  "executedByQa": {
+    "modelCalls": 0,
+    "browserRuns": 0,
+    "sourceEdits": 0
+  },
+  "cases": [
+    {
+      "id": "D01",
+      "message": "Mình đang giải thích một trò chơi cho người mới: hai người lần lượt đưa ra một ví dụ, nhưng không được lặp lại điều người trước đã nói. Bạn giúp mình nói luật này thật dễ hiểu bằng vài câu được không?"
+    },
+    {
+      "id": "D02",
+      "message": "Mình vừa tìm lại một đoạn ghi chép từ nhiều năm trước. Những chuyện khi đó tưởng rất quan trọng giờ đọc lại thấy vừa thương vừa buồn cười. Bạn sẽ mở đầu cuộc trò chuyện về chuyện này thế nào?"
+    },
+    {
+      "id": "D03",
+      "message": "Buổi gặp đã đổi sang hôm khác, nên lời nhắn mình chuẩn bị không còn phù hợp. Mình muốn báo lại thật lịch sự, ngắn gọn và không làm người kia cảm thấy bị trách. Bạn gợi ý giúp mình nhé."
+    },
+    {
+      "id": "D04",
+      "message": "Mình cần tập trung đối chiếu các con số trong ít phút. Không cần bổ sung lời khuyên hoặc làm gì thêm lúc này; để mình tự kiểm tra xong đã."
+    }
+  ],
+  "positiveControl": {
+    "id": "PC01",
+    "message": "Đây là lượt kiểm tra đường công cụ, không phải tương tác tự phát. Hãy dùng compose_expression tạo một bố cục do bạn tự soạn rồi đọc trạng thái thực thi của yêu cầu đó.",
+    "interpretation": "An explicitly requested generic tool action tests model access/argument authoring and the signed-in host integration. It names no shape/color/effect, but it DOES request a physical action, so never count it as spontaneous relevance or geometry uptake. Existing deterministic synthetic MCP/renderer controls establish lower-level plumbing separately."
+  },
+  "implementationDifference": "The implemented B arm uses turn/start.outputSchema for a final JSON reply plus retain/animate/compose decision, with validated same-thread host dispatch. A has optional ordinary tools, no outputSchema. This is a bundled output-contract and host-dispatch exploratory comparison, not an isolated instruction effect. Production tools and policy are identical."
+}
