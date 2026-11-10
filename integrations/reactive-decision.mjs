@@ -8,7 +8,7 @@ export const reactiveDecisionSchema = object({ schemaVersion: { const: 1 }, requ
   action: { anyOf: [{ type: 'null' }, object({ actionId: id, body: structuredClone(planSchema.properties.body) })] } });
 reactiveDecisionSchema.$defs = structuredClone(planSchema.$defs);
 const briefNodes = planSchema.properties.body.properties.children.items.properties.children.items.anyOf
-  .filter(node => ['morph', 'flow', 'shapeQuality'].includes(node.properties.type.const)).map(node => {
+  .filter(node => ['morph', 'flow', 'shapeQuality', 'style'].includes(node.properties.type.const)).map(node => {
     const copy = structuredClone(node); copy.properties.durationMs = { type: 'integer', minimum: 200, maximum: 1000 }; return copy;
   });
 export const reactiveDecisionSchemaV2 = object({ ...structuredClone(reactiveDecisionSchema.properties), schemaVersion: { const: 2 },

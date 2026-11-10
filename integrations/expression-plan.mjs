@@ -18,8 +18,9 @@ const quality = object({ type: { const: 'shapeQuality' }, rise: { type: 'number'
   grow: { type: 'number', minimum: 0.7, maximum: 1.3 },
   effort: object({ time: unit, weight: unit, flow: unit }), durationMs });
 const assembly = object({ type: { const: 'assemble' }, parts: geometry.properties.parts, durationMs });
+const colorStyle = object({ type: { const: 'style' }, color: { type: 'string', pattern: '^#[0-9a-fA-F]{6}$' }, durationMs });
 const parallel = object({ type: { const: 'parallel' },
-  children: { type: 'array', minItems: 1, maxItems: 3, items: { anyOf: [morph, assembly, flow, quality] } } });
+  children: { type: 'array', minItems: 1, maxItems: 3, items: { anyOf: [morph, assembly, flow, quality, colorStyle] } } });
 const sceneBody = object({ type: { const: 'sequence' },
   children: { type: 'array', minItems: 1, maxItems: 2, items: parallel } });
 const idleSceneSchema = object({ id: { type: 'string', minLength: 1, maxLength: 40 },
@@ -108,8 +109,9 @@ export function planBody(value, requireAssembly = false) {
     if (step.type !== 'parallel' || !Array.isArray(step.children) || !step.children.length || step.children.length > 3)
       throw Error('invalid_plan');
     for (const node of step.children) {
-      if (!['morph', 'assemble', 'flow', 'shapeQuality'].includes(node.type) || !Number.isInteger(node.durationMs) ||
+      if (!['morph', 'assemble', 'flow', 'shapeQuality', 'style'].includes(node.type) || !Number.isInteger(node.durationMs) ||
           node.durationMs < 200 || node.durationMs > 1500) throw Error('invalid_plan');
+      if (node.type === 'style' && (Object.keys(node).length !== 3 || typeof node.color !== 'string' || !/^#[0-9a-f]{6}$/i.test(node.color))) throw Error('invalid_plan');
       if (node.type === 'shapeQuality' && (!Number.isFinite(node.rise) || Math.abs(node.rise) > 0.4 ||
           !Number.isFinite(node.grow) || node.grow < 0.7 || node.grow > 1.3)) throw Error('invalid_plan');
     }
@@ -130,6 +132,7 @@ export const plannerInstructions = 'React to the supplied interaction event as a
   + 'Address the viewer: frontal XY silhouette, attentive approach or nod, readable eyes/mouth where appropriate. Keep attention on the user rather than illustrating tool logs. '
   + 'Design a readable miniature performance, not a static icon or whole-body wobble. Use a clear setup, visible action, a readable hold and recovery. '
   + 'The display is low-resolution colored Braille: use a bold silhouette, thick strokes and large relative changes; tiny jitter and fine detail disappear. '
+  + 'Choose any RGB color using style.color as #RRGGBB, including subtle or unexpected hues, to communicate this response. Color choices are yours and have no fixed emotion palette. Use smooth bounded transitions and avoid flashing. '
   + 'Every plan must contain an assemble node. A familiar expressive face is welcome; do not force a different concept. '
   + 'You control one reconfigurable swarm, not a fixed avatar. Prefer assemble to invent a coherent silhouette or object from curve tubes, ellipsoid shells and quadrilateral patches. '
   + 'Express ideas creatively: hands, creatures, symbols, tools or unexpected compositions are possible without named presets. Use a few readable parts, not visual clutter. '

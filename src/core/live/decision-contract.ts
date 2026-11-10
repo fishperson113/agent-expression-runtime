@@ -52,10 +52,11 @@ export function validateBriefV2Body(value: unknown) {
   if (parallel.type !== 'parallel') throw Error('v2_body');
   for (const value of array(parallel.children, 1, 3)) {
     const type = value && typeof value === 'object' ? Object.getOwnPropertyDescriptor(value, 'type')?.value : undefined, keys = type === 'morph' ? ['type', 'target', 'durationMs'] : type === 'flow' ? ['type', 'field', 'strength', 'durationMs'] :
-      type === 'shapeQuality' ? ['type', 'rise', 'grow', 'effort', 'durationMs'] : [];
+      type === 'shapeQuality' ? ['type', 'rise', 'grow', 'effort', 'durationMs'] : type === 'style' ? ['type', 'color', 'durationMs'] : [];
     const node = object(value, keys);
     if (!keys.length || !Number.isSafeInteger(node.durationMs) || node.durationMs < 200 || node.durationMs > 1000) throw Error('v2_body');
     if (type === 'flow' && !(typeof node.strength === 'number' && Number.isFinite(node.strength) && node.strength >= 0 && node.strength <= 1)) throw Error('v2_body');
+    if (type === 'style' && (typeof node.color !== 'string' || !/^#[0-9a-f]{6}$/i.test(node.color))) throw Error('v2_body');
     if (type === 'shapeQuality') {
       const effort = object(node.effort, ['time', 'weight', 'flow']);
       if (!(typeof node.rise === 'number' && typeof node.grow === 'number' && Number.isFinite(node.rise) && Number.isFinite(node.grow) && node.rise >= -0.4 && node.rise <= 0.4 && node.grow >= 0.7 && node.grow <= 1.3) ||
