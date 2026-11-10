@@ -573,6 +573,9 @@ it.skipIf(!nativeGateway)('returns public Fisch history with strict inspect and 
     const collision=toolValue(await client.tool('observe'));unavailable(collision.coordination);expect(collision.coordination.reasonCode).toBe('rate_limited');expect(collision.snapshot).toBeTruthy();
     await f.live.page.evaluate(()=>window.fischLive.conversationClear());await f.live.page.waitForTimeout(1100);
     const cleared=toolValue(await client.tool('inspect_expression'));expect(cleared.coordination.available).toBe(true);expect(cleared.coordination.state.recentPublished).toEqual([]);
+    expect(await f.live.page.locator('#look-indicator').isVisible()).toBe(true);
+    await f.live.page.waitForTimeout(1100);await client.tool('observe');await f.live.page.waitForTimeout(1000);
+    expect(await f.live.page.locator('#look-indicator').isHidden()).toBe(true);
     expect((await f.live.page.evaluate(()=>window.fischLive.metrics())).cameraActive).toBe(false);
   }finally{await client.close();await f.close();}
 },60000);
