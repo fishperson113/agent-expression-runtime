@@ -23,10 +23,12 @@ async function start(reactiveProvider) {
     authorizeReactiveRequest(id) { return this.current?.request.requestId === id && !this.busy; },
     deliverReactiveDecision(id, data) { const reason = !data ? 'invalid_decision' : this.current.request.intentRevision !== this.intent ? 'stale' : 'accepted';
       deliveries.push({ id, data, reason }); if (reason === 'accepted') actions.push(data); return { reason }; }, failReactiveDecision() {} };
-  const page = { isClosed: () => false, evaluate: async (fn, arg) => {
+  const frame = { url: () => 'http://127.0.0.1:1/live.html' };
+  const page = Object.assign(new EventEmitter(), { url: frame.url, mainFrame: () => frame, exposeBinding: async () => {},
+    isClosed: () => false, evaluate: async (fn, arg) => {
     const previous = globalThis.window; globalThis.window = { fischLive: api };
     try { return await fn(arg); } finally { globalThis.window = previous; }
-  } };
+  } });
   const running = runTerminalCodex({ live: { page, base: 'http://127.0.0.1:1', token: 'test-gateway-token' }, cwd: process.cwd(), signal: controller.signal,
     host: { command: process.execPath, args: ['-e', fakeServer, '--'] }, reactiveProvider,
     spawnClient: (_command, args, options) => {
