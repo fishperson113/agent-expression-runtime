@@ -42,6 +42,11 @@ describe('bounded expression evidence', () => {
     await f.tracker.begin('new', { id: 'other' });
     expect(f.tracker.read({ requestId: 'own' })).toMatchObject({ status: 'unknown', reason: 'session_changed' });
   });
+  it('updates pending admission when later accepted feedback arrives', async () => {
+    const f = fixture(); await f.tracker.begin('own', session);
+    f.tracker.receipt('own', { ...receipt, status: 'pending' }); f.feedback('accepted');
+    expect(f.tracker.read({ requestId: 'own' })).toMatchObject({ status: 'accepted', admission: 'accepted' });
+  });
   it('bounds entries and unmatched feedback, expires records and resets old session evidence', async () => {
     const f = fixture({ limit: 2, ttlMs: 10 });
     for (const id of ['a', 'b', 'c']) await f.tracker.begin(id, session);

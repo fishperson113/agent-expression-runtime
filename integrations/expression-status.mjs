@@ -23,6 +23,7 @@ export function createExpressionStatus({ base, token, subscribe = subscribePlayg
     if (terminal.has(entry.status)) return;
     if (['accepted', 'pending'].includes(value.status) && entry.status === 'applied') return;
     entry.status = value.status; entry.updatedAt = now();
+    if (['accepted', 'rejected'].includes(value.status)) entry.admission = value.status;
     entry.reason = undefined;
   }
   function lost(reason) {

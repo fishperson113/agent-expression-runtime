@@ -106,9 +106,13 @@ async function send(args) {
   if (previous && previous !== payload) throw Error('request_id_reused');
   commands.set(args.requestId, payload);
   while (commands.size > 256) commands.delete(commands.keys().next().value);
-  await expressionStatus.begin(args.requestId, session);
+  const held = session, owner = { id: session.id, epoch: session.epoch };
   let result;
-  try { result = await request(`/v1/sessions/${session.id}/expressions`, { ...args, epoch: session.epoch }); }
+  try {
+    await expressionStatus.begin(args.requestId, owner);
+    if (session !== held || session?.id !== owner.id || session?.epoch !== owner.epoch) throw Error('session');
+    result = await request(`/v1/sessions/${owner.id}/expressions`, { ...args, epoch: owner.epoch });
+  }
   catch (error) {
     if (['rejected', 'cancelled'].includes(error.receipt?.status)) expressionStatus.receipt(args.requestId, error.receipt);
     else expressionStatus.failed(args.requestId);

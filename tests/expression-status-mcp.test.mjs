@@ -74,3 +74,35 @@ describe('external MCP lifecycle inspection', () => {
     });
   });
 });
+
+it('never dispatches across a session reset while the feedback subscription is connecting', async () => {
+  let release, notify, creates = 0, sends = 0, reads = 0;
+  const connecting = new Promise(resolve => { notify = resolve; });
+  const token = 'synthetic-held-feedback';
+  const server = createServer(async (req, res) => {
+    if (req.headers.authorization !== `Bearer ${token}`) { res.writeHead(401).end(); return; }
+    if (req.url.endsWith('/events')) {
+      release = () => { res.writeHead(200, { 'content-type': 'text/event-stream' }); res.flushHeaders(); };
+      notify(); return;
+    }
+    res.setHeader('content-type', 'application/json');
+    if (req.url === '/v1/sessions') { creates++; res.end(JSON.stringify({ id: randomUUID(), epoch: randomUUID() })); return; }
+    if (req.url.includes('/observe')) {
+      if (++reads === 1) { res.writeHead(404).end(JSON.stringify({ code: 'session_closed' })); return; }
+      res.end(JSON.stringify({ cursor: 0 })); return;
+    }
+    if (req.url.endsWith('/expressions')) sends++;
+    res.end('{}');
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const client = liveTestClient(`http://127.0.0.1:${server.address().port}`, token);
+  try {
+    const pending = client.tool('express', expression); await connecting;
+    expect((await client.tool('observe')).isError).toBe(true);
+    await client.tool('observe'); release();
+    const result = await pending;
+    expect({ creates, sends }).toEqual({ creates: 2, sends: 0 });
+    expect(result.isError).toBe(true);
+    expect(JSON.parse(result.content[0].text).code).toBe('live_session_changed_request_not_replayed');
+  } finally { await client.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
+});
