@@ -1,0 +1,18 @@
+{
+  "width": 1440,
+  "height": 900,
+  "camera": false,
+  "mediaCalls": 0,
+  "scene": "face",
+  "schedulerBusy": false,
+  "renderFrame": 120,
+  "connection": "Chưa nối Codex",
+  "transcriptItems": 0,
+  "inputDisabled": true,
+  "scroll": false,
+  "sourceCommit": "8fbc21454ba5b4ac654db642d63a06003f3beb03",
+  "capturedAtUtc": "2026-11-10T04:03:29.652065+00:00",
+  "renderer": "Headless Chromium with SwiftShader; not physical GPU acceptance",
+  "page": "live.html, no synthetic fixture query, no conversation binding",
+  "sha256": "6caec05ed5ab1b621399a7d7092e393420b53349cfedb030b7538f087ac2d350"
+}

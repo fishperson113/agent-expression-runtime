@@ -36,19 +36,21 @@ vẫn giữ cwd là project. Không cần đổi ExecutionPolicy.
 Live mở Native Codex/host riêng trong terminal hiện tại, dùng login có sẵn;
 không hot-attach tiến trình Codex cũ. Browser không tự gửi nội dung bạn gõ ở
 Cùng sáng tạo. Nếu clipboard không dùng được, chọn/chép request đang hiện rồi
-tự dán vào terminal. Chỉ bắt đầu bấm giờ chơi sau khi Live mở xong.
+tự dán vào panel hội thoại hoặc terminal. Chỉ bắt đầu bấm giờ chơi sau khi Live mở xong.
 
 ## Kịch bản và điều cần nhìn
 
 | Phút | Thao tác | Điều cần quan sát / khi chưa đạt |
 | --- | --- | --- |
-| 0–2 | Trong terminal Native Codex mới, chọn/bắt đầu phiên rồi nhập một câu của chính bạn. Mở **Agent và cách dùng** trên trang. | Gateway đã nối và Native đã chọn phiên là hai trạng thái riêng. Camera vẫn tắt. “Đã chọn phiên” chưa chứng minh model trả lời; câu trả lời thực và hoạt động tool mới là bằng chứng. Nếu vẫn chờ, kiểm tra terminal, không mở thêm controller. |
-| 2–5 | Mở **Cùng sáng tạo**, nhập một ý tưởng của bạn, một dòng; mục tiêu tùy chọn. Bấm **Nguyên tác**, tự dán vào terminal và gửi. | “Đã chép; chưa gửi” đúng trước khi dán. Codex dùng `playground_state` rồi `playground_edit`; chỉ coi đã lưu khi tool trả `committed` và UI xác nhận lịch sử. Chỉ có text/ACK hoặc hạt tự chuyển động chưa đủ. |
+| 0–2 | Trong terminal Native Codex mới, chọn/bắt đầu phiên; sau đó nhập một câu của chính bạn ở panel hội thoại hoặc terminal. Mở **Kết nối** trên trang. | Gateway đã nối và Native đã chọn phiên là hai trạng thái riêng. Camera vẫn tắt. “Đã chọn phiên” chưa chứng minh model trả lời; câu trả lời thực và hoạt động tool mới là bằng chứng. Nếu vẫn chờ, kiểm tra terminal, không mở thêm controller. |
+| 2–5 | Mở **Cùng sáng tạo**, nhập một ý tưởng của bạn, một dòng; mục tiêu tùy chọn. Bấm **Nguyên tác**, tự dán vào panel hội thoại hoặc terminal và gửi. | “Đã chép; chưa gửi” đúng trước khi dán. Codex dùng `playground_state` rồi `playground_edit`; chỉ coi đã lưu khi tool trả `committed` và UI xác nhận lịch sử. Chỉ có text/ACK hoặc hạt tự chuyển động chưa đủ. |
 | 5–8 | Chọn một thay đổi bạn thật sự muốn, dùng **Chỉnh ý tưởng**, dán/gửi; sau đó dùng **Hoàn tác** tương tự. | Hình có thay đổi liên quan tới ý định, lịch sử tăng sau commit; undo quay về bản đã lưu trước. Tạo hình cần giữ bản sắc qua các lượt. “Đã lưu” là lịch sử trong phiên, không đảm bảo mọi frame bị đóng băng. |
 | 8–10 | Nếu bắt gặp trạng thái đang xử lý, bấm **Dừng biểu đạt** một lần, rồi nhờ Codex đọc lại state. | Không báo đã lưu mới nếu chưa hoàn tất. Nếu uncertain/recoveryRequired, đừng gửi lại request cũ tự động. Chỉ dùng **Phục hồi** khi đồng ý xóa lịch sử trong phiên, rồi tạo mới. Nếu không kịp ngắt, ghi “chưa thử”, không tính pass. |
 | 10–15 | Chơi tự do theo tò mò của bạn: tạo, sửa, undo hoặc nói chuyện. Không cần theo kịch bản mẫu. | Bạn có muốn tiếp tục không? Hình có liên quan và có điều bất ngờ thú vị không? Ghi cả khoảnh khắc chán, hiểu nhầm hoặc phải vật lộn với copy/paste. Không chỉ chọn happy case để quay video. |
-| Tùy chọn, tối đa 2 phút | Xem **Quan sát và phản ứng**. Chỉ bấm **Bật camera** nếu muốn; có thể từ chối quyền hoặc dùng **Tắt camera** bất kỳ lúc nào. | Camera opt-in và observer độc lập. Native có login không làm observer sẵn sàng. Observer chưa cấu hình/thiếu hoặc hết ngân sách thì giữ off; co-create vẫn thử được. Khi đã sẵn sàng, chỉ bật **Phản ứng theo camera** nếu đồng ý gửi typed observations tới provider riêng. Không kỳ vọng mỗi cử động đều tạo phản ứng. |
+| Tùy chọn, tối đa 2 phút | Xem trạng thái trong **Kết nối**, mở **Thiết lập** ở panel camera khi cần bật phản ứng. Chỉ bấm **Bật camera** nếu muốn; có thể từ chối quyền hoặc dùng **Tắt camera** bất kỳ lúc nào. | Camera opt-in và observer độc lập. Native có login không làm observer sẵn sàng. Observer chưa cấu hình/thiếu hoặc hết ngân sách thì giữ off; co-create vẫn thử được. Khi đã sẵn sàng, chỉ bật **Phản ứng theo camera** nếu đồng ý gửi typed observations tới provider riêng. Không kỳ vọng mỗi cử động đều tạo phản ứng. |
 | 1–2 phút cuối | Bấm **Dừng toàn bộ**, xem mã thoát, rồi chạy lại `fisch.cmd live` nếu muốn kiểm tra restart. | Dừng thành công trả 0; Ctrl+C/abort trả 130; đóng trang giữ khác 0 vì có thể là browser lỗi. Lượt mới camera-off, ý tưởng/request/lịch sử cũ không tự phục hồi. Đừng coi mất lịch sử qua restart là lưu trữ bền. |
+
+Để thử ngắt hội thoại, bấm **Dừng trả lời** khi turn đang chạy; chỉ coi đã ngắt khi trạng thái xác nhận. Nếu kết quả gửi chưa rõ, không bấm gửi lại. Chuyển thread thành công xóa draft/transcript; chuyển thất bại giữ draft. Reload đóng phiên theo cơ chế pagehide: chạy lại Live để có phiên sạch, không tự replay nội dung.
 
 Nếu camera bị từ chối, thử tiếp phần chữ; không tìm cách bỏ qua quyền. Nếu ngân
 sách observer hết hạn, không tăng limit, reset used hay gia hạn ledger để làm nút
