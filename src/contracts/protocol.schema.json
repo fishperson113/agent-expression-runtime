@@ -83,6 +83,7 @@
               "maximum": 1
             },
             "pointSize": {
+              "description": "Particle sprite diameter in pixel-like units, not scene-space radius or normalized 0..1. Renderer requests size times capped DPR and a depth factor; driver limits can clamp or quantize. For ordinary readable figures, 2–4 is a starting range on the current renderer, not a validity bound or legibility guarantee. Small values remain valid for intentional delicacy; even zero may rasterize under driver minima. Use brightness for intentional fades.",
               "type": "number",
               "minimum": 0,
               "maximum": 8
@@ -496,6 +497,7 @@
               "maximum": 1
             },
             "pointSize": {
+              "description": "Particle sprite diameter in pixel-like units, not scene-space radius or normalized 0..1. Renderer requests size times capped DPR and a depth factor; driver limits can clamp or quantize. For ordinary readable figures, 2–4 is a starting range on the current renderer, not a validity bound or legibility guarantee. Small values remain valid for intentional delicacy; even zero may rasterize under driver minima. Use brightness for intentional fades.",
               "type": "number",
               "minimum": 0,
               "maximum": 8
@@ -1065,6 +1067,7 @@
               ]
             },
             "pointSize": {
+              "description": "Particle sprite diameter in pixel-like units, not scene-space radius or normalized 0..1. Renderer requests size times capped DPR and a depth factor; driver limits can clamp or quantize. For ordinary readable figures, 2–4 is a starting range on the current renderer, not a validity bound or legibility guarantee. Small values remain valid for intentional delicacy; even zero may rasterize under driver minima. Use brightness for intentional fades.",
               "anyOf": [
                 {
                   "type": "number",
