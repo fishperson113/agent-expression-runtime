@@ -65,6 +65,7 @@ export async function openCodexTransport({ host, args, cwd, env, instructions, o
       detached: process.platform !== 'win32', stdio: ['pipe', 'pipe', 'pipe'] });
     child.aerProcessGroup = process.platform !== 'win32';
     relayOutput(child, connection, async message => {
+      await rpc.observe(message);
       const outgoing = rpc.accept(message);
       if (outgoing === false) return false;
       await onEvent(outgoing); return outgoing;
@@ -73,6 +74,7 @@ export async function openCodexTransport({ host, args, cwd, env, instructions, o
       try {
         if (child.stdin.writableLength > 1048576) throw Error('relay_backpressure');
         const message = liveInstructions(JSON.parse(bytes.toString()), instructions);
+        if (rejectReservedClient(connection, message, rpc.prefix)) return;
         if (onRequest(message) !== false) rpc.client(message);
       }
       catch { fail(); }
@@ -81,24 +83,88 @@ export async function openCodexTransport({ host, args, cwd, env, instructions, o
     child.once('error', fail); child.once('exit', fail);
   }
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
-  return { url: 'ws://127.0.0.1:' + server.address().port, token, close, reject: (message, error) => {
+  return transportControls(rpc, () => client, 'ws://127.0.0.1:' + server.address().port, token, close, onEvent, onRequest);
+}
+
+function rejectReservedClient(connection, message, prefix) {
+  if (!message.method || typeof message.id !== 'string' || !message.id.startsWith(prefix)) return false;
+  connection.send(JSON.stringify({ id: message.id, error: { code: -32600, message: 'relay_request_id_reserved' } }));
+  return true;
+}
+function guardAllows(guard, message) {
+  try { return guard(message) === true; } catch { return false; }
+}
+function transportControls(rpc, getClient, url, token, close, onEvent, onRequest) {
+  const submit = (method, params, guard, discard) => {
+    if (typeof guard !== 'function') return Promise.reject(Object.assign(Error('relay_guard_required'), { uncertain: false }));
+    return rpc.request(method, params, { guard, discard, observe: onEvent, dispatch: message => {
+      if (!guardAllows(guard, message)) { rpc.fail(message.id, 'relay_guard_rejected'); return; }
+      if (onRequest(message) !== false) rpc.forward(message);
+    } });
+  };
+  return { url, token, close, reject: (message, error) => {
+    if (rpc.rejectOwned(message)) return;
+    const client = getClient();
     if (client?.readyState === WebSocket.OPEN && message.id !== undefined) client.send(JSON.stringify({ id: message.id, error }));
-  }, request: (method, params) => rpc.request(method, params), forward: message => rpc.client(message) };
+  }, request: (method, params) => rpc.request(method, params), forward: message => rpc.forward(message),
+  submitUser: (params, guard, discard) => submit('turn/start', params, guard, discard),
+  interruptUser: (params, guard, discard) => submit('turn/interrupt', params, guard, discard) };
 }
 
 export class LiveRequests {
-  pending = new Map(); escaped = new Map(); serial = 0;
+  pending = new Map(); escaped = new Map(); owned = new WeakMap(); serial = 0;
   prefix = 'fisch:' + randomBytes(16).toString('hex') + ':';
   constructor(write) { this.write = write; }
-  request(method, params) {
-    if (this.pending.size >= 8) return Promise.reject(Error('relay_request_limit'));
+  request(method, params, options = {}) {
+    if (this.pending.size >= 8) return Promise.reject(Object.assign(Error('relay_request_limit'), { uncertain: false }));
     const id = this.prefix + ++this.serial;
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => { this.pending.delete(id); reject(Error('relay_request_timeout')); }, 10000);
-      this.pending.set(id, { resolve, reject, timer });
-      try { this.write({ id, method, params }); }
-      catch (error) { clearTimeout(timer); this.pending.delete(id); reject(error); }
+      const timer = setTimeout(() => this.fail(id, 'relay_request_timeout'), 10000), owned = typeof options.guard === 'function';
+      this.pending.set(id, { resolve, reject, timer, owned, sent: false, expiresAt: performance.now() + 10000, observe: options.observe, discard: options.discard });
+      try {
+        const message = { id, method, params: owned ? structuredClone(params) : params };
+        if (owned) this.owned.set(message, options.guard);
+        if (options.dispatch) options.dispatch(message); else if (owned) this.forward(message); else this.write(message);
+      } catch (error) { this.fail(id, owned ? 'relay_dispatch_rejected' : error); }
     });
+  }
+  async observe(message) {
+    if (message.method) return;
+    const pending = this.pending.get(message.id);
+    if (pending?.owned && performance.now() >= pending.expiresAt) { this.fail(message.id, 'relay_request_timeout'); return; }
+    if (pending?.owned && !pending.sent) return;
+    if (!pending?.observe || pending.observed) return;
+    pending.observed = true;
+    try { await pending.observe(message); }
+    catch { this.fail(message.id, 'relay_observation_unknown'); throw Error('relay_observation_unknown'); }
+  }
+  forward(message) {
+    const guard = this.owned.get(message);
+    if (!guard) return this.client(message);
+    const pending = this.pending.get(message.id);
+    if (!pending) throw Error('relay_owned_expired');
+    if (performance.now() >= pending.expiresAt) {
+      this.fail(message.id, 'relay_request_timeout'); throw Error('relay_owned_expired');
+    }
+    if (pending.sent || !guardAllows(guard, message)) {
+      this.fail(message.id, pending.sent ? 'relay_duplicate_forward' : 'relay_guard_rejected'); throw Error('relay_guard_rejected');
+    }
+    pending.sent = true;
+    try { this.write(message); }
+    catch { this.fail(message.id, 'relay_write_unknown'); throw Error('relay_write_unknown'); }
+  }
+  fail(id, reason) {
+    const pending = this.pending.get(id);
+    if (!pending) return;
+    clearTimeout(pending.timer); this.pending.delete(id);
+    const error = typeof reason === 'string' ? Error(reason) : reason;
+    if (pending.owned) error.uncertain = pending.sent;
+    try { pending.discard?.(id); } catch { /* Cleanup cannot prevent settlement. */ }
+    pending.reject(error);
+  }
+  rejectOwned(message) {
+    if (!this.owned.has(message)) return false;
+    this.fail(message.id, 'relay_owned_rejected'); return true;
   }
   client(message) {
     if (message.method && typeof message.id === 'string' && message.id.startsWith(this.prefix)) {
@@ -112,6 +178,7 @@ export class LiveRequests {
     if (message.method || message.id === undefined) return message;
     const pending = this.pending.get(message.id);
     if (pending) {
+      if (pending.owned && !pending.sent) return false;
       clearTimeout(pending.timer); this.pending.delete(message.id); pending.resolve(message); return false;
     }
     if (this.escaped.has(message.id)) {
@@ -121,7 +188,7 @@ export class LiveRequests {
     return message;
   }
   close() {
-    for (const pending of this.pending.values()) { clearTimeout(pending.timer); pending.reject(Error('relay_closed')); }
+    for (const id of this.pending.keys()) this.fail(id, 'relay_closed');
     this.pending.clear(); this.escaped.clear();
   }
 }
