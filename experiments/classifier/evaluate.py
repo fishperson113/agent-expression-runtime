@@ -106,9 +106,9 @@ def overlap_audit(rows):
             'warning': 'Family-name separation alone did not isolate baseline features. Deduplicated subset is post hoc, not fresh validation.'}
 
 
-def report_group(report, split, group, outputs, baselines):
+def report_group(report, split, group, outputs, baselines, model_label):
     variants = {'always_observe': ['observe'] * len(group)}
-    for name, scores in [('logistic', baselines), ('laya', {key: value['scores'] for key, value in outputs.items()})]:
+    for name, scores in [('logistic', baselines), (model_label, {key: value['scores'] for key, value in outputs.items()})]:
         for gated in [False, True]:
             variants[name + ('_gated' if gated else '_raw')] = [choose(scores[row['id']], gated) for row in group]
     report['results'][split] = {name: metrics(group, preds) for name, preds in variants.items()}
@@ -124,6 +124,7 @@ def main():
     parser.add_argument('dataset', type=Path)
     parser.add_argument('predictions', type=Path)
     parser.add_argument('output', type=Path)
+    parser.add_argument('--model-label', default='laya', choices=['laya', 'gliner', 'candidate'])
     args = parser.parse_args()
     rows = [json.loads(line) for line in args.dataset.read_text().splitlines() if line]
     outputs = load_predictions(args.predictions, rows)
@@ -135,6 +136,7 @@ def main():
     probabilities = classifier.predict_proba(vectorizer.transform([features(row) for row in rows]))
     baselines = {row['id']: dict(zip(classifier.classes_, scores)) for row, scores in zip(rows, probabilities)}
     report = {'datasetSha256': hashlib.sha256(args.dataset.read_bytes()).hexdigest(),
+              'candidateLabel': args.model_label,
               'predictionsSha256': hashlib.sha256(args.predictions.read_bytes()).hexdigest(),
               'gate': {'minimumTopScore': 0.7, 'minimumMargin': 0.15, 'calibrated': False},
               'notes': ['Canonical macro F1 uses first acceptable label; acceptable accuracy permits all declared labels.',
@@ -143,11 +145,11 @@ def main():
                         'Synthetic policy labels do not establish real-world gesture or naturalness quality.'], 'results': {}}
     report['featureOverlapAudit'] = overlap_audit(rows)
     for split in sorted({row['split'] for row in rows} - {'train'}):
-        report_group(report, split, [row for row in rows if row['split'] == split], outputs, baselines)
+        report_group(report, split, [row for row in rows if row['split'] == split], outputs, baselines, args.model_label)
     overlapping = {row['id'] for row in report['featureOverlapAudit']['overlaps']}
     clean = [row for row in rows if row['split'] == 'holdout' and row['id'] not in overlapping]
     if clean:
-        report_group(report, 'holdout_nonoverlap_posthoc', clean, outputs, baselines)
+        report_group(report, 'holdout_nonoverlap_posthoc', clean, outputs, baselines, args.model_label)
     args.output.write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report['results'].get('holdout', {}), indent=2))
 
