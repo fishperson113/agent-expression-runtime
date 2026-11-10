@@ -7,6 +7,7 @@ import { createLiveTools, liveInputSchema, liveToolDefinitions, liveResource, re
 import { createPlaygroundController } from './playground-controller.mjs';
 import { subscribePlaygroundFeedback } from './playground-feedback.mjs';
 import { playgroundToolDefinitions } from './playground-tools.mjs';
+import { capabilityResource, capabilityResourceList } from './capability-contract.mjs';
 const base = process.env.AER_BASE_URL,
   token = process.env.AER_PAIRING_TOKEN;
 if (!base || !token) {
@@ -81,6 +82,7 @@ function tools() {
 }
 function resources(params) {
   const uri = params?.uri;
+  const capability = capabilityResource(uri); if (capability) return capability;
   if (uri === 'aer://instructions/v1') return { contents: [{ uri, mimeType: 'text/markdown', text: instructions }] };
   if (uri === 'aer://schema/v1') return { contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(protocol) }] };
   if (live && uri === 'aer://live/v1') return { contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(liveResource()) }] };
@@ -237,9 +239,10 @@ async function handle(message) {
   if (method === 'ping') return {};
   if (method === 'tools/list') return tools();
   if (method === 'resources/list') return { resources: [
-    { uri: 'aer://instructions/v1', name: 'Expression instructions v1', mimeType: 'text/markdown' },
-    { uri: 'aer://schema/v1', name: 'Expression protocol schema v1', mimeType: 'application/json' },
-    ...(live ? [{ uri: 'aer://live/v1', name: 'Live observations and control schemas', mimeType: 'application/json' }] : []),
+    { uri: 'aer://instructions/v1', name: 'Expression instructions v1', mimeType: 'text/markdown', description: 'Agent authoring, free RGB/motion, priority, privacy and bounded recovery instructions.' },
+    { uri: 'aer://schema/v1', name: 'Expression protocol schema v1', mimeType: 'application/json', description: 'Complete declarative program, baseline state and immutable macro schemas.' },
+    ...capabilityResourceList(),
+    ...(live ? [{ uri: 'aer://live/v1', name: 'Live observations and control schemas', mimeType: 'application/json', description: 'Optional typed observations, continuous controls and declared resting-body geometry; no real camera pixels.' }] : []),
   ] };
   if (method === 'resources/read') return resources(params);
   if (method === 'tools/call') {

@@ -1,5 +1,7 @@
 # Agent expression instructions · version 1.1.0
 
+Use `tools/list` and `resources/list` for discovery. `aer://capabilities/v1` exposes actual supported nodes and limits; `aer://schema/v1` supplies the complete schema; `aer://workflow/v1` explains ownership, feedback evidence and recovery. Fisch is an expression capability, not your conversation/voice backend. Camera and classifiers are optional. Your own task context may guide expression; a camera-only observer must not invent that context.
+
 Use `express` to select a short, sparse expression alongside your normal answer. The expression is chosen behavior, not a statement about internal emotions. Your host owns the credential, session, epoch and sequence. Do not request, print or manage those values.
 
 Body shapes: `sphere`, `wall`, `pin`, `screw`, `pyramid`, `wave`, `cloud`. Motion fields: `orbit`, `turbulence`, `pulse`. Coordinates are normalized; strength, brightness and dispersion are 0–1; pointSize is 0–8 CSS pixels. Durations are integer milliseconds, 0–10,000. Easing is `linear` or `smoothstep`.
