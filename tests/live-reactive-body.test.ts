@@ -3,7 +3,7 @@ import { LiveBody } from '../src/live/body';
 import { ReactiveSession } from '../src/core/live/reactive-session';
 import { FaceObservations } from '../src/live/observation';
 import type { ReactiveRequest } from '../src/core/live/decision-types';
-import { faceProgram } from '../src/core/live/face';
+import { faceProgram, faceDefinition } from '../src/core/live/face';
 vi.mock('../src/adapters/three-renderer', () => ({ ThreeRenderer: class {
   count = 2000; reducedMotion = false; renderSnapshot = { contextLost: false, frame: 0, signature: 'fixture' };
   quality() {} resize() {} apply() {} dispose() {}
@@ -215,4 +215,25 @@ it('discards movement observed only while motion is off instead of queueing a gl
   expect(f.body.metrics.visualAttention.active).toBeNull();
   expect(f.body.metrics.visualAttention.history.filter(e => e.status === 'started')).toHaveLength(started);
   f.body.dispose();
+});
+
+it('keeps a complete face component living inside an agent-owned compound assembly', () => {
+  const f = setup(), rendered = vi.spyOn(f.body.renderer, 'apply'); f.session.configure(false);
+  const overlay = { id: 'agent_mark', kind: 'ellipsoid', center: [1.7, 1.6, 0.3], scale: [0.12, 0.12, 0.05] };
+  const parts = [...structuredClone(faceDefinition.parts), overlay];
+  expect(f.body.admit({ v: 1, epoch: f.body.scheduler.epoch, seq: 1, kind: 'program', track: 'body', policy: 'replace',
+    body: { type: 'assemble', parts, durationMs: 100 } }).status).toBe('accepted');
+  f.body.activity('replying'); f.body.output = 0.8;
+  for (let i = 0; i < 80; i++) { f.advance(16); f.frame(); }
+  const state = () => rendered.mock.calls.at(-1)![0] as any;
+  const matrix = (id: string) => state().liveMatrices[state().particleParts.findIndex((p: any) => p.id === id) + 1];
+  expect(matrix('mouth')?.[5] ?? 1).toBeGreaterThan(1.5);
+  expect(f.body.userSceneOwned).toBe(true); expect(f.body.canReactive()).toBe(false);
+  expect(state().particleParts.find((p: any) => p.id === overlay.id)).toEqual(overlay);
+  expect(matrix(overlay.id)).toBeUndefined(); expect(f.body.metrics.visualAttention.active).toBeNull();
+  expect(f.body.admit({ v: 1, epoch: f.body.scheduler.epoch, seq: 2, kind: 'program', track: 'body', policy: 'replace',
+    body: { type: 'live', program: null, configuration: { controls: [], poses: [
+      { type: 'pose', target: { part: 'mouth', prop: 'scaleY' }, value: 0.4, durationMs: 1000, attackMs: 100, releaseMs: 100 }], lifetimeMs: 2000 } } }).status).toBe('accepted');
+  for (let i = 0; i < 45; i++) { f.advance(16); f.frame(); }
+  expect(matrix('mouth')?.[5]).toBeCloseTo(0.4, 1); expect(f.body.userSceneOwned).toBe(true); f.body.dispose();
 });

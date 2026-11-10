@@ -11,7 +11,7 @@ import defaults from '../../integrations/live-reflexes.json';
 import type { BodyState } from '../core/ports';
 import type { PresenceState } from '../core/runtime/presence';
 import type { Observation, LiveEventKind } from '../core/live/types';
-import { faceProgram, faceWrites, geometricGazeWrites, isFace } from '../core/live/face';
+import { faceProgram, faceWrites, geometricGazeWrites, hasCanonicalFaceComponent, isFace } from '../core/live/face';
 import type { LiveCompiled } from '../core/live/control-types';
 import type { ReactiveOwnership } from '../core/live/decision-types';
 import type { ReactiveLease, LeaseRevokeReason } from '../core/live/reactive-lease';
@@ -80,7 +80,7 @@ export class LiveBody {
     const smoothing = 1 - Math.exp(-Math.min(100, Math.max(0, time - this.faceAt)) / 84); this.faceAt = time;
     const point = this.attention.sample(this.scheduler.epoch, this.activityState,
       !resting || this.userGeometryLocked || time < this.userLeaseUntil || this.scheduler.busy, this.controls.mode);
-    if (resting) for (const write of faceWrites(this.faceActivity(time), this.output, this.controls.mode, time, point?.strength ?? 0)) {
+    if (resting || hasCanonicalFaceComponent(parts)) for (const write of faceWrites(this.faceActivity(time), this.output, this.controls.mode, time, point?.strength ?? 0)) {
       const key = write.target.part + ':' + write.target.prop, from = this.faceBlend.get(key) ?? (write.target.prop.startsWith('scale') ? 1 : 0);
       const value = from + (write.value - from) * smoothing; this.faceBlend.set(key, value);
       face.push({ ...write, value });
