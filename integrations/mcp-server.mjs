@@ -8,6 +8,7 @@ import { createPlaygroundController } from './playground-controller.mjs';
 import { subscribePlaygroundFeedback } from './playground-feedback.mjs';
 import { playgroundToolDefinitions } from './playground-tools.mjs';
 import { capabilityResource, capabilityResourceList } from './capability-contract.mjs';
+import { createExpressionStatus, expressionStatusTool } from './expression-status.mjs';
 const base = process.env.AER_BASE_URL,
   token = process.env.AER_PAIRING_TOKEN;
 if (!base || !token) {
@@ -26,6 +27,7 @@ if (
   console.error('A loopback HTTP base URL is required.');
   process.exit(1);
 }
+const expressionStatus = createExpressionStatus({ base, token });
 const live = process.env.FISCH_LIVE === '1';
 const instructions = readFileSync(new URL(live ? './live-instructions.md' : './instructions-v1.md', import.meta.url), 'utf8');
 let session, connecting;
@@ -50,7 +52,7 @@ async function request(path, body,method=body===undefined?'GET':'POST', timeoutM
   } catch {
     throw Error(response.ok ? 'invalid_gateway_response' : `http_${response.status}`);
   }
-  if (!response.ok) throw Object.assign(Error(result.code ?? 'gateway_rejected'), { path: result.path });
+  if (!response.ok) throw Object.assign(Error(result.code ?? 'gateway_rejected'), { path: result.path, receipt: result });
   return result;
 }
 const inputSchema = {
@@ -76,6 +78,7 @@ function tools() {
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false }, inputSchema: live ? liveInputSchema(inputSchema) : inputSchema },
     { name: 'cancel_expression', description: 'Cancel body work and reset posture; keep the agent running.',
       inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
+    expressionStatusTool,
     ...(live ? liveToolDefinitions() : []),
     ...(live ? playgroundToolDefinitions(protocol) : []),
   ] };
@@ -103,9 +106,22 @@ async function send(args) {
   if (previous && previous !== payload) throw Error('request_id_reused');
   commands.set(args.requestId, payload);
   while (commands.size > 256) commands.delete(commands.keys().next().value);
-  const result = await request(`/v1/sessions/${session.id}/expressions`, { ...args, epoch: session.epoch });
+  const held = session, owner = { id: session.id, epoch: session.epoch };
+  let result;
+  try {
+    await expressionStatus.begin(args.requestId, owner);
+    if (session !== held || session?.id !== owner.id || session?.epoch !== owner.epoch) throw Error('session');
+    result = await request(`/v1/sessions/${owner.id}/expressions`, { ...args, epoch: owner.epoch });
+  }
+  catch (error) {
+    if (['rejected', 'cancelled'].includes(error.receipt?.status)) expressionStatus.receipt(args.requestId, error.receipt);
+    else expressionStatus.failed(args.requestId);
+    error.requestId = args.requestId;
+    throw error;
+  }
+  expressionStatus.receipt(args.requestId, result);
   remember(args, result);
-  return result;
+  return { ...result, requestId: args.requestId };
 }
 async function settlePending() {
   for (const args of [...pendingDefinitions.values()]) {
@@ -142,6 +158,7 @@ async function connect() {
   await connecting;
 }
 async function invoke(params) {
+  if (stopping) throw Error('mcp_closed');
   if (!['express', 'cancel_expression'].includes(params?.name)) throw Error('unknown_tool');
   const args = { ...(params.arguments ?? {}) };
   if (params.name === 'express') {
@@ -153,6 +170,7 @@ async function invoke(params) {
   await settlePending();
   if (params.name === 'express') return send(args);
   const result = await request(`/v1/sessions/${session.id}/cancel`, { epoch: session.epoch });
+  expressionStatus.reset('cancel_acknowledged');
   session.epoch = result.epoch;
   pendingDefinitions.clear();
   return result;
@@ -171,6 +189,7 @@ async function toolCall(params) {
     try { result = await invoke(params); }
     catch (error) {
       if (lifecycleErrors.includes(error.message)) {
+        expressionStatus.reset('session_changed');
         session = undefined; pendingDefinitions.clear();
         if (live && params.name === 'express') throw Error('live_session_changed_request_not_replayed');
         result = await invoke(params);
@@ -181,14 +200,15 @@ async function toolCall(params) {
     }
     return { content: [{ type: 'text', text: JSON.stringify(result) }] };
   } catch (error) {
-    if (lifecycleErrors.includes(error.message)) session = undefined;
+    if (lifecycleErrors.includes(error.message)) { expressionStatus.reset('session_changed'); session = undefined; }
     return { isError: true, content: [{ type: 'text', text: JSON.stringify({ status: 'rejected', code: error.message,
-      ...(error.path ? { path: error.path } : {}) }) }] };
+      ...(error.path ? { path: error.path } : {}),
+      ...(error.requestId ? { requestId: error.requestId } : {}) }) }] };
   }
 }
 let calls = Promise.resolve();
 let playgroundGeneration = 0;
-const liveCall = createLiveTools(request, async () => { await connect(); return session; }, () => { session = undefined; });
+const liveCall = createLiveTools(request, async () => { await connect(); return session; }, () => { expressionStatus.reset('session_changed'); session = undefined; });
 const playground = createPlaygroundController({
   currentSession: async () => { await connect(); return { id: session.id, epoch: session.epoch }; },
   send: (args, owner) => {
@@ -206,7 +226,7 @@ async function revokePlayground(owner) {
   if (!owner || typeof owner.id !== 'string') throw Error('playground_session_changed');
   try { await request(`/v1/sessions/${encodeURIComponent(owner.id)}`, undefined, 'DELETE'); }
   catch (error) { if (!['session', 'session_closed', 'http_404'].includes(error.message)) throw error; }
-  if (session?.id === owner.id) session = undefined;
+  if (session?.id === owner.id) { expressionStatus.reset('session_changed'); session = undefined; }
 }
 const playgroundReply = value => ({ ...(['uncertain', 'rejected'].includes(value.status) ? { isError: true } : {}),
   content: [{ type: 'text', text: JSON.stringify(value) }] });
@@ -246,6 +266,10 @@ async function handle(message) {
   ] };
   if (method === 'resources/read') return resources(params);
   if (method === 'tools/call') {
+    if (params?.name === 'expression_status') {
+      try { return { content: [{ type: 'text', text: JSON.stringify(expressionStatus.read(params.arguments)) }] }; }
+      catch { return { isError: true, content: [{ type: 'text', text: JSON.stringify({ status: 'rejected', code: 'invalid_arguments' }) }] }; }
+    }
     if (live && ['observe', 'look'].includes(params?.name)) return liveCall(params.name, params.arguments);
     if (live && params?.name === 'playground_state') return playgroundRead(params.arguments);
     if (live && (['express', 'cancel_expression', 'return_to_face'].includes(params?.name) ||
@@ -263,6 +287,7 @@ let inFlight = 0;
 let stopping=false;
 async function releaseOnExit(){
   if(stopping)return;stopping=true;process.stdin.pause();
+  expressionStatus.close();
   await playground.close();
   await calls.catch(()=>{});
   await connecting?.catch(()=>{});
