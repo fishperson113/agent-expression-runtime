@@ -61,7 +61,11 @@ export class Scheduler {
       ir: ProgramIR | StateIR,
     ) => void,
     particleCount = capability.assembly.particles,
-  ) { this.formation = new ParticleFormation(particleCount); }
+    restingStyle?: { brightness: number; pointSize: number; dispersion: number },
+  ) {
+    this.formation = new ParticleFormation(particleCount);
+    if (restingStyle) { Object.assign(this.baseline, restingStyle); Object.assign(this.state, restingStyle); }
+  }
   get queueDepth() {
     return this.queue.length;
   }

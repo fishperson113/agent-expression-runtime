@@ -207,7 +207,7 @@ function configureReactive(available: boolean, handVersion = 0, contractVersion 
   reactive.configure(enabled); element<HTMLInputElement>('enable-reactivity').disabled = !enabled;
   if (!enabled) element<HTMLInputElement>('enable-reactivity').checked = false;
   updateHandProducer();
-  element('reactivity-status').textContent = !enabled ? 'Phản ứng tự động chưa có bộ quyết định được kết nối.'
+  element('reactivity-status').textContent = !enabled ? 'Phản xạ cục bộ dùng tín hiệu hợp lệ; observer ngữ nghĩa chưa kết nối.'
     : body.userSceneOwned ? 'Đang giữ hình bạn tạo; phản ứng tự động tạm nhường quyền.' : 'Bộ quyết định đã kết nối; phản ứng camera là tùy chọn.';
 }
 document.addEventListener('visibilitychange', () => {

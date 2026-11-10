@@ -1,6 +1,6 @@
 type Native = 'waiting' | 'connected';
 const observerMessages = {
-  disabled_by_config: 'Observer đang tắt trong cấu hình.',
+  disabled_by_config: 'Observer ngữ nghĩa đang tắt trong cấu hình. Phản xạ cục bộ vẫn dùng tín hiệu hợp lệ, không cần API riêng.',
   missing_model_or_endpoint: 'Observer chưa đủ cấu hình bộ quyết định.',
   missing_api_key: 'Observer chưa có thông tin xác thực cần thiết.',
   invalid_provider_config: 'Cấu hình bộ quyết định chưa hợp lệ.',
@@ -35,7 +35,7 @@ function elements() {
     <p>Kết nối gateway chỉ nối trang với Fisch; không xác nhận Native Codex đã chọn phiên hoặc observer đã sẵn sàng.</p>
     <ol><li>Trò chuyện trong terminal Native Codex đang chạy cùng Fisch. Chờ Codex chọn phiên trước khi gửi yêu cầu.</li>
     <li>Trong Cùng sáng tạo, chép yêu cầu rồi tự dán vào terminal đó; trang không tự gửi.</li>
-    <li>Camera chỉ bật khi bạn chủ động chọn và xử lý tại máy; bật camera không tự bật observer. Observer cần bộ quyết định riêng, ngân sách đã được cho phép và bạn chọn ô phản ứng tự động. Xem trạng thái phản ứng hiện tại trong Thiết lập ở Góc của bạn.</li></ol>
+    <li>Camera chỉ bật khi bạn chủ động chọn và xử lý tại máy. Phản xạ vị trí mặt/tay chạy cục bộ khi có dữ liệu hợp lệ; đây không phải hiểu ngữ nghĩa camera. Chat và biểu đạt Codex không cần observer riêng; bật camera không tự bật observer ngữ nghĩa. Observer cần bộ quyết định riêng, ngân sách đã được cho phép và bạn chọn ô phản ứng tự động. Xem trạng thái phản ứng hiện tại trong Thiết lập ở Góc của bạn.</li></ol>
     <p><a href="https://github.com/fishperson113/agent-expression-runtime/blob/main/docs/reactive-provider.md" target="_blank" rel="noopener noreferrer">Hướng dẫn cấu hình observer</a></p>
     <p><a href="https://github.com/fishperson113/agent-expression-runtime/blob/main/docs/live-windows-qa.md" target="_blank" rel="noopener noreferrer">Chạy và cập nhật CLI trên Windows</a></p>
     <p>Dừng hoặc khởi chạy lại từ terminal. Tạo hình riêng trong phiên không tự được khôi phục sau khi khởi chạy lại.</p></details>`;

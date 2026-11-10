@@ -23,7 +23,7 @@ export class LiveBody {
   readonly scheduler: Scheduler;
   readonly controls = new LiveCompositor();
   readonly trace = new SceneTrace();
-  private defaults = new LiveCompositor();
+  private defaults = new LiveCompositor({ releaseUnavailableBindings: true });
   private compiler = new LiveCompiler();
   private observation: Observation | null = null;
   private defaultAt = 0;
@@ -53,7 +53,7 @@ export class LiveBody {
     this.scheduler = new Scheduler({ now: () => performance.now() }, { apply: (state, now) => this.apply(state, now),
       dispose: () => this.renderer.dispose() }, { count: status }, (status, ir) => {
         this.lifecycle.feedback(status, ir);
-      }, 2000);
+      }, 2000, { brightness: 0.95, pointSize: 2.2, dispersion: 0 });
     this.defaults.install(validateConfiguration(defaults), performance.now());
     this.restFace(0);
     this.resize = new ResizeObserver(() => this.size()); this.resize.observe(canvas); this.size();
@@ -81,7 +81,8 @@ export class LiveBody {
       const value = from + (write.value - from) * smoothing; this.faceBlend.set(key, value);
       face.push({ ...write, value });
     }
-    const layers = [this.defaults.sample(time, snapshot, this.output, blocked), face, this.controls.sample(time, snapshot, this.output, blocked)];
+    const local = this.userGeometryLocked ? [] : this.defaults.sample(time, snapshot, this.output, blocked);
+    const layers = [local, face, this.controls.sample(time, snapshot, this.output, blocked)];
     const writes = new Map(composeWrites(layers).map(write => [write.target.part + ':' + write.target.prop, write]));
     const rendered = { ...state, liveMatrices: transformMatrices([...writes.values()], parts) } as PresenceState;
     if (rendered.presencePose) {
