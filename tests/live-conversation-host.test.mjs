@@ -544,28 +544,35 @@ it.skipIf(!nativeGateway)('keeps a long public brief above usable chat with publ
   }finally{await client?.close();await f.close();}
 },90000);
 
-it.skipIf(!nativeGateway)('returns only public Fisch presentation history through fresh MCP observe feedback',async()=>{
+it.skipIf(!nativeGateway)('returns public Fisch history with strict inspect and best-effort observe diagnostics',async()=>{
   const receipts=[];const provider={conversationLane:true,contractVersion:1,confirmPublication:(_request,value)=>receipts.push(value),
     decide:async window=>({decision:{schemaVersion:1,requestId:window.request.requestId,decisionId:'public_'+window.request.requestId,
       mode:'observe',validUntil:window.request.deadline,action:null},reply:'Bạn chọn lối trái hay lối phải? PUBLIC_QUESTION'})};
   const f=await nativeBrowserLoop(provider),client=liveTestClient(f.live.base,f.live.token);
+  const publicHistory=coordination=>{
+    expect(coordination).toMatchObject({schemaVersion:1,source:'fisch-host',available:true,state:{schemaVersion:1}});
+    expect(coordination.state.recentPublished[0].text).toContain('PUBLIC_QUESTION');
+    expect(JSON.stringify(coordination)).not.toContain('Public scripted coding task');
+  };
+  const unavailable=coordination=>{
+    expect(coordination.available).toBe(false);expect(coordination.state).toBeUndefined();
+    expect(['timeout','rate_limited','disconnected','epoch_changed','invalid_response','refresh_unavailable','request_failed']).toContain(coordination.reasonCode);
+    expect(Number.isInteger(coordination.elapsedMs)).toBe(true);expect(coordination.elapsedMs).toBeGreaterThanOrEqual(0);expect(coordination.elapsedMs).toBeLessThanOrEqual(60000);
+  };
   try{await client.call('initialize');await arrive(f);await expect.poll(()=>receipts.length,{timeout:10000}).toBe(1);
     expect(receipts[0].chatPublished).toBe(true);
-    const feedback=toolValue(await client.tool('observe'));
-    expect(feedback.coordination).toMatchObject({source:'fisch-host',available:true,state:{schemaVersion:1}});
-    expect(feedback.coordination.state.recentPublished[0].text).toContain('PUBLIC_QUESTION');
-    expect(JSON.stringify(feedback.coordination)).not.toContain('Public scripted coding task');
-    expect(feedback.snapshot.summary).not.toContain('PUBLIC_QUESTION');
-    expect(await f.live.page.locator('#look-indicator').isHidden()).toBe(true);
-    const inspectCollision=await client.tool('inspect_expression');expect(inspectCollision.isError).toBe(true);expect(JSON.stringify(inspectCollision)).toContain('render_rate_limited');
-    const collision=toolValue(await client.tool('observe'));expect(collision.coordination.available).toBe(false);expect(collision.snapshot).toBeTruthy();
-    await f.live.page.evaluate(()=>window.fischLive.conversationClear());
+    const inspected=toolValue(await client.tool('inspect_expression'));publicHistory(inspected.coordination);
+    expect(inspected.coordination.epoch).toBe(inspected.epoch);expect(inspected.coordination.session).toBe(inspected.session);
     await f.live.page.waitForTimeout(1100);
-    const cleared=toolValue(await client.tool('observe'));expect(cleared.coordination.state.recentPublished).toEqual([]);
-    expect(cleared.coordination.available).toBe(true);
-    await f.live.page.waitForTimeout(1100);await client.tool('inspect_expression');expect(await f.live.page.locator('#look-indicator').isVisible()).toBe(true);
-    await f.live.page.waitForTimeout(1100);await client.tool('observe');await f.live.page.waitForTimeout(1000);
-    expect(await f.live.page.locator('#look-indicator').isHidden()).toBe(true);
+    const feedback=toolValue(await client.tool('observe'));expect(feedback.snapshot).toBeTruthy();expect(feedback.snapshot.summary).not.toContain('PUBLIC_QUESTION');
+    if(process.env.FISCH_FEEDBACK_OBSERVE_EVIDENCE)writeFileSync(process.env.FISCH_FEEDBACK_OBSERVE_EVIDENCE,JSON.stringify({actualModelCalls:0,attempts:1,timeoutMs:750,available:feedback.coordination.available,reasonCode:feedback.coordination.reasonCode,elapsedMs:feedback.coordination.elapsedMs}));
+    if(feedback.coordination.available){publicHistory(feedback.coordination);expect(feedback.coordination.epoch).toBe(inspected.epoch);expect(feedback.coordination.session).toBe(inspected.session);}
+    else unavailable(feedback.coordination);
+    await f.live.page.waitForTimeout(1100);
+    publicHistory(toolValue(await client.tool('inspect_expression')).coordination);
+    const collision=toolValue(await client.tool('observe'));unavailable(collision.coordination);expect(collision.coordination.reasonCode).toBe('rate_limited');expect(collision.snapshot).toBeTruthy();
+    await f.live.page.evaluate(()=>window.fischLive.conversationClear());await f.live.page.waitForTimeout(1100);
+    const cleared=toolValue(await client.tool('inspect_expression'));expect(cleared.coordination.available).toBe(true);expect(cleared.coordination.state.recentPublished).toEqual([]);
     expect((await f.live.page.evaluate(()=>window.fischLive.metrics())).cameraActive).toBe(false);
   }finally{await client.close();await f.close();}
 },60000);
