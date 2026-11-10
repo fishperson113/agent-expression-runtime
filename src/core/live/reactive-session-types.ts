@@ -10,6 +10,7 @@ export type ReactiveWindow = Readonly<{ schemaVersion: 1; request: ReactiveReque
   events: readonly Readonly<ReactiveWindowEvent>[]; observations: readonly Observation[] }>;
 export type SessionOptions = {
   record?: CausalSink;
+  canConverse?: () => boolean;
   handState?: () => HandReadSet | undefined;
   handMotion?: () => number | null;
   now: () => number; wallNow: () => number; epoch: () => string; id: () => string; canAdmit: () => boolean;

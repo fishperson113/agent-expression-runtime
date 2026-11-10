@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { nativeVisualAuthoringGuide } from '../integrations/native-visual-authoring.mjs';
 import { ReactiveProviderError } from '../integrations/reactive-provider.mjs';
 import { LiveReactiveBroker } from '../integrations/live-reactive-broker.mjs';
-import { NativeReactionProvider, nativeReactionEnvironment, presenceReactionData, reactionObservationData } from '../integrations/native-reaction-provider.mjs';
+import { NativeReactionProvider, freezeNativeHostCapabilities, nativeReactionEnvironment, presenceReactionData, reactionObservationData } from '../integrations/native-reaction-provider.mjs';
 const window = () => ({ schemaVersion: 1, request: { schemaVersion: 1, sessionId: 's', epoch: 'e', requestId: 'r', intentRevision: 0,
   presenceRevision: 1, deadline: 60000, requiredTrackIds: [] }, events: [{ id: 1, type: 'user_arrived', at: 100 }],
   observations: [{ v: 1, sessionId: 's', seq: 1, capturedAt: 100, camera: 'absent', turn: 'working', summary: 'PRIVATE_INSTRUCTION_CANARY',
@@ -47,7 +47,7 @@ it('projects only typed presence evidence and strips summary/head/expression/tas
 it('uses a separate readonly native lane, proves empty MCP catalog before reserve/inference, and returns host IDs', async () => {
   let reserved = 0; const f = fixture({ reserve: async () => { reserved++; expect(f.calls.at(-1).method).toBe('mcpServerStatus/list'); } });
   try {
-    const result = await f.provider.decide(window(), new AbortController().signal);
+    const result = await f.provider.decide(window(), new AbortController().signal, undefined, { schemaVersion: 1, expressionAllowed: true });
     expect(result.decision).toMatchObject({ schemaVersion: 1, requestId: 'r', mode: 'observe', validUntil: 60000, action: null });
     expect(result.reply).toBe(retain.reply); expect(result.nativeProvenance).toMatchObject({ processRole: 'observation-reaction', mcpCatalogVerifiedEmpty: true, threadId: 'reaction-thread' });
     expect(reserved).toBe(1); expect(f.processes[0].env).toEqual({ HOME: '/native-auth', PATH: 'native' });
@@ -96,7 +96,7 @@ it('converts unrestricted authored geometry and existing live animation without 
   for (const response of responses) {
     const f = fixture({ response });
     try {
-      const result = await f.provider.decide(window(), new AbortController().signal);
+      const result = await f.provider.decide(window(), new AbortController().signal, undefined, { schemaVersion: 1, expressionAllowed: true });
       expect(result.decision.mode).toBe('express'); expect(result.decision.action.body.type).toBe(response.decision.mode === 'compose' ? 'parallel' : 'live');
       expect(result.decision.action.actionId).toMatch(/^[a-f0-9-]{36}$/);
     } finally { f.provider.close(); }
@@ -262,7 +262,7 @@ const publication = result => ({ source: 'native-observation', requestId: result
   decisionId: result.decision.decisionId, reason: result.decision.mode === 'express' ? 'accepted' : 'observed', chatPublished: true });
 async function contextCue(f, id, scope = {}) {
   const value = window(); Object.assign(value.request, { requestId: id, ...scope }); value.observations[0].sessionId = value.request.sessionId;
-  const result = await f.provider.decide(value, new AbortController().signal);
+  const result = await f.provider.decide(value, new AbortController().signal, undefined, { schemaVersion: 1, expressionAllowed: true });
   const input = JSON.parse(f.calls.filter(call => call.method === 'turn/start').at(-1).params.input[0].text);
   return { value, result, input };
 }
@@ -347,10 +347,70 @@ it('carries observer-authored curves, patches, free RGB and bounded motion throu
     easing: 'smoothstep', style: { color: '#71D3A9', brightness: 0.8, pointSize: 4, dispersion: 0.1 }, flow: null } } };
   const f = fixture({ response });
   try {
-    const result = await f.provider.decide(window(), new AbortController().signal);
+    const result = await f.provider.decide(window(), new AbortController().signal, undefined, { schemaVersion: 1, expressionAllowed: true });
     const children = result.decision.action.body.children;
     expect(children.find(node => node.type === 'assemble').parts).toEqual(parts.map(part => Object.fromEntries(Object.entries(part).filter(([,value]) => value !== null))));
     expect(children.find(node => node.type === 'style')).toMatchObject({ color: '#71D3A9' });
     expect(result.nativeProvenance.selectedMode).toBe('compose');
+  } finally { f.provider.close(); }
+});
+
+it('freezes exact host permissions and rejects getters/extras before starting inference', async () => {
+  expect(freezeNativeHostCapabilities()).toEqual({ schemaVersion: 1, expressionAllowed: false });
+  expect(Object.isFrozen(freezeNativeHostCapabilities({ schemaVersion: 1, expressionAllowed: true }))).toBe(true);
+  let reads = 0;
+  for (const value of [null, { schemaVersion: 1, expressionAllowed: 1 }, { schemaVersion: 2, expressionAllowed: false },
+    { schemaVersion: 1, expressionAllowed: false, private: 'forbidden' },
+    { schemaVersion: 1, get expressionAllowed() { reads++; return true; } }]) {
+    const f = fixture(); try {
+      await expect(f.provider.decide(window(), new AbortController().signal, undefined, value)).rejects.toThrow('native_host_capabilities_invalid');
+      expect(f.processes).toEqual([]);
+    } finally { f.provider.close(); }
+  }
+  expect(reads).toBe(0);
+});
+it('hashes protected-form permission into Native input and rejects a mixed visual result as a whole', async () => {
+  const f = fixture(), g = fixture();
+  try {
+    const protectedResult = await f.provider.decide(window(), new AbortController().signal, undefined, { schemaVersion: 1, expressionAllowed: false });
+    const allowedResult = await g.provider.decide(window(), new AbortController().signal, undefined, { schemaVersion: 1, expressionAllowed: true });
+    const input = JSON.parse(f.calls.find(call => call.method === 'turn/start').params.input[0].text);
+    expect(input.hostCapabilities).toEqual({ schemaVersion: 1, expressionAllowed: false });
+    expect(protectedResult.decision.mode).toBe('observe'); expect(protectedResult.nativeProvenance.inputHash).not.toBe(allowedResult.nativeProvenance.inputHash);
+  } finally { f.provider.close(); g.provider.close(); }
+  const mixed = fixture({ response: { reply: 'A caption must not leak through', decision: { mode: 'animate', reasonCode: 'subtle', payload: { controls: [], poses: [], lifetimeMs: 1000 } } } });
+  try {
+    await expect(mixed.provider.decide(window(), new AbortController().signal, undefined, { schemaVersion: 1, expressionAllowed: false })).rejects.toThrow('native_expression_not_allowed');
+  } finally { mixed.provider.close(); }
+});
+it('captures Native expression permission as an immutable fourth provider argument without changing legacy calls', async () => {
+  for (const native of [true, false]) {
+    const calls = [], api = { activity() {}, configureReactive() {}, setReactiveUserBusy() {}, takeReactiveRequest: () => ({ request: window().request, observationWindow: window() }),
+      authorizeReactiveRequest: () => true, nativeReactionCapabilities: () => ({ schemaVersion: 1, expressionAllowed: false }),
+      deliverNativeReaction: () => ({}), deliverReactiveDecision: () => ({}) };
+    const page = { evaluate: async (fn, args) => { const old = globalThis.window; globalThis.window = { fischLive: api }; try { return await fn(args); } finally { globalThis.window = old; } } };
+    const broker = new LiveReactiveBroker({ page, output: {}, provider: { conversationLane: native, decide: async (...args) => { calls.push(args); return null; } }, forward() {}, reject() {} });
+    await broker.poll({}); while (!calls.length) await new Promise(resolve => setImmediate(resolve));
+    expect(calls[0]).toHaveLength(native ? 4 : 3);
+    if (native) { expect(calls[0][3]).toEqual({ schemaVersion: 1, expressionAllowed: false }); expect(Object.isFrozen(calls[0][3])).toBe(true); }
+    broker.close();
+  }
+});
+
+it('drops a settled permission mismatch without retrying or permanently muting the conversation lane', async () => {
+  const f = fixture({ response: { reply: 'must not publish', decision: { mode: 'animate', reasonCode: 'wrong_channel', payload: { controls: [], poses: [], lifetimeMs: 1000 } } } });
+  try {
+    const error = await f.provider.decide(window(), new AbortController().signal, undefined, { schemaVersion: 1, expressionAllowed: false }).catch(value => value);
+    expect(error).toBeInstanceOf(ReactiveProviderError); expect(error).toMatchObject({ code: 'native_expression_not_allowed', transportSettled: true });
+    for (const settled of [true, false]) {
+      const delivered = [], failed = [], broker = new LiveReactiveBroker({ page: {}, output: {}, provider: { conversationLane: true }, forward() {}, reject() {} });
+      broker.deliver = async (_id, value) => delivered.push(value); broker.fail = async id => failed.push(id);
+      const owned = { id: 'r', terminal: false, controller: new AbortController() }; broker.active = owned;
+      await broker.failed(owned, settled ? error : new ReactiveProviderError('native_expression_not_allowed', false));
+      expect(broker.paused).toBe(!settled); expect(broker.uncertain).toBe(!settled);
+      expect(delivered).toEqual(settled ? [null] : []); expect(failed).toEqual(settled ? [] : ['r']); broker.close();
+    }
+    expect(f.calls.filter(call => call.method === 'turn/start')).toHaveLength(1);
+    expect(f.provider.uncertain).not.toBe(true);
   } finally { f.provider.close(); }
 });

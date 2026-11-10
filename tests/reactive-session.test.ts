@@ -3,11 +3,11 @@ import { ReactiveSession } from '../src/core/live/reactive-session';
 import { unavailableUser, type Observation } from '../src/core/live/types';
 import type { ReactiveRequest } from '../src/core/live/decision-types';
 
-function fixture() {
+function fixture(converse?: () => boolean) {
   let now = 1000, wall = 10000, seq = 0, event = 0, id = 0, epoch = 'epoch', canAdmit = true;
   const admitted: unknown[] = [], cancelled: unknown[] = [];
   const session = new ReactiveSession({ now: () => now, wallNow: () => wall, epoch: () => epoch, id: () => `r${++id}`,
-    canAdmit: () => canAdmit, admit: (...args) => admitted.push(args), cancel: (...args) => cancelled.push(args) });
+    canAdmit: () => canAdmit, canConverse: converse, admit: (...args) => admitted.push(args), cancel: (...args) => cancelled.push(args) });
   const observe = (present = true, type?: 'user_arrived' | 'user_left' | 'expression_changed' | 'looked_away' | 'looked_back', tracks: string[] = []) => {
     const snapshot: Observation = { v: 1, sessionId: 's', seq: ++seq, capturedAt: wall, camera: present ? 'tracking' : 'absent',
       turn: 'idle', summary: '', user: { ...unavailableUser(), present } };
@@ -219,4 +219,25 @@ it('native execution ownership expires independently of its slow admission deadl
   const g = fixture(); g.session.configureNativeConversation(true); const held = g.launch().request;
   g.session.enable(false); g.session.enable(true); g.observe(); expect(g.session.canPublish(held)).toBe(false);
   expect((await g.session.deliver(held.requestId, express(held)))?.reason).toBe('revoked');
+});
+
+it('native conversation can observe a protected idle scene while all visual admission stays blocked', async () => {
+  const f = fixture(() => true); f.session.configureNativeConversation(true); f.block();
+  const { request } = f.launch(); expect(f.session.canPublish(request)).toBe(true);
+  expect((await f.session.deliver(request.requestId, observeDecision(request)))?.reason).toBe('observed');
+  expect(f.admitted).toEqual([]);
+  const g = fixture(() => true); g.session.configureNativeConversation(true); g.block();
+  const held = g.launch().request;
+  expect((await g.session.deliver(held.requestId, express(held)))?.reason).toBe('admission_failed'); expect(g.admitted).toEqual([]);
+});
+it('conversation permission is Native-only and retains active, stopped and stale-source fences', () => {
+  const legacy = fixture(() => true); legacy.block(); legacy.observe(true, 'user_arrived'); legacy.advance(750); legacy.observe();
+  expect(legacy.session.takeRequest()).toBeNull();
+  const denied = fixture(() => false); denied.session.configureNativeConversation(true);
+  denied.observe(true, 'user_arrived'); denied.advance(750); denied.observe(); expect(denied.session.takeRequest()).toBeNull();
+  for (const stop of [(f: ReturnType<typeof fixture>) => f.session.enable(false), (f: ReturnType<typeof fixture>) => f.session.setUserBusy(true),
+    (f: ReturnType<typeof fixture>) => f.advance(1600), (f: ReturnType<typeof fixture>) => f.session.userIntent()]) {
+    const f = fixture(() => true); f.session.configureNativeConversation(true); f.block(); const { request } = f.launch(); stop(f);
+    expect(f.session.canPublish(request)).toBe(false);
+  }
 });
