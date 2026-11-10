@@ -1,31 +1,30 @@
-# Pane runtime and browser reference
+# Live runtime and reference hosts
 
-Implementation baseline: `9863ba3` (2026-11-07).
+## Default workflow
 
-The default entry point is `fisch run` in a free Herdr pane beside an existing Codex or Claude. Node runs the particle engine and renderer, discovers the existing agent and subscribes to lifecycle status. No browser or new interactive agent opens; the main agent receives no injected prompt and calls no Fisch tool. See [pane controls](multiplexer.md).
+`fisch live` prepares the checkout-local dependencies, standalone browser gateway and frontend, then opens a browser body and Codex in the launching terminal. Herdr is optional. The workspace is the directory where you run the command, not necessarily the Fisch checkout. `npm start` is the equivalent when launched from that checkout.
 
-## Requirements
+The old `fisch run` terminal renderer and terminal-only `express`/`cancel` CLI controls have been removed. Use [the migration guide](multiplexer.md) for existing installations. Live does not hot-attach to an already-running agent and does not launch the old secondary expression planner.
 
-Node.js 22.12+ (or 24), npm and Herdr with its local socket API enabled. Link the checkout once with `npm link`. Missing dependencies are installed with `npm ci`. The launcher uses platform-native sockets and has no PowerShell dependency. Windows Codex attachment has recorded live evidence. Interactive Claude-in-Herdr and live Linux/macOS pane delivery remain unverified; earlier Linux build/smoke results have narrower scope.
+## Requirements and setup
 
-## Display and lifecycle
+- Node.js 22.12+ and npm.
+- Rust stable with the platform compiler/linker prerequisites. The standalone Live gateway does not require Tauri's desktop GTK/WebKit dependencies.
+- Edge, Chrome or Playwright Chromium (`npx playwright install chromium`). `CHROME_PATH` can select a browser executable.
+- A compatible Codex CLI with app-server/remote support, already signed in.
 
-Inline RGB requires Herdr graphics support and cell dimensions. Otherwise colored Braille remains inside the pane. Launch reads Herdr settings without changing them or reloading Herdr. Adaptive Braille is the default; `FISCH_BRAILLE_STYLE=peak` in the launching shell selects the earlier area-peak style. Braille has lower fidelity than the reference renderer; subtle effort perception remains unverified.
+Run `npm link` once in the Fisch checkout, then `fisch live` from your project. First launch can download locked npm dependencies, Cargo crates and checksum-verified face assets; later launches reuse unchanged builds. `--hands` also prepares the hand model. `--no-assets` skips vision downloads, not existing local assets. Asset preparation never enables the camera. See [the Live guide](fisch-live.md) and [Windows checks](live-windows-qa.md).
 
-Each agent pane has a private control endpoint and at most one attached body. Event subscriptions reconnect. q, Ctrl+C or `fisch stop` closes Fisch while leaving the agent running; a vanished agent ends the body. Restart resets macros and prepared scenes.
+`fisch doctor` inspects installed prerequisites without changing settings. It does not certify Codex login/protocol support, compiler linking, camera permission, GPU performance or hook delivery.
 
-## Interaction and local presence
+## Lifecycle, privacy and optional Herdr
 
-Herdr status events supply activity. Actual user-message and recognized task events come from explicitly installed native provider hooks: `fisch hooks install codex` or `fisch hooks install claude`. Codex additionally requires review/trust in `/hooks`. Launch itself never edits provider settings. Installation alone does not prove delivery; inspect `fisch status` or `fisch doctor`.
+Camera and automatic camera reactions start off. Codex uses transient MCP configuration; tokens stay in inherited environment and authenticated local transport, never command arguments or URLs. Live does not install hooks or rewrite global Codex/Herdr settings.
 
-Immediate local attention precedes contextual inference in a separate noninteractive provider process using existing CLI authentication, or the optional API backend. Fisch does not read terminal excerpts for planning. The engine requires no model account; inference consumes provider usage. Set `FISCH_PLANNER_BACKEND=off` to disable it.
-
-Local presence, validated part performances and prepared idle scenes run without idle inference. Scenes can change the full form and show short in-pane captions; they are finite, memory-only content prepared during an interaction. There are no sounds or external notifications. See [planner budgets, privacy and configuration](expression-planner.md).
+Exit Codex, close the body, use the browser's stop control or interrupt the launcher to close the owned normal-terminal session. Unrelated agents stay running. Starting again creates fresh pairing/session credentials. The explicit `fisch live --agent <pane-id>` adapter creates a dedicated Herdr Codex pane; its private `status`/`stop` controls and ownership limits are documented [separately](multiplexer.md#explicit-herdr-adapter).
 
 ## Development and evaluation
 
-`npm run dev` and `npm run tauri -- dev` are browser/desktop development entry points. `fisch evaluate` opens a separate browser reference evaluation workflow with its Rust/browser prerequisites. `fisch build` and `fisch test` are independent of pane attachment. Custom hosts can use the [HTTP/MCP protocol](integration.md).
+`npm run dev` and `npm run tauri -- dev` remain the browser sandbox and native desktop development entry points. The latter requires the additional platform Tauri prerequisites. `fisch evaluate` opens the model-free browser reference A/B workflow; it is not Live and does not need a Codex login. `fisch build` builds the frontend and standalone gateway; `fisch test` also runs the automated checks, including default-feature Rust tests with desktop prerequisites. `fisch capabilities` prints the base expression contract without starting a session.
 
-## Camera/WebGL Live mode
-
-`fisch live` is a separate browser-camera workflow: local MediaPipe observations/reflexes and a WebGL body, with observe/express/synthetic-look tools in a dedicated Codex pane. It preserves the existing pane workflow and original CLI session. It does not attach new tools to an already-running Codex process or run the secondary expression planner. See [Fisch Live](fisch-live.md) for prerequisites, keyboard controls, privacy, experimental output rhythm and measured acceptance.
+The retained terminal engine, planner and Braille helpers support historical reference tests and explicit research scripts; no supported CLI launches the terminal panel. Custom hosts may still use the [HTTP/MCP protocol](integration.md). The core compiler/scheduler and admission/authentication guarantees are unchanged. See [development checks](my-harness.md) and [validation limits](validation.md); deterministic fixtures do not establish native/GPU or human-semantic acceptance.

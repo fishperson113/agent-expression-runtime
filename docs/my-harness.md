@@ -86,7 +86,7 @@ local docs setting if desired; preserve unrelated hooks/configuration.
 
 README is the human-facing introduction and quick start. Keep implementation details, agent instructions, historical evidence and acceptance limits in docs/ or integrations/. Read [AGENTS.md](../AGENTS.md) and [architecture](architecture.md) before changing behavior. Contributions use the root [MIT License](../LICENSE); follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
-After the README setup, npm run dev opens the browser sandbox and npm run tauri -- dev opens the desktop app. fisch live starts the complete web POC; fisch run keeps the terminal body workflow. See [Live controls/privacy](fisch-live.md) and [panel setup](multiplexer.md) for details.
+After the README setup, npm run dev opens the browser sandbox and npm run tauri -- dev opens the desktop app. fisch live (or npm start from the checkout) starts the complete web POC. The old fisch run terminal panel has been removed. See [Live controls/privacy](fisch-live.md) and [Herdr/migration guidance](multiplexer.md) for details.
 
 Validate changes with:
 

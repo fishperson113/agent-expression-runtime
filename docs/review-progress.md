@@ -24,15 +24,15 @@ This ledger records review findings and validation evidence. Publication status 
 | 18 Fixed seed | Configurable body seed is passed to compiler and both renderer hosts; browser accepts uint32 `?seed=123` | IR seed and deterministic geometry tests |
 | 19 Missing cross-layer tests | Live Rust gateway + browser Workers + renderer + HTTP + MCP + CLI exercise lifecycle and delayed ACK | `scripts/browser-bridge-smoke.mjs` and JSON evidence |
 
-## Current implementation at `9863ba3`
+## Historical implementation at `9863ba3`
 
-The ledger above records earlier fixes and their evidence; it is not a fresh run or full acceptance report. The default workflow is `fisch run` beside an existing Codex/Claude in Herdr. It attaches without an injected prompt, browser launch or main-agent tool call. Launch reads provider/Herdr settings without modifying them. Native interaction hooks are explicitly installed; Codex requires native trust in `/hooks`.
+The ledger above records earlier fixes and their evidence; it is not a fresh run or full acceptance report. Current launches use [Fisch Live](fisch-live.md); `fisch run` is removed. The following paragraphs describe the historical panel workflow at `9863ba3`, not current launch instructions. That workflow used a neighboring existing Codex/Claude in Herdr. It attaches without an injected prompt, browser launch or main-agent tool call. Launch reads provider/Herdr settings without modifying them. Native interaction hooks are explicitly installed; Codex requires native trust in `/hooks`.
 
 Herdr lifecycle events supply activity. Native hooks supply actual user messages and recognized task results; terminal excerpts are not planner input. Immediate local attention runs before background inference. Codex uses a warm app-server with ephemeral request threads; Claude uses noninteractive processes. API planning is optional and implemented separately from the core. Per-turn budgets, stale-result rejection and cancellation are described in [the planner guide](expression-planner.md).
 
 The particle body supports legacy primitives and free-form assemblies with stable part IDs, independent motion and bounded target-aware boids. Local presence and model-authored part performances continue without idle model calls. Up to three prepared idle scenes can replace full geometry and show short in-pane captions; resumed activity restores the interaction program. New messages, accepted manual replacement and cancel clear earlier continuation. Scenes remain in memory. There is no automatic 30-second idle freeze. `FISCH_MOTION` controls normal/reduced/off independently of inference.
 
-The installed Herdr preview uses adaptive colored Braille with density sampling, smoothed exposure/color, fixed Bayer dithering and hysteresis. Inline RGB is selected only when supported; disabled graphics stays disabled. The launching-shell option `FISCH_BRAILLE_STYLE=peak` retains the earlier sampler. See [current rendering and idle evidence](related-work.md#10-cập-nhật-braille-theo-thời-gian-và-idle-scene-tự-do).
+The installed Herdr preview uses adaptive colored Braille with density sampling, smoothed exposure/color, fixed Bayer dithering and hysteresis. Inline RGB is selected only when supported; disabled graphics stays disabled. The launching-shell option `FISCH_BRAILLE_STYLE=peak` retains the earlier sampler. See [historical rendering and idle evidence](related-work.md#10-cập-nhật-braille-theo-thời-gian-và-idle-scene-tự-do).
 
 ## Protocol and geometry guarantees
 

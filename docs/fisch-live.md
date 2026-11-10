@@ -12,7 +12,7 @@ fisch live
 
 Lệnh chuẩn bị build/gateway, mở browser và Codex trong terminal hiện tại với MCP tạm thời. Workspace là thư mục đang gọi; không cần provider/pane ID hoặc mở Codex trước. Trong Herdr hoặc multiplexer khác, Codex chạy ngay trong pane khởi chạy Live; chỉ `--agent <pane>` mới dùng adapter cũ. Phiên cũ không bị thay thế. Login hiện có được dùng lại; không có planner phụ. Cấu hình global không bị viết lại. Nếu asset thị giác chưa tải được, Live vẫn dùng được camera-off; chuẩn bị asset trước khi bật camera.
 
-Sau `npm link`, lệnh `fisch` có trên PATH. Với checkout mới, chạy bước link một lần sau chuẩn bị; sau đó luôn dùng `fisch live`. `fisch run` vẫn mở bản trong panel. Tùy chọn `--agent` chỉ dành cho debug/chọn workspace nguồn tường minh, không cần trong luồng thường ngày.
+Sau `npm link`, lệnh `fisch` có trên PATH. Với checkout mới, chạy bước link một lần sau chuẩn bị; sau đó luôn dùng `fisch live`. `fisch run` và các CLI `fisch express`/`fisch cancel` đã được bỏ; `npm start` trong checkout cũng khởi chạy Live. Xem [hướng dẫn chuyển từ panel](multiplexer.md). Tùy chọn `--agent` chỉ dành cho debug/chọn workspace nguồn tường minh, không cần trong luồng thường ngày.
 
 Launcher mở Edge/Chromium với trang Live và camera mặc định **tắt**. Chọn **Bật camera** để xử lý tại máy. Fisch ở panel trái; camera và nhật ký hoạt động agent ở panel phải. Tiếp tục gõ vào Codex trong terminal/pane Live. MCP có thể hỏi quyền tool lần đầu; cấp quyền theo ý bạn. Launcher không sửa global Codex/Herdr config hoặc bypass hook trust.
 
@@ -257,7 +257,8 @@ turns and tool lifecycle, never private model thoughts or raw tool arguments.
 Ordinary `fisch live` now runs Codex through the official app-server relay in the
 launching terminal, including a Herdr, tmux or other multiplexer pane. It no longer
 automatically creates a separate Herdr pane. Start it in a free shell pane; existing
-agent sessions are left alone. `fisch run` keeps its existing panel workflow.
+agent sessions are left alone. The old `fisch run` panel launcher has been removed;
+`npm start` now launches Live.
 Explicit `fisch live --agent <pane>` retains the legacy Herdr adapter; its camera
 reflexes work, but agent-triggered camera reactions are unavailable there and the
 control stays disabled. No keystrokes are injected into an unrelated agent.

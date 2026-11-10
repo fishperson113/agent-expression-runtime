@@ -1,12 +1,14 @@
-# Interaction-driven expression planner
+# Historical terminal expression planner
 
-Fisch keeps free-form `assemble` generation: faces, hands, creatures and unexpected shapes remain possible. What changes is the trigger and purpose. A model plan responds to a specific user interaction; idle timers never request inference. The same interaction can prepare finite idle scenes that later replace the full form through local playback.
+**Scope:** This documents the retired terminal panel and retained planner/geometry reference fixtures, not the current Live launch path. `fisch run` and its terminal `express`/`cancel` CLI controls are removed. Start [Fisch Live](fisch-live.md); see [migration and hook cleanup](multiplexer.md). Live never starts this secondary planner, and `FISCH_PLANNER_*` settings do not configure its separate camera observer.
 
-## One-command attachment
+The historical panel kept free-form `assemble` generation: faces, hands, creatures and unexpected shapes remain possible. What changes is the trigger and purpose. A model plan responds to a specific user interaction; idle timers never request inference. The same interaction can prepare finite idle scenes that later replace the full form through local playback.
 
-Run `fisch run` beside an existing Codex or Claude pane. Launch inspects hook configuration without changing it. The main agent calls no Fisch tools and receives no injected prompt. No browser or new interactive agent starts. Herdr graphics configuration is also read-only: unavailable or disabled graphics uses Braille.
+## Historical attachment and retained hook management
 
-Hook installation is explicit and provider-specific:
+The removed panel attached beside an existing Codex or Claude pane without launching a browser or another interactive agent. Its RGB/Braille renderer and planner helpers remain as reference fixtures; there is no replacement terminal-renderer CLI. The configuration and behavior below describe those retained components, not normal Live.
+
+Hook management is retained for optional existing integrations and cleanup. Normal-terminal Live does not require it; see the [current Herdr adapter](multiplexer.md#optional-hooks-and-cleanup) before installing:
 
 ```sh
 fisch hooks install codex
@@ -20,7 +22,7 @@ Choosing `install` opts into the stated provider's global hook configuration. Co
 
 The runner is bundled into `%LOCALAPPDATA%/fisch/hooks/hook.mjs` on Windows or `$XDG_DATA_HOME/fisch/hooks/hook.mjs` (default `~/.local/share`) elsewhere. It has no repository imports, so moving/deleting the checkout does not break installed hooks. Shell guards check Herdr environment and runner existence before starting Node. Outside Herdr no Node process starts. Inside Herdr, delivery uses bounded private pane-scoped IPC and is silent if no body is attached.
 
-**Codex requires native trust for new hook definitions.** Open `/hooks`, review the Fisch command and trust it. Fisch does not modify trust records. Claude may require reviewing/reloading changed hook settings. Header, `fisch status` and `fisch doctor` distinguish missing installation, waiting for trust/events and receiving events. See [OpenAI Docs: hooks](https://learn.chatgpt.com/docs/hooks) and [Claude hook reference](https://code.claude.com/docs/en/hooks).
+**Codex requires native trust for new hook definitions.** Open `/hooks`, review the Fisch command and trust it. Fisch does not modify trust records. Claude may require reviewing/reloading changed hook settings. The retired panel header/status distinguished installation and delivery. Current `fisch hooks status` inspects installation, `fisch status` in the explicit Live Herdr pane reports delivered event count, and `fisch doctor` checks only local prerequisites. See [OpenAI Docs: hooks](https://learn.chatgpt.com/docs/hooks) and [Claude hook reference](https://code.claude.com/docs/en/hooks).
 
 ## What drives expression
 

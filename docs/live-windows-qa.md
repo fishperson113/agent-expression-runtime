@@ -125,7 +125,9 @@ Nếu chính Node/tool bị policy quản trị chặn, giữ nguyên policy và
 có và workspace đang gọi lệnh. Nó không hot-attach một tiến trình Codex đang chạy
 hay tự nối lại thread cũ. Muốn dùng lịch sử có sẵn, chọn thread bằng chức năng Codex
 trong UI mới; việc resume còn phải kiểm tra trên bản CLI thực tế. Thread cũ/agent
-khác không bị thay thế. `fisch run` là đường panel Herdr khác với Live.
+khác không bị thay thế. `fisch run` và các CLI terminal `express`/`cancel` đã được bỏ;
+`npm start` trong checkout cũng mở Live. Xem [chuyển đổi từ panel](multiplexer.md)
+về adapter Herdr tùy chọn và cách gỡ hook cũ.
 
 Thoát Codex, đóng cửa sổ body, Ctrl+C ở launcher, hoặc Dừng toàn bộ để kết thúc
 phiên sở hữu gateway/browser/relay. Dừng biểu đạt chỉ hủy biểu đạt, không đóng

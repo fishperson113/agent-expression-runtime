@@ -1,37 +1,46 @@
-# Herdr: one command
+# Herdr and terminal-panel migration
 
-Keep Codex or Claude running in one pane. In the neighboring free pane, run:
+## Normal use
+
+Run `fisch live` in a free shell pane, including inside Herdr, tmux or another multiplexer. Codex runs in that same terminal and the body opens in a browser. No Herdr API, neighboring agent, global hooks or pane ID is needed. Run from the project directory you want Codex to use.
+
+The old `fisch run` terminal body has been removed. `npm start` now launches Live from the checkout. The old terminal-only `fisch express` and `fisch cancel` commands are also removed; they fail with migration guidance rather than silently launching another session. Codex still has the Live MCP `express` and `cancel_expression` tools. Use the browser controls to stop an expression or end a normal Live session.
+
+Live starts a new Codex process with temporary MCP settings. It does not attach tools to an already-running Codex or Claude process. Existing sessions stay untouched. See [Live setup, controls and privacy](fisch-live.md).
+
+## Explicit Herdr adapter
+
+The optional adapter remains available for a known Codex source pane:
 
 ```sh
-fisch run
+fisch live --agent <pane-id>
 ```
 
-Fisch displays the body in that pane and discovers the existing agent. Hook setup is explicit: `fisch hooks install codex` or `fisch hooks install claude`, with `fisch hooks uninstall` to remove it. Launch only inspects settings. The path is:
+This requires a working Herdr local socket API. It selects the source pane's workspace and creates a dedicated Codex pane with temporary MCP settings, while the body still renders in the browser. It does not restore the removed RGB/Braille terminal renderer. Ordinary `fisch live` does not create a separate pane automatically.
 
-`actual user message hook → immediate local attention → event-bound model reaction → expression engine → pane`
-
-`working/waiting status → local posture and settling`
-
-The main agent calls no Fisch tool and receives no injected attachment prompt. A separate noninteractive process can invent a face, hand, creature or another free-form composition responding to the user's message. There is no browser or new interactive conversation. Native CLI login is reused; an external API is optional.
-
-Codex requires trusting new hooks in its native `/hooks` interface once. Fisch never bypasses this trust requirement. Claude may require reloading changed settings. The header says `review /hooks` or `waiting` until valid interaction events arrive; `fisch status` exposes `interactionHooks.delivery` and `planner.interactionEvents`. Installing settings is not proof of delivery. See [planner scope, setup and usage](expression-planner.md).
-
-Idle lets intensity fade and runs local presence and prepared performances. If the preceding interaction supplied idle scenes, it can change full form and display a short in-pane caption without new model calls. Without scenes it holds the current form. Scenes are memory-only; a fresh launch uses the fallback until an interaction prepares content. Working keeps its form and uses event-driven gestures; status changes do not force cloud/wall/sphere. A local attentive face is only the bootstrap fallback. The event socket reconnects with bounded backoff, and snapshots reconcile working/waiting status without reading terminal text.
-
-Discovery prefers the same tab and working directory within the same workspace. If several agents match equally, choose explicitly with `fisch run --agent <pane-id>`. The renderer pane is excluded.
-
-Optional diagnostic/manual controls:
+Run these diagnostics from that dedicated Live Codex pane, whose `HERDR_PANE_ID` identifies the private endpoint:
 
 ```sh
 fisch status
-fisch capabilities
-fisch express '{"type":"morph","target":"wall","durationMs":900}'
-fisch cancel
 fisch stop
 ```
 
-`express` accepts an AST or an envelope containing `body`, `kind`, `track`, `policy` and `ttlMs`. `cancel` cancels semantic motion, resets posture and clears prepared performances/scenes without selecting another shape. Manual control pauses inference until the next user message; gentle local presence remains independently controlled by `FISCH_MOTION=normal|reduced|off`. `stop`, q or Ctrl+C closes the body and its private socket, leaving the existing agent running. Explicitly installed hooks stay installed until uninstalled; shell guards skip Node outside Herdr and a missing body is a bounded no-op. The standalone managed runner does not depend on the checkout path. If the agent disappears, Fisch exits. Restarting Fisch starts a fresh engine; definitions must be sent again.
+`status` reports `status: live`, synthetic-only look mode and the number of delivered hook events. It does not expose the retired planner, Braille or idle-scene metrics. `stop` ends Live's gateway/browser resources; Herdr owns the separate pane lifecycle. For normal-terminal Live, use its browser controls or exit Codex instead. Camera-triggered provider reactions are unavailable in the explicit adapter; local camera reflexes and native observe/express tools remain available.
 
-Herdr clients with inline RGB support display projected particles. Otherwise Fisch uses lower-detail Braille with per-cell RGB colors, including red/blue particles with little green. Disabled graphics stays disabled: Fisch never edits Herdr configuration or reloads it. The installed preview uses adaptive Braille: density sampling, smoothed exposure/color, fixed Bayer dithering and hysteresis. Set `FISCH_BRAILLE_STYLE=peak` in the launching shell for the earlier area-peak style; this option is not loaded from `.env`. `fisch status` reports rendering and prepared idle-scene state. No browser fallback opens.
+## Optional hooks and cleanup
 
-See [runtime requirements](browser-and-hosts.md) and `fisch doctor` for attachment/hook diagnostics.
+Normal-terminal Live does not require global hooks. Existing trusted Codex hooks can forward supported event types to the explicit Herdr adapter; no raw prompt context is injected into Live. Hook delivery is optional and installation alone does not establish trust or delivery.
+
+To inspect or remove Fisch hooks installed for the old panel:
+
+```sh
+fisch hooks status
+fisch hooks uninstall
+# Or remove one provider only:
+fisch hooks uninstall codex
+fisch hooks uninstall claude
+```
+
+Uninstall removes only Fisch entries and preserves unrelated hooks/settings. Closing a session does not uninstall hooks. If explicitly adding optional hooks, `fisch hooks install codex` still requires native review/trust in Codex `/hooks`; Fisch does not bypass trust or change it automatically. Claude hook management remains for existing integrations and cleanup, not a supported Claude Live launcher.
+
+`fisch doctor` checks local Node/Rust/Codex/browser/dependency prerequisites, not pane attachment, login, hook trust or actual event delivery. The [historical planner reference](expression-planner.md) records the retired panel behavior and retained test fixtures, not current launch instructions.
