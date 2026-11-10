@@ -215,7 +215,7 @@ it('ignores foreign correlation while HTTP is unresolved and does not dispatch b
     return new Promise(() => {});
   } });
   const job = await f.controller.begin({ operation: 'create', expectedRevision: 0, scene: scene() });
-  expect(await job.result).toMatchObject({ status: 'uncertain', code: 'playground_timeout', revision: 0 });
+  expect(await job.result).toMatchObject({ status: 'uncertain', code: 'playground_timeout', revision: 0, waitingFor: 'body_http_or_correlated_ack' });
   expect(sent).toBe(1); f.controller.close();
 });
 it('scopes a contradictory late HTTP receipt to its still-active transaction', async () => {

@@ -172,3 +172,19 @@ response while real Rust feedback and WebGL continue, and requires both phases t
 complete before releasing HTTP. This establishes that failure path, not a claim
 that every timeout or the specific native test had the same transport cause.
 Timeout/uncertain remains an unknown or partial outcome, not proof nothing ran.
+
+Uncertain playground outcomes include a bounded waitingFor stage and monotonic
+elapsedMs for diagnosis. A stage describes what the host was waiting for; it
+does not prove whether the renderer had already applied the command. No scene,
+goal, prompt or model content is added to these diagnostics.
+
+Reproduce without a model, webcam or external dataset using the repository's
+locked dependencies and standalone gateway (root MIT license; no new dependency
+or upstream component added): run `npm ci`, install Chromium with
+`npx playwright install chromium`, then build the gateway with
+`cargo build --locked --no-default-features --bin fisch-gateway --manifest-path src-tauri/Cargo.toml`.
+Run `npx vitest run tests/playground-mcp.test.mjs -t 'first HTTP receipt is held'`.
+The fixture authors one ellipsoid scene and places a local HTTP proxy between MCP
+and Rust, withholding only the first expression response while streaming feedback.
+It requires exactly two expression requests and both receipts' applied/completed
+phases before HTTP release; a framebuffer image is not used as a commit oracle.

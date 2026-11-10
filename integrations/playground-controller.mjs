@@ -49,7 +49,8 @@ class Controller {
       this.detach();
     }
     this.job = undefined;
-    job.resolve({ status, ...this.state(), ...(code ? { code } : {}) });
+    job.resolve({ status, ...this.state(), ...(code ? { code } : {}),
+      ...(status === 'uncertain' ? { waitingFor: job.stage, elapsedMs: Math.round(performance.now() - job.startedAt) } : {}) });
   }
   fail(job, code) { this.finish(job, 'uncertain', code); }
   bind(next) {
@@ -137,9 +138,11 @@ class Controller {
   }
   async run(job, args) {
     try {
+      job.stage = 'session';
       const session = sessionValue(await this.options.currentSession()); if (!this.live(job)) return;
       if (args.operation === 'recover') { await this.recover(job, session); return; }
       if (!this.bind(session)) return;
+      job.stage = 'feedback_connection';
       await this.stream(job); if (!this.live(job)) return;
       let proposal;
       try { proposal = this.journal.propose({ sessionId: session.id, ...args }); }
@@ -147,12 +150,15 @@ class Controller {
       job.transaction = proposal.transaction; job.revision = proposal.baseRevision;
       for (const { phase, ...command } of proposal.commands) {
         if (!this.live(job)) return;
+        job.stage = phase + '_http_or_correlated_ack';
         const reply = await this.sendCommand(job, { ...command, requestId: `${proposal.transaction}:${phase}` }, session);
         if (!this.live(job)) return;
+        job.stage = phase + '_admission';
         const receipt = await this.admission(job, phase, reply, session); if (!this.live(job) || !receipt) return;
         this.journal.admit(proposal.transaction, phase, receipt);
         job.known.push({ session: receipt.session, epoch: receipt.epoch, seq: receipt.seq }); this.replay(job);
       }
+      job.stage = 'body_and_baseline_completion';
     } catch { if (this.live(job)) this.fail(job, 'playground_transport'); }
   }
   async recover(job, before) {
@@ -170,7 +176,7 @@ class Controller {
     if (this.job) throw Error('playground_busy');
     if (args.expectedRevision !== (this.journal?.status().revision ?? 0)) throw Error('playground_revision');
     if (this.required && args.operation !== 'recover') throw Error('playground_recovery_required');
-    const job = { done: false, buffer: [], known: [], deadline: performance.now() + this.timeoutMs }; job.result = new Promise(resolve => { job.resolve = resolve; }); this.job = job;
+    const job = { startedAt: performance.now(), stage: 'session', done: false, buffer: [], known: [], deadline: performance.now() + this.timeoutMs }; job.result = new Promise(resolve => { job.resolve = resolve; }); this.job = job;
     job.timer = setTimeout(() => this.fail(job, job.waitCode ?? 'playground_timeout'), this.timeoutMs);
     await Promise.race([this.run(job, args), job.result]);
     return { result: job.result };
