@@ -1,0 +1,21 @@
+{
+  "model": "convaiinnovations/laya",
+  "revision": "55cf4c4ebb4ebe31b2550e8bdf3bd21b99753851",
+  "weightsSha256": "891102d372688fc2a094dac56a384bc537b87c63f21f9f3dac0be2b7cbc8d86c",
+  "originalDatasetSha256": "9b0e1fb245dfb457476cd850ed62e6cda69d457e95dd37af4c515a703ae0b6f3",
+  "pairedDatasetSha256": "190fcff94c9757e612cb93993d202d53a338189e59e577a0ca0ca9787a6a5801",
+  "actualOfflineForwards": 152,
+  "additionalLocalProductForwards": 9,
+  "remoteProviderCalls": 0,
+  "data": "Engineer-authored synthetic policy fixtures only; no personal media or user conversation.",
+  "scope": "mixed original probe cohort; 8 train-feature repeats; 24-row subset post-hoc, not generalization proof",
+  "files": {
+    "original.jsonl": "781b25a2c02e9eea511eb0356805e2e9aa73a635803770229d60d8f7116d1ea1",
+    "paired.jsonl": "991bc666db66f2de2df93c92fe8225fce60f924440859c2c76f3913cd5317a2a",
+    "reversed-options.jsonl": "cd3fc98b1a1d74d806ff1ed9592e985503e9e611ecfbb3ce74ba75680725a77c",
+    "metrics.json": "f8d084a2c4b7075f23043529812782655917cf563cde7485dc55b32f60da20a7",
+    "overlap-audit.json": "344f9aabab9851d0ef20a1d2238c241e5b959aa30316b46c060e4369f8f29e5d",
+    "product-actual.jsonl": "849beae79367a0dc4b9e2f397eea867372d563c3421a2c1a28e3aca0ea86f9b5",
+    "product-summary.json": "db4909ae099f26cbaf2046329a2f1aca7dd91afc85d9800db6285b989e889401"
+  }
+}

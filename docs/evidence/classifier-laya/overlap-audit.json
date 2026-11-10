@@ -1,0 +1,297 @@
+{
+  "definition": "Exact frozen baseline flattened structured features, note excluded; null normalized to unknown as original evaluator.",
+  "datasetSha256": "9b0e1fb245dfb457476cd850ed62e6cda69d457e95dd37af4c515a703ae0b6f3",
+  "trainOverlap": {
+    "dev": {
+      "fullState": [],
+      "baselineFeatures": []
+    },
+    "holdout": {
+      "fullState": [],
+      "baselineFeatures": [
+        {
+          "evaluationId": "negated_motion_observed_still_0",
+          "trainingIds": [
+            "quiet_neutral_0"
+          ]
+        },
+        {
+          "evaluationId": "negated_motion_observed_still_1",
+          "trainingIds": [
+            "quiet_neutral_1"
+          ]
+        },
+        {
+          "evaluationId": "negated_motion_observed_still_2",
+          "trainingIds": [
+            "quiet_neutral_2"
+          ]
+        },
+        {
+          "evaluationId": "negated_motion_observed_still_3",
+          "trainingIds": [
+            "quiet_neutral_3"
+          ]
+        },
+        {
+          "evaluationId": "unknown_not_absent_0",
+          "trainingIds": [
+            "no_modalities_0"
+          ]
+        },
+        {
+          "evaluationId": "unknown_not_absent_1",
+          "trainingIds": [
+            "no_modalities_1"
+          ]
+        },
+        {
+          "evaluationId": "unknown_not_absent_2",
+          "trainingIds": [
+            "no_modalities_2"
+          ]
+        },
+        {
+          "evaluationId": "unknown_not_absent_3",
+          "trainingIds": [
+            "no_modalities_3"
+          ]
+        }
+      ]
+    },
+    "ood": {
+      "fullState": [],
+      "baselineFeatures": []
+    },
+    "counterfactual": {
+      "fullState": [
+        {
+          "evaluationId": "cf_turn_sweeping_0",
+          "trainingIds": [
+            "steady_hand_sweep_0"
+          ]
+        },
+        {
+          "evaluationId": "cf_turn_sweeping_1",
+          "trainingIds": [
+            "busy_with_motion_0"
+          ]
+        },
+        {
+          "evaluationId": "cf_turn_playful_0",
+          "trainingIds": [
+            "joint_varied_motion_0"
+          ]
+        },
+        {
+          "evaluationId": "cf_recent_sweeping_0",
+          "trainingIds": [
+            "steady_hand_sweep_0"
+          ]
+        },
+        {
+          "evaluationId": "cf_recent_face_geometry_0",
+          "trainingIds": [
+            "front_face_change_0"
+          ]
+        }
+      ],
+      "baselineFeatures": [
+        {
+          "evaluationId": "cf_turn_sweeping_0",
+          "trainingIds": [
+            "steady_hand_sweep_0"
+          ]
+        },
+        {
+          "evaluationId": "cf_turn_sweeping_1",
+          "trainingIds": [
+            "busy_with_motion_0"
+          ]
+        },
+        {
+          "evaluationId": "cf_turn_playful_0",
+          "trainingIds": [
+            "joint_varied_motion_0"
+          ]
+        },
+        {
+          "evaluationId": "cf_recent_sweeping_0",
+          "trainingIds": [
+            "steady_hand_sweep_0"
+          ]
+        },
+        {
+          "evaluationId": "cf_recent_face_geometry_0",
+          "trainingIds": [
+            "front_face_change_0"
+          ]
+        },
+        {
+          "evaluationId": "cf_stillness_negation_paraphrase_0",
+          "trainingIds": [
+            "quiet_neutral_0"
+          ]
+        },
+        {
+          "evaluationId": "cf_stillness_negation_paraphrase_1",
+          "trainingIds": [
+            "quiet_neutral_0"
+          ]
+        }
+      ]
+    },
+    "tiny_holdout": {
+      "fullState": [],
+      "baselineFeatures": []
+    }
+  },
+  "crossSplitOverlap": {
+    "train__dev": [],
+    "train__holdout": [
+      {
+        "evaluationId": "negated_motion_observed_still_0",
+        "trainingIds": [
+          "quiet_neutral_0"
+        ]
+      },
+      {
+        "evaluationId": "negated_motion_observed_still_1",
+        "trainingIds": [
+          "quiet_neutral_1"
+        ]
+      },
+      {
+        "evaluationId": "negated_motion_observed_still_2",
+        "trainingIds": [
+          "quiet_neutral_2"
+        ]
+      },
+      {
+        "evaluationId": "negated_motion_observed_still_3",
+        "trainingIds": [
+          "quiet_neutral_3"
+        ]
+      },
+      {
+        "evaluationId": "unknown_not_absent_0",
+        "trainingIds": [
+          "no_modalities_0"
+        ]
+      },
+      {
+        "evaluationId": "unknown_not_absent_1",
+        "trainingIds": [
+          "no_modalities_1"
+        ]
+      },
+      {
+        "evaluationId": "unknown_not_absent_2",
+        "trainingIds": [
+          "no_modalities_2"
+        ]
+      },
+      {
+        "evaluationId": "unknown_not_absent_3",
+        "trainingIds": [
+          "no_modalities_3"
+        ]
+      }
+    ],
+    "train__ood": [],
+    "train__counterfactual": [
+      {
+        "evaluationId": "cf_turn_sweeping_0",
+        "trainingIds": [
+          "steady_hand_sweep_0"
+        ]
+      },
+      {
+        "evaluationId": "cf_turn_sweeping_1",
+        "trainingIds": [
+          "busy_with_motion_0"
+        ]
+      },
+      {
+        "evaluationId": "cf_turn_playful_0",
+        "trainingIds": [
+          "joint_varied_motion_0"
+        ]
+      },
+      {
+        "evaluationId": "cf_recent_sweeping_0",
+        "trainingIds": [
+          "steady_hand_sweep_0"
+        ]
+      },
+      {
+        "evaluationId": "cf_recent_face_geometry_0",
+        "trainingIds": [
+          "front_face_change_0"
+        ]
+      },
+      {
+        "evaluationId": "cf_stillness_negation_paraphrase_0",
+        "trainingIds": [
+          "quiet_neutral_0"
+        ]
+      },
+      {
+        "evaluationId": "cf_stillness_negation_paraphrase_1",
+        "trainingIds": [
+          "quiet_neutral_0"
+        ]
+      }
+    ],
+    "train__tiny_holdout": [],
+    "dev__holdout": [],
+    "dev__ood": [],
+    "dev__counterfactual": [
+      {
+        "evaluationId": "cf_missing_face_negation_paraphrase_0",
+        "trainingIds": [
+          "hand_only_moving_0"
+        ]
+      },
+      {
+        "evaluationId": "cf_missing_face_negation_paraphrase_1",
+        "trainingIds": [
+          "hand_only_moving_0"
+        ]
+      }
+    ],
+    "dev__tiny_holdout": [],
+    "holdout__ood": [],
+    "holdout__counterfactual": [
+      {
+        "evaluationId": "cf_stillness_negation_paraphrase_0",
+        "trainingIds": [
+          "negated_motion_observed_still_0"
+        ]
+      },
+      {
+        "evaluationId": "cf_stillness_negation_paraphrase_1",
+        "trainingIds": [
+          "negated_motion_observed_still_0"
+        ]
+      },
+      {
+        "evaluationId": "cf_lost_hand_negation_paraphrase_0",
+        "trainingIds": [
+          "geometric_change_without_hand_0"
+        ]
+      },
+      {
+        "evaluationId": "cf_lost_hand_negation_paraphrase_1",
+        "trainingIds": [
+          "geometric_change_without_hand_0"
+        ]
+      }
+    ],
+    "holdout__tiny_holdout": [],
+    "ood__counterfactual": [],
+    "ood__tiny_holdout": [],
+    "counterfactual__tiny_holdout": []
+  },
+  "warning": "Original family split failed feature isolation. Historical scores remain observed fit to partly repeated features, not heldout feature generalization."
+}

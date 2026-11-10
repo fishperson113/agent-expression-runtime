@@ -1,0 +1,85 @@
+{
+  "model": {
+    "ready": true,
+    "modelId": "convaiinnovations/laya",
+    "modelRevision": "55cf4c4ebb4ebe31b2550e8bdf3bd21b99753851",
+    "loadMs": 13304.557344999921
+  },
+  "actualLocalInferences": 9,
+  "source": "synthetic typed V2 observation windows projected without labels",
+  "gate": {
+    "minimumTopScore": 0.7,
+    "minimumMargin": 0.15,
+    "calibrated": false
+  },
+  "cases": [
+    {
+      "id": "quiet_neutral_0",
+      "mode": "observe",
+      "action": null,
+      "requestId": "request_product_quiet_neutral",
+      "validUntil": 7500
+    },
+    {
+      "id": "busy_with_motion_0",
+      "mode": "observe",
+      "action": null,
+      "requestId": "request_product_busy_with_motion",
+      "validUntil": 7500
+    },
+    {
+      "id": "front_face_change_0",
+      "mode": "observe",
+      "action": null,
+      "requestId": "request_product_front_face_change",
+      "validUntil": 7500
+    },
+    {
+      "id": "no_modalities_0",
+      "mode": "observe",
+      "action": null,
+      "requestId": "request_product_no_modalities",
+      "validUntil": 7500
+    },
+    {
+      "id": "joint_varied_motion_0",
+      "mode": "observe",
+      "action": null,
+      "requestId": "request_product_joint_varied_motion",
+      "validUntil": 9000
+    },
+    {
+      "id": "hand_only_moving_0",
+      "mode": "observe",
+      "action": null,
+      "requestId": "request_product_hand_only_moving",
+      "validUntil": 7500
+    },
+    {
+      "id": "permission_stopped_0",
+      "mode": "observe",
+      "action": null,
+      "requestId": "request_product_permission_stopped",
+      "validUntil": 7500
+    },
+    {
+      "id": "unknown_not_absent_0",
+      "mode": "observe",
+      "action": null,
+      "requestId": "request_product_unknown_not_absent",
+      "validUntil": 7500
+    }
+  ],
+  "abortAfterActualInferenceRejected": true,
+  "fakeSemanticHttpCalls": 0,
+  "fixtureLedgerUsed": 0,
+  "realRemoteProviderCalls": 0,
+  "workerExit": 0,
+  "renderedActions": 0,
+  "limitations": [
+    "hand measurement quality remains unknown; handedness confidence ignored",
+    "recent-response age supplied by synthetic trusted host context",
+    "downstream semantic provider is a controlled fake returning observe",
+    "this product factory bridge does not enable a UI/CLI backend or certify real camera behavior"
+  ]
+}
