@@ -69,7 +69,7 @@ it('aborts only its reaction process/turn, blocks overlap, and does not publish 
   try {
     while (!f.calls.some(c => c.method === 'turn/start')) await new Promise(resolve => setImmediate(resolve));
     await expect(f.provider.decide(window(), new AbortController().signal)).rejects.toThrow('unavailable');
-    controller.abort(); await expect(run).rejects.toThrow(); expect(f.processes[0].closed).toBe(true);
+    controller.abort(); await expect(run).rejects.toMatchObject({ message: 'native_reaction_aborted', transportSettled: true }); expect(f.processes[0].closed).toBe(true);
     f.event('turn/completed', { threadId: 'reaction-thread', turn: { id: 'reaction-turn', status: 'completed' } });
     expect(f.calls.filter(c => c.method === 'turn/interrupt').every(c => c.params.threadId === 'reaction-thread')).toBe(true);
     const again = new AbortController(), restarted = f.provider.decide(window(), again.signal);
@@ -230,5 +230,17 @@ it('records exact policy/schema/projected-input/config/model hashes without raw 
       expect(JSON.stringify(diagnostics.lastResult)).not.toMatch(/PRIVATE|observations|schema\/auth|Mình|baseInstructions/);
       diagnostics.lastResult.policyHash = 'mutated'; expect(f.provider.diagnostics().lastResult.policyHash).toBe(metadata.policyHash);
     } finally { f.provider.close(); }
+  }
+});
+
+it('fences a late reaction result as soon as user intent arrives, before the browser barrier completes', async () => {
+  for (const mode of ['aborted', 'pending']) {
+    const output = { thread: 'main', turn: 'coding' }, values = [];
+    const broker = new LiveReactiveBroker({ page: {}, output, provider: { conversationLane: true }, forward() {}, reject() {} });
+    const owned = { id: 'reaction', controller: new AbortController(), terminal: false }; broker.active = owned;
+    broker.deliver = async (_id, data) => values.push(data);
+    if (mode === 'aborted') owned.controller.abort(); else broker.pending.set('user', { method: 'turn/steer' });
+    await broker.finish(owned, { reply: 'must not appear' });
+    expect(values).toEqual([null]); expect(broker.active).toBeUndefined(); expect(output.turn).toBe('coding'); broker.close();
   }
 });

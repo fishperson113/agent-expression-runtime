@@ -22,7 +22,7 @@ const playgroundContainer = element('playground-tools');
 const playground = mountPlayground(playgroundContainer);
 const setupContainer = element('setup-tools');
 const liveSetup = mountLiveSetup(setupContainer);
-const conversation = mountConversation(element('conversation-tools'), value => (window as any).fischLiveConversation(value));
+const conversation = mountConversation(element('conversation-tools'), value => { if (nativeConversation) (window as any).fischLive?.reactiveUserIntent?.(); return (window as any).fischLiveConversation(value); });
 mountDisclosures(element('app'));
 const synthetic = new URLSearchParams(location.search).get('fixture') === 'synthetic';
 const body = new LiveBody(element<HTMLCanvasElement>('body'), text => { element('body-status').textContent = text; });

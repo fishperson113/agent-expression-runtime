@@ -135,7 +135,7 @@ export class NativeReactionProvider {
     const done = new Promise((yes, no) => { resolve = yes; reject = no; }); done.catch(() => {});
     this.#flight.rpc = this.rpc;
     const job = { threadId: thread.id, turnId: null, resolve, reject }; this.active = job;
-    const abort = () => { if (job.turnId) void this.rpc.request('turn/interrupt', { threadId: thread.id, turnId: job.turnId }).catch(() => {}); this.rpc?.close(); this.starting = undefined; reject(Error('native_reaction_aborted')); };
+    const abort = () => { reject(Error('native_reaction_aborted')); if (job.turnId) void this.rpc.request('turn/interrupt', { threadId: thread.id, turnId: job.turnId }).catch(() => {}); this.rpc?.close(); this.starting = undefined; };
     const timer = setTimeout(abort, this.config.timeoutMs ?? 60000); signal.addEventListener('abort', abort, { once: true });
     try {
       if (signal.aborted) abort(); if (this.closed) throw Error('native_reaction_aborted');
