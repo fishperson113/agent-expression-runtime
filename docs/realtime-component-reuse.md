@@ -6,7 +6,9 @@ voice stack, memory service or VTuber application. This research directory is
 inactive: neither the root package nor production host imports its dependency.
 Nothing is enabled by default. The candidate is not production-adoption ready.
 
-| Candidate | Exact source / license | What actually ran | Decision in this scope |
+The Open-LLM limits below describe only this isolated minimal probe; main separately preserves actual upstream conversation/interrupt orchestration and MCP reuse in the [OLV adapter (#127)](https://github.com/fishperson113/agent-expression-runtime/blob/8deb6678f25da0e869cfce564a761daab2ad6698/docs/olv-adapter.md).
+
+| Candidate | Exact source / license | What this isolated probe ran | Decision in this scope |
 |---|---|---|---|
 | XState 5.33.4 | [release commit](https://github.com/statelyai/xstate/tree/bd77717b8d33c49af1c8ee4a7e22cebb936cc8b1), [MIT](https://github.com/statelyai/xstate/blob/bd77717b8d33c49af1c8ee4a7e22cebb936cc8b1/LICENSE) | Actual `createActor`, invoked promise actors, cancellation signals and retained context counters, around existing Fisch ownership classes | Useful small orchestration component to investigate; keep authority and agent memory in the existing host |
 | Open-LLM-VTuber | [992309c](https://github.com/Open-LLM-VTuber/Open-LLM-VTuber/tree/992309c0aa19845960228f880013d4685fde93b5), backend MIT with separate Live2D sample terms | Actual interface/DTO imports and concrete `StreamJSONDetector`; full `BasicMemoryAgent` not executed | The interface alone is not backend behavior reuse; the tested detector fails strict parser requirements |
