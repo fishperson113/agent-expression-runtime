@@ -1,5 +1,9 @@
 # Data-only reactive Responses adapter
 
+For the separate signed-in Codex conversation lane, see
+[Native observation loop](native-observation-loop.md). This page describes the
+optional Responses API adapter.
+
 Live terminal wiring uses this separate data-only adapter for explicitly configured
 reactive inference; it defaults off. Camera decisions never enter the Native coding
 thread. This contains the shared-thread capability route; the historical unrelated

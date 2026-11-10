@@ -1,0 +1,153 @@
+# Native observation conversation loop
+
+Fisch can use the existing signed-in Codex app-server as a separate, data-only
+reaction lane. It does not inject camera events into the coding conversation or
+require a Responses API key. The agent chooses whether to say something, retain
+the current appearance, animate it, or compose a new form. No gesture-to-effect
+or emotion-to-color table is used.
+
+## Run and boundaries
+
+Use the normal Live entry point with an existing approved budget ledger:
+
+```sh
+FISCH_REACTIVE_BACKEND=codex \
+FISCH_REACTIVE_BUDGET=/absolute/path/to/existing-ledger.json npm start
+```
+
+The app-server must already be usable in its own writable authenticated home.
+Do not move credentials between environments. The factory neither creates nor
+resets the ledger. Observation/reactivity is opt-in in the Live controls; camera
+capture is a separate permission and starts off. Voice is outside this slice.
+
+The reaction process owns ephemeral threads independent of the coding transport.
+It receives typed presence/quality, event-specific facing-screen estimates,
+geometric expression coefficients, or coarse hand wrist regions. Missing data is
+unknown. It receives no coding task, raw media, identity, object description, or
+inferred emotion. Read-only mode, verified disabled feature flags and an empty
+MCP catalog constrain this POC; they are not certification of universal tool or
+private-context isolation across arbitrary Codex installations.
+
+The source and renderer continue while inference waits. A bounded event gate
+coalesces events, keeps one reaction transport, and applies rolling rate limits.
+Native defaults are 60 seconds for inference admission, 15 seconds cooldown and
+four dispatches per minute. `FISCH_REACTIVE_DEADLINE_MS` (5000–90000),
+`FISCH_REACTIVE_COOLDOWN_MS` (1000–60000), and
+`FISCH_REACTIVE_MAX_PER_MINUTE` (1–4) allow bounded configuration. These do not
+extend source freshness: current observations, epoch, intent, presence, tracks
+and the decision's semantic read set must still hold at publication/execution.
+Execution has its own finite lease beginning at admission.
+
+A human input revokes the reaction lane without interrupting a different coding
+turn. Caption and expression admission share the same causal check. Stale
+results cannot publish a new caption merely because their expression was
+rejected. Retain with a grounded caption is valid; retain with an empty reply
+means abstention. Provider failure does not automatically retry. Unknown
+transport/browser outcomes stop automatic reactions and require reconciliation
+or restart; ordinary coding conversation has its own ownership.
+
+`transportSettled:true` can mean the local reaction process has closed. Inspect
+`nativeTerminalAcknowledged` and `settlementBasis` before claiming server-side
+cancellation. `local_process_closed` does not imply a Native terminal ACK, stopped
+remote billing, or zero usage.
+
+## Confirmed session context
+
+Each inference still starts a fresh ephemeral thread. The model receives at most
+8 historical reactions from this engine session/epoch, with an aggregate limit
+of 2,400 reply characters and a 5-minute monotonic TTL. Only a successful browser
+publication receipt can confirm an entry; generated, dropped, failed or unknown
+outputs never become conversation context. User intent, cancellation and source
+changes fence confirmations still pending at the boundary. Session/epoch changes
+clear the scope. Nothing is persisted to disk by this context store.
+
+A confirmed entry includes text only if the browser actually inserted it.
+Expression metadata says `admitted`, not visible; `currentGeometry` stays unknown.
+It cannot restore or replay an earlier action. Confirmation checks the correlated
+request/decision, current browser authority and Node ownership again after await.
+History count/hash in Native provenance support auditing the exact input without
+dumping prior text into diagnostics. This mechanism does not supply private main
+coding conversation or prove the resulting dialogue feels natural.
+
+## Reproducible acceptance
+
+The existing `tests/live-conversation-host.test.mjs` contains both scripted
+lifecycle checks and opt-in actual-model checks. Build the gateway and install
+the browser dependencies described in the repository validation guide first.
+The actual cases use synthetic observations through production ingestion; the
+main coding connection is explicitly a protocol fixture.
+
+```sh
+FISCH_RUN_MODEL_TESTS=1 FISCH_NATIVE_OBSERVATION_REAL=1 \
+FISCH_REACTIVE_BUDGET=/absolute/path/to/existing-ledger.json \
+FISCH_NATIVE_OBSERVATION_EVIDENCE=/absolute/private/evidence \
+PLAYWRIGHT_BROWSERS_PATH=/absolute/path/to/browser-cache \
+npm test -- tests/live-conversation-host.test.mjs -t 'signed-in Codex'
+```
+
+These calls consume actual model budget. Do not rerun a silent/retain result to
+select an expressive example. Keep original failures and each subsequent run
+separate. Record the exact commit, projected input sequence, policy/schema/model/
+config/catalog hashes, request/thread/turn IDs, actual caption, decision, renderer
+receipts, and timed browser evidence. Do not commit private raw logs or tokens.
+
+The conversation case accepts a model-selected retain alongside a visible
+unsolicited caption. If the model chooses animate/compose it also requires
+renderer applied/completed evidence. This is not an aggregate proof of varied
+expression: that requires a predeclared finite multi-context session, reporting
+every silence/retain/action outcome rather than conditioning on successful
+images. Interruption is a separate case requiring continued observations, no
+late caption/owner, and no interrupt sent to the main protocol fixture.
+
+## Evidence and remaining gates
+
+PR #150, tested head `daa7640e39756b80490c56b38c9d3b9c95539a66`, merged as
+`903a6e7d77eebfc8c0c410d62c89ee000402f9ba`, passed seven CI checks. Independent
+signed-in acceptance ran both opt-in cases once and passed: actual Codex produced
+an unsolicited greeting with retain, and local interruption fenced outputs.
+The diagnostic explicitly reported no Native terminal ACK and local process
+closure. Earlier failed runs remain separate and unchanged.
+
+This evidence does not establish two actual model lanes running together,
+real-camera semantics, varied autonomous geometry, canonical server cancellation,
+or human enjoyment. A 10–20 minute human-reviewed session remains a distinct
+product gate. See [the SRS](proactive-srs.md) and the separate
+[Responses adapter](reactive-provider.md) for the wider requirements and the
+older optional API-backed path.
+
+## Finite continuity evaluation profile
+
+The next evaluation profile is declared before execution; it is not a record of
+an executed test. Use a fresh session with the same production synthetic fixture
+path every 150 ms, camera/microphone off, existing Native authentication and an
+explicit cap of six observer reservations. Keep the ordinary rate/freshness/
+causal gates. Do not force an expression, extend the run, or retry a silent turn.
+
+| Seconds | Existing fixture | Interpretation |
+| --- | --- | --- |
+| 0–10 | `absent` | Quiet baseline |
+| 10–100 | `present-neutral` | Stable presence arrives |
+| 100–190 | `present-smile` | Geometric coefficients change; no emotion ground truth |
+| 190–280 | `present-neutral` | Coefficients return |
+| 280–370 | `present-hand`, wrist x=0.2 | Hand appears; during 340–370 alternate x=0.2/0.202 to test same-cell jitter |
+| 370–460 | `hand-lost` | This fixture also removes face landmarks: combined face absence and hand loss |
+| 460–550 | `present-neutral` | Return; send one fixed public main-lane user intent at 475 seconds |
+
+At 550 seconds stop the source and disable observation. If the fixed user-intent
+instant does not intersect an in-flight reaction, mark that interruption subcase
+unexercised instead of retrying it. If the provider pauses or transport becomes
+unknown, preserve the failure and mark dependent remaining phases unrun. A main
+protocol fixture is not a second actual model.
+
+Report every opportunity and outcome: silence, retain, animate, compose,
+rejected, revoked, timed out, unknown and unrun. Correlate source/events/read set,
+model inputs, caption insertion, action admission/execution and confirmation of
+history. A generated result is not conversation history until browser publication
+is confirmed. Cross-block continuity is evaluable only while a previously
+confirmed entry remains inside its declared TTL; do not extend that TTL to rescue
+a result. Prior geometry never proves the current scene or authorizes replay.
+
+Review continuous clips first under opaque identifiers without model claims;
+then reveal cues and captions to assess relevance, repetition and continuity.
+Report reviewer priming and do not invent a recognition/enjoyment pass score.
+Caption-only retention validates conversational publication, not geometry utility.
