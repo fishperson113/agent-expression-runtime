@@ -76,7 +76,7 @@ export function createExpressionStatus({ base, token, subscribe = subscribePlayg
     if (!entry) return;
     if (value.session && value.epoch && Number.isSafeInteger(value.seq)) entry.receipt = {
       session: value.session, epoch: value.epoch, seq: value.seq };
-    if (entry.admission !== 'accepted') entry.admission = value.status;
+    if (entry.admission === undefined || entry.admission === 'pending') entry.admission = value.status;
     update(entry, value);
     if (entry.receipt && connected && feedback.has(key(entry.receipt))) update(entry, feedback.get(key(entry.receipt)));
     if (!connected && !terminal.has(entry.status)) { entry.status = 'unknown'; entry.reason = 'feedback_unavailable'; }
