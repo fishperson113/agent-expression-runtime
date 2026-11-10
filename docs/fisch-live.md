@@ -5,7 +5,10 @@ Fisch Live là trang web local gồm camera debug và cơ thể hạt WebGL, dù
 ## Hội thoại cùng agent hiện có
 
 Panel text dùng đường Native mặc định; adapter `--agent` legacy tiếp tục nhập
-trong terminal. Panel chỉ gửi khi bạn bấm **Gửi**, tới thread Native đang được chọn.
+trong terminal. Trong ô nhập, **Enter** xuống dòng; bấm **Gửi** hoặc
+**Ctrl+Enter** / **⌘+Enter** để gửi tới thread Native đang được chọn. Shortcut không
+bỏ qua trạng thái bận, kết quả chưa rõ hoặc giới hạn input; giữ phím hay đang gõ
+IME không tự gửi thêm lượt.
 Nó hiển thị user/assistant text thực của turn đang theo dõi, không biến log công cụ
 hoặc reasoning thành lời trả lời. Panel chỉ giữ bản sao trong bộ nhớ phiên, không ghi
 vào local storage hoặc recording; Native Codex giữ lịch sử theo cấu hình hiện có.

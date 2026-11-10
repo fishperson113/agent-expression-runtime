@@ -35,7 +35,8 @@ Windows cần Rust/MSVC/SDK và browser như [hướng dẫn Windows](live-windo
 Trong terminal Native vừa mở, chọn hoặc bắt đầu thread. Live không hot-attach một
 Codex cũ; panel text chỉ sẵn sàng sau khi thread thật được chọn. Giữ camera tắt.
 
-- Nhập một ý tưởng của chính bạn rồi bấm **Gửi**. Thử thêm hai lượt nối tiếp, trong
+- Nhập một ý tưởng của chính bạn rồi bấm **Gửi** hoặc **Ctrl/⌘+Enter** trong ô nhập
+  (Enter thường xuống dòng). Thử thêm hai lượt nối tiếp, trong
   đó lượt sau nhắc lại ý tưởng trước; xem agent có giữ đúng ngữ cảnh không.
 - Nhờ agent dùng Fisch expression tools để biểu đạt ý tưởng đó, rồi đọc
   `expression_status`. Hoặc mở **Cùng sáng tạo**, chép request, tự dán vào panel
@@ -121,6 +122,11 @@ Sáu flag `FISCH_REACTIVE_*` của lượt Cloud đều unset: observer trả
 `disabled_by_config`, không fetch, reserve hoặc write. Không có đường dẫn
 `FISCH_REACTIVE_BUDGET` đang cấu hình; không tìm ledger lịch sử và không kết luận
 đã hết ngân sách. Native account auth không thay thế credential observer. Không
-cần tạo/reset ledger để thử panel Native cơ bản. QA tự động có gọi model thật
-chưa được chạy khi approved budget path chưa được cung cấp; OLV ServiceContext và
-provider thật cũng chưa được đối soát. Fixture đã pass không thay thế các bước đó.
+cần tạo/reset ledger để thử panel Native cơ bản trên máy của bạn. Tại main
+`2c5169c`, QA Cloud có gọi model thật vẫn bị chặn bởi cả approved budget path chưa
+được cung cấp và quyền truy cập app-server; không retry, bypass hoặc reset ledger
+để vượt qua hai gate này. Đây là giới hạn của lượt QA Cloud, không cấm bạn chủ động
+chạy Live bằng tài khoản Native trên máy riêng. OLV ServiceContext/provider thật
+cũng chưa được đối soát; fixture đã pass không thay thế các bước đó. Kịch bản
+[10–20 phút](live-morning-check.md) vẫn là hướng dẫn để người dùng thử, không phải
+bằng chứng đã chạy soak hoặc đạt trải nghiệm vui.

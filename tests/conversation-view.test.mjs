@@ -203,3 +203,38 @@ it.each(['send-last', 'cancel-last'])('keeps send uncertainty when an overlappin
     expect(await panel.getByRole('button', { name: 'Gửi', exact: true }).isDisabled()).toBe(true);
   } finally { await page.close(); }
 }, 45000);
+
+it.each(['Control', 'Meta'])('keeps plain Enter as newline and submits exactly once using the %s keyboard shortcut', async modifier => {
+  const { page, panel, input } = await open();
+  try {
+    await page.evaluate(value => window.conversation.project(value), ready); await input.fill('Ý tưởng bằng bàn phím');
+    await input.press('Enter'); expect(await input.inputValue()).toBe('Ý tưởng bằng bàn phím\n'); expect(await page.evaluate(() => window.calls.length)).toBe(0);
+    await input.press(modifier + '+Enter'); await expect.poll(() => page.evaluate(() => window.calls.length)).toBe(1);
+    expect(await input.evaluate(node => node === document.activeElement)).toBe(true);
+    await input.press(modifier + '+Enter'); expect(await page.evaluate(() => window.calls.length)).toBe(1);
+    expect(await input.getAttribute('aria-keyshortcuts')).toBe('Control+Enter Meta+Enter');
+    expect(await panel.locator('.conversation-count').textContent()).toContain('Ctrl/⌘+Enter');
+    await page.evaluate(() => window.sendResolve({ status: 'accepted' })); await expect.poll(() => input.inputValue()).toBe('');
+    expect(await input.evaluate(node => node === document.activeElement)).toBe(true);
+  } finally { await page.close(); }
+}, 45000);
+
+it('does not submit during IME, modifier variants, key repeat, busy/unknown or invalid input', async () => {
+  const { page, input } = await open();
+  try {
+    await page.evaluate(value => window.conversation.project(value), ready); await input.fill('Bản nháp không gửi nhầm');
+    const variants = [{ ctrlKey: true, isComposing: true }, { metaKey: true, isComposing: true },
+      { ctrlKey: true, keyCode: 229 }, { ctrlKey: true, altKey: true }, { metaKey: true, altKey: true },
+      { ctrlKey: true, shiftKey: true }, { metaKey: true, shiftKey: true }, { ctrlKey: true, metaKey: true },
+      { ctrlKey: true, repeat: true }, { metaKey: true, repeat: true }];
+    for (const value of variants) await input.evaluate((node, value) => node.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true, ...value })), value);
+    expect(await page.evaluate(() => window.calls.length)).toBe(0); expect(await input.inputValue()).toBe('Bản nháp không gửi nhầm');
+    await page.evaluate(value => window.conversation.project(value), { ...ready, revision: 2, canSend: false, pending: true, ownerTurn: 'owned', canCancel: true });
+    await input.press('Control+Enter'); expect(await page.evaluate(() => window.calls.length)).toBe(0);
+    await page.evaluate(value => window.conversation.project(value), { ...ready, revision: 3, canSend: false, error: 'conversation_unknown' });
+    await input.press('Meta+Enter'); expect(await page.evaluate(() => window.calls.length)).toBe(0);
+    await page.evaluate(value => window.conversation.project(value), { ...ready, generation: 2, revision: 4 });
+    await input.fill('🙂'.repeat(4001)); await input.press('Control+Enter'); expect(await page.evaluate(() => window.calls.length)).toBe(0);
+    await input.fill('   '); await input.press('Meta+Enter'); expect(await page.evaluate(() => window.calls.length)).toBe(0);
+  } finally { await page.close(); }
+}, 45000);

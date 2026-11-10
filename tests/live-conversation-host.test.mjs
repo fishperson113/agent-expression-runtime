@@ -154,7 +154,8 @@ it.skipIf(!existsSync(gatewayExecutable()) && !requireBrowserGateway)('sends and
     const cancel = chat.getByRole('button', { name: 'Dừng trả lời', exact: true });
     await expect.poll(() => input.isEnabled(), { timeout: 5000 }).toBe(true);
     await input.fill('Public browser request.');
-    await expect.poll(() => send.isEnabled(), { timeout: 5000 }).toBe(true); await send.click();
+    await expect.poll(() => send.isEnabled(), { timeout: 5000 }).toBe(true); await input.press('Control+Enter');
+    expect(await input.evaluate(node => node === document.activeElement)).toBe(true);
     await expect.poll(() => chat.locator('ol').textContent()).toContain('Public synthetic reply.');
     expect(await chat.locator('ol').textContent()).toContain('Public browser request.');
     expect(await input.inputValue()).toBe('');
@@ -190,7 +191,7 @@ it.skipIf(!existsSync(gatewayExecutable()) && !requireBrowserGateway)('uses the 
     const chat = page.locator('.fisch-conversation'), input = chat.locator('textarea');
     await expect.poll(() => input.isEnabled(), { timeout: 5000 }).toBe(true);
     await input.fill(JSON.stringify({ operation: 'express' }));
-    await chat.getByRole('button', { name: 'Gửi', exact: true }).click();
+    await input.press('Meta+Enter');
     const result = await route.next(value => value.type === 'result' && value.command === 'express');
     expect(result.value.status).toBe('accepted');
     await expect.poll(() => page.evaluate(() => window.fischLive.metrics().scene)).toBe('wall');
