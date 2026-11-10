@@ -1,0 +1,15 @@
+{
+  "name": "fisch-airi-component-probe",
+  "version": "1.0.0",
+  "description": "Experimental pinned AIRI component probes; no production integration",
+  "license": "MIT",
+  "type": "module",
+  "dependencies": {
+    "rehype-parse": "9.0.1",
+    "rehype-stringify": "10.0.1",
+    "unified": "11.0.5",
+    "unist-util-visit": "5.2.0",
+    "esbuild": "0.28.2"
+  },
+  "private": true
+}
