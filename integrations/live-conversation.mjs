@@ -1,0 +1,168 @@
+const id = value => typeof value === 'string' && /^[A-Za-z0-9._:-]{1,128}$/.test(value);
+const freeze = value => {
+  if (value && typeof value === 'object') { Object.values(value).forEach(freeze); Object.freeze(value); }
+  return value;
+};
+const failure = code => Error(code);
+const bytes = value => Buffer.byteLength(value, 'utf8');
+const clip = (value, limit) => new TextDecoder().decode(Buffer.from(value.slice(0, limit)).subarray(0, limit), { stream: true });
+
+export class LiveConversation {
+  #output; #transport; #broker; #thread; #selection; #generation = 0; #revision = 0;
+  #terminal = new Set(); #intent = 0; #messages = []; #unknown = new Set(); #pending; #stopping; #error = ''; #closed = false; #navigated = false;
+  constructor({ output, transport, broker }) {
+    if (!output || typeof broker?.busy !== 'function' || typeof transport?.submitUser !== 'function' || typeof transport?.interruptUser !== 'function')
+      throw failure('conversation_configuration');
+    this.#output = output; this.#transport = transport; this.#broker = broker;
+    this.#thread = output.thread; this.#selection = output.selection;
+  }
+  #clear() {
+    this.#terminal.clear(); this.#messages = []; this.#stopping = undefined; this.#error = '';
+    this.#generation++; this.#revision++;
+  }
+  #sync() {
+    if (this.#output.selection !== this.#selection) {
+      this.#selection = this.#output.selection;
+      if (this.#selection !== undefined) { this.#intent++; this.#revision++; }
+    }
+    if (this.#thread !== this.#output.thread) { this.#thread = this.#output.thread; this.#clear(); }
+  }
+  selectionAttempt() { this.#intent++; this.#revision++; }
+  navigation() { this.#navigated = true; this.#clear(); this.#error = 'conversation_restart_required'; }
+  close() { this.#closed = true; this.#unknown.clear(); this.#clear(); }
+  #available() {
+    return !this.#closed && !this.#navigated && id(this.#thread) && !this.#broker.closed && !this.#broker.browserUnavailable;
+  }
+  #owner() {
+    return this.#available() && this.#output.selection === undefined && id(this.#output.turn) &&
+      !this.#output.completed?.has(this.#output.turn) ? this.#output.turn : undefined;
+  }
+  #guard(job, message, cancelling = false) {
+    this.#sync();
+    if (!this.#available() || job.generation !== this.#generation || job.intent !== this.#intent || job.thread !== this.#thread ||
+      this.#output.selection !== undefined || (!cancelling && this.#unknown.has(job.thread))) return false;
+    if (!id(message?.id) || (job.rpcId !== undefined && job.rpcId !== message.id)) return false;
+    job.rpcId = message.id;
+    if (cancelling) return this.#owner() === job.turn;
+    if (this.#pending !== job) return false;
+    return !this.#output.turn && !this.#broker.turns?.size &&
+      ![...(this.#broker.pending?.keys() ?? [])].some(key => key !== message?.id) &&
+      !(this.#broker.queue ?? []).some(value => value.id !== message?.id);
+  }
+  #canSend() {
+    return this.#available() && this.#output.selection === undefined && !this.#pending &&
+      !this.#unknown.has(this.#thread) && this.#unknown.size < 64 && !this.#output.turn && !this.#broker.busy();
+  }
+  async send(value) {
+    this.#sync();
+    if (!this.#canSend() || value?.generation !== this.#generation) throw failure('conversation_unavailable');
+    if (typeof value.text !== 'string' || !value.text.trim() || bytes(value.text) > 16000) throw failure('conversation_invalid_text');
+    const job = { generation: this.#generation, intent: this.#intent, thread: this.#thread };
+    this.#pending = job; this.#error = ''; this.#revision++;
+    try {
+      const reply = await this.#transport.submitUser({ threadId: job.thread,
+        input: [{ type: 'text', text: value.text, text_elements: [] }] }, message => this.#guard(job, message), key => { if (key === job.rpcId) this.#discard(key); });
+      if (reply?.error) throw Object.assign(failure('conversation_rejected'), { uncertain: false });
+      if (!id(reply?.result?.turn?.id) || !['inProgress', 'completed', 'interrupted', 'failed'].includes(reply.result.turn.status))
+        throw Object.assign(failure('conversation_unknown'), { uncertain: true });
+      return Object.freeze({ status: 'accepted' });
+    } catch (error) {
+      const unknown = error?.uncertain !== false;
+      if (unknown && !this.#closed) this.#unknown.add(job.thread);
+      const code = unknown ? 'conversation_unknown' : (job.generation !== this.#generation || job.intent !== this.#intent) ? 'conversation_changed' : 'conversation_rejected';
+      if (job.thread === this.#output.thread) this.#error = code;
+      throw failure(code);
+    } finally { if (this.#pending === job) this.#pending = undefined; this.#revision++; }
+  }
+  #discard(key) {
+    this.#broker.pending?.delete(key); this.#output.turnRequests?.delete(key);
+  }
+  async cancel(value) {
+    this.#sync(); const turn = this.#owner();
+    if (!turn || value?.generation !== this.#generation) throw failure('conversation_no_turn');
+    if (this.#stopping?.turn === turn) return Object.freeze({ status: 'stopping' });
+    const job = { generation: this.#generation, intent: this.#intent, thread: this.#thread, turn };
+    this.#stopping = job; this.#revision++;
+    try {
+      const reply = await this.#transport.interruptUser({ threadId: job.thread, turnId: turn },
+        message => this.#guard(job, message, true), key => { if (key === job.rpcId) this.#discard(key); });
+      if (reply?.error) throw failure('conversation_stop_unconfirmed');
+      return Object.freeze({ status: 'stopping' });
+    } catch {
+      if (this.#stopping === job) { this.#error = 'conversation_stop_unconfirmed'; this.#revision++; }
+      throw failure('conversation_stop_unconfirmed');
+    }
+  }
+  accept(message) {
+    this.#sync();
+    if (!this.#available() || this.#output.selection !== undefined) return;
+    const { method, params = {} } = message;
+    if (params.threadId !== this.#thread) return;
+    if (method === 'turn/completed' && id(params.turn?.id) && this.#output.completed?.has(params.turn.id)) {
+      if (this.#terminal.has(params.turn.id)) return;
+      this.#terminal.add(params.turn.id);
+      if (this.#terminal.size > 64) this.#terminal.delete(this.#terminal.values().next().value);
+      const status = ['completed', 'interrupted', 'failed'].includes(params.turn.status) ? params.turn.status : 'unknown';
+      for (const item of this.#messages) if (item.turn === params.turn.id && item.status === 'streaming') item.status = status;
+      if (status === 'unknown') this.#error = 'conversation_completion_unknown';
+      if (this.#stopping?.turn === params.turn.id) this.#stopping = undefined;
+      this.#revision++; return;
+    }
+    const turn = this.#owner();
+    if (!turn || params.turnId !== turn) return;
+    if (method === 'item/agentMessage/delta' && typeof params.delta === 'string') this.#update(params.itemId, turn, 'assistant', params.delta, true);
+    if (['item/started', 'item/completed'].includes(method)) this.#item(params.item, turn);
+  }
+  #item(item, turn) {
+    if (item?.type === 'agentMessage' && typeof item.text === 'string') this.#update(item.id, turn, 'assistant', item.text);
+    if (item?.type === 'userMessage' && Array.isArray(item.content)) {
+      const text = item.content.slice(0, 32).filter(value => value?.type === 'text' && typeof value.text === 'string')
+        .map(value => value.text.slice(0, 16000)).join('\n');
+      this.#update(item.id, turn, 'user', text);
+    }
+  }
+  #update(key, turn, role, text, delta = false) {
+    if (!id(key) || !text) return;
+    let item = this.#messages.find(value => value.id === key && value.turn === turn);
+    if (!item) { item = { id: key, turn, role, text: '', status: 'streaming', truncated: false }; this.#messages.push(item); }
+    if (item.role !== role) return;
+    const length = (delta ? bytes(item.text) : 0) + bytes(text);
+    item.text = clip(delta ? item.text + clip(text, 64000) : text, 64000);
+    item.truncated = length > 64000 || (delta && item.truncated);
+    while (this.#messages.length > 80 || this.#messages.reduce((sum, value) => sum + bytes(value.text), 0) > 128000) this.#messages.shift();
+    this.#revision++;
+  }
+  snapshot() {
+    this.#sync();
+    return freeze({ generation: this.#generation, revision: this.#revision, available: !!this.#available(),
+      canSend: !!this.#canSend(), canCancel: !!this.#owner() && !this.#stopping,
+      pending: !!this.#pending, stopping: !!this.#stopping, waiting: this.#output.state === 'waiting',
+      error: this.#unknown.has(this.#thread) ? 'conversation_unknown' : this.#unknown.size >= 64 ? 'conversation_capacity' : this.#error,
+      messages: this.#messages.map(value => ({ ...value })) });
+  }
+}
+
+export async function bindLiveConversation(page, conversation) {
+  const expected = new URL(page.url()), frame = page.mainFrame();
+  await page.exposeBinding('fischLiveConversation', (source, value) => {
+    let current;
+    try { current = new URL(source.frame.url()); } catch { throw failure('conversation_source_rejected'); }
+    if (source.page !== page || source.frame !== frame || page.isClosed() || current.origin !== expected.origin ||
+      current.pathname !== expected.pathname || current.search !== expected.search || !value || !['send', 'cancel'].includes(value.action))
+      throw failure('conversation_source_rejected');
+    return value.action === 'send' ? conversation.send(value) : conversation.cancel(value);
+  });
+  const navigate = current => {
+    if (current !== frame) return;
+    let location;
+    try { location = new URL(frame.url()); } catch { conversation.navigation(); return; }
+    if (location.origin !== expected.origin || location.pathname !== expected.pathname || location.search !== expected.search)
+      conversation.navigation();
+  };
+  const requested = request => {
+    try { if (request.isNavigationRequest() && request.frame() === frame) conversation.navigation(); }
+    catch { /* Detached or non-frame requests cannot identify this main frame. */ }
+  };
+  page.on('request', requested); page.on('framenavigated', navigate);
+  return () => { page.off('request', requested); page.off('framenavigated', navigate); };
+}
