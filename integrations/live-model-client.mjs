@@ -17,7 +17,7 @@ function protocol(socket) {
       return;
     }
     const entry = pending.get(message.id);
-    if (entry) { clearTimeout(entry.timer); pending.delete(message.id); message.error ? entry.reject(Error('app_server_request_failed')) : entry.resolve(message.result); }
+    if (entry) { clearTimeout(entry.timer); pending.delete(message.id); message.error ? entry.reject(Object.assign(Error('app_server_request_failed'), { rpcError: message.error })) : entry.resolve(message.result); }
     else events.emit('notification', message);
   });
   socket.on('close', () => { for (const item of pending.values()) { clearTimeout(item.timer); item.reject(Error('app_server_closed')); }
