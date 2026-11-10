@@ -371,3 +371,24 @@ it.skipIf(!nativeGateway)('keeps raw hand reacquisition while avoiding a duplica
     expect((await f.live.page.evaluate(()=>window.fischLive.metrics())).cameraActive).toBe(false);
   }finally{await f.close();}
 },60000);
+
+it.skipIf(!nativeGateway)('hands off only an explicitly disposable MAIN form through actual MCP and gateway',async()=>{
+  const calls=[],receipts=[];
+  const provider={conversationLane:true,contractVersion:1,confirmPublication:(_request,value)=>receipts.push(value),
+    decide:async(window,_signal,_receipt,capabilities)=>{calls.push(capabilities);return authored(window.request);}};
+  const f=await nativeBrowserLoop(provider),client=liveTestClient(f.live.base,f.live.token);
+  try{
+    await client.call('initialize');
+    const receipt=toolValue(await client.tool('compose_expression',{durationMs:100,observerHandoffMs:30000,
+      parts:[{id:'disposable_main_form',kind:'ellipsoid',center:[0,0,0],scale:[0.4,0.6,0.2]}]}));
+    expect(receipt.status).toBe('accepted');
+    await expect.poll(()=>f.live.page.evaluate(()=>window.fischLive.nativeReactionCapabilities().expressionAllowed)).toBe(true);
+    await arrive(f);await expect.poll(()=>receipts.length,{timeout:10000}).toBe(1);
+    expect(calls).toEqual([{schemaVersion:1,expressionAllowed:true}]);
+    expect(receipts[0]).toMatchObject({reason:'accepted',chatPublished:true});
+    const metrics=await f.live.page.evaluate(()=>window.fischLive.metrics());
+    expect(metrics.userGeometryLocked).toBe(false);expect(metrics.observerHandoff).toBeNull();
+    expect(metrics.parts).not.toContain('disposable_main_form');expect(metrics.cameraActive).toBe(false);
+    expect(metrics.diagnostics.events.some(row=>row.origin==='reactive'&&row.phase==='applied')).toBe(true);
+  }finally{await client.close();await f.close();}
+},60000);

@@ -12,7 +12,7 @@ export type Pose = { type: 'pose'; target: TransformTarget; value: number; durat
 export type Reflex = { type: 'reflex'; id: string; when: { event: LiveEventKind }; do: Pose;
   cooldownMs: number };
 export type LiveControl = Binding | Orient | Reflex;
-export type LiveConfiguration = { controls: LiveControl[]; poses: Pose[]; lifetimeMs: number };
+export type LiveConfiguration = { controls: LiveControl[]; poses: Pose[]; lifetimeMs: number; observerHandoffMs?: number };
 export type LiveCompiled = { program: Compiled; configuration?: LiveConfiguration };
 export const channel = (target: TransformTarget) => target.part + ':' + target.prop;
 export const neutral = (prop: TransformProperty) => prop.startsWith('scale') ? 1 : 0;

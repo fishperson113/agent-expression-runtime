@@ -245,3 +245,71 @@ it('permits conversation only after a protected user form is idle and keeps off 
   expect(f.body.canReactive()).toBe(false); expect(f.body.canConverse()).toBe(true);
   f.body.motion('off'); expect(f.body.canConverse()).toBe(false); f.body.dispose();
 });
+
+function disposable(f: ReturnType<typeof setup>, ms = 30000, seq = 100) {
+  return f.body.admit({ v: 1, epoch: f.body.scheduler.epoch, seq, kind: 'program', track: 'body', policy: 'replace',
+    body: { type: 'live', program: { type: 'morph', target: 'sphere', durationMs: 100 },
+      configuration: { controls: [], poses: [], lifetimeMs: 1000, observerHandoffMs: ms } } });
+}
+it('transfers only explicitly disposable geometry after its lease, without restoring the old scene', async () => {
+  const f = setup(); expect(disposable(f).status).toBe('accepted');
+  f.source.status('absent', Date.now()); f.body.observe(f.source.snapshot); expect(f.body.metrics.observerHandoff).not.toBeNull();
+  expect(f.body.canReactive()).toBe(false); f.advance(1001); f.frame(); expect(f.body.canReactive()).toBe(true);
+  expect(f.body.metrics.userGeometryLocked).toBe(true);
+  const request = f.launch(); expect((await f.session.deliver(request.requestId, decision(request)))?.reason).toBe('accepted');
+  expect(f.body.metrics.userGeometryLocked).toBe(false); expect(f.body.metrics.observerHandoff).toBeNull();
+  f.advance(5001); f.frame(); expect(f.body.metrics.reactiveOwner).toBeNull();
+  expect(f.body.metrics.scene).toBe('face'); f.body.dispose();
+});
+it('expires or revokes unused handoff on intent, reset, source loss and motion off', () => {
+  const changes = [(f: ReturnType<typeof setup>) => f.body.prepareUserMutation(),
+    (f: ReturnType<typeof setup>) => f.body.epoch('replacement'), (f: ReturnType<typeof setup>) => f.body.motion('off'),
+    (f: ReturnType<typeof setup>) => { f.source.status('stopped', Date.now()); f.body.observe(f.source.snapshot); },
+    (f: ReturnType<typeof setup>) => f.body.revokeObserverHandoff(),
+    (f: ReturnType<typeof setup>) => { f.observe(); f.body.observe({ ...f.source.snapshot, sessionId: 'new_source' }); }];
+  for (const change of changes) {
+    const f = setup(); expect(disposable(f).status).toBe('accepted'); f.advance(1001); f.frame();
+    expect(f.body.canReactive()).toBe(true); change(f); expect(f.body.metrics.observerHandoff).toBeNull();
+    f.body.dispose();
+  }
+  const f = setup(); expect(disposable(f, 1000).status).toBe('accepted');
+  f.advance(2000); f.frame(); expect(f.body.canReactive()).toBe(false); expect(f.body.metrics.userGeometryLocked).toBe(true); f.body.dispose();
+});
+it('rejects reactive self-delegation before mutation and keeps valid MAIN handoff on invalid admission', () => {
+  const f = setup(); expect(disposable(f).status).toBe('accepted'); f.advance(1001); f.frame();
+  const compiled = { program: { kind: 'program', epoch: f.body.scheduler.epoch, ops: [], duration: 0 },
+    configuration: { controls: [], poses: [], lifetimeMs: 1000, observerHandoffMs: 3000 } } as any;
+  const before = f.body.metrics.observerHandoff;
+  expect(() => f.body.admitReactive(compiled, {} as any)).toThrow('reactive_delegation_forbidden');
+  expect(f.body.metrics.observerHandoff).toEqual(before); expect(f.body.metrics.userGeometryLocked).toBe(true);
+  expect(disposable(f, NaN, 101).status).toBe('rejected'); expect(f.body.metrics.observerHandoff).toBeNull(); f.body.dispose();
+});
+
+it('rejects a delayed decision at exact handoff expiry and never reuses a superseded grant', async () => {
+  const f = setup(); expect(disposable(f, 1000).status).toBe('accepted'); f.advance(1001); f.frame();
+  const request = f.launch(); f.advance(249); f.observe();
+  const result = await f.session.deliver(request.requestId, decision(request));
+  expect(result?.reason).toBe('admission_failed'); expect(f.body.metrics.userGeometryLocked).toBe(true);
+  expect(f.body.metrics.reactiveOwner).toBeNull();
+  expect(disposable(f, 30000, 101).status).toBe('accepted'); f.advance(1001); f.frame();
+  expect(f.body.canReactive()).toBe(true);
+  expect(f.body.admit({ v: 1, epoch: f.body.scheduler.epoch, seq: 102, kind: 'program', track: 'body', policy: 'replace',
+    body: { type: 'wait', durationMs: 1 } }).status).toBe('accepted');
+  expect(f.body.metrics.observerHandoff).toBeNull(); f.advance(2); f.frame(); expect(f.body.canReactive()).toBe(false);
+  expect(await f.session.deliver(request.requestId, decision(request))).toBeNull(); f.body.dispose();
+});
+
+it('carries explicit disposable handoff through existing live compilation and bounds it', async () => {
+  const { composeExpression } = await import('../integrations/compose-expression.mjs');
+  const { expressionResponseSchema } = await import('../integrations/expression-response.mjs');
+  expect(JSON.stringify(expressionResponseSchema)).not.toContain('observerHandoffMs');
+  const part = () => ({ id: 'authored', kind: 'ellipsoid', center: [0,0,0], scale: [0.3,0.3,0.1] });
+  const { LiveCompiler } = await import('../src/core/live/compiler.ts');
+  const output = composeExpression({ parts: [part()], observerHandoffMs: 30000 });
+  expect(output.body).toMatchObject({ type: 'live', configuration: { controls: [], poses: [], lifetimeMs: 1000, observerHandoffMs: 30000 } });
+  const compiled = new LiveCompiler().compile({ v: 1, epoch: 'test', seq: 1, kind: 'program', track: 'body', ...output }, 0);
+  expect(compiled.configuration?.observerHandoffMs).toBe(30000);
+  for (const ms of [0, 999, 60001, 1000.5, NaN, Infinity])
+    expect(() => composeExpression({ parts: [part()], observerHandoffMs: ms })).toThrow('composition_arguments');
+  expect(composeExpression({ parts: [part()] }).body.type).toBe('parallel');
+});
