@@ -181,3 +181,38 @@ it('keeps the brighter crisp Live baseline after idle release and still accepts 
   expect(f.body.scheduler.state.brightness).toBeCloseTo(0.3);
   expect(f.body.scheduler.state.pointSize).toBeCloseTo(1.5); f.body.dispose();
 });
+it('glances during work with no semantic provider, then revokes on Native intent and cached epoch input', () => {
+  const f = setup(), rendered = vi.spyOn(f.body.renderer, 'apply'); f.session.configure(false); f.body.activity('working');
+  for (let i = 0; i < 25; i++) { f.observe(true, false, 0.2); f.advance(16); f.frame(); }
+  const state = () => rendered.mock.calls.at(-1)![0] as any;
+  const pupilX = () => state().liveMatrices[state().particleParts.findIndex((p: any) => p.id === 'pupil_left') + 1]?.[3] ?? 0;
+  expect(f.body.metrics.visualAttention.active).not.toBeNull(); expect(pupilX()).toBeGreaterThan(0.01);
+  const started = f.body.metrics.visualAttention.history.filter(e => e.status === 'started').length;
+  f.body.prepareUserMutation(); f.frame(); expect(f.body.metrics.visualAttention.active).toBeNull();
+  expect(Math.abs(pupilX())).toBeLessThan(1e-8);
+  for (let i = 0; i < 40; i++) { f.observe(true, false, 0.2); f.advance(16); f.frame(); }
+  expect(f.body.metrics.visualAttention.history.filter(e => e.status === 'started')).toHaveLength(started);
+  f.body.epoch('new-epoch'); f.body.observe(f.source.snapshot); f.frame();
+  expect(f.body.metrics.visualAttention.active).toBeNull(); f.body.dispose();
+});
+it('keeps geometric gaze below an explicit canonical-face user lease', () => {
+  const f = setup(); f.session.configure(false);
+  expect(f.body.admit({ v: 1, epoch: f.body.scheduler.epoch, seq: 1, kind: 'program', track: 'body', policy: 'replace',
+    body: { type: 'live', program: null, configuration: { controls: [], lifetimeMs: 1000,
+      poses: [{ type: 'pose', target: { part: 'pupil_left', prop: 'x' }, value: 0.2, durationMs: 1000 }] } } }).status).toBe('accepted');
+  for (let i = 0; i < 30; i++) { f.observe(true, false, 0.2); f.advance(16); f.frame(); }
+  expect(f.body.metrics.userGeometryLocked).toBe(false); expect(f.body.metrics.visualAttention.active).toBeNull();
+  expect(f.body.metrics.visualAttention.reason).toBe('owned'); f.body.dispose();
+});
+it('discards movement observed only while motion is off instead of queueing a glance for resume', () => {
+  const f = setup(); f.session.configure(false); f.body.activity('working');
+  for (let i = 0; i < 25; i++) { f.observe(true, false, 0.2); f.advance(16); f.frame(); }
+  const started = f.body.metrics.visualAttention.history.filter(e => e.status === 'started').length;
+  expect(started).toBe(1); f.body.motion('off');
+  for (let i = 0; i < 100; i++) { f.observe(true, false, 0.8); f.advance(100); f.frame(); }
+  f.body.motion('normal');
+  for (let i = 0; i < 40; i++) { f.observe(true, false, 0.8); f.advance(16); f.frame(); }
+  expect(f.body.metrics.visualAttention.active).toBeNull();
+  expect(f.body.metrics.visualAttention.history.filter(e => e.status === 'started')).toHaveLength(started);
+  f.body.dispose();
+});

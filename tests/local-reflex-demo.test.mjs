@@ -12,7 +12,10 @@ async function probe(page) {
       const p = window.localProbe, profile = p.pending;
       const shown = profile === 'prior-style' ? { ...state, brightness: 0.65, pointSize: 2, dispersion: 0.12 } : state;
       apply.call(this, shown, now);
-      p.x = state.liveMatrices?.[0]?.[3] ?? 0; p.frame = this.renderSnapshot.frame;
+      p.x = state.liveMatrices?.[0]?.[3] ?? 0;
+      const index = state.particleParts?.findIndex(part => part.id === 'pupil_left') ?? -1;
+      p.pupilX = index < 0 ? 0 : state.liveMatrices?.[index + 1]?.[3] ?? 0;
+      p.pupilMax = Math.max(p.pupilMax ?? 0, Math.abs(p.pupilX)); p.frame = this.renderSnapshot.frame;
       p.style = { brightness: state.brightness, pointSize: state.pointSize, dispersion: state.dispersion };
       if (!profile) return;
       const gl = this.renderer.getContext(), w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
@@ -37,9 +40,16 @@ async function capture(page, profile) {
 async function handDemo(page) {
   await page.evaluate(() => {
     window.fischLive.configureReactive(false);
+    window.fischLive.activity({ turn: 'working', output: 0, quality: 'synthetic' });
     window.localFixtureTimer = setInterval(() => window.fischLive.fixture('hand-only', 0.2), 60);
   });
   await expect.poll(() => page.evaluate(() => window.localProbe.x)).toBeGreaterThan(0.07);
+  await expect.poll(() => page.evaluate(() => window.localProbe.pupilMax)).toBeGreaterThan(0.005);
+  const attention = await page.evaluate(() => window.fischLive.metrics().visualAttention);
+  expect(attention.history.some(entry => entry.status === 'started')).toBe(true);
+  await page.evaluate(() => window.fischLive.reactiveUserIntent());
+  await expect.poll(() => page.evaluate(() => Math.abs(window.localProbe.pupilX))).toBeLessThan(0.001);
+  expect(await page.evaluate(() => window.fischLive.metrics().visualAttention.active)).toBeNull();
   await page.evaluate(() => { clearInterval(window.localFixtureTimer); window.fischLive.fixture('hand-lost'); });
   await expect.poll(() => page.evaluate(() => Math.abs(window.localProbe.x))).toBeLessThan(0.01);
   await page.locator('#motion').selectOption('off');
@@ -66,6 +76,7 @@ it('shows a brighter crisp resting body and local hand responses without a seman
     expect(await page.evaluate(() => window.fischLive.metrics().cameraActive)).toBe(false);
     if (process.env.FISCH_LOCAL_REFLEX_EVIDENCE) writeFileSync(process.env.FISCH_LOCAL_REFLEX_EVIDENCE,
       JSON.stringify({ mode: 'synthetic_local_reflex_actual_software_WebGL', semanticModelCalls: 0, realCamera: false, prior, current,
+        attention: await page.evaluate(() => window.fischLive.metrics().visualAttention),
         interpretation: 'controlled style ablation and local response, not human legibility/enjoyment or semantic camera understanding' }, null, 2));
   } finally { await browser?.close(); await server.close(); }
 }, 60000);

@@ -226,3 +226,45 @@ The fixture injects synthetic hand observations into the actual Live page and
 reads WebGL aggregates, never camera pixels. Unit tests check loss/ownership and
 an authored dimmer style. This uses existing MIT Fisch code and locked Vite,
 Playwright and Three.js dependencies; no new framework, dataset, model or package.
+
+## Bounded geometric attention during work
+
+Live can briefly move the declared resting body's pupils toward a fresh, salient
+face/primary-wrist position while ordinary Codex work activity continues. This is
+a local geometric-attention policy, not semantic camera understanding or emotion
+recognition. No extra API key, model, STT/TTS, framework or dataset is introduced.
+Arbitrary agent-authored geometry, RGB and control rules remain available.
+
+At least two distinct measurements of the same target over 80 ms debounce a
+candidate (they do not establish a stationary position); a 0.12
+normalized displacement from the last attended anchor is novel. Centered input
+needs no glance. Reported face tracking-stability quality and a 700 ms freshness bound reject
+unknown/stale cues. Hand tracking uses the typed tracked state, primary track and
+finite wrist coordinates; handedness confidence is not tracking confidence and is
+not used as such. One episode lasts 650 ms during working/replying or 1100 ms otherwise,
+with bounded entry/release envelopes and a six-second cooldown. New compatible
+frames update the target instead of cancelling it. Quiet/cooldown inputs update
+anchors without queueing reactions for later. Declared pupil offsets are at most
+0.055 scene units, reduced to 8% in reduced-motion mode.
+
+Epoch, Native intent, explicit user lease/creation, source loss/change, motion-off
+and disposal revoke/suppress this layer before rendering. Resume rebases to the
+latest cue, so movement seen only while motion was off is not replayed. Cached pre-reset input
+cannot re-arm it. Epoch and source sequence provide ordering; capture timestamps
+only identify distinct measurements and map reported observation age into a monotonic deadline.
+The current camera adapter stamps observations after perception; this bound does
+not measure sensor-frame age or capture-to-display latency. The intent barrier
+rejects already-received observations, not an unreported frame still in perception. Clock
+rewind fails closed until reset. Agent controls remain the later compositor
+layer; an arbitrary part named like an eye is not recognized as anatomy.
+
+The memory-only visualAttention metric retains at most 32 transition records with
+epoch/intent generation, evidence-start/latest source sequences, target and reason.
+Lease expiry is logical timing, not proof of visibility. Run
+`npx vitest run tests/visual-attention.test.ts tests/live-reactive-body.test.ts tests/local-reflex-demo.test.mjs`
+with the repository's locked dependencies/Chromium to reproduce virtual replay
+(including 20 virtual minutes), ownership/epoch tests and actual WebGL pupil motion
+with synthetic hand input and simulated Native work/intent callbacks. Replay does
+not call perception or a model; no real camera/mic is used. Identical virtual-clock
+input yields identical local trajectories in the same runtime. Human naturalness,
+physical-camera quality and actual Codex task acceptance remain separate gates.

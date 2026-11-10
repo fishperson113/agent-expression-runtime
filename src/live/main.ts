@@ -76,7 +76,7 @@ Object.assign(window, { fischLive: { pair: (base: string, token: string) => brid
     cameraStatus: element('camera-status').textContent, cameraActive: !!element<HTMLVideoElement>('camera').srcObject,
     cameraTransitions, stopped,
     simulatedParticles: body.scheduler.state.particlePositions?.length ? body.scheduler.state.particlePositions.length / 3 : 2000 }), event: (type: string) => {
-    if (type === 'user_message') { semanticEvents.length = 0; reactive.userIntent(); }
+    if (type === 'user_message') { semanticEvents.length = 0; body.prepareUserMutation(); }
     const turn = type === 'user_message' ? 'working' : type === 'needs_user' ? 'waiting' : type === 'interrupted' ? 'interrupted' : 'idle';
     body.activity(turn); events(handEvents.publish(observations.turn(turn, Date.now())));
     if (type === 'interrupted') void bridge.cancel();
