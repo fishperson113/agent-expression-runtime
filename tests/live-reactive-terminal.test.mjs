@@ -7,14 +7,14 @@ import { WebSocket } from 'ws';
 import { runTerminalCodex } from '../integrations/live-terminal.mjs';
 import { createLiveReactiveProvider } from '../integrations/live-reactive-provider.mjs';
 
-const fakeServer = `let b='',seen=[];const send=x=>process.stdout.write(JSON.stringify(x)+'\\n');process.stdin.on('data',c=>{b+=c;let n;while((n=b.indexOf('\\n'))>=0){const m=JSON.parse(b.slice(0,n));b=b.slice(n+1);if(m.method==='test/snapshot'){send({id:m.id,result:{seen,keys:Object.keys(process.env).filter(k=>k.startsWith('FISCH_REACTIVE_'))}});continue}seen.push(m);let result={};if(m.method==='thread/start')result={thread:{id:'native'}};if(m.method==='turn/start')result={turn:{id:'user',status:'inProgress'}};send({id:m.id,result});if(m.method==='turn/interrupt')send({method:'turn/completed',params:{threadId:'native',turn:{id:'user',status:'interrupted'}}})}});`;
+const fakeServer = `let b='',seen=[],turnNo=0,active;const send=x=>process.stdout.write(JSON.stringify(x)+'\\n');process.stdin.on('data',c=>{b+=c;let n;while((n=b.indexOf('\\n'))>=0){const m=JSON.parse(b.slice(0,n));b=b.slice(n+1);if(m.method==='test/snapshot'){send({id:m.id,result:{seen,keys:Object.keys(process.env).filter(k=>k.startsWith('FISCH_REACTIVE_'))}});continue}seen.push(m);let result={};if(m.method==='thread/start')result={thread:{id:'native'}};if(m.method==='turn/start'){active=++turnNo===1?'user':'user_'+turnNo;result={turn:{id:active,status:'inProgress'}}};send({id:m.id,result});if(m.method==='turn/start')send({method:'item/agentMessage/delta',params:{threadId:'native',turnId:active,itemId:'reply_'+active,delta:'A synthetic conversational reply.'}});if(m.method==='turn/interrupt')send({method:'turn/completed',params:{threadId:'native',turn:{id:m.params.turnId??active,status:'interrupted'}}})}});`;
 const validWindow = revision => ({ schemaVersion: 1, request: { schemaVersion: 1, sessionId: 's', epoch: 'e', requestId: 'camera',
   intentRevision: revision, presenceRevision: 1, deadline: 100000, requiredTrackIds: [] }, events: [{ id: 1, type: 'user_arrived', at: 100 }],
   observations: [{ v: 1, sessionId: 's', seq: 1, capturedAt: 100, camera: 'tracking', turn: 'idle', summary: 'LOCAL_ONLY_SUMMARY',
     user: { present: false, quality: { score: 0, basis: 'unavailable' }, position: null, head: null, facingScreen: null,
       expression: null, mouthMoving: null } }] });
 async function start(reactiveProvider) {
-  let socket, nativeEnv, child; let id = 0; const pending = new Map(), selected = [], deliveries = [], candidates = [], actions = [];
+  let socket, nativeEnv, child; let id = 0; const pending = new Map(), selected = [], deliveries = [], candidates = [], actions = [], notifications = [];
   const controller = new AbortController();
   const api = { intent: 0, available: false, busy: false, barrier: async () => {}, current: null,
     polls: 0, activity() { this.polls++; }, logActivity() {}, configureReactive(value) { this.available = value; }, setReactiveUserBusy(value) { this.busy = value; },
@@ -32,13 +32,13 @@ async function start(reactiveProvider) {
     spawnClient: (_command, args, options) => {
       nativeEnv = options.env; child = new EventEmitter();
       socket = new WebSocket(args[args.indexOf('--remote') + 1], { headers: { Authorization: 'Bearer ' + options.env.FISCH_CODEX_TRANSPORT_TOKEN } });
-      socket.on('error', () => {}); socket.on('message', bytes => { const value = JSON.parse(bytes.toString());
+      socket.on('error', () => {}); socket.on('message', bytes => { const value = JSON.parse(bytes.toString()); if (value.method) notifications.push(value);
         if (pending.has(value.id)) { pending.get(value.id)(value); pending.delete(value.id); } }); return child;
     } });
   await vi.waitFor(() => expect(socket).toBeDefined()); if (socket.readyState !== WebSocket.OPEN) await once(socket, 'open');
   const call = (method, params = {}) => new Promise(resolve => { const requestId = ++id; pending.set(requestId, resolve); socket.send(JSON.stringify({ id: requestId, method, params })); });
   await call('initialize'); await call('thread/start');
-  return { call, api, deliveries, selected, actions, nativeEnv, camera: () => { const observationWindow = validWindow(api.intent);
+  return { call, api, deliveries, selected, actions, notifications, nativeEnv, camera: () => { const observationWindow = validWindow(api.intent);
     candidates.push({ request: observationWindow.request, observationWindow }); }, close: async () => {
     controller.abort(); child.emit('exit', 0); await running; socket.terminate();
   } };
@@ -99,5 +99,39 @@ it('revokes browser authority before native input while provider stays pending a
     expect(snapshot.seen.filter(message => message.method === 'turn/interrupt')).toEqual([]);
     expect(snapshot.seen.filter(message => message.method === 'turn/steer')).toHaveLength(1);
     expect(JSON.stringify(requests)).not.toContain('PRIVATE_USER_INPUT'); expect(f.actions).toEqual([]);
+  } finally { await f.close(); }
+});
+
+it.each(['absent', 'observe'])('keeps conversation and its input barrier usable when the observer is %s', async mode => {
+  const provider = mode === 'absent' ? null : { decide: vi.fn(async window => ({ schemaVersion: 1,
+    requestId: window.request.requestId, decisionId: 'quiet', mode: 'observe', action: null, validUntil: window.request.deadline })) };
+  const f = await start(provider);
+  try {
+    if (provider) {
+      f.camera(); await vi.waitFor(() => expect(f.deliveries).toHaveLength(1));
+      expect(f.deliveries[0].data).toMatchObject({ mode: 'observe', action: null });
+    }
+    let release, entered = false;
+    f.api.barrier = () => { entered = true; return new Promise(resolve => { release = resolve; }); };
+    const firstInput = [{ type: 'text', text: 'What shall we make together?' }];
+    const firstTurn = f.call('turn/start', { threadId: 'native', input: firstInput });
+    await vi.waitFor(() => expect(entered).toBe(true));
+    expect((await f.call('test/snapshot')).result.seen.filter(m => m.method === 'turn/start')).toEqual([]);
+    release(); expect((await firstTurn).error).toBeUndefined(); f.api.barrier = async () => {};
+    await vi.waitFor(() => expect(f.notifications.some(m => m.method === 'item/agentMessage/delta')).toBe(true));
+    await f.call('turn/interrupt', { threadId: 'native', turnId: 'user' });
+    const secondInput = [{ type: 'text', text: 'Let us keep talking quietly.' }];
+    const secondTurn = await f.call('turn/start', { threadId: 'native', input: secondInput });
+    expect(secondTurn.error).toBeUndefined(); expect(secondTurn.result.turn.id).toBe('user_2');
+    await vi.waitFor(() => expect(f.notifications.filter(m => m.method === 'item/agentMessage/delta').map(m => m.params.turnId)).toEqual(['user', 'user_2']));
+    const seen = (await f.call('test/snapshot')).result.seen;
+    expect(seen.filter(m => m.method === 'turn/start').map(m => m.params.input)).toEqual([firstInput, secondInput]);
+    expect(seen.filter(m => m.method === 'turn/interrupt')).toHaveLength(1);
+    expect(seen.find(m => m.method === 'thread/start').params.developerInstructions).toContain('`express`');
+    expect(f.nativeEnv.FISCH_LIVE).toBe('1');
+    expect(seen.some(m => m.method === 'item/toolOutput' || JSON.stringify(m).includes('fisch_local_observation'))).toBe(false);
+    expect(f.deliveries.every(d => d.data?.action === null)).toBe(true);
+    if (provider) expect(provider.decide).toHaveBeenCalledTimes(1);
+    else expect(f.api.available).toBe(false);
   } finally { await f.close(); }
 });

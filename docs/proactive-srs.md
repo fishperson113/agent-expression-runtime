@@ -3,6 +3,19 @@
 Design baseline: 2026-11-09, main `0bca491c0b11a407d109f1b2579adf465afeb2a0`.
 Status: implementation in increments; requirements below are targets, not acceptance claims.
 
+## Current product scope clarification — 2026-11-10
+
+Fisch is an expression capability for external agents. Their conversation,
+reasoning, memory and existing input/voice remain external; Fisch supplies
+bounded expression tools, optional observation and execution. The historical
+camera-first plan below is retained as an observation subsystem design, not a
+requirement to build a complete AI character or dialogue platform. Prioritize
+[expression capability experience](expression-capability-experience.md): tool
+use and ordinary agent input remain usable with camera/classifiers off, followed
+by a formative external-agent session. Classifiers are auxiliary/default-off.
+Actual conversation coherence, contextual expression and human acceptance remain
+pending; no new hosted run is authorized without the existing reconciled ledger.
+
 ## Product requirements
 
 Fisch is an optional observing creature. Camera starts off and requires consent.
