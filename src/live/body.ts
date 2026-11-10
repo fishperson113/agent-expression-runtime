@@ -1,6 +1,7 @@
 import { ThreeRenderer } from '../adapters/three-renderer';
 import { Scheduler } from '../core/runtime/scheduler';
 import { ExpressionLifecycle } from '../core/live/expression-lifecycle';
+import { VisualAttention } from '../core/live/visual-attention';
 import { LiveCompiler, referencedParts } from '../core/live/compiler';
 import { LiveCompositor, composeWrites, type TransformWrite } from '../core/live/compositor';
 import { transformMatrices } from '../core/live/transforms';
@@ -10,7 +11,7 @@ import defaults from '../../integrations/live-reflexes.json';
 import type { BodyState } from '../core/ports';
 import type { PresenceState } from '../core/runtime/presence';
 import type { Observation, LiveEventKind } from '../core/live/types';
-import { faceProgram, faceWrites, isFace } from '../core/live/face';
+import { faceProgram, faceWrites, geometricGazeWrites, isFace } from '../core/live/face';
 import type { LiveCompiled } from '../core/live/control-types';
 import type { ReactiveOwnership } from '../core/live/decision-types';
 import type { ReactiveLease, LeaseRevokeReason } from '../core/live/reactive-lease';
@@ -26,6 +27,7 @@ export class LiveBody {
   private defaults = new LiveCompositor({ releaseUnavailableBindings: true });
   private compiler = new LiveCompiler();
   private observation: Observation | null = null;
+  private attention = new VisualAttention({ now: () => performance.now(), wallNow: () => Date.now() });
   private defaultAt = 0;
   private partIds = '';
   private resize: ResizeObserver;
@@ -70,19 +72,21 @@ export class LiveBody {
     this.frameId = requestAnimationFrame(this.frame);
   };
   private apply(state: BodyState, now: number) {
-    const time = performance.now(), parts = state.particleParts ?? [], ids = parts.map(part => part.id).join('|');
+    const time = performance.now(), parts = state.particleParts ?? [], ids = parts.map(part => part.id).join('|'), resting = isFace(parts);
     if (ids !== this.partIds) { this.partIds = ids; this.controls.topology(parts.map(part => part.id)); }
     if (time - this.defaultAt > 240000) { this.defaults.install(validateConfiguration(defaults), time); this.defaultAt = time; }
     const snapshot = this.observation && Date.now() - this.observation.capturedAt <= 1500 ? this.observation : null;
     const blocked = this.blocked(state), face: TransformWrite[] = [];
     const smoothing = 1 - Math.exp(-Math.min(100, Math.max(0, time - this.faceAt)) / 84); this.faceAt = time;
-    if (isFace(parts)) for (const write of faceWrites(this.faceActivity(time), this.output, this.controls.mode, time)) {
+    if (resting) for (const write of faceWrites(this.faceActivity(time), this.output, this.controls.mode, time)) {
       const key = write.target.part + ':' + write.target.prop, from = this.faceBlend.get(key) ?? (write.target.prop.startsWith('scale') ? 1 : 0);
       const value = from + (write.value - from) * smoothing; this.faceBlend.set(key, value);
       face.push({ ...write, value });
     }
     const local = this.userGeometryLocked ? [] : this.defaults.sample(time, snapshot, this.output, blocked);
-    const layers = [local, face, this.controls.sample(time, snapshot, this.output, blocked)];
+    const gaze = geometricGazeWrites(this.attention.sample(this.scheduler.epoch, this.activityState,
+      !resting || this.userGeometryLocked || time < this.userLeaseUntil || this.scheduler.busy, this.controls.mode));
+    const layers = [local, face, gaze, this.controls.sample(time, snapshot, this.output, blocked)];
     const writes = new Map(composeWrites(layers).map(write => [write.target.part + ':' + write.target.prop, write]));
     const rendered = { ...state, liveMatrices: transformMatrices([...writes.values()], parts) } as PresenceState;
     if (rendered.presencePose) {
@@ -116,7 +120,7 @@ export class LiveBody {
     }
   }
   attachReactive(session: ReactiveSession) { this.reactive = session; }
-  prepareUserMutation() { this.reactive?.userIntent(); }
+  prepareUserMutation() { this.attention.revoke(); this.reactive?.userIntent(); }
   get userSceneOwned() { return this.userGeometryLocked; }
   canReactive() { return !this.userGeometryLocked && this.controls.mode !== 'off' && performance.now() >= this.userLeaseUntil && !this.scheduler.busy; }
   private userGeometry(compiled: LiveCompiled, at: number) {
@@ -175,6 +179,7 @@ export class LiveBody {
     this.restFace(this.controls.mode === 'off' ? 0 : 600);
   }
   epoch(epoch: string, reset = false) {
+    this.attention.reset(epoch, this.observation ?? undefined);
     this.reactive?.reset(); this.reactiveOwner = undefined; this.userLeaseUntil = 0; this.userGeometryLocked = false;
     this.trace.reset();
     this.lifecycle.cancel();
@@ -191,8 +196,8 @@ export class LiveBody {
     this.scheduler.tick();
   }
   observe(snapshot: Observation) {
-    try { this.observation = validateObservation(snapshot); }
-    catch { this.observation = null; }
+    try { this.observation = validateObservation(snapshot); this.attention.observe(this.observation); }
+    catch { this.observation = null; this.attention.unavailable('invalid_observation'); }
   }
   activity(activity: string) {
     this.trace.activity(activity);
@@ -204,14 +209,16 @@ export class LiveBody {
   private faceActivity(at: number) { return this.output > 0.01 ? 'replying' : at < this.attentionUntil ? 'attention' : this.activityState; }
   event(type: LiveEventKind) { const now = performance.now(); this.defaults.event(type, now); this.controls.event(type, now); }
   motion(mode: 'normal' | 'reduced' | 'off') {
+    if (this.controls.mode === 'off' && mode !== 'off') this.attention.rebase('motion_resume');
+    if (mode === 'off') this.attention.revoke('motion_off');
     if (mode === 'off') this.reactive?.reset();
     this.controls.mode = mode; this.defaults.mode = mode; this.renderer.reducedMotion = mode === 'reduced';
     this.scheduler.state.presenceIntent = { activity: 'idle', mode };
   }
   get metrics() { const sorted = [...this.samples].sort((a, b) => a - b); const p95 = sorted[Math.floor(sorted.length * 0.95)] ?? 0;
-    return { reactiveOwner: this.reactiveOwner?.actionId ?? null, userGeometryLocked: this.userGeometryLocked, userLeaseUntil: this.userLeaseUntil, schedulerBusy: this.scheduler.busy, queueDepth: this.scheduler.queueDepth, activity: this.faceActivity(performance.now()), diagnostics: this.trace.snapshot(), render: this.renderer.renderSnapshot,
+    return { visualAttention: this.attention.snapshot(), reactiveOwner: this.reactiveOwner?.actionId ?? null, userGeometryLocked: this.userGeometryLocked, userLeaseUntil: this.userLeaseUntil, schedulerBusy: this.scheduler.busy, queueDepth: this.scheduler.queueDepth, activity: this.faceActivity(performance.now()), diagnostics: this.trace.snapshot(), render: this.renderer.renderSnapshot,
       scene: isFace(this.scheduler.state.particleParts ?? []) ? 'face' : this.scheduler.state.shape,
       parts: this.scheduler.state.particleParts?.map(part => part.id) ?? [],
       frameP95: p95, meanFps: 1000 / (this.samples.reduce((sum, value) => sum + value, 0) / Math.max(1, this.samples.length)), particles: this.renderer.count }; }
-  dispose() { this.lifecycle.cancel(); this.reactive?.configure(false); cancelAnimationFrame(this.frameId); this.resize.disconnect(); this.scheduler.dispose(); }
+  dispose() { this.attention.revoke('disposed'); this.lifecycle.cancel(); this.reactive?.configure(false); cancelAnimationFrame(this.frameId); this.resize.disconnect(); this.scheduler.dispose(); }
 }

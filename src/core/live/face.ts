@@ -51,3 +51,9 @@ function livingFace(at: number, mode: 'normal' | 'reduced'): TransformWrite[] {
     { target: { part: 'dorsal', prop: 'rotateZ' }, value: Math.sin(t * 1.4 + 0.7) * 0.035 * gain },
   ];
 }
+
+export function geometricGazeWrites(point: { x: number; y: number } | null): TransformWrite[] {
+  if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return [];
+  return [definition.roles.leftPupil, definition.roles.rightPupil].flatMap(part =>
+    (['x', 'y'] as const).map(prop => ({ target: { part, prop }, value: Math.max(-1, Math.min(1, point[prop])) * 0.055 })));
+}

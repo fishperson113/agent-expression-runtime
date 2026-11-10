@@ -1,5 +1,5 @@
 {
-  "roles": {"leftEye":"eye_left","rightEye":"eye_right","leftBrow":"brow_left","rightBrow":"brow_right","mouth":"mouth"},
+  "roles": {"leftPupil":"pupil_left","rightPupil":"pupil_right","leftEye":"eye_left","rightEye":"eye_right","leftBrow":"brow_left","rightBrow":"brow_right","mouth":"mouth"},
   "parts": [
     {"id":"outline","kind":"curve","points":[[0.975,0.93,0.0],[0.3,1.41,-0.15],[-0.72,1.305,-0.225],[-1.335,0.66,-0.15],[-1.41,-0.225,-0.15],[-0.975,-1.035,0.0],[-0.105,-1.2,0.15],[0.825,-0.885,0.225],[1.245,-0.285,0.15],[1.305,0.405,0.0],[0.975,0.93,0.0]],"radius":0.0312,"weight":1.2},
     {"id":"eye_left","kind":"curve","points":[[-0.225,0.36,0.18],[-0.3,0.66,0.18],[-0.585,0.765,0.18],[-0.885,0.645,0.18],[-0.975,0.345,0.18],[-0.84,0.06,0.18],[-0.54,-0.015,0.18],[-0.285,0.105,0.18],[-0.225,0.36,0.18]],"radius":0.0438,"weight":1.2},
