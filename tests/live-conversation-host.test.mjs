@@ -487,3 +487,53 @@ it.skipIf(!nativeGateway)('rejects observer-authored context even when MAIN gran
     const metrics=await f.live.page.evaluate(()=>window.fischLive.metrics());expect(metrics.parts).toEqual(['shared_game_form']);expect(metrics.userGeometryLocked).toBe(true);
   }finally{await client?.close();await f.close();}
 },60000);
+
+it.skipIf(!nativeGateway)('keeps a long public brief above usable chat across desktop and mobile without losing drafts',async()=>{
+  let calls=0;const provider={conversationLane:true,contractVersion:1,decide:async()=>{calls++;throw Error('unexpected_layout_inference');}};
+  const f=await nativeBrowserLoop(provider);let client;
+  try{
+    await f.call('turn/interrupt',{threadId:'thread-1',turnId:'turn-1'});
+    client=liveTestClient(f.live.base,f.live.token);await client.call('initialize');
+    const text='Ngữ cảnh công khai của trò chơi: '.repeat(12).slice(0,239)+'!';
+    expect(toolValue(await client.tool('compose_expression',{durationMs:100,observerContext:{text,mode:'open',durationMs:60000},
+      parts:[{id:'layout_form',kind:'ellipsoid',center:[0,0,0],scale:[0.3,0.3,0.1]}]})).status).toBe('accepted');
+    const page=f.live.page,input=page.locator('.fisch-conversation textarea'),brief=page.locator('.observer-context');
+    await expect.poll(()=>brief.innerText()).toContain(text);
+    await page.evaluate(()=>{const log=document.querySelector('.observation-messages');for(let i=0;i<2;i++){const row=document.createElement('div');row.textContent='Fisch · chủ động: Bản chiếu bố cục tổng hợp, không phải lượt model. '.repeat(3);log.append(row);}});
+    await input.fill('Bản nháp phải còn nguyên khi brief đếm ngược.');
+    for(const[width,height]of[[1360,950],[1440,900],[1280,720],[390,844],[320,568],[844,390],[640,450]]){
+      await page.setViewportSize({width,height});
+      expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth&&document.documentElement.scrollHeight<=innerHeight)).toBe(true);
+      const layout=await page.evaluate(()=>{
+        const host=document.querySelector('#conversation-tools').getBoundingClientRect(),brief=document.querySelector('.observer-context').getBoundingClientRect();
+        const nodes=['.fisch-conversation','.fisch-conversation ol','.fisch-conversation textarea','.fisch-conversation button[type=submit]','.fisch-conversation button[type=button]'];
+        return{width:innerWidth,height:innerHeight,host:{x:host.x,y:host.y,right:host.right,bottom:host.bottom,width:host.width},brief:{x:brief.x,right:brief.right,bottom:brief.bottom,width:brief.width},
+          nodes:nodes.map(selector=>{const element=document.querySelector(selector),r=element.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
+            return{selector,x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height,lineHeight:parseFloat(getComputedStyle(element).lineHeight),padding:parseFloat(getComputedStyle(element).paddingTop)+parseFloat(getComputedStyle(element).paddingBottom),hit:hit===element||element.contains(hit)};})};
+      });
+      if(process.env.FISCH_BRIEF_LAYOUT_EVIDENCE){writeFileSync(process.env.FISCH_BRIEF_LAYOUT_EVIDENCE+`/layout-${width}x${height}.json`,JSON.stringify(layout,null,2));if([1360,390,320].includes(width))await page.screenshot({path:process.env.FISCH_BRIEF_LAYOUT_EVIDENCE+`/brief-${width}x${height}.png`});}
+      for(const node of layout.nodes){expect(node.x).toBeGreaterThanOrEqual(layout.host.x-1);expect(node.right).toBeLessThanOrEqual(Math.min(layout.host.right,layout.width)+1);expect(node.bottom).toBeLessThanOrEqual(Math.min(height,layout.host.bottom)+1);expect(node.height,`${width}x${height} ${node.selector} ${JSON.stringify(layout)}`).toBeGreaterThan(0);}
+      for(const node of layout.nodes.slice(0,3))expect(node.width).toBeGreaterThanOrEqual(layout.host.width*.9);
+      expect(layout.brief.bottom).toBeLessThanOrEqual(layout.nodes[0].y+1);
+      for(const node of layout.nodes.slice(2))expect(node.hit).toBe(true);
+      expect(await input.inputValue()).toBe('Bản nháp phải còn nguyên khi brief đếm ngược.');
+      expect(layout.nodes[1].height).toBeGreaterThanOrEqual(layout.nodes[1].lineHeight);expect(layout.nodes[2].height).toBeGreaterThanOrEqual(layout.nodes[2].lineHeight*2+layout.nodes[2].padding);
+      expect(layout.brief.x).toBeGreaterThanOrEqual(layout.host.x-1);expect(layout.brief.right).toBeLessThanOrEqual(layout.host.right+1);
+    }
+    await brief.focus();await page.keyboard.press('End');
+    await expect.poll(()=>brief.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);await page.waitForTimeout(1100);
+    expect(await brief.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);expect(await brief.textContent()).toContain(text);
+    const reaction=page.locator('.observation-messages');await reaction.focus();await page.keyboard.press('End');await expect.poll(()=>reaction.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);
+    expect(await input.inputValue()).toBe('Bản nháp phải còn nguyên khi brief đếm ngược.');expect(calls).toBe(0);
+    const replace=async durationMs=>toolValue(await client.tool('compose_expression',{durationMs:100,observerContext:{text,mode:'open',durationMs},
+      parts:[{id:'layout_form',kind:'ellipsoid',center:[0,0,0],scale:[0.3,0.3,0.1]}]}));
+    expect((await replace(1000)).status).toBe('accepted');await expect.poll(()=>brief.isVisible(),{timeout:6000}).toBe(false);
+    expect(await brief.textContent()).toBe('');expect(await input.inputValue()).toBe('Bản nháp phải còn nguyên khi brief đếm ngược.');
+    await page.locator('.fisch-conversation button[type=submit]').click();
+    await expect.poll(async()=>(await f.call('test/snapshot')).result.seen.filter(row=>row.method==='turn/start').length).toBe(2);
+    expect((await f.call('test/snapshot')).result.seen.filter(row=>row.method==='turn/start').at(-1).text).toBe('Bản nháp phải còn nguyên khi brief đếm ngược.');
+    expect((await replace(60000)).status).toBe('accepted');await expect.poll(()=>brief.isVisible()).toBe(true);
+    await page.locator('#stop-all').click();expect(await brief.isVisible()).toBe(false);expect(await brief.textContent()).toBe('');
+    expect((await page.evaluate(()=>window.fischLive.metrics())).cameraActive).toBe(false);
+  }finally{await client?.close();await f.close();}
+},90000);
