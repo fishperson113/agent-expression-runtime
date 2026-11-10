@@ -189,3 +189,40 @@ The sent strict schema closes every object and requires all fields, following
 It omits uniqueItems; local parsing and the core enforce prerequisite uniqueness.
 No live API compatibility or semantic-quality test is claimed. Existing receipt
 prompt/request hashes bind the selected instructions, schema and input version.
+
+## Codex-only demo and local cue fallback
+
+Native Codex conversation and expression tools use the existing signed-in host;
+local cue responses do not require the separate Responses provider or an API key.
+The resting body follows valid tracked face position and, when optional local
+hand tracking is enabled before camera start, bounded primary-wrist position.
+These are smoothed geometric reflexes, not semantic scene understanding, emotion
+inference or gesture-to-expression presets. Missing/stale/lost inputs fade toward
+neutral and release their local channels, leaving idle motion free. Motion-off remains authoritative, and default cue writes yield to an
+explicit user creation; authored controls and arbitrary RGB remain available.
+
+Live initializes a crisp resting baseline (brightness 0.95, point size 2.2,
+dispersion 0). The shared legacy Scheduler defaults are unchanged; authored state
+and playground styles can still replace that baseline. There is no flashing or
+emotion-to-color mapping. A controlled headless SwiftShader style ablation showed
+more nonbackground pixel energy with this profile; that is not a human enjoyment,
+recognition, real-camera or physical-display measurement.
+
+A signed-in Codex app-server is not automatically a data-only observer. In the
+examined installed CLI 0.167.0-alpha.4, generated ThreadStartParams/TurnStartParams
+provide ephemeral threads, instructions, sandbox policy and final outputSchema,
+but no verified global zero-tools boundary. Empty dynamic tools, read-only mode
+and a JSON response schema do not establish that inherited tools, skills or
+context sources are absent. No Native observer is auto-enabled on that basis,
+no camera events are injected into the coding thread, and no auth material is
+copied or exported to the Responses endpoint. A supported enforceable restriction
+and an authenticated host test are still needed for that adapter; an API key is
+not required merely to use the Codex-plus-local-reflex demo.
+
+Reproduce without a model or webcam: `npm ci`, install Chromium with
+`npx playwright install chromium`, then run
+`npx vitest run tests/local-reflex-demo.test.mjs tests/live-reactive-body.test.ts`.
+The fixture injects synthetic hand observations into the actual Live page and
+reads WebGL aggregates, never camera pixels. Unit tests check loss/ownership and
+an authored dimmer style. This uses existing MIT Fisch code and locked Vite,
+Playwright and Three.js dependencies; no new framework, dataset, model or package.

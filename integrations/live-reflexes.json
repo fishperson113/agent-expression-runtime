@@ -6,7 +6,9 @@
     { "type": "reflex", "id": "arrival", "when": { "event": "user_arrived" },
       "do": { "type": "pose", "target": { "part": "body", "prop": "y" }, "value": 0.12, "durationMs": 600 }, "cooldownMs": 10000 },
     { "type": "reflex", "id": "departure", "when": { "event": "user_left" },
-      "do": { "type": "pose", "target": { "part": "body", "prop": "y" }, "value": -0.06, "durationMs": 700 }, "cooldownMs": 10000 }
+      "do": { "type": "pose", "target": { "part": "body", "prop": "y" }, "value": -0.06, "durationMs": 700 }, "cooldownMs": 10000 },
+    {"type":"bind","id":"hand-position-x","signal":"hand.primary.position.x","target":{"part":"body","prop":"x"},"gain":0.16,"offset":0,"clamp":[-0.16,0.16],"smoothMs":100},
+    {"type":"bind","id":"hand-position-y","signal":"hand.primary.position.y","target":{"part":"body","prop":"y"},"gain":0.12,"offset":0,"clamp":[-0.12,0.12],"smoothMs":100}
   ],
   "poses": [], "lifetimeMs": 300000
 }

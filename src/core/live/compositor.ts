@@ -15,6 +15,7 @@ export function composeWrites(layers: TransformWrite[][]): TransformWrite[] {
 }
 type TimedPose = { pose: Pose; at: number };
 export class LiveCompositor {
+  constructor(private options: { releaseUnavailableBindings?: boolean } = {}) {}
   private configuration?: LiveConfiguration;
   private installedAt = 0;
   private previous?: number;
@@ -86,6 +87,7 @@ export class LiveCompositor {
     for (const item of this.configuration?.controls ?? []) {
       if (item.type === 'bind') {
         const value = signalValue(item.signal, snapshot, output);
+        if (value === null && this.options.releaseUnavailableBindings) continue;
         put(item.target, value === null ? neutral(item.target.prop) : Math.max(item.clamp[0], Math.min(item.clamp[1], item.offset + item.gain * value)), item.smoothMs);
       }
       if (item.type === 'orient') {

@@ -154,3 +154,30 @@ it('reports a native live pose cancelled when Stop changes epoch after 470ms, no
   expect(f.body.metrics.diagnostics.events.some(event => event.seq === 99 && event.epoch === epoch && event.phase === 'cancelled')).toBe(true);
   f.body.dispose();
 });
+it('follows valid hand position locally with semantics disabled, fades on loss, and yields to a user creation', () => {
+  const f = setup(), rendered = vi.spyOn(f.body.renderer, 'apply'); f.session.configure(false);
+  const x = () => (rendered.mock.calls.at(-1)?.[0] as any)?.liveMatrices?.[0]?.[3] ?? 0;
+  for (let i = 0; i < 45; i++) { f.observe(true, false, 0.2); f.advance(16); f.frame(); }
+  expect(x()).toBeGreaterThan(0.07); expect(x()).toBeLessThanOrEqual(0.16);
+  f.source.status('stopped', Date.now()); f.body.observe(f.source.snapshot);
+  for (let i = 0; i < 90; i++) { f.advance(16); f.frame(); }
+  expect(Math.abs(x())).toBeLessThan(0.01);
+  expect((rendered.mock.calls.at(-1)?.[0] as any)?.liveMatrices?.[0]).toBeUndefined();
+  expect(f.body.admit({ v: 1, epoch: f.body.scheduler.epoch, seq: 1, kind: 'program', track: 'body', policy: 'replace',
+    body: { type: 'assemble', durationMs: 100, parts: [{ id: 'owned-scene', kind: 'ellipsoid', center: [0, 0, 0], scale: [0.2, 0.2, 0.1] }] } }).status).toBe('accepted');
+  for (let i = 0; i < 45; i++) { f.observe(true, false, 0.2); f.advance(16); f.frame(); }
+  expect(Math.abs(x())).toBeLessThan(0.001); expect(f.body.metrics.userGeometryLocked).toBe(true);
+  expect(f.body.metrics.reactiveOwner).toBeNull(); f.body.dispose();
+});
+it('keeps the brighter crisp Live baseline after idle release and still accepts an authored dimmer style', () => {
+  const f = setup();
+  for (let i = 0; i < 80; i++) { f.advance(16); f.frame(); }
+  expect(f.body.scheduler.state.brightness).toBeCloseTo(0.95);
+  expect(f.body.scheduler.state.pointSize).toBeCloseTo(2.2);
+  expect(f.body.scheduler.state.dispersion).toBe(0);
+  expect(f.body.admit({ v: 1, epoch: f.body.scheduler.epoch, seq: 1, kind: 'state',
+    body: { brightness: 0.3, pointSize: 1.5, durationMs: 100 } }).status).toBe('accepted');
+  for (let i = 0; i < 80; i++) { f.advance(16); f.frame(); }
+  expect(f.body.scheduler.state.brightness).toBeCloseTo(0.3);
+  expect(f.body.scheduler.state.pointSize).toBeCloseTo(1.5); f.body.dispose();
+});
