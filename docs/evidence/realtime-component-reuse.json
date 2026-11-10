@@ -1,0 +1,297 @@
+{
+  "schemaVersion": 1,
+  "dateUtc": "2026-11-10",
+  "sourceBase": "a684783efa73434395bbdfefdf7664aac8a2bc78",
+  "status": "research only; no default production integration",
+  "probeHashes": {
+    "experiments/realtime-reuse/actor-probe.mjs": "40b42e2b5b3047c840e937129b25813dcf626bd7a2bd8e7f05a23307d8e27b3e",
+    "experiments/realtime-reuse/native-fixture.mjs": "48259afedb9366e97dd52ce496ee0d1fdec0c5bf82aa991f52308c69c11b3e9c",
+    "experiments/realtime-reuse/capability-probe.mjs": "96e7c99e58b3722a15ceeeef220fd9aa79293dd371cb284f25acfcfc8bacb2b4",
+    "experiments/realtime-reuse/openllm-probe.py": "52b7832066ca06966f20f4cced9c5ebb07c70df93eeddea9f5aafa1907f2c81a",
+    "experiments/realtime-reuse/package.json": "196257a44733afc3bf4c0ca2087aef1ebd2498eaf6da137f31386732078c7518",
+    "experiments/realtime-reuse/package-lock.json": "7c359ba9dad081f5b1a7dff0ed97dd9b59975e54a471b168cf1cc4f9f7e75f2e",
+    "experiments/realtime-reuse/startup-contract.mjs": "3bfa102f2e378beb47b8b4be1c992e97d052d34b93bfeb39d42d7111c34f5525",
+    "experiments/realtime-reuse/setup-check.mjs": "85aecdae2786ceccaa7df6cb81c93f8db4a5d2872ed896e20e5762fe82e51b70"
+  },
+  "node": {
+    "schemaVersion": 1,
+    "component": "xstate@5.33.4",
+    "hostHead": "a684783efa73434395bbdfefdf7664aac8a2bc78",
+    "hostFiles": {
+      "integrations/live-output.mjs": "5d5d17d62b43c8877d69fa54d4c92f7069de0b5663bf4f9a6e26820f4890406d",
+      "integrations/live-conversation.mjs": "cac9025069f061b9bf47551e3975def10fece494031083b3b7a8dd68490c8acf",
+      "integrations/live-codex-transport.mjs": "3f06e91d34371e64bb52302de8d2e50366b049b0678b870e67b1fe32bbdda863",
+      "integrations/live-reactive-broker.mjs": "2cf54b18613cf2c1c60491d49a78def195d4915a8c28dd87e172685115143fe0"
+    },
+    "upstreamEntrySha256": "1f8181161bb501aaf0949007cfb8a8639751e10c5ed0814aa1d056be6a5ed814",
+    "upstreamCommit": "bd77717b8d33c49af1c8ee4a7e22cebb936cc8b1",
+    "mode": "injected-page-canonical-Node-port",
+    "agent": "public synthetic app-server; no real model",
+    "ownershipSource": "correlated raw owned RPC receipt, not global output after await",
+    "actualUpstreamActorRuntime": true,
+    "contextPriorUserCounts": [
+      0,
+      1,
+      2
+    ],
+    "actualFixtureHistoryRolesChecked": true,
+    "confirmedNativeInterruption": true,
+    "staleCallbackArrivedAndDropped": true,
+    "staleCancelAfterCaptureBlocked": true,
+    "completionBeforeAckWithNewerOwnerBlocked": true,
+    "earlyCancelBeforeReceipt": "unknown/no interrupt; no replay after late ACK",
+    "sessionBContextIsolated": true,
+    "unknownSurvivedActorReset": true,
+    "privateOwnedAckLeaked": false,
+    "actorAbortSignals": 2,
+    "barrierCalls": 13,
+    "mediaCalls": null,
+    "observedBrowserHosts": [],
+    "elapsedMs": 325.76001400000007,
+    "parentMaxRSSKB": 73064,
+    "parentCpuMs": 100.069,
+    "processTreePeakRSS": null,
+    "realModelCalls": 0,
+    "realAccountCredentials": 0,
+    "limitations": [
+      "Synthetic history is not real-model coherence.",
+      "No MCP mutation in this probe; use the separate capability probe.",
+      "RSS/CPU cover the Node parent only; null counters are unmeasured, not zero.",
+      "The generic browser stop-current API remains unsuitable for stale machine cancellation."
+    ]
+  },
+  "actualPageNodePort": {
+    "schemaVersion": 1,
+    "component": "xstate@5.33.4",
+    "hostHead": "a684783efa73434395bbdfefdf7664aac8a2bc78",
+    "hostFiles": {
+      "integrations/live-output.mjs": "5d5d17d62b43c8877d69fa54d4c92f7069de0b5663bf4f9a6e26820f4890406d",
+      "integrations/live-conversation.mjs": "cac9025069f061b9bf47551e3975def10fece494031083b3b7a8dd68490c8acf",
+      "integrations/live-codex-transport.mjs": "3f06e91d34371e64bb52302de8d2e50366b049b0678b870e67b1fe32bbdda863",
+      "integrations/live-reactive-broker.mjs": "2cf54b18613cf2c1c60491d49a78def195d4915a8c28dd87e172685115143fe0"
+    },
+    "upstreamEntrySha256": "1f8181161bb501aaf0949007cfb8a8639751e10c5ed0814aa1d056be6a5ed814",
+    "upstreamCommit": "bd77717b8d33c49af1c8ee4a7e22cebb936cc8b1",
+    "mode": "actual-page-canonical-Node-port",
+    "agent": "public synthetic app-server; no real model",
+    "ownershipSource": "correlated raw owned RPC receipt, not global output after await",
+    "actualUpstreamActorRuntime": true,
+    "contextPriorUserCounts": [
+      0,
+      1,
+      2
+    ],
+    "actualFixtureHistoryRolesChecked": true,
+    "confirmedNativeInterruption": true,
+    "staleCallbackArrivedAndDropped": true,
+    "staleCancelAfterCaptureBlocked": true,
+    "completionBeforeAckWithNewerOwnerBlocked": true,
+    "earlyCancelBeforeReceipt": "unknown/no interrupt; no replay after late ACK",
+    "sessionBContextIsolated": true,
+    "unknownSurvivedActorReset": true,
+    "privateOwnedAckLeaked": false,
+    "actorAbortSignals": 2,
+    "barrierCalls": null,
+    "mediaCalls": 0,
+    "observedBrowserHosts": [
+      "127.0.0.1"
+    ],
+    "elapsedMs": 7313.2334869999995,
+    "parentMaxRSSKB": 179088,
+    "parentCpuMs": 2570.515,
+    "processTreePeakRSS": null,
+    "realModelCalls": 0,
+    "realAccountCredentials": 0,
+    "limitations": [
+      "Synthetic history is not real-model coherence.",
+      "No MCP mutation in this probe; use the separate capability probe.",
+      "RSS/CPU cover the Node parent only; null counters are unmeasured, not zero.",
+      "The generic browser stop-current API remains unsuitable for stale machine cancellation."
+    ]
+  },
+  "actualCapability": {
+    "schemaVersion": 1,
+    "component": "xstate@5.33.4",
+    "hostHead": "a684783efa73434395bbdfefdf7664aac8a2bc78",
+    "hostFiles": {
+      "integrations/live-terminal.mjs": "0292fd5fbba38094ca848827e111681f7262305f9de1707bb767099826bcf5da",
+      "integrations/live-conversation.mjs": "cac9025069f061b9bf47551e3975def10fece494031083b3b7a8dd68490c8acf",
+      "integrations/live-codex-transport.mjs": "3f06e91d34371e64bb52302de8d2e50366b049b0678b870e67b1fe32bbdda863",
+      "src/live/main.ts": "b47a6ae0df54413b1685d53ec193424363a05ddc9adbcae72c5ecadf734ffd28",
+      "tests/fixtures/playground-agent.mjs": "f4b7edf8e59585d6483c1add0799cb585da0a0ef279662b051e819814ead1c1c"
+    },
+    "actorRuntime": "actual upstream package",
+    "agent": "public scripted Native fixture, not inference",
+    "path": "XState \u2192 existing browser conversation binding \u2192 owned Native transport \u2192 configured MCP \u2192 Rust gateway \u2192 scheduler/render",
+    "operations": [
+      "create",
+      "remix",
+      "undo"
+    ],
+    "revisions": [
+      1,
+      2,
+      3
+    ],
+    "onlyDeclaredCenterChanged": true,
+    "undoRestoredCanonicalScene": true,
+    "proof": {
+      "scene": "assembled",
+      "cameraActive": false,
+      "parts": [
+        "amber-loop-oss-7",
+        "public-tail-oss-9"
+      ],
+      "sequence": 1,
+      "epoch": "80fd5aa5-498d-4f5f-b0ed-f5b78056fdb5",
+      "phases": [
+        "received",
+        "admitted",
+        "applied",
+        "frame_submitted",
+        "frame_changed_proxy",
+        "completed"
+      ],
+      "renderFrame": 184,
+      "completedEvents": 6
+    },
+    "mediaCalls": 0,
+    "observedBrowserHosts": [
+      "127.0.0.1"
+    ],
+    "realModelCalls": 0,
+    "elapsedMs": 11078.085276999998,
+    "parentMaxRSSKB": 162996,
+    "parentCpuMs": 2354.332,
+    "processTreePeakRSS": null,
+    "limitations": [
+      "No machine CANCEL is connected to the browser stop-current API.",
+      "The synthetic full-scene fixture does not establish real-model creativity or human enjoyment.",
+      "The frame change is an application proxy, not a semantic score."
+    ]
+  },
+  "openLLM": {
+    "revision": "992309c0aa19845960228f880013d4685fde93b5",
+    "upstreamFiles": {
+      "src/open_llm_vtuber/agent/agents/agent_interface.py": "934da3dc1f0878b0510ead83aaf67ce9fb59d59cceb737237f7ff3d3df442595",
+      "src/open_llm_vtuber/agent/input_types.py": "8ac302d9fd635049639f5362b0f43385589587e4483ef7ac6c37d3574911edfa",
+      "src/open_llm_vtuber/agent/output_types.py": "e14963eac1d24cbc24841b87a1533c6b068fd33052f5d87096cf18495bed7c38",
+      "src/open_llm_vtuber/mcpp/json_detector.py": "b83d6c21db0639f1688bbd4c0ce90408308a3529424c390c13dd5dfb8cebf217"
+    },
+    "upstreamModifiedLines": 0,
+    "actualModulesImported": [
+      "src/open_llm_vtuber/agent/agents/agent_interface.py",
+      "src/open_llm_vtuber/agent/input_types.py",
+      "src/open_llm_vtuber/agent/output_types.py",
+      "src/open_llm_vtuber/mcpp/json_detector.py"
+    ],
+    "fragmentedSimpleJSON": true,
+    "validQuotedBraceJSONParsed": false,
+    "plainTextBytesRetained": 16384,
+    "warningContainsPublicInputExcerpt": true,
+    "componentVerdict": "FAIL direct strict tool-parser reuse; not a verdict on the whole project",
+    "basicMemoryAgent": "not run; missing dependency: anthropic",
+    "fullBackendRuntime": null,
+    "importMs": 86.83299599942984,
+    "parentMaxRSSKB": 18036,
+    "realModelCalls": 0,
+    "mediaCalls": 0
+  },
+  "rejectedAdapters": [
+    {
+      "name": "generation-only generic browser cancel",
+      "fault": "held old cancel crossed a newer same-generation Native turn",
+      "result": "FAIL: targeted the newer turn",
+      "attribution": "experimental adapter, not XState or human stop-current API"
+    },
+    {
+      "name": "global owner sampled after awaited send",
+      "fault": "old turn completed, newer turn began, old ACK resolved",
+      "result": "FAIL: captured newer owner",
+      "replacement": "per-invocation correlated raw owned RPC receipt"
+    }
+  ],
+  "historicalOracleFailure": {
+    "result": "FAIL research assertion",
+    "expected": "assembly",
+    "actual": "assembled",
+    "attribution": "probe oracle; not product bug",
+    "resolution": "corrected before maintained smoke; failed run was not reported passed"
+  },
+  "resources": {
+    "xstateInstall": {
+      "elapsedSeconds": 0.595,
+      "npmProcessMaxRSSKB": 83836,
+      "cache": "metadata queried before first package install",
+      "installedDiskKiB": 2672,
+      "dependencyDeclarations": 0
+    },
+    "xstateImport": {
+      "firstImportMs": 34.41101,
+      "cachedImportMs": 0.075582,
+      "parentMaxRSSKB": 29256,
+      "node": "v24.22.1"
+    },
+    "processTreePeakRSS": null,
+    "fullOpenLLMSetup": null,
+    "fullPipecatSetup": null,
+    "latestCapabilityGatewayBuildSecondsObserved": 4.17
+  },
+  "licenses": {
+    "xstate": {
+      "license": "MIT",
+      "commit": "bd77717b8d33c49af1c8ee4a7e22cebb936cc8b1",
+      "newRuntimeDependencies": 0
+    },
+    "openLLMBackend": {
+      "license": "MIT except Live2D samples",
+      "commit": "992309c0aa19845960228f880013d4685fde93b5",
+      "declaredDependencyEntries": 35
+    },
+    "openLLMFrontend": {
+      "commit": "d176e7df2366952e3bacbf12cf9a8b18a4315932",
+      "license": "custom Open-LLM-VTuber License 1.0; additional commercial conditions",
+      "used": false
+    },
+    "pipecat": {
+      "commit": "dea65430bed0f3d1317a66d2edd200263ab8b67d",
+      "license": "BSD-2-Clause",
+      "declaredDependencyEntries": 22,
+      "executed": false
+    }
+  },
+  "gateLimits": {
+    "realModelContextWithPriorToolOutcome": "not run",
+    "FischActuatorCancellationAfterAdmissionInThisComponent": "not run",
+    "disconnectAfterSendInThisComponent": "not run; malformed-ACK unknown tested",
+    "crossSessionLateFischMutation": "not run; selected-thread text/owner isolation tested separately",
+    "genericBrowserMachineCancel": "FAIL and not connected",
+    "earlyCancelBeforeReceipt": "unknown/no interrupt; not full interruption acceptance",
+    "robustMissingPrerequisiteSetup": "six helper controls passed; full missing-cargo/browser matrix not run"
+  },
+  "nonClaims": [
+    "No real model inference, voice, camera or microphone acceptance.",
+    "No actual private prompts or account credentials supplied to the scripted agent.",
+    "No second agent memory platform or production API/dependency flip.",
+    "No native GPU, calibrated semantic utility or human enjoyment acceptance.",
+    "Null resource/counter values are unmeasured, not zero."
+  ],
+  "setupControls": {
+    "count": 6,
+    "result": "pass",
+    "scope": "Node helper controls; no browser/model",
+    "cases": [
+      "host setup rejection observed",
+      "host ends before ready observed",
+      "readiness timeout bounded",
+      "successful readiness clears timer",
+      "all cleanup attempted and failure propagated",
+      "primary error suppresses secondary cleanup failures"
+    ]
+  },
+  "independentReview": {
+    "actorNodeAndActualPage": "pass at hash40b42e2b5b3047c840e937129b25813dcf626bd7a2bd8e7f05a23307d8e27b3e",
+    "capabilityNormalPath": "pass at prior1ff482c; startup-only helper fix re-smoked by author at96e7c99",
+    "setupHelper": "six controls passed independently; source reviewed ready for research DRAFT"
+  }
+}

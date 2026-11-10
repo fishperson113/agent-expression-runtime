@@ -1,0 +1,16 @@
+{
+  "name": "fisch-realtime-reuse-research",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "test": "node actor-probe.mjs && node setup-check.mjs",
+    "test:browser": "node actor-probe.mjs --browser",
+    "test:capability": "node capability-probe.mjs",
+    "test:setup": "node setup-check.mjs"
+  },
+  "dependencies": {
+    "xstate": "5.33.4"
+  }
+}
