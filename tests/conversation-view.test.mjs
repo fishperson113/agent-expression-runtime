@@ -1,6 +1,7 @@
 import { beforeAll, afterAll, expect, it } from 'vitest';
 import { createServer } from 'vite';
 import { chromium } from '@playwright/test';
+import { writeFileSync } from 'node:fs';
 let server, browser;
 const ready = { generation: 1, revision: 1, ownerTurn: null, available: true, canSend: true, canCancel: false, pending: false, stopping: false, waiting: false, error: '', messages: [] };
 beforeAll(async () => {
@@ -130,6 +131,51 @@ it('keeps the reader position while new real transcript items arrive', async () 
     await panel.locator('ol').evaluate(node => { node.scrollTop = 100; });
     await page.evaluate(value => window.conversation.project(value), { ...ready, revision: 2, messages: [...messages, { ...messages[0], id: 'new', text: 'Câu trả lời mới' }] });
     expect(await panel.locator('ol').evaluate(node => node.scrollTop)).toBe(100);
+  } finally { await page.close(); }
+}, 45000);
+
+it.each(['following', 'reading-earlier', 'resumed-following'])('preserves %s intent when public context and captions resize the transcript', async intent => {
+  const { page, panel, input } = await open();
+  try {
+    const messages = Array.from({ length: 20 }, (_, i) => ({ id: 'scroll' + i, turn: 't', role: 'assistant', text: 'Nội dung phiên '.repeat(20), status: 'completed', truncated: false }));
+    await page.evaluate(value => {
+      const shell = document.querySelector('#conversation-test'); shell.style.flexDirection = 'column';
+      shell.querySelector('.fisch-conversation').style.flex = '1';
+      const brief = document.createElement('p'); brief.id = 'scroll-test-brief'; brief.hidden = true;
+      brief.style.cssText = 'height:100px;max-height:100px;flex:none;overflow:auto;margin:0;white-space:pre-wrap';
+      brief.textContent = 'Brief công khai tổng hợp\n'.repeat(30); shell.prepend(brief);
+      window.conversation.project(value);
+    }, { ...ready, messages });
+    const list = panel.locator('ol');
+    await list.evaluate((node, mode) => { node.scrollTop = mode === 'following' ? node.scrollHeight : 100; }, intent);
+    if (intent === 'resumed-following') { await list.focus(); await page.keyboard.press('End'); await expect.poll(() => list.evaluate(node => node.scrollHeight - node.clientHeight - node.scrollTop)).toBeLessThanOrEqual(1); }
+    const before = await list.evaluate(node => ({ top: node.scrollTop, height: node.clientHeight, total: node.scrollHeight }));
+    await input.fill('Bản nháp không được mất khi viewport đổi.');
+    await page.evaluate(() => {
+      document.querySelector('#scroll-test-brief').hidden = false;
+      window.conversation.reaction({ requestId: 'resize-caption', text: 'Lời Fisch công khai tổng hợp. '.repeat(15) });
+    });
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    expect(await list.evaluate(node => node.clientHeight)).toBeLessThan(before.height - 40);
+    if (intent !== 'reading-earlier') expect(await list.evaluate(node => node.scrollHeight - node.clientHeight - node.scrollTop)).toBeLessThanOrEqual(1);
+    await page.evaluate(() => {
+      document.querySelector('#scroll-test-brief').scrollTop = 25;
+      document.querySelector('#conversation-test .observation-messages').scrollTop = 20;
+    });
+    await page.evaluate(value => window.conversation.project(value), { ...ready, revision: 2,
+      messages: [...messages, { ...messages[0], id: 'scroll-latest', text: 'Nội dung mới nhất phải xem được khi đang theo cuối.' }] });
+    if (intent !== 'reading-earlier') expect(await list.evaluate(node => node.scrollHeight - node.clientHeight - node.scrollTop)).toBeLessThanOrEqual(1);
+    else expect(await list.evaluate(node => node.scrollTop)).toBe(before.top);
+    expect(await input.inputValue()).toBe('Bản nháp không được mất khi viewport đổi.');
+    expect(await page.locator('#scroll-test-brief').evaluate(node => node.scrollTop)).toBe(25);
+    expect(await panel.locator('.observation-messages').evaluate(node => node.scrollTop)).toBe(20);
+    if (process.env.FISCH_SCROLL_EVIDENCE) {
+      writeFileSync(process.env.FISCH_SCROLL_EVIDENCE + '/' + intent + '.json', JSON.stringify({ actualModelCalls: 0, before, after: await list.evaluate(node => ({ top: node.scrollTop, height: node.clientHeight, total: node.scrollHeight })) }));
+      await page.screenshot({ path: process.env.FISCH_SCROLL_EVIDENCE + '/' + intent + '.png' });
+    }
+    await page.evaluate(() => { window.conversation.clear(); });
+    await page.evaluate(value => window.conversation.project(value), { ...ready, generation: 2, revision: 3, messages });
+    expect(await list.evaluate(node => node.scrollHeight - node.clientHeight - node.scrollTop)).toBeLessThanOrEqual(1);
   } finally { await page.close(); }
 }, 45000);
 
