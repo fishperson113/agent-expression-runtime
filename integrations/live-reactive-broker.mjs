@@ -191,7 +191,7 @@ export class LiveReactiveBroker {
   async finish(owned, value) {
     if (this.closed || this.browserUnavailable || this.active !== owned || owned.terminal) return;
     clearTimeout(owned.timer); owned.terminal = true;
-    if (owned.controller.signal.aborted || this.reactionBusy() || conversationBusy(this.conversationSource?.()?.snapshot)) { await this.finishFailure(owned); return; }
+    if (this.provider?.conversationLane && (owned.controller.signal.aborted || this.reactionBusy() || conversationBusy(this.conversationSource?.()?.snapshot))) { await this.finishFailure(owned); return; }
     try { await this.deliver(owned.id, value); if (this.active === owned) this.active = undefined; }
     catch { this.uncertain = true; this.log('reactive_delivery_unknown'); }
   }

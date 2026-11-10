@@ -50,7 +50,9 @@ export class NativeReactionProvider {
       const row = { requestId: id(value.requestId), threadId: id(value.threadId), turnId: id(value.turnId),
         status: typeof value.status === 'string' && /^[a-zA-Z_]{1,32}$/.test(value.status) ? value.status : 'unknown',
         error: boundedNativeError(value.error), ...(typeof value.code === 'string' && /^[a-z_]{1,80}$/.test(value.code) ? { code: value.code } : {}),
-        ...(typeof value.transportSettled === 'boolean' ? { transportSettled: value.transportSettled } : {}) };
+        ...(typeof value.transportSettled === 'boolean' ? { transportSettled: value.transportSettled } : {}),
+        ...(typeof value.nativeTerminalAcknowledged === 'boolean' ? { nativeTerminalAcknowledged: value.nativeTerminalAcknowledged } : {}),
+        ...(['native_terminal', 'not_dispatched', 'local_process_closed', 'unknown'].includes(value.settlementBasis) ? { settlementBasis: value.settlementBasis } : {}) };
       this.#nativeTrace.push(row); if (this.#nativeTrace.length > 8) this.#nativeTrace.shift();
       if (failure) this.#lastFailure = row;
     } catch { /* Diagnostics never change transport or admission behavior. */ }
@@ -115,7 +117,8 @@ export class NativeReactionProvider {
       const code = signal.aborted ? 'native_reaction_aborted' : error?.code === 'reactive_budget_denied' ? error.code :
         /^[a-z][a-z0-9_]{0,80}$/.test(error?.message) ? error.message : 'native_reaction_failed';
       this.recordDiagnostic({ requestId: flight.requestId, threadId: flight.threadId ?? null, turnId: flight.ackTurnId ?? null,
-        status: flight.nativeStatus ?? (flight.dispatched ? 'transport_failed' : 'pre_dispatch_rejected'), code, transportSettled: settled, error: flight.nativeError ?? null }, true);
+        status: flight.nativeStatus ?? (flight.dispatched ? 'transport_failed' : 'pre_dispatch_rejected'), code, transportSettled: settled, nativeTerminalAcknowledged: terminal,
+        settlementBasis: terminal ? 'native_terminal' : !flight.dispatched ? 'not_dispatched' : settled ? 'local_process_closed' : 'unknown', error: flight.nativeError ?? null }, true);
       throw new ReactiveProviderError(code, settled);
     } finally { signal.removeEventListener('abort', abort); this.#flight = undefined; this.busy = false; }
   }

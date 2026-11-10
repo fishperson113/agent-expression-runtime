@@ -253,6 +253,6 @@ it('preserves human abort before turn ACK while separately confirming process cl
     while (!f.calls.some(call => call.method === 'turn/start')) await new Promise(resolve => setImmediate(resolve));
     controller.abort();
     await expect(run).rejects.toMatchObject({ message: 'native_reaction_aborted', transportSettled: true });
-    expect(f.provider.diagnostics().lastFailure).toMatchObject({ code: 'native_reaction_aborted', transportSettled: true });
+    expect(f.provider.diagnostics().lastFailure).toMatchObject({ code: 'native_reaction_aborted', transportSettled: true, nativeTerminalAcknowledged: false, settlementBasis: 'local_process_closed' });
   } finally { f.provider.close(); }
 });

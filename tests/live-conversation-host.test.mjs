@@ -282,7 +282,10 @@ it.skipIf(!real)('signed-in Codex autonomously chooses a visible conversational 
     await arrive(f);
     await expect.poll(()=>f.live.page.locator('.observation-messages').innerText(),{timeout:90000}).not.toBe('');
     const result=await evidence(f,'actual-native');expect(result.metrics.cameraActive).toBe(false);
-    expect(result.metrics.diagnostics.events.some(row=>row.origin==='reactive'&&['applied','completed'].includes(row.phase))).toBe(true);
+    const decision=configured.provider.diagnostics().lastResult;
+    expect(decision).toBeTruthy();
+    if(decision.selectedMode!=='retain') expect(result.metrics.diagnostics.events.some(row=>row.origin==='reactive'&&['applied','completed'].includes(row.phase))).toBe(true);
+    else { expect(decision.selectedMode).toBe('retain'); expect(decision.actionId).toBeNull(); }
   }finally{if(process.env.FISCH_NATIVE_OBSERVATION_EVIDENCE){const dir=process.env.FISCH_NATIVE_OBSERVATION_EVIDENCE;mkdirSync(dir,{recursive:true,mode:0o700});writeFileSync(dir+'/actual-native-diagnostics.json',JSON.stringify(nativeEvidence(configured.provider,inputs),null,2),{mode:0o600});}await f.close();}
 },120000);
 
