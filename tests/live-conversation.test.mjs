@@ -294,3 +294,42 @@ it('accepts recognized terminal ACKs without granting ownership or resurrecting 
     expect(f.conversation.snapshot().messages[0].status).toBe(status);
   }
 });
+
+it('keeps a private canonical Fisch mutation failure visible after the Native turn completes', async () => {
+  const f = fixture(), pending = f.send(); f.reply(0, { result: { turn: { id: 'turn-a', status: 'inProgress' } } }); await pending;
+  const item = { type: 'mcpToolCall', id: 'tool-a', server: 'fisch_live', tool: 'compose_expression', status: 'failed',
+    arguments: { private: 'PRIVATE_TOOL_CANARY' }, error: { message: 'PRIVATE_TOOL_CANARY' }, result: { content: ['PRIVATE_TOOL_CANARY'] } };
+  f.event({ method: 'item/completed', params: { threadId: 'thread-a', turnId: 'turn-a', item } });
+  f.event({ method: 'turn/completed', params: { threadId: 'thread-a', turn: { id: 'turn-a', status: 'completed' } } });
+  expect(f.conversation.snapshot()).toMatchObject({ canSend: true, error: 'conversation_expression_failed', messages: [] });
+  expect(JSON.stringify(f.conversation.snapshot())).not.toContain('PRIVATE_TOOL_CANARY');
+  const next = f.send(); expect(f.conversation.snapshot().error).toBe('');
+  f.reply(1, { result: { turn: { id: 'turn-b', status: 'inProgress' } } }); await next;
+});
+
+it('does not infer expression failure from unrelated, nonterminal, late or foreign tool events', async () => {
+  const f = fixture(), pending = f.send(); f.reply(0, { result: { turn: { id: 'turn-a', status: 'inProgress' } } }); await pending;
+  const item = { type: 'mcpToolCall', id: 'tool-a', server: 'fisch_live', tool: 'compose_expression', status: 'failed' };
+  const events = [
+    { method: 'item/started', params: { threadId: 'thread-a', turnId: 'turn-a', item } },
+    ...[{ ...item, server: 'other' }, { ...item, tool: 'observe' }, { ...item, status: 'completed' }].map(item =>
+      ({ method: 'item/completed', params: { threadId: 'thread-a', turnId: 'turn-a', item } })),
+    { method: 'item/completed', params: { threadId: 'other', turnId: 'turn-a', item } },
+    { method: 'item/completed', params: { threadId: 'thread-a', turnId: 'other', item } },
+  ];
+  for (const event of events) { f.event(event); expect(f.conversation.snapshot().error).toBe(''); }
+  f.event({ method: 'turn/completed', params: { threadId: 'thread-a', turn: { id: 'turn-a', status: 'completed' } } });
+  f.event({ method: 'item/completed', params: { threadId: 'thread-a', turnId: 'turn-a', item } });
+  expect(f.conversation.snapshot().error).toBe('');
+});
+
+it('clears the request-failure notice when a different Native terminal turn owns the conversation', async () => {
+  const f = fixture(), pending = f.send(); f.reply(0, { result: { turn: { id: 'turn-a', status: 'inProgress' } } }); await pending;
+  f.event({ method: 'item/completed', params: { threadId: 'thread-a', turnId: 'turn-a',
+    item: { type: 'mcpToolCall', id: 'tool-a', server: 'fisch_live', tool: 'express', status: 'failed' } } });
+  f.event({ method: 'turn/completed', params: { threadId: 'thread-a', turn: { id: 'turn-a', status: 'completed' } } });
+  expect(f.conversation.snapshot().error).toBe('conversation_expression_failed');
+  f.output.request({ id: 'native-next', method: 'turn/start', params: { threadId: 'thread-a' } });
+  f.event({ id: 'native-next', result: { turn: { id: 'turn-b', status: 'inProgress' } } });
+  expect(f.conversation.snapshot()).toMatchObject({ ownerTurn: 'turn-b', error: '' });
+});

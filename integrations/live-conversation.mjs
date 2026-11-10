@@ -9,7 +9,7 @@ const clip = (value, limit) => new TextDecoder().decode(Buffer.from(value.slice(
 
 export class LiveConversation {
   #output; #transport; #broker; #thread; #selection; #generation = 0; #revision = 0;
-  #terminal = new Set(); #intent = 0; #messages = []; #unknown = new Set(); #pending; #stopping; #stopErrorTurn; #error = ''; #closed = false; #navigated = false;
+  #terminal = new Set(); #intent = 0; #messages = []; #unknown = new Set(); #pending; #stopping; #stopErrorTurn; #expressionFailureTurn; #error = ''; #closed = false; #navigated = false;
   constructor({ output, transport, broker }) {
     if (!output || typeof broker?.busy !== 'function' || typeof transport?.submitUser !== 'function' || typeof transport?.interruptUser !== 'function')
       throw failure('conversation_configuration');
@@ -17,7 +17,7 @@ export class LiveConversation {
     this.#thread = output.thread; this.#selection = output.selection;
   }
   #clear() {
-    this.#terminal.clear(); this.#messages = []; this.#stopping = this.#stopErrorTurn = undefined; this.#error = '';
+    this.#expressionFailureTurn = undefined; this.#terminal.clear(); this.#messages = []; this.#stopping = this.#stopErrorTurn = undefined; this.#error = '';
     this.#generation++; this.#revision++;
   }
   #sync() {
@@ -27,6 +27,10 @@ export class LiveConversation {
     }
     if (this.#thread !== this.#output.thread) { this.#thread = this.#output.thread; this.#clear(); }
     const owner = this.#owner();
+    if (owner && this.#expressionFailureTurn && owner !== this.#expressionFailureTurn) {
+      if (this.#error === 'conversation_expression_failed') this.#error = '';
+      this.#expressionFailureTurn = undefined; this.#revision++;
+    }
     if (owner && this.#stopping && owner !== this.#stopping.turn) { this.#stopping = undefined; this.#revision++; }
     if (this.#stopErrorTurn && (this.#output.completed?.has(this.#stopErrorTurn) || owner && owner !== this.#stopErrorTurn)) {
       if (this.#error === 'conversation_stop_unconfirmed') this.#error = '';
@@ -128,9 +132,14 @@ export class LiveConversation {
     const turn = this.#owner();
     if (!turn || params.turnId !== turn) return;
     if (method === 'item/agentMessage/delta' && typeof params.delta === 'string') this.#update(params.itemId, turn, 'assistant', params.delta, true);
-    if (['item/started', 'item/completed'].includes(method)) this.#item(params.item, turn);
+    if (['item/started', 'item/completed'].includes(method)) this.#item(params.item, turn, method === 'item/completed');
   }
-  #item(item, turn) {
+  #item(item, turn, completed) {
+    if (completed && item?.type === 'mcpToolCall' && item.server === 'fisch_live' && item.status === 'failed' &&
+        ['compose_expression', 'express', 'playground_edit', 'return_to_face', 'cancel_expression'].includes(item.tool) &&
+        (!this.#error || this.#error === 'conversation_expression_failed')) {
+      this.#error = 'conversation_expression_failed'; this.#expressionFailureTurn = turn; this.#revision++;
+    }
     if (item?.type === 'agentMessage' && typeof item.text === 'string') this.#update(item.id, turn, 'assistant', item.text);
     if (item?.type === 'userMessage' && Array.isArray(item.content)) {
       const text = item.content.slice(0, 32).filter(value => value?.type === 'text' && typeof value.text === 'string')
