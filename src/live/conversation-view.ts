@@ -55,7 +55,7 @@ function elements() {
   const host = document.createElement('section'); host.className = 'fisch-conversation'; const limitId = `conversation-byte-limit-${++mounts}`; host.setAttribute('aria-label', 'Trò chuyện với phiên Codex hiện tại');
   host.innerHTML = `<style>.fisch-conversation{display:flex;flex-direction:column;min-height:0;min-width:0;gap:8px}.fisch-conversation ol{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;list-style:none;padding:0;margin:0;overflow-wrap:anywhere}.fisch-conversation li{white-space:pre-wrap;padding:8px 0}.fisch-conversation form{flex-shrink:0;display:grid;gap:6px}.fisch-conversation textarea{box-sizing:border-box;width:100%;min-width:0;resize:none;background:var(--bg,#080e14);color:inherit;font:inherit;border:1px solid var(--line,#344650);border-radius:6px;padding:8px}.fisch-conversation p{font-size:12px;margin:0;overflow-wrap:anywhere}.fisch-conversation .conversation-actions{display:flex;gap:8px;flex-wrap:wrap}.fisch-conversation button{min-height:40px}.fisch-conversation :focus-visible{outline:2px solid var(--focus,#fff);outline-offset:2px}</style>
     <h2>Trò chuyện với Codex</h2><ol tabindex="0" aria-label="Nội dung phiên Codex hiện tại"></ol>
-    <p class="conversation-status" role="status" aria-live="polite" aria-atomic="true"></p>
+    <div class="observation-messages" role="log" aria-label="Fisch chủ động từ quan sát" style="max-height:160px;overflow:auto;flex:none;white-space:pre-wrap"></div><p class="conversation-status" role="status" aria-live="polite" aria-atomic="true"></p>
     <form><label>Nhắn trong phiên hiện tại<textarea rows="2" maxlength="16000" aria-describedby="${limitId}"></textarea></label>
     <p id="${limitId}" class="conversation-count"></p><div class="conversation-actions"><button type="submit">Gửi</button><button type="button">Dừng trả lời</button></div></form>`;
   return { host, list: host.querySelector('ol')!, status: host.querySelector<HTMLElement>('.conversation-status')!, count: host.querySelector<HTMLElement>('.conversation-count')!,
@@ -78,11 +78,19 @@ function statusText(state: Snapshot | undefined, busy: boolean) {
     state.waiting ? 'Codex cần bạn xác nhận trong terminal.' : state.stopping ? 'Đang dừng trả lời; chưa xác nhận đã dừng.' :
     state.pending || busy ? 'Đang gửi; chưa xác nhận kết quả.' : state.canSend ? 'Bạn có thể nhắn trong phiên hiện tại.' : 'Phiên đang bận hoặc đang được chọn trong terminal.';
 }
-export function mountConversation(container: HTMLElement, request: Request) {
-  const ui = elements(); container.append(ui.host);
-  let state: Snapshot | undefined, disposed = false, attempt = 0, busy = false, cancelling = false, localError = '', lock = false, acknowledged = -1, highGeneration = -1, highRevision = -1, cleared = false;
-  let cancelScope: CancelScope | undefined, localCancelError: CancelScope | undefined;
-  function paint() {
+function reactionView(host: HTMLElement, disposed: () => boolean) {
+  const reactionIds = new Set<string>();
+  function reaction(value: { requestId: string; text: string }) {
+    if (disposed() || !value || typeof value.requestId !== 'string' || !/^[a-zA-Z0-9_-]{1,64}$/.test(value.requestId) || reactionIds.has(value.requestId) || typeof value.text !== 'string' || value.text.length > 600 || !value.text.trim()) return false;
+    reactionIds.add(value.requestId); if (reactionIds.size > 128) reactionIds.delete(reactionIds.values().next().value!);
+    const list = host.querySelector('.observation-messages')!, item = document.createElement('div');
+    item.dataset.requestId = value.requestId; item.textContent = 'Fisch · chủ động: ' + value.text; list.append(item);
+    while (list.children.length > 24) list.firstChild?.remove(); list.scrollTop = list.scrollHeight; return true;
+  }
+  return { publish: reaction, clear: () => { reactionIds.clear(); host.querySelector('.observation-messages')?.replaceChildren(); } };
+}
+function paintConversation(ui: ReturnType<typeof elements>, state: Snapshot | undefined, flags: { disposed: boolean; busy: boolean; cancelling: boolean; localError: string; lock: boolean; acknowledged: number }) {
+    const { disposed, busy, cancelling, localError, lock, acknowledged } = flags;
     const length = bytes(ui.input.value), invalid = !ui.input.value.trim() || length > 16000;
     ui.count.textContent = `${length} / 16000 byte UTF-8 · chỉ gửi khi bạn bấm Gửi.`;
     ui.input.disabled = disposed || !state?.available;
@@ -91,7 +99,13 @@ export function mountConversation(container: HTMLElement, request: Request) {
     const text = localError || statusText(state, busy);
     if (ui.status.textContent !== text) ui.status.textContent = text;
   }
-  function clear() { cleared = true; attempt++; busy = false; cancelling = false; cancelScope = localCancelError = undefined; lock = false; acknowledged = -1; localError = ''; ui.input.value = ''; ui.list.replaceChildren(); state = undefined; paint(); }
+export function mountConversation(container: HTMLElement, request: Request) {
+  const ui = elements(); container.append(ui.host);
+  let state: Snapshot | undefined, disposed = false, attempt = 0, busy = false, cancelling = false, localError = '', lock = false, acknowledged = -1, highGeneration = -1, highRevision = -1, cleared = false;
+  const reactions = reactionView(ui.host, () => disposed);
+  let cancelScope: CancelScope | undefined, localCancelError: CancelScope | undefined;
+  const paint = () => paintConversation(ui, state, { disposed, busy, cancelling, localError, lock, acknowledged });
+  function clear() { reactions.clear(); cleared = true; attempt++; busy = false; cancelling = false; cancelScope = localCancelError = undefined; lock = false; acknowledged = -1; localError = ''; ui.input.value = ''; ui.list.replaceChildren(); state = undefined; paint(); }
   function project(value: unknown) {
     if (disposed) return;
     const next = snapshot(value);
@@ -126,5 +140,5 @@ export function mountConversation(container: HTMLElement, request: Request) {
     } finally { if (!disposed && current === attempt) { if (action === 'send') busy = false; else if (cancelScope === scope) cancelling = false; paint(); } }
   }
   ui.input.oninput = paint; ui.form.onsubmit = event => { event.preventDefault(); void act('send'); }; ui.cancel.onclick = () => { void act('cancel'); }; paint();
-  return { project, clear, dispose: () => { if (disposed) return; clear(); disposed = true; ui.input.oninput = null; ui.form.onsubmit = null; ui.cancel.onclick = null; ui.host.remove(); } };
+  return { project, clear, reaction: reactions.publish, dispose: () => { if (disposed) return; clear(); disposed = true; ui.input.oninput = null; ui.form.onsubmit = null; ui.cancel.onclick = null; ui.host.remove(); } };
 }

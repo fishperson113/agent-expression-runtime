@@ -1,3 +1,4 @@
+import { NativeReactionProvider } from './native-reaction-provider.mjs';
 import { isAbsolute } from 'node:path';
 import { readModelBudget, reserveModelTurn } from './live-model-budget.mjs';
 import { reactiveProviderConfig, reactiveResponsesAdapter } from './reactive-provider.mjs';
@@ -8,7 +9,7 @@ export function nativeLiveEnvironment(env = process.env) {
 }
 export function createLiveReactiveProvider(env = process.env, { fetch, now = Date.now, classifier } = {}) {
   let config;
-  try { config = reactiveProviderConfig(env); }
+  try { config = env.FISCH_REACTIVE_BACKEND === 'codex' ? { enabled: true, native: true, model: env.FISCH_REACTIVE_MODEL } : reactiveProviderConfig(env); }
   catch { return { provider: null, reason: 'invalid_provider_config' }; }
   if (!config.enabled) return { provider: null, reason: config.reason };
   const path = env.FISCH_REACTIVE_BUDGET;
@@ -20,6 +21,13 @@ export function createLiveReactiveProvider(env = process.env, { fetch, now = Dat
   const at = now();
   if (!Number.isFinite(at) || at >= Date.parse(budget.deadline)) return { provider: null, reason: 'budget_expired' };
   if (budget.used >= budget.limit) return { provider: null, reason: 'budget_exhausted' };
+  if (config.native) {
+    const policy = { deadlineMs: Number(env.FISCH_REACTIVE_DEADLINE_MS ?? 60000), cooldownMs: Number(env.FISCH_REACTIVE_COOLDOWN_MS ?? 15000), maxPerMinute: Number(env.FISCH_REACTIVE_MAX_PER_MINUTE ?? 4) };
+    if (!Number.isInteger(policy.deadlineMs) || policy.deadlineMs < 5000 || policy.deadlineMs > 90000 || !Number.isInteger(policy.cooldownMs) || policy.cooldownMs < 1000 || policy.cooldownMs > 60000 || !Number.isInteger(policy.maxPerMinute) || policy.maxPerMinute < 1 || policy.maxPerMinute > 4) return { provider: null, reason: 'invalid_provider_config' };
+    const provider = new NativeReactionProvider({ model: config.model, reserve: ({ requestId }) => { reserveModelTurn(path, 'native-observation:' + requestId, now()); return true; } });
+    provider.conversationLane = true; provider.contractVersion = 1; provider.policy = Object.freeze(policy);
+    return { provider, reason: 'ready_native_conversation' };
+  }
   const provider = reactiveResponsesAdapter(config, { fetch, reserve: ({ requestId }) => {
     reserveModelTurn(path, 'reactive:' + requestId, now()); return true;
   } });
