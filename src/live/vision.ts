@@ -8,6 +8,9 @@ export class VisionCamera {
   private busy = false;
   private capturedTime = -1;
   private availableTime = -1;
+  private availableAt = -1;
+  private frameSeq = 0;
+  private pendingFrame?: { id: number; availableAt: number; requestedAt: number; mediaTime: number };
   private ready = false;
   private actualDelegate?: 'GPU' | 'CPU';
   private generation = 0;
@@ -34,14 +37,17 @@ export class VisionCamera {
   private message(data: any, generation: number) {
     if (generation !== this.generation || !this.active) return;
     if (data.type === 'ready') { this.actualDelegate = data.delegate; this.ready = true; clearTimeout(this.timeout); this.status('ready-' + data.delegate); }
-    if (data.type === 'sample') { this.busy = false; this.receive(data.sample); void this.capture(generation); }
+    if (data.type === 'sample' && this.pendingFrame && data.frameId === this.pendingFrame.id) {
+      const { id: _id, ...sourceFrame } = this.pendingFrame; this.pendingFrame = undefined; this.busy = false;
+      this.receive({ ...data.sample, sourceFrame }); void this.capture(generation);
+    }
     if (data.type === 'error') this.fail('vision_failed: ' + String(data.code).slice(0, 180));
   }
   private schedule(generation: number) {
     if (!this.active || generation !== this.generation) return;
     this.callback = this.video.requestVideoFrameCallback((_, metadata) => {
       if (!this.active || generation !== this.generation) return;
-      this.availableTime = metadata.mediaTime;
+      this.availableTime = metadata.mediaTime; this.availableAt = Date.now();
       this.schedule(generation); void this.capture(generation);
     });
   }
@@ -49,13 +55,15 @@ export class VisionCamera {
     if (!this.active || generation !== this.generation || !this.ready || this.busy || !this.worker) return;
     const mediaTime = this.availableTime;
     if (mediaTime < 0 || mediaTime === this.capturedTime) return;
+    const sourceFrame = { id: ++this.frameSeq, availableAt: this.availableAt, requestedAt: Date.now(), mediaTime };
     this.busy = true; this.capturedTime = mediaTime;
     let frame: ImageBitmap | undefined;
     try {
       frame = await createImageBitmap(this.video);
       if (!this.active || generation !== this.generation) { frame.close(); return; }
-      this.worker.postMessage({ type: 'frame', frame, at: performance.now() }, [frame]); frame = undefined;
-    } catch { frame?.close(); if (generation === this.generation) this.busy = false; }
+      this.pendingFrame = sourceFrame;
+      this.worker.postMessage({ type: 'frame', frame, frameId: sourceFrame.id, at: performance.now() }, [frame]); frame = undefined;
+    } catch { frame?.close(); if (generation === this.generation) { this.busy = false; this.pendingFrame = undefined; } }
   }
   private fail(code: string) { this.stop(); this.status(code); }
   private ended() {
@@ -66,7 +74,8 @@ export class VisionCamera {
     this.timeout = setTimeout(() => { if (this.generation === generation) void this.start(); }, 500);
   }
   stop() {
-    this.active = false; this.ready = false; this.busy = false; this.capturedTime = -1; this.availableTime = -1; this.actualDelegate = undefined; this.generation++;
+    this.active = false; this.ready = false; this.busy = false; this.capturedTime = -1; this.availableTime = -1; this.availableAt = -1; this.actualDelegate = undefined; this.generation++;
+    this.pendingFrame = undefined;
     clearTimeout(this.timeout); this.video.cancelVideoFrameCallback(this.callback);
     this.stream?.getTracks().forEach(track => { track.onended = null; track.stop(); });
     this.stream = undefined; this.video.srcObject = null;

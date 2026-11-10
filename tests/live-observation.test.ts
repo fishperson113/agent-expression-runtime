@@ -56,3 +56,15 @@ it('preserves versioned structured hand observations without inventing face pres
   observations.status('stopped', 1100);
   expect(validateObservation(observations.snapshot).hands).toBeUndefined();
 });
+
+it('uses pre-inference acquisition time and refuses stale, future or regressing source timestamps', () => {
+  const source = new FaceObservations('timed');
+  source.update({ ...sample(), sourceFrame: { availableAt: 1000, requestedAt: 1100, mediaTime: 1 } }, 1600);
+  expect(source.snapshot.capturedAt).toBe(1000); const seq = source.snapshot.seq;
+  for (const availableAt of [900, 1000, 1800, NaN, -1000]) {
+    expect(source.update({ ...sample(), sourceFrame: { availableAt, requestedAt: 1600, mediaTime: 2 } }, 1700)).toEqual([]);
+    expect(source.snapshot.seq).toBe(seq);
+  }
+  source.update({ ...sample(), sourceFrame: { availableAt: 1800, requestedAt: 1850, mediaTime: 2 } }, 1900);
+  expect(source.snapshot.capturedAt).toBe(1800);
+});

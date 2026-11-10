@@ -25,7 +25,7 @@ async function initialize(preferred: 'GPU' | 'CPU' = 'GPU', enableHands = false)
   } finally { URL.revokeObjectURL(loader); }
   self.postMessage({ type: 'ready', delegate });
 }
-function detect(frame: ImageBitmap, at: number) {
+function detect(frame: ImageBitmap, at: number, frameId: number) {
   try {
     const start = performance.now(), result = landmarker!.detectForVideo(frame, at);
     let categories: { categoryName: string; score: number }[] = [];
@@ -46,7 +46,7 @@ function detect(frame: ImageBitmap, at: number) {
     if (handsFailed) handObservation = { v: 1, trackingState: 'error', coordinateSpace: 'image-normalized',
       landmarkSchema: 'mediapipe-hand-21', zMeaning: 'wrist-relative-image-width', mirrored: false,
       sourceWidth: frame.width, sourceHeight: frame.height, entities: [] };
-    self.postMessage({ type: 'sample', sample: { ...(handObservation ? { handObservation } : {}), hands: categories, handsFailed, landmarks: result.faceLandmarks[0] ?? [],
+    self.postMessage({ type: 'sample', frameId, sample: { ...(handObservation ? { handObservation } : {}), hands: categories, handsFailed, landmarks: result.faceLandmarks[0] ?? [],
       scores: Object.fromEntries((result.faceBlendshapes[0]?.categories ?? []).map(item => [item.categoryName, item.score])),
       matrix: result.facialTransformationMatrixes[0]?.data ?? [], durationMs: performance.now() - start, delegate } });
   } finally { frame.close(); }
@@ -54,7 +54,7 @@ function detect(frame: ImageBitmap, at: number) {
 self.onmessage = async event => {
   try {
     if (event.data.type === 'init') await initialize(event.data.delegate === 'CPU' ? 'CPU' : 'GPU', event.data.hands === true);
-    if (event.data.type === 'frame' && landmarker) detect(event.data.frame, event.data.at);
+    if (event.data.type === 'frame' && landmarker) detect(event.data.frame, event.data.at, event.data.frameId);
     if (event.data.type === 'stop') { landmarker?.close(); hands?.close(); self.close(); }
   } catch (error) { self.postMessage({ type: 'error', code: error instanceof Error ? error.message : 'vision_failed' }); }
 };

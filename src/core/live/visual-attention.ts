@@ -6,6 +6,7 @@ type Entry = { episode: number; epoch: string; intent: number; sourceSeq: number
 const clamp = (n: number) => Math.max(-1, Math.min(1, n));
 export class VisualAttention {
   private epoch = 'idle'; private session?: string; private seq = -1; private measurement = -1;
+  private notBefore = -Infinity;
   private processed = -1; private current?: Point; private anchor?: Point;
   private candidate?: { key: string; at: number; samples: number; fromSeq: number };
   private episode?: Episode; private serial = 0; private intent = 0; private cooldown = 0;
@@ -27,10 +28,12 @@ export class VisualAttention {
   reset(epoch: string, barrier?: Pick<Observation, 'sessionId' | 'seq' | 'capturedAt'>) {
     this.finish('epoch_changed', this.clock.now()); this.epoch = epoch; this.session = undefined;
     this.barrier = barrier ? { sessionId: barrier.sessionId, seq: barrier.seq, capturedAt: barrier.capturedAt } : undefined;
+    this.notBefore = this.clock.wallNow();
     this.seq = -1; this.measurement = -1; this.processed = -1; this.current = undefined;
     this.anchor = undefined; this.cooldown = 0; this.previous = -Infinity; this.clockBroken = false;
   }
   rebase(reason: string) {
+    this.notBefore = this.clock.wallNow();
     this.finish(reason, this.clock.now()); this.anchor = this.current; this.processed = this.measurement;
   }
   revoke(reason = 'user_intent') { this.rebase(reason); this.intent++; }
@@ -39,7 +42,7 @@ export class VisualAttention {
   }
   observe(value: Observation) {
     const now = this.clock.now(), age = this.clock.wallNow() - value.capturedAt;
-    if (this.clockBroken) return;
+    if (this.clockBroken || value.capturedAt <= this.notBefore) return;
     if (!Number.isFinite(now) || now < this.previous) { this.unavailable('clock_discontinuity'); this.clockBroken = true; return; }
     if (this.barrier?.sessionId === value.sessionId && (value.seq <= this.barrier.seq || value.capturedAt === this.barrier.capturedAt)) return;
     if (!Number.isSafeInteger(value.seq) || value.seq <= this.seq || (this.session && value.sessionId !== this.session)) return;
