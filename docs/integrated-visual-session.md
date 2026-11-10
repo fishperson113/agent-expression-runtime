@@ -17,7 +17,7 @@ history. Reserve every inference in the existing ledger; never copy credentials.
 If either actual lane is unavailable, mark that profile unrun rather than silently
 substituting a fixture or API provider.
 
-Run for 300 seconds once, with at most six MAIN turns and four observer turns.
+Run for 720 seconds (12 minutes) once, with at most six MAIN turns and four observer turns.
 Enforce the observer cap before reservation/dispatch, in addition to normal rate
 limits. Do not extend the run or retry a retain/silent/error result. Text context
 comes from [the six public cases](evidence/visual-expression-dev-contexts.json),
@@ -31,16 +31,16 @@ page. Source callbacks and rendering should continue while either model thinks.
 | Seconds | Fixture |
 | --- | --- |
 | 0–15 | `absent` |
-| 15–95 | `present-neutral` |
-| 95–175 | `present-smile` (coefficient geometry, not an emotional label) |
-| 175–255 | `present-hand`, wrist x=0.2 |
-| 255–300 | `absent` |
+| 15–215 | `present-neutral` |
+| 215–415 | `present-smile` (coefficient geometry, not an emotional label) |
+| 415–615 | `present-hand`, wrist x=0.2 |
+| 615–720 | `absent` |
 
-At 0, 45, 90, 135, 180 and 225 seconds, respectively, submit cases v01–v06
+At 0, 100, 200, 300, 400 and 500 seconds, respectively, submit cases v01–v06
 through actual MAIN user conversation input. Send each only if MAIN is ready for
 a new turn; otherwise record that case unrun instead of steering/interruption
 stress or rescheduling. Supply no target shape/color or per-case demand to call
-a tool. At 300 seconds disable observation and close owned test resources. Mark
+a tool. At 720 seconds disable observation and close owned test resources. Mark
 any action/turn still incomplete as such. Stop earlier on a safety failure or
 unknown transport/browser state, preserve evidence and leave later phases unrun;
 do not widen timeouts. A separate investigation may diagnose a stall without
@@ -61,6 +61,10 @@ revealing text/context, describe the visible forms and motion under opaque IDs;
 then assess contextual relevance, restraint, pleasantness and caption consistency.
 Report reviewer familiarity/priming and all denominators. No geometry quota,
 model-self-score or synthetic duration is a substitute for Dương's experience.
+Report actual elapsed wall time, active-versus-quiet intervals, source/render
+cadence, duplicate greetings, responsiveness and every unrun phase. Do not pad
+quiet time or count local idle/reflex motion as model-authored expression to claim
+a natural 10–20 minute experience.
 A useful observation is an intentional, legible change that fits the interaction;
 a quiet response may also be appropriate. This profile is a development pilot,
 not an untouched holdout or a claim that the product goal is complete.
