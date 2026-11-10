@@ -234,3 +234,24 @@ it('advertises the supported hand-event contract explicitly without resetting av
   await f.broker.poll({}); await f.broker.poll({});
   expect(configured).toEqual([[true, 1, 1], [true, 1, 1]]); f.broker.close();
 });
+it('confirms Native publication only after the browser critical fence with the exact owned request', async () => {
+  const provider = { conversationLane: true, confirmPublication: vi.fn(), discardPublication: vi.fn() }, f = fixture(provider);
+  const candidate = f.candidate('published'), owned = { id: 'published', request: candidate.request, controller: new AbortController(), terminal: false };
+  f.broker.active = owned; f.api.canRememberNativeReaction = request => request.requestId === 'published';
+  const receipt = { source: 'native-observation', requestId: 'published', decisionId: 'd', reason: 'observed', chatPublished: true };
+  f.api.deliverNativeReaction = async () => receipt;
+  await f.broker.finish(owned, { reply: 'published' });
+  expect(provider.confirmPublication).toHaveBeenCalledWith(candidate.request, receipt); expect(f.broker.active).toBeUndefined(); f.broker.close();
+});
+it('drops history confirmation after stop/epoch rejection, unknown delivery, or user intent arriving during the fence await', async () => {
+  for (const mode of ['browser-revoked', 'unknown-delivery', 'late-user']) {
+    const provider = { conversationLane: true, confirmPublication: vi.fn(), discardPublication: vi.fn() }, f = fixture(provider);
+    const request = f.candidate(mode).request, owned = { id: mode, request, controller: new AbortController(), terminal: false }; f.broker.active = owned;
+    f.api.canRememberNativeReaction = () => mode !== 'browser-revoked';
+    f.api.deliverNativeReaction = async () => { if (mode === 'unknown-delivery') throw Error('unknown'); return { reason: 'observed', chatPublished: true }; };
+    const evaluate = f.broker.evaluate.bind(f.broker);
+    f.broker.evaluate = async (fn, arg) => { const result = await evaluate(fn, arg); if (mode === 'late-user' && arg === request) owned.controller.abort(); return result; };
+    await f.broker.finish(owned, { reply: 'must not remember' });
+    expect(provider.confirmPublication).not.toHaveBeenCalled(); f.broker.close();
+  }
+});

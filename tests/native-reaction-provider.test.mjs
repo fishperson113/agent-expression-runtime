@@ -10,10 +10,10 @@ const window = () => ({ schemaVersion: 1, request: { schemaVersion: 1, sessionId
   observations: [{ v: 1, sessionId: 's', seq: 1, capturedAt: 100, camera: 'absent', turn: 'working', summary: 'PRIVATE_INSTRUCTION_CANARY',
     user: { present: false, quality: { score: 0, basis: 'unavailable' }, position: null, head: null, facingScreen: null, expression: null, mouthMoving: null } }] });
 const retain = { reply: 'Mình thấy bạn vừa quay lại.', decision: { mode: 'retain', reasonCode: 'presence', payload: null } };
-function fixture({ catalog = [], response = retain, pending = false, pendingAck = false, reserve = async () => {}, confirmedClose = true, nativeError = null, nativeStatus = 'completed', missingConfig = false, featurePatch = {}, requestedModel, effectiveModel } = {}) {
+function fixture({ catalog = [], response = retain, pending = false, pendingAck = false, reserve = async () => {}, confirmedClose = true, nativeError = null, nativeStatus = 'completed', missingConfig = false, featurePatch = {}, requestedModel, effectiveModel, now } = {}) {
   const calls = [], processes = []; let notify;
   const provider = new NativeReactionProvider({ command: 'codex', reserve, model: requestedModel }, { env: { HOME: '/native-auth', AER_PAIRING_TOKEN: 'SECRET', OPENAI_API_KEY: 'SECRET', PATH: 'native' },
-    settleTimeoutMs: 10, rpcFactory: (command, args, cwd, event, failed, env) => {
+    settleTimeoutMs: 10, now, rpcFactory: (command, args, cwd, event, failed, env) => {
       notify = event;
       let rejectAck; let confirm; const settled = new Promise(resolve => { confirm = resolve; });
       const rpc = { settled, closed: false, command, args, env, send: () => {}, close: () => { rpc.closed = true; if (confirmedClose) confirm(); rejectAck?.(Error('planner_process_closed')); failed('closed'); },
@@ -224,7 +224,8 @@ it('records exact policy/schema/projected-input/config/model hashes without raw 
       const turn = f.calls.find(c => c.method === 'turn/start').params, thread = f.calls.find(c => c.method === 'thread/start').params;
       for (const key of ['policyHash', 'schemaHash', 'inputHash', 'configHash', 'mcpCatalogHash', 'modelHash']) expect(metadata[key]).toMatch(/^[a-f0-9]{64}$/);
       expect(metadata.policyHash).toBe(digest(thread.baseInstructions)); expect(metadata.schemaHash).toBe(digest(turn.outputSchema));
-      expect(metadata.inputHash).toBe(digest(JSON.parse(turn.input[0].text))); expect(metadata.mcpCatalogHash).toBe(digest([]));
+      expect(metadata.inputHash).toBe(digest(JSON.parse(turn.input[0].text)));
+      expect(metadata.publishedHistoryCount).toBe(0); expect(metadata.publishedHistoryHash).toBe(digest([])); expect(metadata.mcpCatalogHash).toBe(digest([]));
       expect(metadata.requestedModel).toBe(options.requestedModel ?? null); expect(metadata.effectiveModel).toBe(options.effectiveModel ?? null);
       expect(metadata).toMatchObject({ requestId: 'r', decisionId: result.decision.decisionId, actionId: null, selectedMode: 'retain', reasonCode: 'presence' });
       const diagnostics = f.provider.diagnostics(); expect(diagnostics.lastResult).toEqual(metadata);
@@ -255,4 +256,82 @@ it('preserves human abort before turn ACK while separately confirming process cl
     await expect(run).rejects.toMatchObject({ message: 'native_reaction_aborted', transportSettled: true });
     expect(f.provider.diagnostics().lastFailure).toMatchObject({ code: 'native_reaction_aborted', transportSettled: true, nativeTerminalAcknowledged: false, settlementBasis: 'local_process_closed' });
   } finally { f.provider.close(); }
+});
+const publication = result => ({ source: 'native-observation', requestId: result.decision.requestId,
+  decisionId: result.decision.decisionId, reason: result.decision.mode === 'express' ? 'accepted' : 'observed', chatPublished: true });
+async function contextCue(f, id, scope = {}) {
+  const value = window(); Object.assign(value.request, { requestId: id, ...scope }); value.observations[0].sessionId = value.request.sessionId;
+  const result = await f.provider.decide(value, new AbortController().signal);
+  const input = JSON.parse(f.calls.filter(call => call.method === 'turn/start').at(-1).params.input[0].text);
+  return { value, result, input };
+}
+it('injects only browser-confirmed replies into a fresh thread, never dropped generated text', async () => {
+  const f = fixture();
+  try {
+    const dropped = await contextCue(f, 'drop'), published = await contextCue(f, 'publish');
+    expect(published.input.recentPublishedReactions).toEqual([]);
+    expect(f.provider.confirmPublication(dropped.value.request, publication(dropped.result))).toBe(false);
+    expect(f.provider.confirmPublication(published.value.request, publication(published.result))).toBe(true);
+    expect(f.provider.confirmPublication(published.value.request, publication(published.result))).toBe(false);
+    const next = await contextCue(f, 'next');
+    expect(next.input.recentPublishedReactions).toHaveLength(1);
+    expect(next.result.nativeProvenance.publishedHistoryCount).toBe(1); expect(next.result.nativeProvenance.publishedHistoryHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(next.input.recentPublishedReactions[0]).toMatchObject({ requestId: 'publish', reply: retain.reply, chatPublished: true, expressionAdmission: 'none', currentGeometry: 'unknown' });
+    expect(f.calls.filter(call => call.method === 'thread/start').every(call => call.params.ephemeral === true)).toBe(true);
+  } finally { f.provider.close(); }
+});
+it('records expression admission separately and never imports an unshown caption or claims current geometry', async () => {
+  const f = fixture({ response: { reply: 'Generated but not published', decision: { mode: 'animate', reasonCode: 'subtle', payload: { controls: [], poses: [], lifetimeMs: 1000 } } } });
+  try {
+    const previous = await contextCue(f, 'expression');
+    expect(f.provider.confirmPublication(previous.value.request, { ...publication(previous.result), chatPublished: false, frame: 9 })).toBe(true);
+    const next = await contextCue(f, 'next'); expect(next.input.recentPublishedReactions[0]).toMatchObject({ reply: '', chatPublished: false, expressionAdmission: 'admitted', currentGeometry: 'unknown', receiptFrame: 9 });
+    expect(JSON.stringify(next.input)).not.toContain('Generated but not published');
+  } finally { f.provider.close(); }
+});
+it('resets on session or epoch change and rejects wrong, aborted, expired or explicitly discarded confirmations', async () => {
+  for (const scope of [{ epoch: 'new' }, { sessionId: 'new' }]) {
+    const f = fixture();
+    try { const first = await contextCue(f, 'first'); f.provider.confirmPublication(first.value.request, publication(first.result));
+      expect((await contextCue(f, 'second', scope)).input.recentPublishedReactions).toEqual([]);
+      expect(f.provider.confirmPublication(first.value.request, publication(first.result))).toBe(false);
+    } finally { f.provider.close(); }
+  }
+  const f = fixture();
+  try {
+    const cue = await contextCue(f, 'wrong'); expect(f.provider.confirmPublication({ ...cue.value.request, epoch: 'wrong' }, publication(cue.result))).toBe(false);
+    f.provider.discardPublication('wrong'); expect(f.provider.confirmPublication(cue.value.request, publication(cue.result))).toBe(false);
+    const controller = new AbortController(), value = window(), result = await f.provider.decide(value, controller.signal);
+    controller.abort(); expect(f.provider.confirmPublication(value.request, publication(result))).toBe(false);
+    expect((await contextCue(f, 'clean')).input.recentPublishedReactions).toEqual([]);
+  } finally { f.provider.close(); }
+});
+it('bounds publication context by entry count, characters and monotonic TTL, including delayed confirmation', async () => {
+  for (const reply of ['short', 'x'.repeat(600)]) {
+    let clock = 0; const f = fixture({ response: { ...retain, reply }, now: () => clock });
+    try {
+      for (let i = 0; i < 12; i++) { clock++; const cue = await contextCue(f, 'r' + i); expect(f.provider.confirmPublication(cue.value.request, publication(cue.result))).toBe(true); }
+      const next = await contextCue(f, 'next'), entries = next.input.recentPublishedReactions;
+      expect(entries).toHaveLength(reply.length === 600 ? 4 : 8); expect(entries.reduce((sum, row) => sum + row.reply.length, 0)).toBeLessThanOrEqual(2400);
+      clock += 300000; expect((await contextCue(f, 'expired')).input.recentPublishedReactions).toEqual([]);
+      const late = await contextCue(f, 'late'); clock += 60000;
+      expect(f.provider.confirmPublication(late.value.request, publication(late.result))).toBe(false);
+    } finally { f.provider.close(); }
+  }
+});
+it('excludes rejected, unknown and mismatched publication receipts from the next model input', async () => {
+  for (const patch of [{ reason: 'stale' }, { reason: 'transport_unknown' }, { requestId: 'other' }, { decisionId: 'other' }, { source: 'other' }, { chatPublished: false }]) {
+    const f = fixture();
+    try {
+      const cue = await contextCue(f, 'rejected'); expect(f.provider.confirmPublication(cue.value.request, { ...publication(cue.result), ...patch })).toBe(false);
+      expect((await contextCue(f, 'next')).input.recentPublishedReactions).toEqual([]);
+    } finally { f.provider.close(); }
+  }
+});
+it('drops pending publication context if staging time becomes nonfinite or rewinds before its start', async () => {
+  for (const times of [[10, NaN, 20], [10, 5, 6]]) {
+    let index = 0; const f = fixture({ now: () => times[Math.min(index++, times.length - 1)] });
+    try { const cue = await contextCue(f, 'bad-clock'); expect(f.provider.confirmPublication(cue.value.request, publication(cue.result))).toBe(false); }
+    finally { f.provider.close(); }
+  }
 });

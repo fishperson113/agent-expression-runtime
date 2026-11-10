@@ -238,8 +238,9 @@ async function evidence(f, kind) {
   return {metrics,messages};
 }
 it.skipIf(!nativeGateway)('observes and publishes a causal reaction while the separate coding turn keeps running',async()=>{
-  let resolve, seen, calls=0;
-  const provider={conversationLane:true,contractVersion:1,decide:window=>{calls++;seen=window;return new Promise(yes=>{resolve=yes;});}};
+  let resolve, seen, calls=0; const published=[];
+  const provider={conversationLane:true,contractVersion:1,confirmPublication:(request,receipt)=>published.push({request,receipt}),
+    decide:window=>{calls++;seen=window;return new Promise(yes=>{resolve=yes;});}};
   const f=await nativeBrowserLoop(provider);
   try{
     await arrive(f); await expect.poll(()=>calls,{timeout:10000}).toBe(1);
@@ -248,6 +249,8 @@ it.skipIf(!nativeGateway)('observes and publishes a causal reaction while the se
     resolve(authored(seen.request));
     await expect.poll(()=>f.live.page.locator('.observation-messages').innerText(),{timeout:10000}).toContain('Lời chủ động từ fixture');
     await expect.poll(()=>f.live.page.evaluate(()=>window.fischLive.metrics().parts)).toEqual(['scripted_reaction']);
+    await expect.poll(()=>published.length).toBe(1);
+    expect(published[0]).toMatchObject({request:{requestId:seen.request.requestId},receipt:{source:'native-observation',reason:'accepted',chatPublished:true}});
     await f.live.page.waitForTimeout(1000);expect(calls).toBe(1);
     const state=(await f.call('test/snapshot')).result;expect(state.seen.filter(row=>row.method==='turn/interrupt')).toHaveLength(0);
     const result=await evidence(f,'scripted');expect(result.metrics.cameraActive).toBe(false);

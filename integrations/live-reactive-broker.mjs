@@ -53,7 +53,7 @@ export class LiveReactiveBroker {
     }
     if (message.method === 'turn/steer' && (!this.output.turn || message.params?.threadId !== this.output.thread ||
       message.params?.expectedTurnId !== this.output.turn)) { this.rejectInput(message, 'reactive_steer_invalid', false); return false; }
-    this.active?.controller.abort();
+    this.active?.controller.abort(); this.provider?.discardPublication?.(this.active?.id);
     this.receipts.add(message.id); if (this.receipts.size > 64) this.receipts.delete(this.receipts.values().next().value);
     this.pending.set(message.id, { method: message.method, threadId: message.params?.threadId });
     this.queue.push(message); void this.drain(); return false;
@@ -122,7 +122,7 @@ export class LiveReactiveBroker {
         let token = null; try { token = api.recordingCaptureToken?.() ?? null; } catch {}
         return { candidate: take ? api.takeReactiveRequest() : null, captureToken: token, conversationApplied: !!publish, activeAllowed: !native || !activeId || api.canContinueNativeReaction?.(activeId) === true };
       }, { activity, entries, busy, available, take: available && !this.active && !busy, receipts: queuedReceipts, projection, policy: this.provider?.policy, native: this.provider?.conversationLane === true, activeId: this.active?.id ?? null, contractVersion: this.provider?.contractVersion === 2 ? 2 : 1 });
-      if (polled?.activeAllowed === false) this.active?.controller.abort();
+      if (polled?.activeAllowed === false) { this.active?.controller.abort(); this.provider?.discardPublication?.(this.active?.id); }
       if (polled?.conversationApplied) this.conversationFingerprint = fingerprint;
       const candidate = polled?.candidate, token = captureToken(polled?.captureToken);
       const currentBusy = this.reactionBusy() || conversationBusy(conversationSource?.()?.snapshot);
@@ -143,7 +143,7 @@ export class LiveReactiveBroker {
       this.log('reactive_request_rejected'); void this.deliver(id, null).catch(() => { this.paused = true; }); return;
     }
     this.requests.add(id);
-    const owned = { id, captureToken: token, receiptSeen: false, controller: new AbortController(), terminal: false };
+    const owned = { id, request: candidate.request, captureToken: token, receiptSeen: false, controller: new AbortController(), terminal: false };
     this.active = owned; void this.authorize(owned, candidate);
   }
   receipt(owned, value) {
@@ -192,8 +192,21 @@ export class LiveReactiveBroker {
     if (this.closed || this.browserUnavailable || this.active !== owned || owned.terminal) return;
     clearTimeout(owned.timer); owned.terminal = true;
     if (this.provider?.conversationLane && (owned.controller.signal.aborted || this.reactionBusy() || conversationBusy(this.conversationSource?.()?.snapshot))) { await this.finishFailure(owned); return; }
-    try { await this.deliver(owned.id, value); if (this.active === owned) this.active = undefined; }
-    catch { this.uncertain = true; this.log('reactive_delivery_unknown'); }
+    try {
+      const receipt = await this.deliver(owned.id, value);
+      try { await this.confirmPublication(owned, receipt); } catch { this.provider?.discardPublication?.(owned.id); }
+      if (this.active === owned) this.active = undefined;
+    }
+    catch { this.provider?.discardPublication?.(owned.id); this.uncertain = true; this.log('reactive_delivery_unknown'); }
+  }
+  async confirmPublication(owned, receipt) {
+    if (!this.provider?.conversationLane || typeof this.provider.confirmPublication !== 'function') return;
+    const current = () => !this.closed && !this.browserUnavailable && this.active === owned && !owned.controller.signal.aborted &&
+      !this.reactionBusy() && !conversationBusy(this.conversationSource?.()?.snapshot);
+    if (!current()) { this.provider.discardPublication?.(owned.id); return; }
+    const allowed = await this.evaluate(request => window.fischLive.canRememberNativeReaction?.(request) === true, owned.request);
+    if (!current() || allowed !== true) { this.provider.discardPublication?.(owned.id); return; }
+    this.provider.confirmPublication(owned.request, receipt);
   }
   async failed(owned, error) {
     if (this.closed || this.browserUnavailable || this.active !== owned || owned.terminal) return;
@@ -204,6 +217,7 @@ export class LiveReactiveBroker {
     else { this.uncertain = true; this.log('reactive_transport_unknown'); await this.fail(owned.id); }
   }
   async finishFailure(owned) {
+    this.provider?.discardPublication?.(owned.id);
     try { await this.deliver(owned.id, null); if (this.active === owned) this.active = undefined; }
     catch { this.uncertain = true; this.log('reactive_delivery_unknown'); }
   }

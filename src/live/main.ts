@@ -65,6 +65,7 @@ Object.assign(window, { fischLive: { pair: (base: string, token: string) => brid
   takeReactiveRequest: () => { const candidate = reactive.takeRequest();
     if (candidate && nativeConversation) { nativeRequests.set(candidate.request.requestId, { request: candidate.request, read: reactive.nativeReadSet(candidate.observationWindow.events) }); if (nativeRequests.size > 8) nativeRequests.delete(nativeRequests.keys().next().value!); }
     return candidate; },
+  canRememberNativeReaction: (request: ReactiveRequest) => nativeConversation && !stopped && reactive.canPublish(request),
   canContinueNativeReaction: (id: string) => { const held = nativeRequests.get(id); return !!held && reactive.canPublish(held.request, held.read); },
   deliverNativeReaction: async (id: string, data: any) => {
     const held = nativeRequests.get(id); nativeRequests.delete(id);
