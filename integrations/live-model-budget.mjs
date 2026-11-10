@@ -2,8 +2,8 @@ import { mkdirSync, readFileSync, writeFileSync, renameSync, rmdirSync } from 'n
 
 export function readModelBudget(path) {
   const budget = JSON.parse(readFileSync(path, 'utf8'));
-  if (!Number.isInteger(budget.limit) || budget.limit < 1 || budget.limit > 120 ||
-    !Number.isInteger(budget.used) || budget.used < 0 || budget.used > budget.limit ||
+  if (!Number.isSafeInteger(budget.limit) || budget.limit < 1 ||
+    !Number.isSafeInteger(budget.used) || budget.used < 0 || budget.used > budget.limit ||
     !Array.isArray(budget.turns) || !Number.isFinite(Date.parse(budget.deadline))) throw Error('invalid_model_budget');
   return budget;
 }

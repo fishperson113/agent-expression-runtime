@@ -29,11 +29,11 @@ function protocol(socket) {
   });
   return { call, events };
 }
-export async function openModelClient(live) {
+export async function openModelClient(live, { onRequest = () => {} } = {}) {
   const output = new LiveOutput(() => live.page.evaluate(() => window.fischLive.selectThread())), host = await codexCommand(), original = liveCodexArguments(liveRoot);
   const transport = await openCodexTransport({ host, args: [...original.slice(original.indexOf('-c')), '-c', 'projects={"' + liveRoot.replace(/\/$/, '') + '"={trust_level="untrusted"}}', '-c', 'sandbox_mode="read-only"', '-c', 'approval_policy="on-request"'], cwd: liveRoot,
     env: { ...process.env, AER_BASE_URL: live.base, AER_PAIRING_TOKEN: live.token, FISCH_LIVE: '1', FISCH_PLANNER_BACKEND: 'off' },
-    instructions: readFileSync(new URL('./live-instructions.md', import.meta.url), 'utf8'), onEvent: message => output.accept(message), onRequest: message => output.request(message) });
+    instructions: readFileSync(new URL('./live-instructions.md', import.meta.url), 'utf8'), onEvent: message => output.accept(message), onRequest: message => { output.request(message); onRequest(message); } });
   const socket = new WebSocket(transport.url, { headers: { Authorization: 'Bearer ' + transport.token } });
   const timer = setInterval(() => { if (!live.page.isClosed()) void live.page.evaluate(value => window.fischLive.activity(value), output.sample()).catch(() => {}); }, 100);
   try {

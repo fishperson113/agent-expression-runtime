@@ -76,7 +76,7 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: cargo build --locked --no-default-features --bin fisch-gateway --manifest-path src-tauri/Cargo.toml
-      - run: npx vitest run --maxWorkers=1 tests/playground-mcp.test.mjs tests/playground-route.test.mjs tests/live-restart-route.test.mjs tests/expression-capability-e2e.test.mjs tests/expression-composition-e2e.test.mjs tests/live-conversation-host.test.mjs
+      - run: npx vitest run --maxWorkers=1 tests/playground-mcp.test.mjs tests/playground-route.test.mjs tests/live-restart-route.test.mjs tests/expression-capability-e2e.test.mjs tests/expression-composition-e2e.test.mjs tests/expression-channel-e2e.test.mjs tests/live-conversation-host.test.mjs
         env:
           FISCH_PLAYGROUND_REQUIRE_GATEWAY: '1'
           FISCH_CAPABILITY_REQUIRE_GATEWAY: '1'
