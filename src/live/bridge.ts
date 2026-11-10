@@ -13,6 +13,7 @@ export class LiveBridge {
   private timer?: ReturnType<typeof setInterval>;
   private connected = false;
   private stopped = false;
+  private inspection = 0;
   constructor(private body: LiveBody, private observations: FaceObservations, private resetReactive = () => {}, private observeReactive = () => {}) {}
   async connect(base: string, token: string) {
     if (this.connection) throw Error('live_already_paired');
@@ -57,6 +58,7 @@ export class LiveBridge {
       this.observeReactive();
       element('connection').textContent = 'Đã nối gateway / look tổng hợp';
     }
+    if (message.type === 'inspect_expression') { await this.inspect(message); return; }
     if (message.type !== 'look' || message.synthetic !== true) return;
     const indicator = element('look-indicator'); indicator.hidden = false; indicator.textContent = 'Look ảnh tổng hợp: ' + String(message.reason).slice(0, 240);
     await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
@@ -68,6 +70,20 @@ export class LiveBridge {
     this.socket?.send(JSON.stringify({ type: 'look_result', id: message.id, synthetic: true, mimeType: 'image/jpeg',
       data: canvas.toDataURL('image/jpeg', 0.85).split(',')[1], width: canvas.width, height: canvas.height }));
     setTimeout(() => { indicator.hidden = true; }, 2000);
+  }
+  private async inspect(message: any) {
+    const socket = this.socket, epoch = this.body.scheduler.epoch;
+    if (message.epoch !== epoch || !socket || this.stopped || document.hidden || this.body.controls.mode === 'off') return;
+    const before = this.body.renderer.contentFrame, generation = ++this.inspection;
+    const indicator = element('look-indicator'); indicator.hidden = false;
+    indicator.textContent = 'Kiểm tra output renderer (không camera)';
+    try {
+    await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    if (document.hidden || String(this.body.controls.mode) === 'off' || this.stopped || socket !== this.socket || socket.readyState !== WebSocket.OPEN || this.body.scheduler.epoch !== epoch) return;
+    const summary = this.body.renderer.inspectOutput();
+    if (summary.contentFrame <= before || summary.contextLost) return;
+    socket.send(JSON.stringify({ type: 'render_output', id: message.id, epoch, summary }));
+    } finally { setTimeout(() => { if (generation === this.inspection) indicator.hidden = true; }, 2000); }
   }
   stop() { this.stopped = true; clearInterval(this.timer); this.socket?.close(); this.connection?.dispose(); this.body.feedback = undefined; }
 }

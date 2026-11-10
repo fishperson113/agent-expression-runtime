@@ -133,3 +133,41 @@ async fn paced_burst_preserves_exact_events_and_sixty_ms_admission_spacing() {
     assert!(!store.ingest(snapshot(530, 1120), vec![], "test", 1120));
     assert!(!store.ingest(snapshot(531, 1120), vec![], "other", 1120));
 }
+
+fn renderer_reply(id: &str, epoch: &str) -> Value {
+    json!({"type":"render_output", "id":id, "epoch":epoch, "summary":{
+        "frame":4,"contentFrame":4,"signature":42,"contextLost":false,"capturedAt":now(),"particles":2000,
+        "color":"#a237c9","pointSize":2,"brightness":0.8,"parts":[{"id":"authored","kind":"curve","particles":2000,"bounds":{"min":[-1.0,-0.5,0.0],"max":[1.0,0.5,0.1]}}],
+        "bounds":{"min":[-1.0,-0.5,0.0],"max":[1.0,0.5,0.1]}}})
+}
+#[test]
+fn renderer_summary_rejects_camera_fields_unknown_fields_and_stale_render_time() {
+    let state = LiveState::default(); let epoch = uuid::Uuid::new_v4().to_string();
+    assert!(receive(&state, renderer_reply("unmatched", &epoch)));
+    let mut value = renderer_reply("x", &epoch); value["summary"]["camera"] = json!("private");
+    assert!(!receive(&state, value));
+    let mut value = renderer_reply("x", &epoch); value["summary"]["capturedAt"] = json!(0);
+    assert!(!receive(&state, value));
+    let mut value = renderer_reply("x", &epoch); value["summary"]["bounds"]["min"] = json!([0,1]);
+    assert!(!receive(&state, value));
+}
+#[tokio::test]
+async fn renderer_capture_drops_a_reply_when_session_or_renderer_connection_changes() {
+    use axum::{body::{to_bytes, Body}, http::Request};
+    use tower::ServiceExt;
+    for disconnect in [false, true] {
+    let g = Gateway::new(); let owner = g.clone();
+    g.subscribe(Arc::new(move |event| { owner.control_ack(event.epoch); Ok(()) }));
+    let response = g.router().oneshot(Request::post("/v1/sessions").header("host","127.0.0.1:12345").header("Authorization", format!("Bearer {}",g.token))
+        .header("Content-Type","application/json").body(Body::from("{}")).unwrap()).await.unwrap();
+    let session: Value = serde_json::from_slice(&to_bytes(response.into_body(), 4096).await.unwrap()).unwrap();
+    let id = session["id"].as_str().unwrap().to_owned(); let epoch = session["epoch"].as_str().unwrap().to_owned();
+    let (sender, mut outgoing) = mpsc::channel(4); g.live.inner.lock().unwrap().sender = Some(sender);
+    let worker = g.clone();
+    let pending = tokio::spawn(async move { render_output::inspect(State(worker), Path(id), Json(json!({}))).await });
+    let request = outgoing.recv().await.unwrap(); assert_eq!(request["epoch"], epoch);
+    if disconnect { g.live.inner.lock().unwrap().generation = uuid::Uuid::new_v4().to_string(); } else { g.revoke(); }
+    assert!(receive(&g.live, renderer_reply(request["id"].as_str().unwrap(), &epoch)));
+    assert_eq!(pending.await.unwrap().status(), StatusCode::CONFLICT);
+    }
+}

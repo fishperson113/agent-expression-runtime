@@ -9,6 +9,8 @@ use tokio::sync::{mpsc, oneshot, Semaphore};
 pub mod observation;
 #[path = "live_ingress.rs"]
 mod ingress;
+#[path = "render_output.rs"]
+pub mod render_output;
 #[cfg(test)]
 #[path = "live_gateway_tests.rs"]
 mod tests;
@@ -16,8 +18,9 @@ mod tests;
 #[derive(Clone)]
 pub struct LiveState { inner: Arc<Mutex<Inner>>, slot: Arc<Semaphore> }
 #[derive(Default)]
-struct Inner { session: String, observations: observation::Observations, sender: Option<mpsc::Sender<Value>>,
-    look: Option<(String, oneshot::Sender<Value>)>, last_look: Option<Instant> }
+struct Inner { generation: String, session: String, observations: observation::Observations, sender: Option<mpsc::Sender<Value>>,
+    look: Option<(String, oneshot::Sender<Value>)>, last_look: Option<Instant>,
+    output: Option<(String, oneshot::Sender<Value>)>, last_output: Option<Instant> }
 impl Default for LiveState {
     fn default() -> Self { Self { inner: Arc::default(), slot: Arc::new(Semaphore::new(1)) } }
 }
@@ -56,7 +59,7 @@ async fn hello(socket: &mut WebSocket, gateway: &Gateway) -> Option<String> {
 async fn connection(mut socket: WebSocket, gateway: Gateway) {
     let Some(session) = hello(&mut socket, &gateway).await else { return; };
     let (sender, mut outgoing) = mpsc::channel(4);
-    { let mut inner = gateway.live.inner.lock().unwrap(); *inner = Inner { session, sender: Some(sender), ..Inner::default() }; }
+    { let mut inner = gateway.live.inner.lock().unwrap(); *inner = Inner { generation: uuid::Uuid::new_v4().to_string(), session, sender: Some(sender), ..Inner::default() }; }
     let _ = socket.send(Message::Text(json!({"type":"ready","lookMode":"synthetic-only"}).to_string().into())).await;
     let mut pacer = ingress::ObservationPacer::new();
     loop {
@@ -86,6 +89,7 @@ fn receive(state: &LiveState, value: Value) -> bool {
         let session = inner.session.clone();
         return inner.observations.ingest(value["snapshot"].clone(), events.clone(), &session, now());
     }
+    if value["type"] == "render_output" { return render_output::receive(&mut inner, value); }
     if value["type"] == "look_result" {
         if !observation::keys(&value, &["type", "id", "synthetic", "mimeType", "data", "width", "height"]) || value["synthetic"] != true || value["mimeType"] != "image/jpeg" { return false; }
         if !["width", "height"].iter().all(|key| value[*key].as_u64().is_some_and(|n| n > 0 && n <= 768)) { return false; }

@@ -109,12 +109,18 @@ export class ThreeRenderer implements RendererSink {
     if (!this.lost && this.submittedFrames > 0) {
       this.renderer.render(this.scene, this.camera);
       this.submittedFrames++;
+      this.outputAt = Date.now();
     }
   }
   quality(count: number) {
     this.count = count;
     this.geometry.setDrawRange(0, count);
   }
+  private outputParts: { id: string; kind: string }[] = [];
+  private outputGroups = new Uint8Array();
+  private outputAt = 0;
+  private outputFrame = 0;
+  get contentFrame() { return this.outputFrame; }
   apply(state: BodyState, now: number) {
     if (this.lost) return;
     const amp = this.reducedMotion ? 0.08 : 1;
@@ -128,6 +134,25 @@ export class ThreeRenderer implements RendererSink {
     this.material.uniforms.brightness.value = Number(state.brightness);
     this.renderer.render(this.scene, this.camera);
     this.submittedFrames++;
+    this.outputGroups = new Uint8Array(state.particleGroups ?? []);
+    this.outputFrame = this.submittedFrames;
+    this.outputParts = (state.particleParts ?? []).map(part => ({ id: part.id, kind: part.kind }));
+    this.outputAt = Date.now();
+  }
+  private outputBounds(group?: number) {
+    let particles = 0;
+    const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
+    for (let i = 0; i < this.count * 3; i++) {
+      if (group !== undefined && this.outputGroups[Math.floor(i / 3)] !== group) continue;
+      if (i % 3 === 0) particles++;
+      const axis = i % 3; min[axis] = Math.min(min[axis], this.positions[i]); max[axis] = Math.max(max[axis], this.positions[i]);
+    }
+    return { particles, bounds: particles ? { min, max } : null };
+  }
+  inspectOutput() {
+    return { ...this.renderSnapshot, contentFrame: this.outputFrame, capturedAt: this.outputAt, particles: this.count,
+      color: '#' + this.material.uniforms.color.value.getHexString(), pointSize: Number(this.material.uniforms.size.value),
+      brightness: Number(this.material.uniforms.brightness.value), parts: this.outputParts.map((part, i) => ({ ...part, ...this.outputBounds(i) })), bounds: this.outputBounds().bounds };
   }
   get renderSnapshot() {
     const signature = particleSignature(this.positions, this.count, [this.material.uniforms.size.value,
