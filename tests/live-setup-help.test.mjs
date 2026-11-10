@@ -35,6 +35,7 @@ it('separates gateway, selected Native session and configured observer without e
     expect(await guide.getAttribute('rel')).toBe('noopener noreferrer');
     expect(await panel.textContent()).toContain('không tự gửi');
     expect(await panel.textContent()).toContain('không tự bật observer');
+    expect(await panel.textContent()).toContain('Thiết lập ở Góc của bạn');
     expect(await page.locator('video').evaluate(node => node.srcObject)).toBeNull();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     for (const viewport of [{ width: 375, height: 812 }, { width: 1440, height: 900 }]) {

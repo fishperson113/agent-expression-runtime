@@ -35,7 +35,7 @@ function elements() {
     <p>Kết nối gateway chỉ nối trang với Fisch; không xác nhận Native Codex đã chọn phiên hoặc observer đã sẵn sàng.</p>
     <ol><li>Trò chuyện trong terminal Native Codex đang chạy cùng Fisch. Chờ Codex chọn phiên trước khi gửi yêu cầu.</li>
     <li>Trong Cùng sáng tạo, chép yêu cầu rồi tự dán vào terminal đó; trang không tự gửi.</li>
-    <li>Camera chỉ bật khi bạn chủ động chọn và xử lý tại máy; bật camera không tự bật observer. Observer cần bộ quyết định riêng, ngân sách đã được cho phép và bạn chọn ô phản ứng tự động. Xem trạng thái phản ứng hiện tại trong Quan sát và phản ứng.</li></ol>
+    <li>Camera chỉ bật khi bạn chủ động chọn và xử lý tại máy; bật camera không tự bật observer. Observer cần bộ quyết định riêng, ngân sách đã được cho phép và bạn chọn ô phản ứng tự động. Xem trạng thái phản ứng hiện tại trong Thiết lập ở Góc của bạn.</li></ol>
     <p><a href="https://github.com/fishperson113/agent-expression-runtime/blob/main/docs/reactive-provider.md" target="_blank" rel="noopener noreferrer">Hướng dẫn cấu hình observer</a></p>
     <p><a href="https://github.com/fishperson113/agent-expression-runtime/blob/main/docs/live-windows-qa.md" target="_blank" rel="noopener noreferrer">Chạy và cập nhật CLI trên Windows</a></p>
     <p>Dừng hoặc khởi chạy lại từ terminal. Tạo hình riêng trong phiên không tự được khôi phục sau khi khởi chạy lại.</p></details>`;
