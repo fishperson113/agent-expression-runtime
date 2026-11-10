@@ -171,3 +171,23 @@ async fn renderer_capture_drops_a_reply_when_session_or_renderer_connection_chan
     assert_eq!(pending.await.unwrap().status(), StatusCode::CONFLICT);
     }
 }
+
+#[test]
+fn public_coordination_rejects_private_fields_and_unbounded_history() {
+    let state = LiveState::default(); let epoch = uuid::Uuid::new_v4().to_string();
+    let mut value = renderer_reply("public", &epoch);
+    value["coordination"] = json!({"schemaVersion":1,"publicBrief":null,"remainingMs":0,"geometryProtected":true,"expressionAllowed":false,"reactiveAvailable":false,"reactiveEnabled":false,
+        "recentPublished":[{"requestId":"public_id","text":"Left or right?","ageMs":10}]});
+    assert!(receive(&state, value.clone()));
+    let mut invalid = value.clone(); invalid["coordination"]["mainTranscript"] = json!("PRIVATE"); assert!(!receive(&state, invalid));
+    let mut invalid = value.clone(); invalid["coordination"]["recentPublished"][0]["ageMs"] = json!(300000); assert!(!receive(&state, invalid));
+    let mut invalid = value.clone(); invalid["coordination"]["recentPublished"] = json!(vec![json!({"requestId":"r","text":"x","ageMs":1});9]); assert!(!receive(&state, invalid));
+    for (field, bad) in [("reactiveEnabled", json!("true")), ("remainingMs", json!(1)), ("schemaVersion", json!(2)),
+        ("recentPublished", json!([{"requestId":"r","text":"x".repeat(601),"ageMs":1}])),
+        ("recentPublished", json!([{"requestId":"r","text":"😀".repeat(301),"ageMs":1}])),
+        ("recentPublished", json!((0..5).map(|n| json!({"requestId":format!("r{n}"),"text":"x".repeat(500),"ageMs":1})).collect::<Vec<_>>()))] {
+        let mut invalid = value.clone(); invalid["coordination"][field] = bad; assert!(!receive(&state, invalid));
+    }
+    let mut unicode = value.clone(); unicode["coordination"]["publicBrief"] = json!({"revision":1,"text":"\u{85}x","mode":"open"}); assert!(receive(&state, unicode));
+    let mut invalid = value; invalid["coordination"]["publicBrief"] = json!({"revision":1,"text":"public","mode":"unknown"}); assert!(!receive(&state, invalid));
+}

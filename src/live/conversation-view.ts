@@ -81,14 +81,19 @@ function statusText(state: Snapshot | undefined, busy: boolean) {
 }
 function reactionView(host: HTMLElement, disposed: () => boolean) {
   const reactionIds = new Set<string>();
+  let history: { requestId: string; text: string; at: number }[] = [];
+  const snapshot = () => { const now = performance.now(); history = history.filter(item => now >= item.at && now - item.at < 300000);
+    return history.map(({ requestId, text, at }) => ({ requestId, text, ageMs: now - at })); };
   function reaction(value: { requestId: string; text: string }) {
     if (disposed() || !value || typeof value.requestId !== 'string' || !/^[a-zA-Z0-9_-]{1,64}$/.test(value.requestId) || reactionIds.has(value.requestId) || typeof value.text !== 'string' || value.text.length > 600 || !value.text.trim()) return false;
     reactionIds.add(value.requestId); if (reactionIds.size > 128) reactionIds.delete(reactionIds.values().next().value!);
     const list = host.querySelector('.observation-messages')!, item = document.createElement('div');
     item.dataset.requestId = value.requestId; item.textContent = 'Fisch · chủ động: ' + value.text; list.append(item);
+    snapshot(); history.push({ requestId: value.requestId, text: value.text, at: performance.now() });
+    while (history.length > 8 || history.reduce((sum, item) => sum + item.text.length, 0) > 2400) history.shift();
     while (list.children.length > 24) list.firstChild?.remove(); list.scrollTop = list.scrollHeight; return true;
   }
-  return { publish: reaction, clear: () => { reactionIds.clear(); host.querySelector('.observation-messages')?.replaceChildren(); } };
+  return { publish: reaction, snapshot, clear: () => { history = []; reactionIds.clear(); host.querySelector('.observation-messages')?.replaceChildren(); } };
 }
 function paintConversation(ui: ReturnType<typeof elements>, state: Snapshot | undefined, flags: { disposed: boolean; busy: boolean; cancelling: boolean; localError: string; lock: boolean; acknowledged: number }) {
     const { disposed, busy, cancelling, localError, lock, acknowledged } = flags;
@@ -141,5 +146,5 @@ export function mountConversation(container: HTMLElement, request: Request) {
     } finally { if (!disposed && current === attempt) { if (action === 'send') busy = false; else if (cancelScope === scope) cancelling = false; paint(); } }
   }
   ui.input.oninput = paint; ui.form.onsubmit = event => { event.preventDefault(); void act('send'); }; ui.cancel.onclick = () => { void act('cancel'); }; paint();
-  return { project, clear, reaction: reactions.publish, dispose: () => { if (disposed) return; clear(); disposed = true; ui.input.oninput = null; ui.form.onsubmit = null; ui.cancel.onclick = null; ui.host.remove(); } };
+  return { project, clear, reaction: reactions.publish, reactionHistory: reactions.snapshot, dispose: () => { if (disposed) return; clear(); disposed = true; ui.input.oninput = null; ui.form.onsubmit = null; ui.cancel.onclick = null; ui.host.remove(); } };
 }

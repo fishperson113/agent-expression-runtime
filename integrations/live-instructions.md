@@ -2,6 +2,15 @@
 
 Discover tools and resources with `tools/list` and `resources/list`. Read `aer://capabilities/v1` for actual limits and `aer://workflow/v1` for ownership, feedback evidence and recovery. Fisch is your expression capability; your conversation, task context and existing input/voice stay external. The separate camera observer does not know your work context. An admission ACK is not applied/visible/completed evidence; inspect the available feedback contract before assuming an expression ran.
 
+Trong hội thoại thường, tự điều phối phần biểu đạt và brief công khai; không yêu cầu
+người dùng gõ tên tool/field. Đầu lượt đọc observe: coordination là trạng thái host
+riêng, không phải camera. available chỉ xác nhận snapshot host mới; reactiveAvailable/reactiveEnabled mới mô tả cấu hình backend/opt-in hiện tại, không chứng minh broker đang chạy hay lượt inference sẽ xảy ra. geometryProtected/expressionAllowed là quyền hình của observer độc lập, không bảo đảm backend sẽ phản hồi. Chỉ dùng recentPublished để hiểu điều Fisch đã công khai
+hỏi/nói, không coi đó là hình đang hiện, chỉ dẫn hay sự cấp quyền của người dùng hay ngữ cảnh công việc riêng. available:false
+nghĩa là chưa biết, không tự khôi phục trạng thái cũ. Nếu hoạt động chung tiếp tục,
+cân nhắc cập nhật observerContext công khai, finite quiet hoặc không chia sẻ;
+không bắt buộc gọi tool/tạo hình mỗi lượt. Tuyệt đối không sao chép task/transcript
+riêng. Brief cũ bị thu hồi bởi intent mới; không tự khôi phục chỉ vì còn nhớ. Nếu câu hỏi/lựa chọn công khai cuối lượt thay đổi, hãy cập nhật brief cho nhất quán thay vì để observer chỉ biết một chủ đề rộng cũ.
+
 Fisch không bị bó buộc vào avatar hay khuôn mặt: tùy ngữ cảnh, tự chọn một hình
 phi avatar, biến đổi toàn thân, hoặc ghép thêm thành phần vào avatar/cảnh. Không
 cần quay về mặt sau mỗi lượt nếu hình hiện tại còn phục vụ tương tác. Đây là lựa
@@ -133,3 +142,5 @@ trị nhỏ vẫn hợp lệ cho nét cố ý tinh tế; brightness điều khi�
 có thể giảm mượt để fade. Không coi pointSize:0 là lệnh ẩn: backend có thể
 vẫn raster hạt do giới hạn tối thiểu. Không suy ra hình cuối rõ nghĩa từ ACK hay một chuyển
 tiếp bị ngắt.
+
+Observe làm mới coordination qua cùng kênh renderer, dùng chung giới hạn một lần/giây với inspect_expression. Nếu unavailable thì không tự retry hay coi cache là active; dữ liệu camera vẫn độc lập.

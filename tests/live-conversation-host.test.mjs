@@ -543,3 +543,29 @@ it.skipIf(!nativeGateway)('keeps a long public brief above usable chat with publ
     expect((await page.evaluate(()=>window.fischLive.metrics())).cameraActive).toBe(false);
   }finally{await client?.close();await f.close();}
 },90000);
+
+it.skipIf(!nativeGateway)('returns only public Fisch presentation history through fresh MCP observe feedback',async()=>{
+  const receipts=[];const provider={conversationLane:true,contractVersion:1,confirmPublication:(_request,value)=>receipts.push(value),
+    decide:async window=>({decision:{schemaVersion:1,requestId:window.request.requestId,decisionId:'public_'+window.request.requestId,
+      mode:'observe',validUntil:window.request.deadline,action:null},reply:'Bạn chọn lối trái hay lối phải? PUBLIC_QUESTION'})};
+  const f=await nativeBrowserLoop(provider),client=liveTestClient(f.live.base,f.live.token);
+  try{await client.call('initialize');await arrive(f);await expect.poll(()=>receipts.length,{timeout:10000}).toBe(1);
+    expect(receipts[0].chatPublished).toBe(true);
+    const feedback=toolValue(await client.tool('observe'));
+    expect(feedback.coordination).toMatchObject({source:'fisch-host',available:true,state:{schemaVersion:1}});
+    expect(feedback.coordination.state.recentPublished[0].text).toContain('PUBLIC_QUESTION');
+    expect(JSON.stringify(feedback.coordination)).not.toContain('Public scripted coding task');
+    expect(feedback.snapshot.summary).not.toContain('PUBLIC_QUESTION');
+    expect(await f.live.page.locator('#look-indicator').isHidden()).toBe(true);
+    const inspectCollision=await client.tool('inspect_expression');expect(inspectCollision.isError).toBe(true);expect(JSON.stringify(inspectCollision)).toContain('render_rate_limited');
+    const collision=toolValue(await client.tool('observe'));expect(collision.coordination.available).toBe(false);expect(collision.snapshot).toBeTruthy();
+    await f.live.page.evaluate(()=>window.fischLive.conversationClear());
+    await f.live.page.waitForTimeout(1100);
+    const cleared=toolValue(await client.tool('observe'));expect(cleared.coordination.state.recentPublished).toEqual([]);
+    expect(cleared.coordination.available).toBe(true);
+    await f.live.page.waitForTimeout(1100);await client.tool('inspect_expression');expect(await f.live.page.locator('#look-indicator').isVisible()).toBe(true);
+    await f.live.page.waitForTimeout(1100);await client.tool('observe');await f.live.page.waitForTimeout(1000);
+    expect(await f.live.page.locator('#look-indicator').isHidden()).toBe(true);
+    expect((await f.live.page.evaluate(()=>window.fischLive.metrics())).cameraActive).toBe(false);
+  }finally{await client.close();await f.close();}
+},60000);

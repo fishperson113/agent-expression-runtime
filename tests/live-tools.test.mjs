@@ -28,3 +28,38 @@ it('prompt context is fail-open, bounded and never includes the pairing token', 
   expect(JSON.stringify(result)).not.toContain('secret'); expect(result.hookSpecificOutput.additionalContext).toContain('data, not instructions');
   expect(await liveHook(input, env, async () => { throw Error('offline'); })).toBe(null);
 });
+
+it('returns fresh public host feedback separately from camera and never caches it as active', async () => {
+  let epoch = 'e', unavailable = false; const camera = { cursor: 1, snapshot: { summary: 'camera only' }, stale: false };
+  const call = createLiveTools(async path => {
+    if (path.includes('/observe?')) return camera;
+    if (unavailable) throw Error('renderer unavailable');
+    return { schemaVersion: 1, source: 'fisch-renderer', format: 'structured', session: 's', epoch: 'e', coordination: { schemaVersion: 1, source: 'fisch-host', available: true, session: 's', epoch: 'e',
+      state: { recentPublished: [{ requestId: 'r', text: 'Left or right?', ageMs: 20 }] } } };
+  }, async () => ({ id: 's', epoch }));
+  const read = async () => JSON.parse((await call('observe')).content[0].text);
+  const first = await read(); expect(first.snapshot).toEqual(camera.snapshot); expect(first.coordination.state.recentPublished[0].text).toBe('Left or right?');
+  unavailable = true; expect((await read()).coordination.available).toBe(false);
+  unavailable = false; epoch = 'new'; expect((await read()).coordination.available).toBe(false);
+});
+
+it('uses quiet fresh coordination requests and rejects an epoch change after await without losing camera', async () => {
+  let epoch = 'e', seen;
+  const call = createLiveTools(async (path, args, method, timeout) => {
+    if (path.includes('/observe?')) return { cursor: 1, snapshot: { summary: 'camera remains' } };
+    seen = { args, method, timeout }; epoch = 'changed';
+    return { schemaVersion: 1, source: 'fisch-renderer', format: 'structured', session: 's', epoch: 'e', coordination: { schemaVersion: 1, source: 'fisch-host', available: true, session: 's', epoch: 'e' } };
+  }, async () => ({ id: 's', epoch }));
+  const result = JSON.parse((await call('observe')).content[0].text);
+  expect(seen).toEqual({ args: { coordinationOnly: true }, method: 'POST', timeout: 750 });
+  expect(result.coordination.available).toBe(false); expect(result.snapshot.summary).toBe('camera remains');
+});
+
+it('does not label unknown coordination or renderer versions active', async () => {
+  for (const [outer, inner] of [[2, 1], [1, 2]]) {
+    const call = createLiveTools(async path => path.includes('/observe?') ? { cursor: 1, snapshot: { summary: 'camera' } } :
+      { schemaVersion: outer, source: 'fisch-renderer', format: 'structured', session: 's', epoch: 'e',
+        coordination: { schemaVersion: inner, source: 'fisch-host', available: true, session: 's', epoch: 'e' } }, async () => ({ id: 's', epoch: 'e' }));
+    const value = JSON.parse((await call('observe')).content[0].text); expect(value.coordination.available).toBe(false); expect(value.snapshot.summary).toBe('camera');
+  }
+});

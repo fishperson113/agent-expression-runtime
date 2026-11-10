@@ -21,7 +21,7 @@ export function liveToolDefinitions() {
   const annotations = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
   return [{ name: 'return_to_face', description: 'Restore the declared resting face after an illustration, clearing semantic controls. For face gestures use express with live poses targeting eye_left, eye_right, brow_left, brow_right or mouth; choose bounded transforms yourself.',
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false }, inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
-  { name: 'observe', description: 'Read current local face observations and events since your last read. Call at the start of every turn; stale/unknown is not absence. No image.', annotations,
+  { name: 'observe', description: 'Read current local face observations and events since your last read. Call at the start of every turn; stale/unknown is not absence. No image. Includes best-effort fresh host coordination separately: public Fisch replies/brief and ownership, never private MAIN transcript. Historical replies are not current geometry.', annotations,
     inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'inspect_expression', description: 'Refresh a structured summary from the engine renderer only: last submitted particle-buffer bounds, part IDs/types and style, with frame/epoch provenance. No camera or image. This is not pixel/recognition/vision evidence. Unavailable while frozen, backgrounded or disconnected. One request per second.', annotations,
     inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
@@ -47,7 +47,17 @@ export function createLiveTools(request, currentSession, resetSession = () => {}
         return { content: [{ type: 'text', text: JSON.stringify(result) }] };
       }
       const result = name === 'observe' ? await request(path + '/observe?cursor=' + cursor) : await request(path + '/look', args, 'POST', 3000);
-      if (name === 'observe') { cursor = result.cursor; return { content: [{ type: 'text', text: JSON.stringify(result) }] }; }
+      if (name === 'observe') {
+        cursor = result.cursor;
+        let coordination = { schemaVersion: 1, source: 'fisch-host', available: false };
+        if (typeof session.epoch === 'string') try {
+          const refreshed = await request(path + '/render-output', { coordinationOnly: true }, 'POST', 750), current = await currentSession();
+          if (refreshed.schemaVersion === 1 && refreshed.source === 'fisch-renderer' && refreshed.format === 'structured' && current.id === session.id && current.epoch === session.epoch && refreshed.session === session.id && refreshed.epoch === session.epoch
+              && refreshed.coordination?.schemaVersion === 1 && refreshed.coordination?.source === 'fisch-host' && refreshed.coordination.available === true
+              && refreshed.coordination.session === session.id && refreshed.coordination.epoch === session.epoch) coordination = refreshed.coordination;
+        } catch (error) { if (['session_closed', 'session', 'http_404'].includes(error.message)) resetSession(); }
+        return { content: [{ type: 'text', text: JSON.stringify({ ...result, coordination }) }] };
+      }
       if (result.synthetic !== true || result.mimeType !== 'image/jpeg' || typeof result.data !== 'string' || result.data.length > 220000) throw Error('look_result_invalid');
       return { content: [{ type: 'text', text: 'Synthetic fixture only; not a camera image. Reason: ' + args.reason },
         { type: 'image', mimeType: 'image/jpeg', data: result.data }] };
