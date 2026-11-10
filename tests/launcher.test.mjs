@@ -34,7 +34,9 @@ async function admitted(call, args) {
   let reply;
   await expect.poll(async () => {
     reply = await call('tools/call', { name: 'express', arguments: arguments_ });
-    return JSON.parse(reply.content[0].text).status;
+    const receipt = JSON.parse(reply.content[0].text);
+    if (receipt.status === 'rejected' && receipt.code === 'renderer_starting') arguments_.requestId = randomUUID();
+    return receipt.status;
   }, { timeout: 1500, interval: 100 }).toBe('accepted');
   return reply;
 }
