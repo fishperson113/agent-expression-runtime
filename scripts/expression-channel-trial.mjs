@@ -59,6 +59,8 @@ async function trial(entry, arm, settings) {
     stage = 'preflight'; const verified = await preflight(client, threadId, audit);
     if (settings.catalog.hash && settings.catalog.hash !== verified.catalogHash) throw Error('catalog_changed_between_arms');
     settings.catalog.hash = verified.catalogHash;
+    if (settings.catalog.policy && settings.catalog.policy !== verified.policy.hash) throw Error('effective_policy_changed_between_arms');
+    settings.catalog.policy = verified.policy.hash;
     const channel = new ExpressionResponseChannel({ call: (method, params) => client.call(method, params) });
     const token = channel.begin({ threadId, epoch: verified.epoch });
     const videoStarted = await startBodyVideo(live.page);
