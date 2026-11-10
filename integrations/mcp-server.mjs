@@ -70,8 +70,16 @@ const inputSchema = {
     policy: { enum: ['replace', 'append'] },
     ttlMs: { type: 'integer', minimum: 0, maximum: 5000 },
     requestId: { type: 'string', minLength: 1, maxLength: 128 },
+    expectedEpoch: { type: 'string', minLength: 1, maxLength: 128, description: 'Optional host lease fence; reject if cancellation/session replacement changed this epoch. Never replay a mismatch.' },
   },
 };
+function assertExpectedEpoch(args) {
+  const epoch = args?.expectedEpoch;
+  if (epoch === undefined) return;
+  if (typeof epoch !== 'string' || !epoch || epoch.length > 128) throw Error('invalid_arguments');
+  if (epoch !== session?.epoch) throw Error('expected_epoch_mismatch');
+}
+
 function tools() {
   return { tools: [
     { name: 'express', description: 'Choose a short particle expression. Read aer://instructions/v1. ACK is admission, not completion.',
@@ -107,11 +115,14 @@ async function send(args) {
   commands.set(args.requestId, payload);
   while (commands.size > 256) commands.delete(commands.keys().next().value);
   const held = session, owner = { id: session.id, epoch: session.epoch };
+  if (args.expectedEpoch !== undefined && args.expectedEpoch !== owner.epoch) throw Error('expected_epoch_mismatch');
+  const { expectedEpoch, ...wireArgs } = args;
   let result;
   try {
     await expressionStatus.begin(args.requestId, owner);
+    if (expectedEpoch !== undefined && (session !== held || session?.epoch !== expectedEpoch)) throw Error('expected_epoch_mismatch');
     if (session !== held || session?.id !== owner.id || session?.epoch !== owner.epoch) throw Error('session');
-    result = await request(`/v1/sessions/${owner.id}/expressions`, { ...args, epoch: owner.epoch });
+    result = await request(`/v1/sessions/${owner.id}/expressions`, { ...wireArgs, epoch: owner.epoch });
   }
   catch (error) {
     if (['rejected', 'cancelled'].includes(error.receipt?.status)) expressionStatus.receipt(args.requestId, error.receipt);
@@ -165,6 +176,7 @@ async function invoke(params) {
     if (Object.keys(args).some(key => !Object.hasOwn(inputSchema.properties, key)) ||
         !args.body || typeof args.body !== 'object' || Array.isArray(args.body)) throw Error('invalid_arguments');
     args.requestId ??= randomUUID();
+    assertExpectedEpoch(args);
   }
   await connect();
   await settlePending();
@@ -177,6 +189,7 @@ async function invoke(params) {
 }
 async function toolCall(params) {
   try {
+    if (params?.name === 'express') assertExpectedEpoch(params.arguments);
     if (live && ['express', 'cancel_expression', 'return_to_face'].includes(params?.name)) {
       const owner = playground.interrupt('user_interrupt');
       if (owner) await revokePlayground(owner);
@@ -266,6 +279,10 @@ async function handle(message) {
   ] };
   if (method === 'resources/read') return resources(params);
   if (method === 'tools/call') {
+    if (params?.name === 'express') {
+      try { assertExpectedEpoch(params.arguments); }
+      catch (error) { return { isError: true, content: [{ type: 'text', text: JSON.stringify({ status: 'rejected', code: error.message }) }] }; }
+    }
     if (params?.name === 'expression_status') {
       try { return { content: [{ type: 'text', text: JSON.stringify(expressionStatus.read(params.arguments)) }] }; }
       catch { return { isError: true, content: [{ type: 'text', text: JSON.stringify({ status: 'rejected', code: 'invalid_arguments' }) }] }; }

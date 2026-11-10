@@ -80,3 +80,23 @@ jobs:
         env:
           FISCH_PLAYGROUND_REQUIRE_GATEWAY: '1'
           FISCH_CAPABILITY_REQUIRE_GATEWAY: '1'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/checkout@v4
+        with:
+          repository: Open-LLM-VTuber/Open-LLM-VTuber
+          ref: 992309c0aa19845960228f880013d4685fde93b5
+          path: .runtime/olv-upstream
+          sparse-checkout: |
+            src
+            prompts
+            LICENSE
+          persist-credentials: false
+      - run: python -m pip install -r integrations/olv/requirements.txt
+      - run: python -m pip check
+      - run: npx vitest run --maxWorkers=1 tests/olv-adapter.test.mjs tests/olv-render.test.mjs
+        env:
+          FISCH_OLV_PYTHON: python
+          FISCH_OLV_UPSTREAM: .runtime/olv-upstream
+          FISCH_OLV_REQUIRE_TRIAL: '1'
