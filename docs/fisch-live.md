@@ -146,11 +146,22 @@ npm run build
 npm run check:architecture
 cargo test --locked --manifest-path src-tauri/Cargo.toml
 node scripts/live-acceptance.mjs
-# Có tiêu hao quota Codex, chỉ ảnh tổng hợp:
+# Chỉ mô tả gate ngân sách, không mở browser hoặc gọi model:
+node scripts/live-preflight.mjs --describe
+# Có tiêu hao quota Codex; cần opt-in FISCH_RUN_MODEL_TESTS=1 và ledger gốc còn hạn:
 node scripts/live-preflight.mjs
 # Bật camera thật, local-only; 60 giây warm-up + 30 phút:
 node scripts/live-soak.mjs --camera-local
 ```
+
+Preflight dùng ledger hiện có tại `.runtime/live-overnight/model-budget.json`
+trong checkout Fisch, cùng sổ với holdout. Không tự tạo ledger, đặt lại `used`,
+sao chép fixture hay gia hạn deadline để chạy. Chỉ bật `FISCH_RUN_MODEL_TESTS=1`
+sau khi ledger đã được đối soát/phê duyệt. Gate kiểm tra trước khi tạo fixture;
+mỗi lần khởi động model được reserve một lượt ngay trước dispatch, giới hạn
+120 lượt và deadline được kiểm tra lại dưới lock. Lỗi/timeout không tự retry
+hoặc hoàn quota. `--describe` chỉ đọc metadata sổ, không xác nhận auth hay model
+thực sự chạy được và không chứng minh một file là ledger được phê duyệt.
 
 Chạy các bài browser tuần tự trên máy này. Preflight Codex native đã gọi observe/look và đọc đúng mã số ngẫu nhiên trong ảnh; phiên Herdr thật đã gọi observe/express/look. Nghiệm thu gateway/MCP bao phủ macro sau cancel, reload, invalid config, ảnh tổng hợp và cooldown. [Evidence chức năng](evidence/live-acceptance.json) ghi rõ cold/warm và headless software rendering; không dùng nó làm benchmark GPU native.
 
