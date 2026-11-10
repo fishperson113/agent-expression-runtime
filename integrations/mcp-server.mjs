@@ -8,6 +8,7 @@ import { createPlaygroundController } from './playground-controller.mjs';
 import { subscribePlaygroundFeedback } from './playground-feedback.mjs';
 import { playgroundToolDefinitions } from './playground-tools.mjs';
 import { capabilityResource, capabilityResourceList } from './capability-contract.mjs';
+import { composeExpression, compositionTool } from './compose-expression.mjs';
 import { createExpressionStatus, expressionStatusTool } from './expression-status.mjs';
 const base = process.env.AER_BASE_URL,
   token = process.env.AER_PAIRING_TOKEN;
@@ -82,12 +83,12 @@ function assertExpectedEpoch(args) {
 
 function tools() {
   return { tools: [
-    { name: 'express', description: 'Choose a short particle expression. Read aer://instructions/v1. ACK is admission, not completion.',
+    { name: 'express', description: live ? 'Advanced expression AST for existing-part motion, free geometry or choreography. For direct authored parts/optional avatar composition use compose_expression; choose the representation from context, not a fixed face pose. Read aer://instructions/v1. ACK is admission, not completion.' : 'Choose a short particle expression. Read aer://instructions/v1. ACK is admission, not completion.',
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false }, inputSchema: live ? liveInputSchema(inputSchema) : inputSchema },
     { name: 'cancel_expression', description: 'Cancel body work and reset posture; keep the agent running.',
       inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
     expressionStatusTool,
-    ...(live ? liveToolDefinitions() : []),
+    ...(live ? [compositionTool, ...liveToolDefinitions()] : []),
     ...(live ? playgroundToolDefinitions(protocol) : []),
   ] };
 }
@@ -265,7 +266,7 @@ async function playgroundEdit(args) {
   catch (error) { return playgroundError(error); }
 }
 async function handle(message) {
-  const { method, params } = message;
+  const { method } = message; let params = message.params;
   if (method === 'initialize') return {
     protocolVersion: '2025-06-18', capabilities: { tools: {}, resources: {} },
     serverInfo: { name: 'fisch', version: '0.1.0' },
@@ -281,6 +282,10 @@ async function handle(message) {
   ] };
   if (method === 'resources/read') return resources(params);
   if (method === 'tools/call') {
+    if (live && params?.name === 'compose_expression') {
+      try { params = { name: 'express', arguments: composeExpression(params.arguments) }; }
+      catch (error) { return { isError: true, content: [{ type: 'text', text: JSON.stringify({ status: 'rejected', code: error.message }) }] }; }
+    }
     if (params?.name === 'express') {
       try { assertExpectedEpoch(params.arguments); }
       catch (error) { return { isError: true, content: [{ type: 'text', text: JSON.stringify({ status: 'rejected', code: error.message }) }] }; }

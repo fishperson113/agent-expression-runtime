@@ -71,3 +71,37 @@ missing events. Keep lifecycle admission/application/terminal and raster evidenc
 separate. Continuation turns are conditioned trials, not additional independent
 contexts. A working authenticated Native executor must run this manifest; the
 scripted composition fixture is not evidence of autonomous model choice.
+
+## Direct geometry affordance (candidate v1)
+
+Live MCP now advertises `compose_expression`. It accepts agent-authored `parts`,
+optional `base:none|resting_face` (default none), bounded duration/easing, optional
+RGB/style and flow. Parts retain the existing bounded motion fields. The helper
+adds no semantic shape, emotion tag, language classifier or current-scene reader.
+It expands into the existing assemble/style/flow DSL and normal express path;
+validation, epoch fences, request ID deduplication, ownership, feedback and cancel
+are shared. Explicit base expansion counts toward the24-part limit, rejects ID
+collisions and is pinned to the loaded canonical-definition fingerprint. Invalid
+arguments fail before the mutation barrier; unknown outcomes are never retried.
+Optional style/flow preserve existing state when omitted. Use express for advanced
+choreography and live binding; neither API forces an expression every turn.
+
+This is an affordance experiment, not proof of why a model chose face poses.
+An audit on6f787c8 measured22,763 bytes for the express schema and found a concrete
+face-pose pattern but no complete assemble example in the delivered Live bundle.
+Copying the canonical avatar required2,205 bytes. However a minimal standalone
+assembly was132 bytes versus190 for a pose: cost alone does not explain missing
+standalone forms. The compact helper schema is3,527 bytes; express remains present,
+so the total discovered tool context actually grows. Model uptake/contextual utility
+must be measured, not inferred from smaller helper arguments or tool names.
+
+The prior v1 choice dataset is now disclosed exploratory evidence after inference;
+do not tune on it and call it untouched holdout. Retest with newly frozen unseen
+contexts after policy/source freeze, keeping model/host settings and all attempts.
+Restart the MCP process and use fresh Native threads/sessions: an existing host may
+cache old tool discovery. Verify the actual host advertises compose_expression.
+Feed only user messages, never shape labels/rubric. Record submitted AST geometry
+and visible output separately: calling a geometry tool alone is not novelty,
+recognition, relevance or naturalness. More geometry is not automatically success;
+retaining a useful form or abstaining may be appropriate. First expressive tool
+latency and full Native turn duration remain separate measures.

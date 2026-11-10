@@ -18,14 +18,14 @@
     "@mediapipe/tasks-vision": "1.2.2",
     "@tauri-apps/api": "2.12.4",
     "three": "0.184.0",
-    "ws": "8.18.3"
+    "ws": "8.18.3",
+    "ajv": "8.20.0"
   },
   "devDependencies": {
     "@playwright/test": "1.56.1",
     "@tauri-apps/cli": "2.12.4",
     "@types/node": "^26.6.6",
     "@types/three": "0.183.0",
-    "ajv": "8.20.0",
     "esbuild": "0.28.2",
     "prettier": "^3.9.10",
     "typescript": "5.9.3",
