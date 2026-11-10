@@ -63,6 +63,7 @@ function request(action: Action, idea: string, goal: string) {
 
 export function mountPlayground(container: HTMLElement) {
   const ui = elements(); container.append(ui.host); let disposed = false, generation = 0;
+  ui.details.addEventListener('fisch:tool-dismiss', () => { generation++; });
   const project = (dto: unknown) => { if (!disposed) { const text = statusText(projection(dto)); if (ui.status.textContent !== text) ui.status.textContent = text; } };
   async function copy(action: Action) {
     const attempt = ++generation; ui.error.textContent = ''; ui.output.value = ''; ui.output.hidden = true;
@@ -70,10 +71,10 @@ export function mountPlayground(container: HTMLElement) {
     try { text = request(action, ui.idea.value, ui.goal.value); }
     catch (error) { ui.error.textContent = (error as Error).message; return; }
     try {
-      await navigator.clipboard.writeText(text); if (disposed || generation !== attempt) return;
+      await navigator.clipboard.writeText(text); if (disposed || generation !== attempt || !ui.details.open) return;
       ui.copied.textContent = 'Đã chép; chưa gửi. Bạn tự dán vào terminal Codex khi muốn.'; ui.details.open = false; ui.summary.focus();
     } catch {
-      if (disposed || generation !== attempt) return;
+      if (disposed || generation !== attempt || !ui.details.open) return;
       ui.copied.textContent = 'Chưa chép được; chưa gửi. Chọn nội dung bên dưới để chép rồi tự gửi Codex.';
       ui.output.value = text; ui.output.hidden = false; ui.details.open = true; ui.output.focus(); ui.output.select();
     }

@@ -148,13 +148,23 @@ it('keeps the workspace within one screen, scrolls only history, and redraws a f
     }
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.locator('#fullscreen').click();
-    await expect.poll(() => page.evaluate(() => Boolean(document.fullscreenElement))).toBe(true);
-    await page.evaluate(() => document.exitFullscreen());
+    await expect.poll(() => page.evaluate(() => document.fullscreenElement?.className)).toBe('body-panel');
+    await inViewport(page, '#stop-all'); await inViewport(page, '#cancel');
+    await page.locator('.fisch-playground summary').click();
+    expect(await page.locator('dialog[open] #stop-all').count()).toBe(1);
+    await page.keyboard.press('Escape');
+    expect(await page.locator('.body-panel > .body-toolbar #stop-all').count()).toBe(1);
+    await page.locator('#cancel').click();
+    await page.getByRole('button', { name: 'Thoát toàn màn hình', exact: true }).click();
     await expect.poll(() => page.evaluate(() => document.fullscreenElement)).toBeNull();
+    await expect.poll(() => page.locator('footer #stop-all').count()).toBe(1);
     await page.evaluate(() => { for (let i = 0; i < 40; i++) window.fischLive.logActivity('Sự kiện kiểm thử dài '.repeat(8)); });
     expect(await page.locator('#agent-activity').evaluate(node => node.scrollHeight > node.clientHeight)).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBe(true);
     expect(await page.locator('video').evaluate(video => video.srcObject)).toBeNull();
+    await page.locator('#fullscreen').click(); await page.locator('#stop-all').click();
+    await expect.poll(() => page.evaluate(() => document.fullscreenElement)).toBeNull();
+    expect(await page.locator('#connection').textContent()).toBe('Đã dừng phiên Live');
   } finally { await browser?.close(); await server.close(); }
 }, 45000);
 
@@ -184,5 +194,36 @@ it('dismisses tools with keyboard and backdrop, preserves drafts, and leaves eme
     expect(await page.locator('#connection').textContent()).toBe('Đã dừng phiên Live');
     expect(await page.locator('dialog[open]').count()).toBe(0);
     expect(await page.locator('video').evaluate(video => video.srcObject)).toBeNull(); expect(errors).toEqual([]);
+  } finally { await browser?.close(); await server.close(); }
+}, 45000);
+
+it.each(['resolve', 'reject'])('ignores delayed clipboard %s after dismissal without reopening or stealing another tool', async outcome => {
+  const server = await createServer({ server: { host: '127.0.0.1', port: 0 } }); await server.listen(); let browser;
+  try {
+    browser = await chromium.launch({ headless: true, ...(process.platform === 'win32' ? { channel: 'msedge' } : {}), args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+    const page = await browser.newPage();
+    await page.goto(server.resolvedUrls.local[0] + 'live.html'); await page.waitForFunction(() => Boolean(window.fischLive));
+    await page.evaluate(outcome => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+      writeText: () => new Promise((resolve, reject) => { window.finishClipboard = () => outcome === 'resolve' ? resolve() : reject(Error('denied')); })
+    } }), outcome);
+    const panel = page.locator('.fisch-playground'); await panel.locator('summary').click();
+    await panel.getByLabel('Ý tưởng', { exact: true }).fill('Giữ bản nháp');
+    await panel.getByRole('button', { name: 'Nguyên tác', exact: true }).click();
+    await page.keyboard.press('Escape'); await page.locator('.camera-options summary').click();
+    await page.evaluate(async () => { window.finishClipboard(); await new Promise(resolve => setTimeout(resolve, 0)); });
+    expect(await page.locator('dialog[open]').count()).toBe(1);
+    expect(await page.locator('.camera-options dialog[open] #stop-all').count()).toBe(1);
+    expect(await page.locator('.camera-options dialog').evaluate(node => node.contains(document.activeElement))).toBe(true);
+    expect(await panel.locator('details').getAttribute('open')).toBeNull();
+    await page.keyboard.press('Escape'); await panel.locator('summary').click();
+    expect(await panel.getByLabel('Ý tưởng', { exact: true }).inputValue()).toBe('Giữ bản nháp');
+    await panel.getByRole('button', { name: 'Nguyên tác', exact: true }).click();
+    await page.keyboard.press('Escape'); await panel.locator('summary').click();
+    await panel.getByLabel('Ý tưởng', { exact: true }).fill('Bản nháp mới');
+    await page.evaluate(async () => { window.finishClipboard(); await new Promise(resolve => setTimeout(resolve, 0)); });
+    expect(await panel.locator('dialog[open]').count()).toBe(1);
+    expect(await panel.getByLabel('Ý tưởng', { exact: true }).inputValue()).toBe('Bản nháp mới');
+    expect(await panel.locator('.pg-output').isVisible()).toBe(false);
+    expect(await page.locator('video').evaluate(video => video.srcObject)).toBeNull();
   } finally { await browser?.close(); await server.close(); }
 }, 45000);

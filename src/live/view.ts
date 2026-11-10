@@ -45,8 +45,14 @@ export function mountDisclosures(root: HTMLElement) {
     while (summary.nextSibling) content.append(summary.nextSibling);
     dialog.append(content); details.append(dialog);
     summary.setAttribute('aria-haspopup', 'dialog');
-    const restore = () => { if (header.contains(stop)) home.append(stop); };
-    const shut = () => { details.open = false; if (dialog.open) dialog.close(); restore(); summary.focus({ preventScroll: true }); };
+    const restore = () => {
+      if (header.contains(stop)) (document.fullscreenElement?.querySelector('.body-actions') ?? home).append(stop);
+    };
+    const shut = () => {
+      const active = details.open || dialog.open; details.open = false;
+      if (active) details.dispatchEvent(new Event('fisch:tool-dismiss'));
+      if (dialog.open) dialog.close(); restore(); summary.focus({ preventScroll: true });
+    };
     close.onclick = shut;
     dialog.addEventListener('cancel', event => { event.preventDefault(); shut(); });
     summary.onclick = event => { event.preventDefault(); details.open = true; header.append(stop); dialog.showModal(); };
