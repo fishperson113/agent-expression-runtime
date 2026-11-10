@@ -125,6 +125,8 @@ The existing Native agent and transport remain in place. Native cancellation now
 uses the same narrow lifecycle principle as the OLV settled-cancellation task:
 release an owned attempt after proven nonexecution, without replaying it. AIRI's
 terminal ownership/cleanup pattern is a design reference, not imported code.
+Source: [AIRI task.ts at 822243de34e8d1151202ac2f688f83d68d04289c](https://github.com/moeru-ai/airi/blob/822243de34e8d1151202ac2f688f83d68d04289c/packages/stream-kit/src/task.ts).
+The pinned source is covered by its [MIT License](https://github.com/moeru-ai/airi/blob/822243de34e8d1151202ac2f688f83d68d04289c/LICENSE); this change reuses the concept only.
 The sources above retain their upstream attribution; no new dependency is added.
 
 An explicit stop creates one owned `stopping` attempt. A success ACK keeps it
