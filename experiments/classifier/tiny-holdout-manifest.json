@@ -1,0 +1,8 @@
+{
+  "status": "frozen before tree predictions; mechanically filtered for exact baseline training feature duplicates",
+  "rows": 26,
+  "sha256": "ef8e081aabeaef067ac900ff98582401d641113f30a4991957915c929c0c2aff",
+  "removedIds": [],
+  "training": "original40 only; no fitting/calibration on this file",
+  "notProof": "Exact nonoverlap does not establish semantic independence or remove near duplicates."
+}

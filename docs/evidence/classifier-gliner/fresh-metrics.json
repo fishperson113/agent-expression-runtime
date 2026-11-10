@@ -1,0 +1,5872 @@
+{
+  "datasetSha256": "55f5b45547ce27554ef593aa1093f3ea2c3d7ba12b71ed8206d2fd00ad3e8485",
+  "candidateLabel": "gliner",
+  "predictionsSha256": "f5cc211ebf6e9a89bda8c3b82d2ed41dcb48a31205f058999c7678bdf4753f57",
+  "gate": {
+    "minimumTopScore": 0.7,
+    "minimumMargin": 0.15,
+    "calibrated": false
+  },
+  "notes": [
+    "Canonical macro F1 uses first acceptable label; acceptable accuracy permits all declared labels.",
+    "Macro F1 always includes all five labels, including absent labels in individual slices.",
+    "Logistic baseline uses structured fields only; natural-language note excluded.",
+    "Synthetic policy labels do not establish real-world gesture or naturalness quality."
+  ],
+  "results": {
+    "tiny_holdout": {
+      "always_observe": {
+        "n": 26,
+        "acceptableAccuracy": 0.23076923076923078,
+        "scenarioFamilyCount": 16,
+        "canonicalMacroF1": 0.075,
+        "reactPrecision": null,
+        "reactRecall": 0.0,
+        "falsePositiveRate": 0.0,
+        "falsePositiveCount": 0,
+        "negativeCount": 6,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.23076923076923078,
+        "mustAbstainRecall": 0.0,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": 0.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            6,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            5,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            4,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            2,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            9,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "logistic_raw": {
+        "n": 26,
+        "acceptableAccuracy": 0.38461538461538464,
+        "scenarioFamilyCount": 16,
+        "canonicalMacroF1": 0.3759523809523809,
+        "reactPrecision": 0.6,
+        "reactRecall": 0.5454545454545454,
+        "falsePositiveRate": 0.3333333333333333,
+        "falsePositiveCount": 2,
+        "negativeCount": 6,
+        "coverage": 0.7692307692307693,
+        "selectiveAccuracy": 0.4,
+        "mustAbstainRecall": 0.2222222222222222,
+        "unsafeReactOnMustAbstain": 2,
+        "unsafeReactOnMustAbstainRate": 0.2222222222222222,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            3,
+            0,
+            1,
+            1,
+            1
+          ],
+          [
+            1,
+            0,
+            0,
+            1,
+            3
+          ],
+          [
+            1,
+            0,
+            3,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            2,
+            0
+          ],
+          [
+            5,
+            0,
+            1,
+            1,
+            2
+          ]
+        ]
+      },
+      "logistic_gated": {
+        "n": 26,
+        "acceptableAccuracy": 0.38461538461538464,
+        "scenarioFamilyCount": 16,
+        "canonicalMacroF1": 0.25555555555555554,
+        "reactPrecision": 0.25,
+        "reactRecall": 0.09090909090909091,
+        "falsePositiveRate": 0.3333333333333333,
+        "falsePositiveCount": 2,
+        "negativeCount": 6,
+        "coverage": 0.2692307692307692,
+        "selectiveAccuracy": 0.42857142857142855,
+        "mustAbstainRecall": 0.7777777777777778,
+        "unsafeReactOnMustAbstain": 1,
+        "unsafeReactOnMustAbstainRate": 0.1111111111111111,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            2,
+            0,
+            1,
+            1,
+            2
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            5
+          ],
+          [
+            0,
+            0,
+            1,
+            0,
+            3
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            2
+          ],
+          [
+            1,
+            0,
+            0,
+            1,
+            7
+          ]
+        ]
+      },
+      "gliner_raw": {
+        "n": 26,
+        "acceptableAccuracy": 0.11538461538461539,
+        "scenarioFamilyCount": 16,
+        "canonicalMacroF1": 0.08076923076923077,
+        "reactPrecision": 0.4166666666666667,
+        "reactRecall": 0.9090909090909091,
+        "falsePositiveRate": 0.8333333333333334,
+        "falsePositiveCount": 5,
+        "negativeCount": 6,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.11538461538461539,
+        "mustAbstainRecall": 0.0,
+        "unsafeReactOnMustAbstain": 9,
+        "unsafeReactOnMustAbstainRate": 1.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            1,
+            0,
+            0,
+            5,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            5,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            3,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            2,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            9,
+            0
+          ]
+        ]
+      },
+      "gliner_gated": {
+        "n": 26,
+        "acceptableAccuracy": 0.34615384615384615,
+        "scenarioFamilyCount": 16,
+        "canonicalMacroF1": 0.1837037037037037,
+        "reactPrecision": 0.5,
+        "reactRecall": 0.36363636363636365,
+        "falsePositiveRate": 0.3333333333333333,
+        "falsePositiveCount": 2,
+        "negativeCount": 6,
+        "coverage": 0.3076923076923077,
+        "selectiveAccuracy": 0.25,
+        "mustAbstainRecall": 0.7777777777777778,
+        "unsafeReactOnMustAbstain": 2,
+        "unsafeReactOnMustAbstainRate": 0.2222222222222222,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            2,
+            4
+          ],
+          [
+            0,
+            0,
+            0,
+            2,
+            3
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            4
+          ],
+          [
+            0,
+            0,
+            0,
+            2,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            2,
+            7
+          ]
+        ]
+      }
+    },
+    "tiny_holdout/contradictory_hand_with_good_face": {
+      "always_observe": {
+        "n": 1,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": null,
+        "reactRecall": null,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.0,
+        "mustAbstainRecall": 0.0,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": 0.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "logistic_raw": {
+        "n": 1,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": null,
+        "reactRecall": null,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.0,
+        "mustAbstainRecall": 0.0,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": 0.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "logistic_gated": {
+        "n": 1,
+        "acceptableAccuracy": 1.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.2,
+        "reactPrecision": null,
+        "reactRecall": null,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 0.0,
+        "selectiveAccuracy": null,
+        "mustAbstainRecall": 1.0,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": 0.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ]
+        ]
+      },
+      "gliner_raw": {
+        "n": 1,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": 0.0,
+        "reactRecall": null,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.0,
+        "mustAbstainRecall": 0.0,
+        "unsafeReactOnMustAbstain": 1,
+        "unsafeReactOnMustAbstainRate": 1.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ]
+        ]
+      },
+      "gliner_gated": {
+        "n": 1,
+        "acceptableAccuracy": 1.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.2,
+        "reactPrecision": null,
+        "reactRecall": null,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 0.0,
+        "selectiveAccuracy": null,
+        "mustAbstainRecall": 1.0,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": 0.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ]
+        ]
+      }
+    },
+    "tiny_holdout/face_only_recent": {
+      "always_observe": {
+        "n": 2,
+        "acceptableAccuracy": 0.5,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.13333333333333333,
+        "reactPrecision": null,
+        "reactRecall": 0.0,
+        "falsePositiveRate": 0.0,
+        "falsePositiveCount": 0,
+        "negativeCount": 1,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.5,
+        "mustAbstainRecall": null,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": null,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "logistic_raw": {
+        "n": 2,
+        "acceptableAccuracy": 1.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.4,
+        "reactPrecision": 1.0,
+        "reactRecall": 1.0,
+        "falsePositiveRate": 0.0,
+        "falsePositiveCount": 0,
+        "negativeCount": 1,
+        "coverage": 1.0,
+        "selectiveAccuracy": 1.0,
+        "mustAbstainRecall": null,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": null,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "logistic_gated": {
+        "n": 2,
+        "acceptableAccuracy": 0.5,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.2,
+        "reactPrecision": null,
+        "reactRecall": 0.0,
+        "falsePositiveRate": 0.0,
+        "falsePositiveCount": 0,
+        "negativeCount": 1,
+        "coverage": 0.5,
+        "selectiveAccuracy": 1.0,
+        "mustAbstainRecall": null,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": null,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "gliner_raw": {
+        "n": 2,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": 0.5,
+        "reactRecall": 1.0,
+        "falsePositiveRate": 1.0,
+        "falsePositiveCount": 1,
+        "negativeCount": 1,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.0,
+        "mustAbstainRecall": null,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": null,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "gliner_gated": {
+        "n": 2,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": null,
+        "reactRecall": 0.0,
+        "falsePositiveRate": 0.0,
+        "falsePositiveCount": 0,
+        "negativeCount": 1,
+        "coverage": 0.0,
+        "selectiveAccuracy": null,
+        "mustAbstainRecall": null,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": null,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    "tiny_holdout/face_quality_boundary": {
+      "always_observe": {
+        "n": 2,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": null,
+        "reactRecall": 0.0,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.0,
+        "mustAbstainRecall": 0.0,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": 0.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "logistic_raw": {
+        "n": 2,
+        "acceptableAccuracy": 0.5,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.13333333333333333,
+        "reactPrecision": 0.5,
+        "reactRecall": 1.0,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.5,
+        "mustAbstainRecall": 0.0,
+        "unsafeReactOnMustAbstain": 1,
+        "unsafeReactOnMustAbstainRate": 1.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            1,
+            0,
+            0
+          ]
+        ]
+      },
+      "logistic_gated": {
+        "n": 2,
+        "acceptableAccuracy": 0.5,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.13333333333333333,
+        "reactPrecision": null,
+        "reactRecall": 0.0,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 0.0,
+        "selectiveAccuracy": null,
+        "mustAbstainRecall": 1.0,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": 0.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ]
+        ]
+      },
+      "gliner_raw": {
+        "n": 2,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": 0.5,
+        "reactRecall": 1.0,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.0,
+        "mustAbstainRecall": 0.0,
+        "unsafeReactOnMustAbstain": 1,
+        "unsafeReactOnMustAbstainRate": 1.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ]
+        ]
+      },
+      "gliner_gated": {
+        "n": 2,
+        "acceptableAccuracy": 0.5,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.13333333333333333,
+        "reactPrecision": null,
+        "reactRecall": 0.0,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 0.0,
+        "selectiveAccuracy": null,
+        "mustAbstainRecall": 1.0,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": 0.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ]
+        ]
+      }
+    },
+    "tiny_holdout/fresh_policy_combinations": {
+      "always_observe": {
+        "n": 26,
+        "acceptableAccuracy": 0.23076923076923078,
+        "scenarioFamilyCount": 16,
+        "canonicalMacroF1": 0.075,
+        "reactPrecision": null,
+        "reactRecall": 0.0,
+        "falsePositiveRate": 0.0,
+        "falsePositiveCount": 0,
+        "negativeCount": 6,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.23076923076923078,
+        "mustAbstainRecall": 0.0,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": 0.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            6,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            5,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            4,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            2,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            9,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "logistic_raw": {
+        "n": 26,
+        "acceptableAccuracy": 0.38461538461538464,
+        "scenarioFamilyCount": 16,
+        "canonicalMacroF1": 0.3759523809523809,
+        "reactPrecision": 0.6,
+        "reactRecall": 0.5454545454545454,
+        "falsePositiveRate": 0.3333333333333333,
+        "falsePositiveCount": 2,
+        "negativeCount": 6,
+        "coverage": 0.7692307692307693,
+        "selectiveAccuracy": 0.4,
+        "mustAbstainRecall": 0.2222222222222222,
+        "unsafeReactOnMustAbstain": 2,
+        "unsafeReactOnMustAbstainRate": 0.2222222222222222,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            3,
+            0,
+            1,
+            1,
+            1
+          ],
+          [
+            1,
+            0,
+            0,
+            1,
+            3
+          ],
+          [
+            1,
+            0,
+            3,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            2,
+            0
+          ],
+          [
+            5,
+            0,
+            1,
+            1,
+            2
+          ]
+        ]
+      },
+      "logistic_gated": {
+        "n": 26,
+        "acceptableAccuracy": 0.38461538461538464,
+        "scenarioFamilyCount": 16,
+        "canonicalMacroF1": 0.25555555555555554,
+        "reactPrecision": 0.25,
+        "reactRecall": 0.09090909090909091,
+        "falsePositiveRate": 0.3333333333333333,
+        "falsePositiveCount": 2,
+        "negativeCount": 6,
+        "coverage": 0.2692307692307692,
+        "selectiveAccuracy": 0.42857142857142855,
+        "mustAbstainRecall": 0.7777777777777778,
+        "unsafeReactOnMustAbstain": 1,
+        "unsafeReactOnMustAbstainRate": 0.1111111111111111,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            2,
+            0,
+            1,
+            1,
+            2
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            5
+          ],
+          [
+            0,
+            0,
+            1,
+            0,
+            3
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            2
+          ],
+          [
+            1,
+            0,
+            0,
+            1,
+            7
+          ]
+        ]
+      },
+      "gliner_raw": {
+        "n": 26,
+        "acceptableAccuracy": 0.11538461538461539,
+        "scenarioFamilyCount": 16,
+        "canonicalMacroF1": 0.08076923076923077,
+        "reactPrecision": 0.4166666666666667,
+        "reactRecall": 0.9090909090909091,
+        "falsePositiveRate": 0.8333333333333334,
+        "falsePositiveCount": 5,
+        "negativeCount": 6,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.11538461538461539,
+        "mustAbstainRecall": 0.0,
+        "unsafeReactOnMustAbstain": 9,
+        "unsafeReactOnMustAbstainRate": 1.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            1,
+            0,
+            0,
+            5,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            5,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            3,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            2,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            9,
+            0
+          ]
+        ]
+      },
+      "gliner_gated": {
+        "n": 26,
+        "acceptableAccuracy": 0.34615384615384615,
+        "scenarioFamilyCount": 16,
+        "canonicalMacroF1": 0.1837037037037037,
+        "reactPrecision": 0.5,
+        "reactRecall": 0.36363636363636365,
+        "falsePositiveRate": 0.3333333333333333,
+        "falsePositiveCount": 2,
+        "negativeCount": 6,
+        "coverage": 0.3076923076923077,
+        "selectiveAccuracy": 0.25,
+        "mustAbstainRecall": 0.7777777777777778,
+        "unsafeReactOnMustAbstain": 2,
+        "unsafeReactOnMustAbstainRate": 0.2222222222222222,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            2,
+            4
+          ],
+          [
+            0,
+            0,
+            0,
+            2,
+            3
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            4
+          ],
+          [
+            0,
+            0,
+            0,
+            2,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            2,
+            7
+          ]
+        ]
+      }
+    },
+    "tiny_holdout/hand_only_cooldown": {
+      "always_observe": {
+        "n": 2,
+        "acceptableAccuracy": 0.5,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.13333333333333333,
+        "reactPrecision": null,
+        "reactRecall": 0.0,
+        "falsePositiveRate": 0.0,
+        "falsePositiveCount": 0,
+        "negativeCount": 1,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.5,
+        "mustAbstainRecall": null,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": null,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "logistic_raw": {
+        "n": 2,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": null,
+        "reactRecall": 0.0,
+        "falsePositiveRate": 0.0,
+        "falsePositiveCount": 0,
+        "negativeCount": 1,
+        "coverage": 0.0,
+        "selectiveAccuracy": null,
+        "mustAbstainRecall": null,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": null,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "logistic_gated": {
+        "n": 2,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": null,
+        "reactRecall": 0.0,
+        "falsePositiveRate": 0.0,
+        "falsePositiveCount": 0,
+        "negativeCount": 1,
+        "coverage": 0.0,
+        "selectiveAccuracy": null,
+        "mustAbstainRecall": null,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": null,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "gliner_raw": {
+        "n": 2,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": 0.5,
+        "reactRecall": 1.0,
+        "falsePositiveRate": 1.0,
+        "falsePositiveCount": 1,
+        "negativeCount": 1,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.0,
+        "mustAbstainRecall": null,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": null,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "gliner_gated": {
+        "n": 2,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": null,
+        "reactRecall": 0.0,
+        "falsePositiveRate": 0.0,
+        "falsePositiveCount": 0,
+        "negativeCount": 1,
+        "coverage": 0.0,
+        "selectiveAccuracy": null,
+        "mustAbstainRecall": null,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": null,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    "tiny_holdout/hand_quality_unknown": {
+      "always_observe": {
+        "n": 2,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": null,
+        "reactRecall": 0.0,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.0,
+        "mustAbstainRecall": 0.0,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": 0.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "logistic_raw": {
+        "n": 2,
+        "acceptableAccuracy": 0.5,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.13333333333333333,
+        "reactPrecision": null,
+        "reactRecall": 0.0,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 0.0,
+        "selectiveAccuracy": null,
+        "mustAbstainRecall": 1.0,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": 0.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ]
+        ]
+      },
+      "logistic_gated": {
+        "n": 2,
+        "acceptableAccuracy": 0.5,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.13333333333333333,
+        "reactPrecision": null,
+        "reactRecall": 0.0,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 0.0,
+        "selectiveAccuracy": null,
+        "mustAbstainRecall": 1.0,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": 0.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ]
+        ]
+      },
+      "gliner_raw": {
+        "n": 2,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": 0.5,
+        "reactRecall": 1.0,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.0,
+        "mustAbstainRecall": 0.0,
+        "unsafeReactOnMustAbstain": 1,
+        "unsafeReactOnMustAbstainRate": 1.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ]
+        ]
+      },
+      "gliner_gated": {
+        "n": 2,
+        "acceptableAccuracy": 0.5,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.13333333333333333,
+        "reactPrecision": null,
+        "reactRecall": 0.0,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 0.0,
+        "selectiveAccuracy": null,
+        "mustAbstainRecall": 1.0,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": 0.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ]
+        ]
+      }
+    },
+    "tiny_holdout/long_but_unreliable_hand": {
+      "always_observe": {
+        "n": 1,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": null,
+        "reactRecall": null,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.0,
+        "mustAbstainRecall": 0.0,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": 0.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "logistic_raw": {
+        "n": 1,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": 0.0,
+        "reactRecall": null,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.0,
+        "mustAbstainRecall": 0.0,
+        "unsafeReactOnMustAbstain": 1,
+        "unsafeReactOnMustAbstainRate": 1.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ]
+        ]
+      },
+      "logistic_gated": {
+        "n": 1,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": 0.0,
+        "reactRecall": null,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.0,
+        "mustAbstainRecall": 0.0,
+        "unsafeReactOnMustAbstain": 1,
+        "unsafeReactOnMustAbstainRate": 1.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ]
+        ]
+      },
+      "gliner_raw": {
+        "n": 1,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": 0.0,
+        "reactRecall": null,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.0,
+        "mustAbstainRecall": 0.0,
+        "unsafeReactOnMustAbstain": 1,
+        "unsafeReactOnMustAbstainRate": 1.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ]
+        ]
+      },
+      "gliner_gated": {
+        "n": 1,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": 0.0,
+        "reactRecall": null,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.0,
+        "mustAbstainRecall": 0.0,
+        "unsafeReactOnMustAbstain": 1,
+        "unsafeReactOnMustAbstainRate": 1.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ]
+        ]
+      }
+    },
+    "tiny_holdout/permission_unknown_priority": {
+      "always_observe": {
+        "n": 2,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": null,
+        "reactRecall": 0.0,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.0,
+        "mustAbstainRecall": 0.0,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": 0.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "logistic_raw": {
+        "n": 2,
+        "acceptableAccuracy": 0.5,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.2,
+        "reactPrecision": 1.0,
+        "reactRecall": 1.0,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.5,
+        "mustAbstainRecall": 0.0,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": 0.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "logistic_gated": {
+        "n": 2,
+        "acceptableAccuracy": 0.5,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.13333333333333333,
+        "reactPrecision": null,
+        "reactRecall": 0.0,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 0.0,
+        "selectiveAccuracy": null,
+        "mustAbstainRecall": 1.0,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": 0.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ]
+        ]
+      },
+      "gliner_raw": {
+        "n": 2,
+        "acceptableAccuracy": 0.5,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.13333333333333333,
+        "reactPrecision": 0.5,
+        "reactRecall": 1.0,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.5,
+        "mustAbstainRecall": 0.0,
+        "unsafeReactOnMustAbstain": 1,
+        "unsafeReactOnMustAbstainRate": 1.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ]
+        ]
+      },
+      "gliner_gated": {
+        "n": 2,
+        "acceptableAccuracy": 0.5,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.13333333333333333,
+        "reactPrecision": 0.5,
+        "reactRecall": 1.0,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.5,
+        "mustAbstainRecall": 0.0,
+        "unsafeReactOnMustAbstain": 1,
+        "unsafeReactOnMustAbstainRate": 1.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ]
+        ]
+      }
+    },
+    "tiny_holdout/playful_orientation": {
+      "always_observe": {
+        "n": 2,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": null,
+        "reactRecall": 0.0,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.0,
+        "mustAbstainRecall": null,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": null,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "logistic_raw": {
+        "n": 2,
+        "acceptableAccuracy": 0.5,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.13333333333333333,
+        "reactPrecision": 1.0,
+        "reactRecall": 1.0,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.5,
+        "mustAbstainRecall": null,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": null,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "logistic_gated": {
+        "n": 2,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": null,
+        "reactRecall": 0.0,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 0.0,
+        "selectiveAccuracy": null,
+        "mustAbstainRecall": null,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": null,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "gliner_raw": {
+        "n": 2,
+        "acceptableAccuracy": 0.5,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.13333333333333333,
+        "reactPrecision": 1.0,
+        "reactRecall": 1.0,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.5,
+        "mustAbstainRecall": null,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": null,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "gliner_gated": {
+        "n": 2,
+        "acceptableAccuracy": 0.5,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.13333333333333333,
+        "reactPrecision": 1.0,
+        "reactRecall": 1.0,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.5,
+        "mustAbstainRecall": null,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": null,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    "tiny_holdout/source_unknown_priority": {
+      "always_observe": {
+        "n": 2,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": null,
+        "reactRecall": 0.0,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.0,
+        "mustAbstainRecall": 0.0,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": 0.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "logistic_raw": {
+        "n": 2,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": null,
+        "reactRecall": 0.0,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.0,
+        "mustAbstainRecall": 0.0,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": 0.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "logistic_gated": {
+        "n": 2,
+        "acceptableAccuracy": 0.5,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.13333333333333333,
+        "reactPrecision": null,
+        "reactRecall": 0.0,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 0.0,
+        "selectiveAccuracy": null,
+        "mustAbstainRecall": 1.0,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": 0.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ]
+        ]
+      },
+      "gliner_raw": {
+        "n": 2,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": 0.5,
+        "reactRecall": 1.0,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.0,
+        "mustAbstainRecall": 0.0,
+        "unsafeReactOnMustAbstain": 1,
+        "unsafeReactOnMustAbstainRate": 1.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ]
+        ]
+      },
+      "gliner_gated": {
+        "n": 2,
+        "acceptableAccuracy": 0.5,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.13333333333333333,
+        "reactPrecision": null,
+        "reactRecall": 0.0,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 0.0,
+        "selectiveAccuracy": null,
+        "mustAbstainRecall": 1.0,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": 0.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ]
+        ]
+      }
+    },
+    "tiny_holdout/stopped_overrides_play": {
+      "always_observe": {
+        "n": 1,
+        "acceptableAccuracy": 1.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.2,
+        "reactPrecision": null,
+        "reactRecall": null,
+        "falsePositiveRate": 0.0,
+        "falsePositiveCount": 0,
+        "negativeCount": 1,
+        "coverage": 1.0,
+        "selectiveAccuracy": 1.0,
+        "mustAbstainRecall": null,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": null,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "logistic_raw": {
+        "n": 1,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": 0.0,
+        "reactRecall": null,
+        "falsePositiveRate": 1.0,
+        "falsePositiveCount": 1,
+        "negativeCount": 1,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.0,
+        "mustAbstainRecall": null,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": null,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "logistic_gated": {
+        "n": 1,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": 0.0,
+        "reactRecall": null,
+        "falsePositiveRate": 1.0,
+        "falsePositiveCount": 1,
+        "negativeCount": 1,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.0,
+        "mustAbstainRecall": null,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": null,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "gliner_raw": {
+        "n": 1,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": 0.0,
+        "reactRecall": null,
+        "falsePositiveRate": 1.0,
+        "falsePositiveCount": 1,
+        "negativeCount": 1,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.0,
+        "mustAbstainRecall": null,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": null,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "gliner_gated": {
+        "n": 1,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": 0.0,
+        "reactRecall": null,
+        "falsePositiveRate": 1.0,
+        "falsePositiveCount": 1,
+        "negativeCount": 1,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.0,
+        "mustAbstainRecall": null,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": null,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    "tiny_holdout/temporal_support": {
+      "always_observe": {
+        "n": 2,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": null,
+        "reactRecall": 0.0,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.0,
+        "mustAbstainRecall": 0.0,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": 0.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "logistic_raw": {
+        "n": 2,
+        "acceptableAccuracy": 0.5,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.13333333333333333,
+        "reactPrecision": null,
+        "reactRecall": 0.0,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 0.0,
+        "selectiveAccuracy": null,
+        "mustAbstainRecall": 1.0,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": 0.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ]
+        ]
+      },
+      "logistic_gated": {
+        "n": 2,
+        "acceptableAccuracy": 0.5,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.13333333333333333,
+        "reactPrecision": null,
+        "reactRecall": 0.0,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 0.0,
+        "selectiveAccuracy": null,
+        "mustAbstainRecall": 1.0,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": 0.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ]
+        ]
+      },
+      "gliner_raw": {
+        "n": 2,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": 0.5,
+        "reactRecall": 1.0,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.0,
+        "mustAbstainRecall": 0.0,
+        "unsafeReactOnMustAbstain": 1,
+        "unsafeReactOnMustAbstainRate": 1.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ]
+        ]
+      },
+      "gliner_gated": {
+        "n": 2,
+        "acceptableAccuracy": 0.5,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.13333333333333333,
+        "reactPrecision": null,
+        "reactRecall": 0.0,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 0.0,
+        "selectiveAccuracy": null,
+        "mustAbstainRecall": 1.0,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": 0.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ]
+        ]
+      }
+    },
+    "tiny_holdout/unknown_overrides_busy": {
+      "always_observe": {
+        "n": 1,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": null,
+        "reactRecall": null,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.0,
+        "mustAbstainRecall": 0.0,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": 0.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "logistic_raw": {
+        "n": 1,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": null,
+        "reactRecall": null,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.0,
+        "mustAbstainRecall": 0.0,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": 0.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "logistic_gated": {
+        "n": 1,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": null,
+        "reactRecall": null,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.0,
+        "mustAbstainRecall": 0.0,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": 0.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "gliner_raw": {
+        "n": 1,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": 0.0,
+        "reactRecall": null,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.0,
+        "mustAbstainRecall": 0.0,
+        "unsafeReactOnMustAbstain": 1,
+        "unsafeReactOnMustAbstainRate": 1.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ]
+        ]
+      },
+      "gliner_gated": {
+        "n": 1,
+        "acceptableAccuracy": 1.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.2,
+        "reactPrecision": null,
+        "reactRecall": null,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 0.0,
+        "selectiveAccuracy": null,
+        "mustAbstainRecall": 1.0,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": 0.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ]
+        ]
+      }
+    },
+    "tiny_holdout/unsupported_motion_with_face_geometry": {
+      "always_observe": {
+        "n": 1,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": null,
+        "reactRecall": null,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.0,
+        "mustAbstainRecall": 0.0,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": 0.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "logistic_raw": {
+        "n": 1,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": null,
+        "reactRecall": null,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.0,
+        "mustAbstainRecall": 0.0,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": 0.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "logistic_gated": {
+        "n": 1,
+        "acceptableAccuracy": 1.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.2,
+        "reactPrecision": null,
+        "reactRecall": null,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 0.0,
+        "selectiveAccuracy": null,
+        "mustAbstainRecall": 1.0,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": 0.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ]
+        ]
+      },
+      "gliner_raw": {
+        "n": 1,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": 0.0,
+        "reactRecall": null,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.0,
+        "mustAbstainRecall": 0.0,
+        "unsafeReactOnMustAbstain": 1,
+        "unsafeReactOnMustAbstainRate": 1.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ]
+        ]
+      },
+      "gliner_gated": {
+        "n": 1,
+        "acceptableAccuracy": 1.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.2,
+        "reactPrecision": null,
+        "reactRecall": null,
+        "falsePositiveRate": null,
+        "falsePositiveCount": 0,
+        "negativeCount": 0,
+        "coverage": 0.0,
+        "selectiveAccuracy": null,
+        "mustAbstainRecall": 1.0,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": 0.0,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ]
+        ]
+      }
+    },
+    "tiny_holdout/waiting_away_vs_working": {
+      "always_observe": {
+        "n": 2,
+        "acceptableAccuracy": 0.5,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.13333333333333333,
+        "reactPrecision": null,
+        "reactRecall": 0.0,
+        "falsePositiveRate": 0.0,
+        "falsePositiveCount": 0,
+        "negativeCount": 1,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.5,
+        "mustAbstainRecall": null,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": null,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "logistic_raw": {
+        "n": 2,
+        "acceptableAccuracy": 0.5,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.13333333333333333,
+        "reactPrecision": null,
+        "reactRecall": 0.0,
+        "falsePositiveRate": 0.0,
+        "falsePositiveCount": 0,
+        "negativeCount": 1,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.5,
+        "mustAbstainRecall": null,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": null,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "logistic_gated": {
+        "n": 2,
+        "acceptableAccuracy": 0.5,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.2,
+        "reactPrecision": null,
+        "reactRecall": 0.0,
+        "falsePositiveRate": 0.0,
+        "falsePositiveCount": 0,
+        "negativeCount": 1,
+        "coverage": 0.5,
+        "selectiveAccuracy": 1.0,
+        "mustAbstainRecall": null,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": null,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "gliner_raw": {
+        "n": 2,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": 0.5,
+        "reactRecall": 1.0,
+        "falsePositiveRate": 1.0,
+        "falsePositiveCount": 1,
+        "negativeCount": 1,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.0,
+        "mustAbstainRecall": null,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": null,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "gliner_gated": {
+        "n": 2,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": 0.5,
+        "reactRecall": 1.0,
+        "falsePositiveRate": 1.0,
+        "falsePositiveCount": 1,
+        "negativeCount": 1,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.0,
+        "mustAbstainRecall": null,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": null,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    "tiny_holdout/waiting_brow_vs_interrupted": {
+      "always_observe": {
+        "n": 2,
+        "acceptableAccuracy": 0.5,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.13333333333333333,
+        "reactPrecision": null,
+        "reactRecall": 0.0,
+        "falsePositiveRate": 0.0,
+        "falsePositiveCount": 0,
+        "negativeCount": 1,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.5,
+        "mustAbstainRecall": null,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": null,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "logistic_raw": {
+        "n": 2,
+        "acceptableAccuracy": 0.5,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.13333333333333333,
+        "reactPrecision": 0.5,
+        "reactRecall": 1.0,
+        "falsePositiveRate": 1.0,
+        "falsePositiveCount": 1,
+        "negativeCount": 1,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.5,
+        "mustAbstainRecall": null,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": null,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "logistic_gated": {
+        "n": 2,
+        "acceptableAccuracy": 0.5,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.13333333333333333,
+        "reactPrecision": 0.5,
+        "reactRecall": 1.0,
+        "falsePositiveRate": 1.0,
+        "falsePositiveCount": 1,
+        "negativeCount": 1,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.5,
+        "mustAbstainRecall": null,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": null,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "gliner_raw": {
+        "n": 2,
+        "acceptableAccuracy": 0.5,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.13333333333333333,
+        "reactPrecision": null,
+        "reactRecall": 0.0,
+        "falsePositiveRate": 0.0,
+        "falsePositiveCount": 0,
+        "negativeCount": 1,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.5,
+        "mustAbstainRecall": null,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": null,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "gliner_gated": {
+        "n": 2,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": null,
+        "reactRecall": 0.0,
+        "falsePositiveRate": 0.0,
+        "falsePositiveCount": 0,
+        "negativeCount": 1,
+        "coverage": 0.0,
+        "selectiveAccuracy": null,
+        "mustAbstainRecall": null,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": null,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      }
+    },
+    "tiny_holdout/waiting_neutral_no_hand": {
+      "always_observe": {
+        "n": 1,
+        "acceptableAccuracy": 1.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.2,
+        "reactPrecision": null,
+        "reactRecall": null,
+        "falsePositiveRate": 0.0,
+        "falsePositiveCount": 0,
+        "negativeCount": 1,
+        "coverage": 1.0,
+        "selectiveAccuracy": 1.0,
+        "mustAbstainRecall": null,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": null,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "logistic_raw": {
+        "n": 1,
+        "acceptableAccuracy": 1.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.2,
+        "reactPrecision": null,
+        "reactRecall": null,
+        "falsePositiveRate": 0.0,
+        "falsePositiveCount": 0,
+        "negativeCount": 1,
+        "coverage": 1.0,
+        "selectiveAccuracy": 1.0,
+        "mustAbstainRecall": null,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": null,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "logistic_gated": {
+        "n": 1,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": null,
+        "reactRecall": null,
+        "falsePositiveRate": 0.0,
+        "falsePositiveCount": 0,
+        "negativeCount": 1,
+        "coverage": 0.0,
+        "selectiveAccuracy": null,
+        "mustAbstainRecall": null,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": null,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "gliner_raw": {
+        "n": 1,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": 0.0,
+        "reactRecall": null,
+        "falsePositiveRate": 1.0,
+        "falsePositiveCount": 1,
+        "negativeCount": 1,
+        "coverage": 1.0,
+        "selectiveAccuracy": 0.0,
+        "mustAbstainRecall": null,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": null,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "gliner_gated": {
+        "n": 1,
+        "acceptableAccuracy": 0.0,
+        "scenarioFamilyCount": 1,
+        "canonicalMacroF1": 0.0,
+        "reactPrecision": null,
+        "reactRecall": null,
+        "falsePositiveRate": 0.0,
+        "falsePositiveCount": 0,
+        "negativeCount": 1,
+        "coverage": 0.0,
+        "selectiveAccuracy": null,
+        "mustAbstainRecall": null,
+        "unsafeReactOnMustAbstain": 0,
+        "unsafeReactOnMustAbstainRate": null,
+        "confusionLabels": [
+          "observe",
+          "attend",
+          "acknowledge",
+          "playful",
+          "abstain"
+        ],
+        "canonicalConfusion": [
+          [
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      }
+    }
+  },
+  "featureOverlapAudit": {
+    "method": "Exact projected structured features, excluding note; preserves original cohorts.",
+    "overlaps": [],
+    "holdoutOverlapCount": 0,
+    "warning": "Family-name separation alone did not isolate baseline features. Deduplicated subset is post hoc, not fresh validation."
+  },
+  "pairedProbes": {
+    "always_observe": {
+      "waiting_away_vs_working": {
+        "labels": [
+          "observe",
+          "observe"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "hand_only_cooldown": {
+        "labels": [
+          "observe",
+          "observe"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "waiting_brow_vs_interrupted": {
+        "labels": [
+          "observe",
+          "observe"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "face_only_recent": {
+        "labels": [
+          "observe",
+          "observe"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "permission_unknown_priority": {
+        "labels": [
+          "observe",
+          "observe"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "source_unknown_priority": {
+        "labels": [
+          "observe",
+          "observe"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "face_quality_boundary": {
+        "labels": [
+          "observe",
+          "observe"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "hand_quality_unknown": {
+        "labels": [
+          "observe",
+          "observe"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "playful_orientation": {
+        "labels": [
+          "observe",
+          "observe"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "temporal_support": {
+        "labels": [
+          "observe",
+          "observe"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      }
+    },
+    "logistic_raw": {
+      "waiting_away_vs_working": {
+        "labels": [
+          "observe",
+          "observe"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "hand_only_cooldown": {
+        "labels": [
+          "abstain",
+          "abstain"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "waiting_brow_vs_interrupted": {
+        "labels": [
+          "acknowledge",
+          "acknowledge"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "face_only_recent": {
+        "labels": [
+          "acknowledge",
+          "observe"
+        ],
+        "bothAcceptable": true,
+        "relationCorrect": true
+      },
+      "permission_unknown_priority": {
+        "labels": [
+          "playful",
+          "observe"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": true
+      },
+      "source_unknown_priority": {
+        "labels": [
+          "observe",
+          "observe"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "face_quality_boundary": {
+        "labels": [
+          "acknowledge",
+          "acknowledge"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "hand_quality_unknown": {
+        "labels": [
+          "abstain",
+          "abstain"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "playful_orientation": {
+        "labels": [
+          "playful",
+          "playful"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "temporal_support": {
+        "labels": [
+          "abstain",
+          "abstain"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      }
+    },
+    "logistic_gated": {
+      "waiting_away_vs_working": {
+        "labels": [
+          "abstain",
+          "observe"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": true
+      },
+      "hand_only_cooldown": {
+        "labels": [
+          "abstain",
+          "abstain"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "waiting_brow_vs_interrupted": {
+        "labels": [
+          "acknowledge",
+          "acknowledge"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "face_only_recent": {
+        "labels": [
+          "abstain",
+          "observe"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": true
+      },
+      "permission_unknown_priority": {
+        "labels": [
+          "abstain",
+          "abstain"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "source_unknown_priority": {
+        "labels": [
+          "abstain",
+          "abstain"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "face_quality_boundary": {
+        "labels": [
+          "abstain",
+          "abstain"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "hand_quality_unknown": {
+        "labels": [
+          "abstain",
+          "abstain"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "playful_orientation": {
+        "labels": [
+          "abstain",
+          "abstain"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "temporal_support": {
+        "labels": [
+          "abstain",
+          "abstain"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      }
+    },
+    "gliner_raw": {
+      "waiting_away_vs_working": {
+        "labels": [
+          "playful",
+          "playful"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "hand_only_cooldown": {
+        "labels": [
+          "playful",
+          "playful"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "waiting_brow_vs_interrupted": {
+        "labels": [
+          "observe",
+          "observe"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "face_only_recent": {
+        "labels": [
+          "playful",
+          "playful"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "permission_unknown_priority": {
+        "labels": [
+          "playful",
+          "playful"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "source_unknown_priority": {
+        "labels": [
+          "playful",
+          "playful"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "face_quality_boundary": {
+        "labels": [
+          "playful",
+          "playful"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "hand_quality_unknown": {
+        "labels": [
+          "playful",
+          "playful"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "playful_orientation": {
+        "labels": [
+          "playful",
+          "playful"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "temporal_support": {
+        "labels": [
+          "playful",
+          "playful"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      }
+    },
+    "gliner_gated": {
+      "waiting_away_vs_working": {
+        "labels": [
+          "playful",
+          "playful"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "hand_only_cooldown": {
+        "labels": [
+          "abstain",
+          "abstain"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "waiting_brow_vs_interrupted": {
+        "labels": [
+          "abstain",
+          "abstain"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "face_only_recent": {
+        "labels": [
+          "abstain",
+          "abstain"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "permission_unknown_priority": {
+        "labels": [
+          "playful",
+          "playful"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "source_unknown_priority": {
+        "labels": [
+          "abstain",
+          "abstain"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "face_quality_boundary": {
+        "labels": [
+          "abstain",
+          "abstain"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "hand_quality_unknown": {
+        "labels": [
+          "abstain",
+          "abstain"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "playful_orientation": {
+        "labels": [
+          "playful",
+          "playful"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      },
+      "temporal_support": {
+        "labels": [
+          "abstain",
+          "abstain"
+        ],
+        "bothAcceptable": false,
+        "relationCorrect": false
+      }
+    }
+  }
+}

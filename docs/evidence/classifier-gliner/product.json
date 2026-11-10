@@ -1,0 +1,591 @@
+{
+  "summary": {
+    "identity": {
+      "modelId": "fastino/GLiNER2.5-Decide",
+      "modelRevision": "9d1bfb848cd16d93ee56ccbc59cd92bf0f284d90"
+    },
+    "actualModelRequestsSent": 8,
+    "successfulPredictionReplies": 7,
+    "discardedOrphanReplies": 1,
+    "actualLocalForwardsCompleted": 8,
+    "cases": [
+      {
+        "family": "quiet_neutral",
+        "variant": "normal",
+        "hostEligible": true,
+        "requestId": "request_gliner_quiet_neutral_normal",
+        "mode": "observe",
+        "action": null,
+        "error": null,
+        "httpDelta": 0,
+        "reservationDelta": 0,
+        "clientBusyOnReturn": false
+      },
+      {
+        "family": "front_face_change",
+        "variant": "normal",
+        "hostEligible": true,
+        "requestId": "request_gliner_front_face_change_normal",
+        "mode": "observe",
+        "action": null,
+        "error": null,
+        "httpDelta": 0,
+        "reservationDelta": 0,
+        "clientBusyOnReturn": false
+      },
+      {
+        "family": "joint_varied_motion",
+        "variant": "normal",
+        "hostEligible": true,
+        "requestId": "request_gliner_joint_varied_motion_normal",
+        "mode": "observe",
+        "action": null,
+        "error": null,
+        "httpDelta": 1,
+        "reservationDelta": 1,
+        "clientBusyOnReturn": false
+      },
+      {
+        "family": "hand_only_moving",
+        "variant": "normal",
+        "hostEligible": true,
+        "requestId": "request_gliner_hand_only_moving_normal",
+        "mode": "observe",
+        "action": null,
+        "error": null,
+        "httpDelta": 0,
+        "reservationDelta": 0,
+        "clientBusyOnReturn": false
+      },
+      {
+        "family": "geometric_change_without_hand",
+        "variant": "normal",
+        "hostEligible": true,
+        "requestId": "request_gliner_geometric_change_without_hand_normal",
+        "mode": "observe",
+        "action": null,
+        "error": null,
+        "httpDelta": 0,
+        "reservationDelta": 0,
+        "clientBusyOnReturn": false
+      },
+      {
+        "family": "busy_with_motion",
+        "variant": "host_denied",
+        "hostEligible": false,
+        "requestId": "request_gliner_busy_with_motion_host_denied",
+        "mode": null,
+        "action": null,
+        "error": "classifier_revoked",
+        "httpDelta": 0,
+        "reservationDelta": 0,
+        "clientBusyOnReturn": false
+      },
+      {
+        "family": "permission_stopped",
+        "variant": "host_denied",
+        "hostEligible": false,
+        "requestId": "request_gliner_permission_stopped_host_denied",
+        "mode": null,
+        "action": null,
+        "error": "classifier_revoked",
+        "httpDelta": 0,
+        "reservationDelta": 0,
+        "clientBusyOnReturn": false
+      },
+      {
+        "family": "quiet_neutral",
+        "variant": "revoke",
+        "hostEligible": true,
+        "requestId": "request_gliner_quiet_neutral_revoke",
+        "mode": null,
+        "action": null,
+        "error": "classifier_revoked",
+        "httpDelta": 0,
+        "reservationDelta": 0,
+        "clientBusyOnReturn": false
+      },
+      {
+        "family": "quiet_neutral",
+        "variant": "abort",
+        "hostEligible": true,
+        "requestId": "request_gliner_quiet_neutral_abort",
+        "mode": null,
+        "action": null,
+        "error": "reactive_aborted",
+        "httpDelta": 0,
+        "reservationDelta": 0,
+        "clientBusyOnReturn": true
+      },
+      {
+        "family": "front_face_change",
+        "variant": "after_abort",
+        "hostEligible": true,
+        "requestId": "request_gliner_front_face_change_after_abort",
+        "mode": "observe",
+        "action": null,
+        "error": null,
+        "httpDelta": 0,
+        "reservationDelta": 0,
+        "clientBusyOnReturn": false
+      }
+    ],
+    "fakeSemanticHttpCalls": 1,
+    "fixtureBudgetUsed": 1,
+    "actualRemoteProviderCalls": 0,
+    "renderedActions": 0,
+    "gate": {
+      "top": 0.7,
+      "margin": 0.15,
+      "calibrated": false
+    },
+    "projection": "typed synthetic windows; hand measurement quality unknown, no handedness confidence substitution; response age trusted fixture context",
+    "scope": "actual persistent model through committed candidate local process client and product factory; controlled fake semantic provider always observe; no actual renderer or physical camera"
+  },
+  "classifications": [
+    {
+      "sourceFixture": "quiet_neutral_0",
+      "requestId": "request_gliner_quiet_neutral_normal",
+      "projection": {
+        "state": {
+          "camera_permission": "granted",
+          "source_health": "healthy",
+          "turn": "idle",
+          "seconds_since_response": 30,
+          "face": {
+            "available": true,
+            "confidence": 0.902,
+            "present": true,
+            "orientation": "toward_camera",
+            "geometry": "neutral"
+          },
+          "hand": {
+            "available": true,
+            "confidence": null,
+            "tracking": "tracked",
+            "motion": "still",
+            "duration_seconds": 1.5
+          },
+          "note": "Derived from typed observations; missing measurement quality remains unknown."
+        },
+        "gaps": [
+          "hand_measurement_quality_unavailable: handedness confidence deliberately ignored"
+        ],
+        "provenance": {
+          "kind": "typed-window-projection",
+          "fixtureHandQuality": "not provided",
+          "sourceRequestId": "request_gliner_quiet_neutral_normal",
+          "observationSequences": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "noHandednessConfidenceUsed": true
+        }
+      },
+      "prediction": {
+        "schemaVersion": 1,
+        "label": "playful",
+        "scores": {
+          "observe": 0.24428704380989075,
+          "attend": 0.07278715819120407,
+          "acknowledge": 0.018402792513370514,
+          "playful": 0.440049409866333,
+          "abstain": 0.22447358071804047
+        }
+      }
+    },
+    {
+      "sourceFixture": "front_face_change_0",
+      "requestId": "request_gliner_front_face_change_normal",
+      "projection": {
+        "state": {
+          "camera_permission": "granted",
+          "source_health": "healthy",
+          "turn": "idle",
+          "seconds_since_response": 30,
+          "face": {
+            "available": true,
+            "confidence": 0.902,
+            "present": true,
+            "orientation": "toward_camera",
+            "geometry": "mouth_corners_raised"
+          },
+          "hand": {
+            "available": true,
+            "confidence": null,
+            "tracking": "lost",
+            "motion": "none",
+            "duration_seconds": 0
+          },
+          "note": "Derived from typed observations; missing measurement quality remains unknown."
+        },
+        "gaps": [
+          "hand_measurement_quality_unavailable: handedness confidence deliberately ignored"
+        ],
+        "provenance": {
+          "kind": "typed-window-projection",
+          "fixtureHandQuality": "not provided",
+          "sourceRequestId": "request_gliner_front_face_change_normal",
+          "observationSequences": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "noHandednessConfidenceUsed": true
+        }
+      },
+      "prediction": {
+        "schemaVersion": 1,
+        "label": "playful",
+        "scores": {
+          "observe": 0.24642428755760193,
+          "attend": 0.05460743233561516,
+          "acknowledge": 0.029321854934096336,
+          "playful": 0.40725216269493103,
+          "abstain": 0.26239416003227234
+        }
+      }
+    },
+    {
+      "sourceFixture": "joint_varied_motion_0",
+      "requestId": "request_gliner_joint_varied_motion_normal",
+      "projection": {
+        "state": {
+          "camera_permission": "granted",
+          "source_health": "healthy",
+          "turn": "idle",
+          "seconds_since_response": 30,
+          "face": {
+            "available": true,
+            "confidence": 0.902,
+            "present": true,
+            "orientation": "toward_camera",
+            "geometry": "mouth_corners_raised"
+          },
+          "hand": {
+            "available": true,
+            "confidence": null,
+            "tracking": "tracked",
+            "motion": "alternating_directions",
+            "duration_seconds": 3
+          },
+          "note": "Derived from typed observations; missing measurement quality remains unknown."
+        },
+        "gaps": [
+          "hand_measurement_quality_unavailable: handedness confidence deliberately ignored"
+        ],
+        "provenance": {
+          "kind": "typed-window-projection",
+          "fixtureHandQuality": "not provided",
+          "sourceRequestId": "request_gliner_joint_varied_motion_normal",
+          "observationSequences": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "noHandednessConfidenceUsed": true
+        }
+      },
+      "prediction": {
+        "schemaVersion": 1,
+        "label": "playful",
+        "scores": {
+          "observe": 0.09281595051288605,
+          "attend": 0.030667847022414207,
+          "acknowledge": 0.011377541348338127,
+          "playful": 0.8095613121986389,
+          "abstain": 0.0555773563683033
+        }
+      }
+    },
+    {
+      "sourceFixture": "hand_only_moving_0",
+      "requestId": "request_gliner_hand_only_moving_normal",
+      "projection": {
+        "state": {
+          "camera_permission": "granted",
+          "source_health": "healthy",
+          "turn": "idle",
+          "seconds_since_response": 30,
+          "face": {
+            "available": false,
+            "confidence": null,
+            "present": null,
+            "orientation": "unknown",
+            "geometry": "unknown"
+          },
+          "hand": {
+            "available": true,
+            "confidence": null,
+            "tracking": "tracked",
+            "motion": "sweeping",
+            "duration_seconds": 1.5
+          },
+          "note": "Derived from typed observations; missing measurement quality remains unknown."
+        },
+        "gaps": [
+          "hand_measurement_quality_unavailable: handedness confidence deliberately ignored",
+          "face_unmeasured_or_unavailable: present=false is not measured absence"
+        ],
+        "provenance": {
+          "kind": "typed-window-projection",
+          "fixtureHandQuality": "not provided",
+          "sourceRequestId": "request_gliner_hand_only_moving_normal",
+          "observationSequences": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "noHandednessConfidenceUsed": true
+        }
+      },
+      "prediction": {
+        "schemaVersion": 1,
+        "label": "playful",
+        "scores": {
+          "observe": 0.172724649310112,
+          "attend": 0.06218482926487923,
+          "acknowledge": 0.007485554087907076,
+          "playful": 0.5166510343551636,
+          "abstain": 0.24095387756824493
+        }
+      }
+    },
+    {
+      "sourceFixture": "geometric_change_without_hand_0",
+      "requestId": "request_gliner_geometric_change_without_hand_normal",
+      "projection": {
+        "state": {
+          "camera_permission": "granted",
+          "source_health": "healthy",
+          "turn": "idle",
+          "seconds_since_response": 30,
+          "face": {
+            "available": true,
+            "confidence": 0.902,
+            "present": true,
+            "orientation": "toward_camera",
+            "geometry": "brows_raised"
+          },
+          "hand": {
+            "available": true,
+            "confidence": null,
+            "tracking": "lost",
+            "motion": "none",
+            "duration_seconds": 0
+          },
+          "note": "Derived from typed observations; missing measurement quality remains unknown."
+        },
+        "gaps": [
+          "hand_measurement_quality_unavailable: handedness confidence deliberately ignored"
+        ],
+        "provenance": {
+          "kind": "typed-window-projection",
+          "fixtureHandQuality": "not provided",
+          "sourceRequestId": "request_gliner_geometric_change_without_hand_normal",
+          "observationSequences": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "noHandednessConfidenceUsed": true
+        }
+      },
+      "prediction": {
+        "schemaVersion": 1,
+        "label": "playful",
+        "scores": {
+          "observe": 0.2588199973106384,
+          "attend": 0.05476125702261925,
+          "acknowledge": 0.028620637953281403,
+          "playful": 0.3946909010410309,
+          "abstain": 0.2631072402000427
+        }
+      }
+    },
+    {
+      "sourceFixture": "quiet_neutral_0",
+      "requestId": "request_gliner_quiet_neutral_revoke",
+      "projection": {
+        "state": {
+          "camera_permission": "granted",
+          "source_health": "healthy",
+          "turn": "idle",
+          "seconds_since_response": 30,
+          "face": {
+            "available": true,
+            "confidence": 0.902,
+            "present": true,
+            "orientation": "toward_camera",
+            "geometry": "neutral"
+          },
+          "hand": {
+            "available": true,
+            "confidence": null,
+            "tracking": "tracked",
+            "motion": "still",
+            "duration_seconds": 1.5
+          },
+          "note": "Derived from typed observations; missing measurement quality remains unknown."
+        },
+        "gaps": [
+          "hand_measurement_quality_unavailable: handedness confidence deliberately ignored"
+        ],
+        "provenance": {
+          "kind": "typed-window-projection",
+          "fixtureHandQuality": "not provided",
+          "sourceRequestId": "request_gliner_quiet_neutral_revoke",
+          "observationSequences": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "noHandednessConfidenceUsed": true
+        }
+      },
+      "prediction": {
+        "schemaVersion": 1,
+        "label": "playful",
+        "scores": {
+          "observe": 0.24428704380989075,
+          "attend": 0.07278715819120407,
+          "acknowledge": 0.018402792513370514,
+          "playful": 0.440049409866333,
+          "abstain": 0.22447358071804047
+        }
+      }
+    },
+    {
+      "sourceFixture": "quiet_neutral_0",
+      "requestId": "request_gliner_quiet_neutral_abort",
+      "projection": {
+        "state": {
+          "camera_permission": "granted",
+          "source_health": "healthy",
+          "turn": "idle",
+          "seconds_since_response": 30,
+          "face": {
+            "available": true,
+            "confidence": 0.902,
+            "present": true,
+            "orientation": "toward_camera",
+            "geometry": "neutral"
+          },
+          "hand": {
+            "available": true,
+            "confidence": null,
+            "tracking": "tracked",
+            "motion": "still",
+            "duration_seconds": 1.5
+          },
+          "note": "Derived from typed observations; missing measurement quality remains unknown."
+        },
+        "gaps": [
+          "hand_measurement_quality_unavailable: handedness confidence deliberately ignored"
+        ],
+        "provenance": {
+          "kind": "typed-window-projection",
+          "fixtureHandQuality": "not provided",
+          "sourceRequestId": "request_gliner_quiet_neutral_abort",
+          "observationSequences": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "noHandednessConfidenceUsed": true
+        }
+      },
+      "error": "local_classifier_aborted"
+    },
+    {
+      "sourceFixture": "front_face_change_0",
+      "requestId": "request_gliner_front_face_change_after_abort",
+      "projection": {
+        "state": {
+          "camera_permission": "granted",
+          "source_health": "healthy",
+          "turn": "idle",
+          "seconds_since_response": 30,
+          "face": {
+            "available": true,
+            "confidence": 0.902,
+            "present": true,
+            "orientation": "toward_camera",
+            "geometry": "mouth_corners_raised"
+          },
+          "hand": {
+            "available": true,
+            "confidence": null,
+            "tracking": "lost",
+            "motion": "none",
+            "duration_seconds": 0
+          },
+          "note": "Derived from typed observations; missing measurement quality remains unknown."
+        },
+        "gaps": [
+          "hand_measurement_quality_unavailable: handedness confidence deliberately ignored"
+        ],
+        "provenance": {
+          "kind": "typed-window-projection",
+          "fixtureHandQuality": "not provided",
+          "sourceRequestId": "request_gliner_front_face_change_after_abort",
+          "observationSequences": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "noHandednessConfidenceUsed": true
+        }
+      },
+      "prediction": {
+        "schemaVersion": 1,
+        "label": "playful",
+        "scores": {
+          "observe": 0.24642428755760193,
+          "attend": 0.05460743233561516,
+          "acknowledge": 0.029321854934096336,
+          "playful": 0.40725216269493103,
+          "abstain": 0.26239416003227234
+        }
+      }
+    }
+  ],
+  "portableWorkerSmoke": {
+    "identity": {
+      "modelId": "fastino/GLiNER2.5-Decide",
+      "modelRevision": "9d1bfb848cd16d93ee56ccbc59cd92bf0f284d90"
+    },
+    "prediction": {
+      "schemaVersion": 1,
+      "label": "playful",
+      "scores": {
+        "observe": 0.24428704380989075,
+        "attend": 0.07278715819120407,
+        "acknowledge": 0.018402792513370514,
+        "playful": 0.440049409866333,
+        "abstain": 0.22447358071804047
+      }
+    },
+    "actualLocalForwards": 1,
+    "actualRemoteCalls": 0,
+    "scope": "portable repository worker + real generic process client; no provider/render"
+  },
+  "cleanup": {
+    "ownedChildClosed": true,
+    "exitCodeNotExposedByClient": true
+  },
+  "sourceCandidates": {
+    "factory": "8e22acc5552d841b193d01acb5a8d422d0d54938",
+    "processClientBeforeRebase": "7a4ea264484ab49576c2ff34d7eb493933e4bec2",
+    "portableRunnerSha256": "bb1c9317ecfba1fa2fb32bb0aae7c4c2f0901408b9a1bd1547f9ad73b9f9c87c"
+  }
+}
