@@ -7,6 +7,7 @@ const workflow = {
   authoring: {
     schemaResource: 'aer://schema/v1', instructionsResource: 'aer://instructions/v1',
     choice: 'Author geometry, motion and any #RRGGBB color from actual context; no fixed emotion, phrase or gesture-to-effect table is required.',
+    legibility: 'When two expressions should read differently at a glance, choose context-appropriate differences in silhouette, spatial arrangement, pose amplitude or timing; RGB is also freely authored. No fixed mapping is prescribed. Tiny eye/mouth changes alone may be hard to distinguish.',
     input: 'Declarative data only: no executable code, shaders, filesystem, network or per-frame commands.',
   },
   evidence: {
@@ -16,12 +17,14 @@ const workflow = {
     applied: 'Execution/application evidence is separate from the admission receipt.',
     frame: 'A submitted frame or state hash is a rendering proxy, not pixel visibility or human interpretation.',
     visible: 'Raster/pixel evidence and human relevance are separate checks. Do not infer either from accepted or completed.',
+    selfInspection: 'There is no agent tool for reading the actual rendered body image in this build. look returns a synthetic observation fixture, not the body canvas. A submitted AST, part name, scene goal or completed receipt cannot establish what a viewer recognizes. Do not claim that you visually checked the body.',
     canceled: 'Ownership was revoked; provider transport may still be running. Late results must not regain control.',
   },
   ownership: {
     replace: 'Use replace for a new intent; replacement starts from the displayed state.',
     append: 'Use append only for deliberate ordered choreography within the bounded queue.',
     leases: 'Live controls expire and return toward neutral/lower layers; user motion-off and stop remain authoritative.',
+    scenePersistence: 'express is transient body control, not a saved creation. playground_state with includeScene=true returns a session-local authored scene clone, not a screenshot or proof of the current body. Conversation memory is not rendered scene state. Stop/reset/session or epoch changes can return the body to the resting face and invalidate playground ownership. Do not silently replay a remembered scene; inspect playground_state and honor recoveryRequired. recover clears history rather than restoring it. A new creation requires explicit fresh user intent.',
     restore: 'return_to_face restores the declared resting body and clears semantic controls; it is not an emotion preset.',
   },
   recovery: {

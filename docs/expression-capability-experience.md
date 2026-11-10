@@ -135,3 +135,21 @@ extend scheduler ownership or block local controls. Plain program completion
 continues to describe its scheduler timeline; retained geometry or a part motion
 period is not a promise that the expression stayed visible for that duration.
 Neither status nor requested duration proves elapsed rendered time or visibility.
+
+### Legibility and scene-state limits
+
+The discovery workflow and Native instructions now distinguish authored intent
+from visual inspection. The current look tool is a synthetic camera fixture; no
+agent-facing body-canvas readback exists. A scene clone, part name or completed
+receipt cannot verify a hammock, orbit or other semantic shape. At-a-glance
+contrast should be authored through geometry, layout, amplitude, timing and freely
+chosen RGB rather than a fixed emotion palette; recognition still needs human
+evaluation.
+
+Conversation memory and rendered body state are separate. Ordinary express is
+transient; playground stores a bounded session-local authored scene. Epoch loss
+invalidates its controller and may return the body to the resting face. Read state
+before continuing; uncertain recovery requires explicit user intent and clears
+history. It is not an automatic restore operation. This change documents existing
+behavior; it does not add canvas vision, automatic scene recovery or establish
+that real-model expressions became easier to recognize.
