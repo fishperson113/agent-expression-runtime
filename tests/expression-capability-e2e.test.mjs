@@ -88,6 +88,17 @@ it.skipIf(!existsSync(gatewayExecutable()) && !required)('discovers, authors, ex
     expect(['unknown', 'cancelled']).toContain((await status(client, 'interrupt_me')).status);
     results.push(await authored(client, live.page, 'explicit_recovery', '#a237c9', 0.2));
     expect(results.at(-1).result.receipt.epoch).not.toBe(interrupted.epoch);
+    const pose = toolValue(await client.tool('express', { requestId: 'live_pose_stop', body: {
+      type: 'live', program: null, configuration: { controls: [], lifetimeMs: 8000,
+        poses: [{ type: 'pose', target: { part: 'body', prop: 'x' }, value: 0.1, durationMs: 8000 }] } } }));
+    await expect.poll(async () => (await status(client, 'live_pose_stop')).status).toBe('applied');
+    await new Promise(resolve => setTimeout(resolve, 470));
+    expect((await status(client, 'live_pose_stop')).status).toBe('applied');
+    await live.page.getByRole('button', { name: 'Dừng biểu đạt', exact: true }).click();
+    await expect.poll(async () => (await status(client, 'live_pose_stop')).status).toBe('cancelled');
+    const stopped = await status(client, 'live_pose_stop');
+    expect(stopped.receipt.epoch).toBe(pose.epoch);
+    results.push({ requestId: 'live_pose_stop', result: stopped, interpretation: 'stopped early, not an eight-second completion' });
     const metrics = await live.page.evaluate(() => ({ metrics: window.fischLive.metrics(), maxRise: window.expressionProbe.maxRise }));
     expect(metrics.maxRise).toBeGreaterThan(0.2);
     expect(metrics.metrics.cameraActive).toBe(false);

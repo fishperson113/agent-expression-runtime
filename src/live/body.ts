@@ -1,5 +1,6 @@
 import { ThreeRenderer } from '../adapters/three-renderer';
 import { Scheduler } from '../core/runtime/scheduler';
+import { ExpressionLifecycle } from '../core/live/expression-lifecycle';
 import { LiveCompiler, referencedParts } from '../core/live/compiler';
 import { LiveCompositor, composeWrites, type TransformWrite } from '../core/live/compositor';
 import { transformMatrices } from '../core/live/transforms';
@@ -40,15 +41,18 @@ export class LiveBody {
   private userLeaseUntil = 0;
   private userGeometryLocked = false;
   private origins = new WeakMap<Compiled, TraceAttribution>();
+  private lifecycle = new ExpressionLifecycle((status, ir) => {
+    const source = this.origins.get(ir) ?? { origin: 'ambient' as const };
+    this.trace.record(ir.seq, status, performance.now(), undefined, ir.epoch, source);
+    if (source.origin === 'native') this.feedback?.({ status, epoch: ir.epoch, seq: ir.seq });
+  });
   output = 0;
   feedback?: (event: { epoch: string; seq: number; status: string }) => void;
   constructor(private canvas: HTMLCanvasElement, private status: (text: string) => void) {
     this.renderer = new ThreeRenderer(canvas, status); this.renderer.quality(2000);
     this.scheduler = new Scheduler({ now: () => performance.now() }, { apply: (state, now) => this.apply(state, now),
       dispose: () => this.renderer.dispose() }, { count: status }, (status, ir) => {
-        const source = this.origins.get(ir) ?? { origin: 'ambient' as const };
-        this.trace.record(ir.seq, status, performance.now(), undefined, ir.epoch, source);
-        if (source.origin === 'native') this.feedback?.({ status, epoch: ir.epoch, seq: ir.seq });
+        this.lifecycle.feedback(status, ir);
       }, 2000);
     this.defaults.install(validateConfiguration(defaults), performance.now());
     this.restFace(0);
@@ -60,7 +64,9 @@ export class LiveBody {
     const now = performance.now(); this.samples.push(now - this.previous); this.previous = now;
     if (this.samples.length > 120) this.samples.shift();
     this.reactive?.tick();
-    if (!document.hidden && this.controls.mode !== 'off') this.scheduler.tick();
+    if (!document.hidden && this.controls.mode !== 'off') {
+      this.scheduler.tick(); this.lifecycle.tick(now);
+    }
     this.frameId = requestAnimationFrame(this.frame);
   };
   private apply(state: BodyState, now: number) {
@@ -139,7 +145,15 @@ export class LiveBody {
     this.origins.set(compiled.program, source);
     const result = this.scheduler.admit(compiled.program), accepted = ['accepted', 'state', 'defined'].includes(result);
     if (compiled.program.kind === 'define' && compiled.program.draft !== undefined) this.compiler.compiler.settleDefinition(compiled.program.draft, accepted);
-    if (accepted && compiled.configuration) this.controls.install(compiled.configuration, at);
+    if (accepted && compiled.configuration) {
+      this.lifecycle.cancel();
+      const config = compiled.configuration;
+      const duration = config.controls.length ? config.lifetimeMs :
+        Math.max(0, ...config.poses.map(pose => (pose.delayMs ?? 0) + pose.durationMs));
+      if (source.origin === 'native' && compiled.program.kind !== 'define' && duration > 0)
+        this.lifecycle.configuration(compiled.program, at + duration);
+      this.controls.install(compiled.configuration, at);
+    }
     return result;
   }
   admitReactive(compiled: LiveCompiled, owner: ReactiveOwnership) {
@@ -162,6 +176,7 @@ export class LiveBody {
   epoch(epoch: string, reset = false) {
     this.reactive?.reset(); this.reactiveOwner = undefined; this.userLeaseUntil = 0; this.userGeometryLocked = false;
     this.trace.reset();
+    this.lifecycle.cancel();
     this.controls.reset(); this.scheduler.cancel(epoch, false);
     if (reset) { this.compiler.compiler.reset(); this.partIds = ''; }
     else this.compiler.compiler.discardDefinitions();
@@ -197,5 +212,5 @@ export class LiveBody {
       scene: isFace(this.scheduler.state.particleParts ?? []) ? 'face' : this.scheduler.state.shape,
       parts: this.scheduler.state.particleParts?.map(part => part.id) ?? [],
       frameP95: p95, meanFps: 1000 / (this.samples.reduce((sum, value) => sum + value, 0) / Math.max(1, this.samples.length)), particles: this.renderer.count }; }
-  dispose() { this.reactive?.configure(false); cancelAnimationFrame(this.frameId); this.resize.disconnect(); this.scheduler.dispose(); }
+  dispose() { this.lifecycle.cancel(); this.reactive?.configure(false); cancelAnimationFrame(this.frameId); this.resize.disconnect(); this.scheduler.dispose(); }
 }

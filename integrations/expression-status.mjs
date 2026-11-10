@@ -4,7 +4,7 @@ const terminal = new Set(['completed', 'cancelled', 'rejected']);
 const key = value => JSON.stringify([value.session, value.epoch, value.seq]);
 export const expressionStatusTool = {
   name: 'expression_status',
-  description: 'Read lifecycle evidence for this MCP process’s own requestId. Admission is not application or visibility. Never reconnects or replays.',
+  description: 'Read lifecycle evidence for this MCP process’s own requestId. Admission is not application or visibility. Completed covers the program and any active Live configured work, not persistent geometry, physical visibility or proof of an advertised wall-clock duration. Never reconnects or replays.',
   annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
   inputSchema: { type: 'object', required: ['requestId'], additionalProperties: false,
     properties: { requestId: { type: 'string', minLength: 1, maxLength: 128 } } },

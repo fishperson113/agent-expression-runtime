@@ -124,3 +124,14 @@ boundaries. They do not prove that Codex or Claude actually discovers tools or
 chooses a relevant expression during a real conversation. Hosted-agent evaluation
 still needs the existing budget ledger/provider configuration reconciled; the
 human session above remains pending.
+
+### Composite Live completion
+
+A Live receipt completes after both its scheduler program and configured work
+end (pose end times, or the lease for continuous controls). Empty configuration
+does not extend completion. Epoch cancellation or configuration replacement before then emits cancelled,
+even when the scheduler program has already finished. This aggregation does not
+extend scheduler ownership or block local controls. Plain program completion
+continues to describe its scheduler timeline; retained geometry or a part motion
+period is not a promise that the expression stayed visible for that duration.
+Neither status nor requested duration proves elapsed rendered time or visibility.
