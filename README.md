@@ -1,68 +1,43 @@
 # Fisch
 
-A visible particle body for your coding agent.
+**A particle body that an AI agent can shape for itself.**
 
-Fisch turns agent activity into motion and lets Codex create expressions and illustrations with particles. It runs locally in a browser, with the existing Codex agent in your terminal and a same-thread text panel in Live.
+Fisch gives an agent a visual way to communicate alongside its words. It can move a face, turn its whole body into an illustration, or add new parts to a scene. The agent authors the geometry, color and motion to fit the context, rather than choosing from a fixed list of expressions.
 
-![Fisch Live in a blue-black single-screen layout, with the particle body on the left and camera-off and conversation panels on the right.](docs/evidence/live-workspace.png)
+The goal is a body that responds naturally during conversation and work. The agent keeps its own reasoning, memory and tools; Fisch handles expression and optional local observation.
 
-*Actual 1440 × 900 browser screenshot, camera off and Codex disconnected. No real camera imagery or simulated conversation. See [capture details](docs/evidence/live-workspace-provenance.json) and [validation limits](docs/validation.md).*
+![Fisch Live, with the particle body on the left and camera and conversation panels on the right.](docs/evidence/live-workspace.png)
 
-## Why Fisch?
+*Live interface, with camera off and Codex disconnected.*
 
-Working with an agent often means staring at scrolling text. Fisch explores a quieter, more expressive way to see what your agent is doing and give it a presence beside the conversation.
+## Project status
 
-## Prerequisites
-
-For the browser POC:
-
-- Node.js 22.12+ and npm
-- Rust stable and its platform compiler prerequisites
-- Chromium (`npx playwright install chromium` once), or Edge on Windows
-- Codex CLI with app-server/remote support, already signed in
-
-Herdr is optional for Live. The native Tauri app has additional platform prerequisites.
+Fisch is an experimental local browser app, currently integrated with Codex. Agent-authored shapes, motion, a same-thread text panel and optional face/hand tracking are implemented. Reliable spontaneous expression and a coherent proactive interaction loop are still being developed and evaluated. See [current scope](docs/expression-capability-experience.md) and [validation](docs/validation.md).
 
 ## Quick start
 
-Install once:
+You need **Node.js 22.12+**, **npm**, **Rust stable** with your platform's compiler tools, **Edge/Chrome or Playwright Chromium**, and a **signed-in Codex CLI** with app-server/remote support. See the [setup guide](docs/fisch-live.md#chuẩn-bị-checkout-mới) for compatibility and troubleshooting.
 
 ```sh
 git clone https://github.com/fishperson113/agent-expression-runtime.git
 cd agent-expression-runtime
 npm link
-```
-
-Then, in a normal terminal:
-
-```sh
 fisch live
 ```
 
-On first launch, Fisch installs locked project dependencies, builds the browser gateway and frontend, and downloads checksum-verified face assets. Later launches reuse unchanged builds. No global tools or settings are installed. Rust/compiler, Edge/Chrome (or Playwright Chromium) and signed-in Codex must already be available.
+The first launch installs dependencies, builds the app and downloads face-tracking models. Fisch opens in your browser, with Codex in the terminal. Start or select a Codex thread there, then use the browser's text panel or continue in the terminal.
 
-Use `fisch live --hands` to also prepare the optional hand model, or `fisch live --no-assets` to skip vision downloads. Camera and hand tracking still require explicit browser controls. If a model download fails, Live continues camera-off and retries next launch.
+After installation, run `fisch live` from the project you want to work in. From the Fisch checkout, `npm start` also works.
 
-This opens the particle face in a browser and Codex in your terminal. Inside Herdr or another multiplexer, Codex runs in the pane where you launched Live. The explicit `--agent <pane>` legacy adapter remains available. Click **Bật camera** when you want local face tracking; the camera starts off. Real camera images stay on your machine. Select or start a Native Codex thread in that terminal, then talk in the Live text panel or continue in the terminal.
+Camera starts off. Enable it only when you want local tracking; real camera images stay on your machine. Expression works with camera off. [Live controls and privacy](docs/fisch-live.md) covers optional hand tracking, setup options and stopping a session.
 
-`npm start` is the checkout-local equivalent of `fisch live`; pass options with `npm start -- --hands`.
+## Documentation
 
-### Migrating from the terminal panel
+- [Live guide](docs/fisch-live.md): setup, controls and privacy
+- [Expression tools](docs/composable-expression.md): agent-authored shapes and motion
+- [Architecture](docs/architecture.md): how the runtime fits together
+- [Contributing](docs/my-harness.md): development workflow and required checks
 
-The old `fisch run` terminal-body launcher and its `express`/`cancel` CLI controls have been removed. Start `fisch live` from your project directory instead. It opens a new Codex session in that terminal; it does not attach to an already-running agent. Live's MCP `express`/`cancel_expression` tools remain available to Codex.
+## License
 
-Use the Live browser controls for normal sessions. `fisch status` and `fisch stop` remain only for the dedicated Herdr pane created by the explicit `fisch live --agent <pane-id>` adapter. Normal-terminal Live needs no global hooks. To remove old hooks you installed, use `fisch hooks uninstall [codex|claude]`; this preserves unrelated provider hooks.
-
-## Learn more
-
-- [Tonight demo](docs/demo-tonight.md) - Native text/expression steps, scoped QA evidence and the separate optional OLV trial
-- [Live guide](docs/fisch-live.md) - camera, controls and privacy
-- [Herdr guide](docs/multiplexer.md) - optional adapter and panel migration
-- [Contributing](docs/my-harness.md) - development and checks
-- [Architecture](docs/architecture.md) | [Validation](docs/validation.md) - technical details and POC limits
-
-## Community and license
-
-Issues and pull requests are welcome. Please follow the [Code of Conduct](docs/CODE_OF_CONDUCT.md).
-
-Fisch is [MIT licensed](LICENSE). Third-party components retain their [own licenses](docs/dependency-licenses.md).
+[MIT](LICENSE). Third-party components keep their [own licenses](docs/dependency-licenses.md). Contributions are welcome under the [Code of Conduct](docs/CODE_OF_CONDUCT.md).
