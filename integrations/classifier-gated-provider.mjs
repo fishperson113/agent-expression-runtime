@@ -8,7 +8,7 @@ function configuration(value) {
   if (!value || typeof value.classify !== 'function' ||
       ![value.modelId, value.modelRevision].every(item => typeof item === 'string' && /^[A-Za-z0-9_./-]{1,128}$/.test(item)) ||
       !unit(value.minConfidence) || !unit(value.minMargin) ||
-      typeof value.now !== 'function' ||
+      typeof value.now !== 'function' || typeof value.isCurrent !== 'function' ||
       (value.onClassification !== undefined && typeof value.onClassification !== 'function')) throw Error('classifier_gate_config');
   return Object.freeze({ ...value });
 }
@@ -32,6 +32,13 @@ function available(config, request, signal) {
   if (!Number.isFinite(now) || now < 0) throw new ReactiveProviderError('classifier_clock_invalid', true);
   if (now >= request.deadline) throw new ReactiveProviderError('classifier_deadline', true);
 }
+async function current(config, request, signal) {
+  available(config, request, signal);
+  let valid;
+  try { valid = await config.isCurrent(request); } catch { valid = false; }
+  available(config, request, signal);
+  if (valid !== true) throw new ReactiveProviderError('classifier_revoked', true);
+}
 export function classifierGatedProvider(provider, options) {
   if (!provider || typeof provider.decide !== 'function' || ![1, 2].includes(provider.contractVersion)) throw Error('classifier_gate_provider');
   const config = configuration(options), seen = new Set(); let active = false;
@@ -42,10 +49,11 @@ export function classifierGatedProvider(provider, options) {
     if (active || seen.has(key) || seen.size >= 256) throw new ReactiveProviderError('classifier_gate_capacity', true);
     seen.add(key); active = true;
     try {
+      await current(config, request, signal);
       let label = 'abstain', reason = 'classifier_failed';
       try { label = classify(await config.classify(frozen, signal), config); reason = 'classifier_choice'; } catch { /* Fail closed without semantic fallback. */ }
-      available(config, request, signal); report(config, request, label, reason);
-      available(config, request, signal);
+      await current(config, request, signal); report(config, request, label, reason);
+      await current(config, request, signal);
       if (['observe', 'abstain'].includes(label)) return observe(request);
       const transport = { ...frozen, observations: frozen.observations.map(value => ({ ...value, summary: '' })) };
       const decision = await provider.decide(transport, signal, onReceipt);

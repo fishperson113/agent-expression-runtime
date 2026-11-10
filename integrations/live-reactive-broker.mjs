@@ -51,6 +51,7 @@ export class LiveReactiveBroker {
     }
     if (message.method === 'turn/steer' && (!this.output.turn || message.params?.threadId !== this.output.thread ||
       message.params?.expectedTurnId !== this.output.turn)) { this.rejectInput(message, 'reactive_steer_invalid', false); return false; }
+    this.active?.controller.abort();
     this.receipts.add(message.id); if (this.receipts.size > 64) this.receipts.delete(this.receipts.values().next().value);
     this.pending.set(message.id, { method: message.method, threadId: message.params?.threadId });
     this.queue.push(message); void this.drain(); return false;

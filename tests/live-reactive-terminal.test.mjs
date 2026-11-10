@@ -89,7 +89,7 @@ it('revokes browser authority before native input while provider stays pending a
     const user = f.call('turn/start', { threadId: 'native', input: [{ type: 'text', text: 'PRIVATE_USER_INPUT' }] });
     await vi.waitFor(() => expect(entered).toBe(true));
     expect((await f.call('test/snapshot')).result.seen.filter(message => message.method === 'turn/start')).toEqual([]);
-    release(); await user; expect(providerSignal.aborted).toBe(false); f.api.barrier = async () => {};
+    expect(providerSignal.aborted).toBe(true); release(); await user; f.api.barrier = async () => {};
     expect((await f.call('turn/steer', { threadId: 'native', expectedTurnId: 'wrong' })).error).toBeDefined();
     expect((await f.call('turn/steer', { threadId: 'native', expectedTurnId: 'user', input: [] })).error).toBeUndefined();
     complete({ schemaVersion: 1, requestId: 'camera', decisionId: 'd', mode: 'observe', action: null, validUntil: 900 });

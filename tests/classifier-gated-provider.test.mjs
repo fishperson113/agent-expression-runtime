@@ -15,7 +15,7 @@ const window = (id = 'r', version = 2) => ({ schemaVersion: 1, request: { schema
     camera: 'absent', turn: 'idle', summary: 'not transmitted', user: { present: false, quality: { score: 0, basis: 'unavailable' },
       position: null, head: null, facingScreen: null, expression: null, mouthMoving: null } }] });
 const options = extra => ({ modelId: 'convaiinnovations/laya', modelRevision: 'pinned', minConfidence: 0.7, minMargin: 0.15,
-  classify: async () => prediction(), now: () => 1000, ...extra });
+  classify: async () => prediction(), now: () => 1000, isCurrent: () => true, ...extra });
 const provider = version => ({ contractVersion: version, decide: vi.fn(async () => ({ marker: 'unchanged_semantic_result' })) });
 const dirs = [];
 afterEach(() => dirs.splice(0).forEach(path => rmSync(path, { recursive: true, force: true })));
@@ -96,4 +96,18 @@ it('factory preserves budget and provider opt-in while no-ops avoid reservations
   expect(JSON.parse(readFileSync(path)).used).toBe(120); expect(fetch).toHaveBeenCalledTimes(1);
   expect(createLiveReactiveProvider({}, { classifier }).reason).toBe('disabled_by_config');
   expect(createLiveReactiveProvider(env, { now: () => 100, classifier: {} }).reason).toBe('budget_exhausted');
+});
+it('does not reserve or dispatch after intent, camera or track revocation during local classification', async () => {
+  for (const cause of ['intent', 'camera', 'track']) {
+    const directory = mkdtempSync(join(tmpdir(), 'fisch-classifier-revoked-')); dirs.push(directory);
+    const path = join(directory, 'fixture-ledger.json');
+    writeFileSync(path, JSON.stringify({ deadline: new Date(10000).toISOString(), limit: 120, used: 0, turns: [] }));
+    let current = true; const fetch = vi.fn();
+    const classifier = options({ isCurrent: async () => current, classify: async () => { current = false; return prediction(); } });
+    const configured = createLiveReactiveProvider({ FISCH_REACTIVE_BACKEND: 'responses', FISCH_REACTIVE_CONTRACT_VERSION: '2',
+      FISCH_REACTIVE_MODEL: 'fixture', FISCH_REACTIVE_URL: 'https://provider.invalid/responses', FISCH_REACTIVE_BUDGET: path },
+    { now: () => 100, fetch, classifier });
+    await expect(configured.provider.decide(window(cause))).rejects.toThrow('classifier_revoked');
+    expect(fetch).not.toHaveBeenCalled(); expect(JSON.parse(readFileSync(path)).used).toBe(0);
+  }
 });

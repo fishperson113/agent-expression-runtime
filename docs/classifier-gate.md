@@ -7,7 +7,8 @@ rollout. Existing provider configuration and an approved cumulative budget are
 still required. Missing approval cannot be bypassed by enabling the gate.
 
 The classifier option has `modelId`, `modelRevision`, `minConfidence`,
-`minMargin`, `classify(window, signal)`, required monotonic `now`, and optional
+`minMargin`, `classify(window, signal)`, required monotonic `now`, required
+`isCurrent(request)`, and optional
 `onClassification(metadata)`. Its input is the validated frozen observation
 window with natural-language summaries removed. It returns a JSON string in
 the strict five-score [classifier protocol](classifier-shadow.md).
@@ -17,6 +18,20 @@ Browser and Node performance clocks have different origins; passing Node's
 `performance.now` for a browser-origin deadline is invalid without a verified
 mapping. The gate deliberately provides no default clock or inferred mapping.
 The caller owns that mapping; the causal host remains the admission authority.
+
+`isCurrent` is a trusted host freshness check returning `true` or a promise of
+`true` only while intent, source/permission, epoch and required tracking remain
+valid. It is checked before classification, after classification and directly
+before semantic dispatch. Missing checks, false results and exceptions fail
+closed. A browser bridge needs an authoritative read-only validation API;
+cached Node revisions do not establish browser freshness. The gate does not
+reuse the host's non-idempotent initial authorization operation.
+
+The broker also aborts the active observer when accepting native user intent,
+before awaiting the browser revocation barrier. It retains transport ownership
+until settlement; abort is not evidence that a remote provider stopped billing.
+Cross-process freshness checks cannot make a browser change and network send
+atomic. Abort checks and final causal-host validation remain mandatory.
 
 Observe, abstain, low confidence, invalid output and local classifier errors
 produce a host-owned observe decision with no action and no semantic model
