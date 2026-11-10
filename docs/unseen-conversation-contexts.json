@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 2,
+  "datasetId": "fisch-unprimed-expression-choice-vi-v2",
+  "frozenAtUtc": "2026-11-10T12:32:53Z",
+  "language": "vi",
+  "provenance": "Independent QA-authored synthetic everyday conversation contexts, created only after the candidate source/policy freeze. No personal data, imagery or external dataset.",
+  "implementationFreeze": {
+    "commit": "5f652201b23c3fbe06c8933203811355f6d921a6",
+    "tree": "8738b36b317b0b3a41ff720e1e58d0dd2f0f9840",
+    "policyBundleSha256": "3f49b29085e8318a6070f3222bf19e8c6800452f44e5f6937a55c943aa3915b1",
+    "composeHelperSha256": "07019228be02ff7ce34eb83ef35c9de45cd9c3370ac14a80111b6cf59a266151",
+    "rule": "Any behavior or policy edit after revealing these contexts invalidates untouched-holdout status. Preserve this version and disclose it as exploratory; do not silently replace messages."
+  },
+  "priorEvidence": {
+    "v1Status": "Disclosed exploratory evidence, not an untouched control.",
+    "v1EffectiveBundle": "Unverified for the actual 16-turn executor. Its face-only output cannot establish which instruction bundle was loaded or why the agent selected that form.",
+    "comparisonLimit": "V2 uses different contexts and a newly verified deployment. A difference from V1 is not a controlled causal estimate of the helper or policy change."
+  },
+  "modelInputRule": "Send only case.message as the user message, with the unchanged verified production policy. Never send IDs, this manifest, the rubric, expected interpretations, geometry quotas, prior outputs or case-specific coaching to the model.",
+  "cases": [
+    {
+      "id": "V2-01",
+      "message": "Hôm nay đã được một tháng mình giữ được một thói quen nhỏ mà trước đây hay bỏ dở. Không phải thành tích lớn với ai khác, nhưng mình thấy vui vì đã làm được."
+    },
+    {
+      "id": "V2-02",
+      "message": "Mình muốn tận hưởng khoảnh khắc này một chút thôi. Chưa cần đặt mục tiêu tiếp theo hay tìm thêm việc để làm đâu nhé."
+    },
+    {
+      "id": "V2-03",
+      "message": "Một người bạn lâu rồi không liên lạc vừa hỏi thăm mình. Mình muốn đáp lại nhưng hơi ngại, vì không biết bắt đầu thế nào cho tự nhiên."
+    },
+    {
+      "id": "V2-04",
+      "message": "Mình chỉ cần một câu mở lời gần gũi, không cần phân tích mối quan hệ hay viết thành một đoạn trang trọng. Bạn giúp mình giản dị hơn nhé."
+    },
+    {
+      "id": "V2-05",
+      "message": "Mình thử một công thức mới và kết quả khác xa dự tính. Cả nhà lại thấy buồn cười, thành ra buổi tối vẫn vui. Có lẽ lần sau mình sẽ thử lại theo cách khác."
+    },
+    {
+      "id": "V2-06",
+      "message": "Vì sao những chuyện bất ngờ, kể cả chuyện rất nhỏ, thường dễ nhớ hơn những ngày mọi thứ diễn ra bình thường nhỉ? Mình tò mò về điều đó."
+    },
+    {
+      "id": "V2-07",
+      "message": "Cuối tuần này mình có thời gian rảnh nhưng chưa biết muốn ra ngoài đổi không khí hay ở nhà nghỉ. Bạn hỏi mình một điều để mình tự chọn cho rõ hơn được không?"
+    },
+    {
+      "id": "V2-08",
+      "message": "Mình quyết định chưa lên thêm kế hoạch. Giờ mình muốn ngồi yên nghe một chút rồi tự cân nhắc, bạn không cần tiếp tục gợi ý đâu."
+    }
+  ],
+  "executorPreconditions": {
+    "freshProcesses": "Start a fresh model client, authenticated app-server AND fresh Fisch MCP process after deployment; openModelClient captures policy once, so a fresh thread alone does not reload cached instructions or tools. Use only already-authorized host authentication; do not copy/export credentials or weaken security settings.",
+    "freshContext": "Use fresh external-agent threads and fresh Fisch sessions, never resume/fork a private task conversation or inject its history. Do not alter the production policy to fit these messages.",
+    "sourceMatch": "Verify deployed source/artifact identity against the frozen commit/tree and helper/policy hashes. Record how the installed artifact was matched rather than fabricating a Git identity for an installed package.",
+    "catalogMatch": "Fetch actual tools/list and resources from the exact MCP process used by the model. Verify compose_expression is advertised, its concrete schema matches the frozen helper, and workflow.geometryContract has the expected base fingerprint. Save a canonical catalog hash and compare it across trials.",
+    "effectiveInstructionProvenance": "Verify the actual outbound thread-start instruction injection used by this fresh app-server against the frozen policy bundle. A repository file hash, environment flag or model self-report alone is insufficient. Record source-bundle hash, injection/match result and outbound field hash/length without exposing unrelated private instructions or auth data. If this cannot be verified, label the run provenance-unverified and do not claim a frozen-policy holdout result.",
+    "readyGate": "App-server/MCP initialization and verified catalog/instruction provenance must complete before starting evaluated turns. If blocked, record a preflight failure and stop the dependent trial; do not silently fall back to an older running client.",
+    "budget": "This artifact authorizes no model call, credential creation or budget increase. Verify the current authorized ledger/deadline and reserve before each actual inference. Unknown usage is not zero and unknown actions are not automatically retried.",
+    "installedProtocolProvenance": {
+      "cliVersion": "0.167.0-alpha.4",
+      "source": "Parent-supplied read-only installed-protocol verification, /workspace/scratch/fisch-installed-mcp-status-capability.json; QA did not perform authenticated model calls",
+      "sameConnectionCatalogRequest": {
+        "method": "mcpServerStatus/list",
+        "params": {
+          "threadId": "<same fresh evaluated threadId>",
+          "serverName": "fisch_live",
+          "detail": "full",
+          "limit": 100
+        }
+      },
+      "sameConnectionWorkflowRequest": {
+        "method": "mcpServer/resource/read",
+        "params": {
+          "threadId": "<same fresh evaluated threadId>",
+          "server": "fisch_live",
+          "uri": "aer://workflow/v1"
+        }
+      },
+      "rule": "Use the exact same app-server connection/thread that will execute the evaluated turn; note serverName for status versus server for resource/read. Inspect the actual server catalog/resource, not a different standalone MCP test process. These read-only requests do not by themselves prove outbound instruction injection."
+    }
+  },
+  "evaluationOnly": {
+    "singleCaseMode": "One fresh thread/session per message, independent of other messages.",
+    "transitionPairs": [
+      [
+        "V2-01",
+        "V2-02"
+      ],
+      [
+        "V2-03",
+        "V2-04"
+      ],
+      [
+        "V2-05",
+        "V2-06"
+      ],
+      [
+        "V2-07",
+        "V2-08"
+      ]
+    ],
+    "transitionMode": "Each pair starts fresh. Deliver its second message after the first Native turn terminates, preserving the agent's chosen form; do not request a visual reset. The second message is conditioned continuation, not an independent sample.",
+    "predeclareMode": "Select single-case mode, transition mode or a fixed subset before inference, within verified budget. All eight independent cases plus all four two-turn pairs would require 16 turns before any failed attempts; running both is not implicitly authorized.",
+    "abstention": "Retaining the current form, using motion without new geometry, or making no expressive call may be appropriate. Do not require geometry on each turn or impose a geometry-count pass quota.",
+    "blindReview": "Before showing context or assistant claims, show opaque-ID actual composite output/transition clips and ask viewers to describe what is visible. Then reveal only the user context and ask relevance/restraint/transition questions. Reveal assistant descriptions last for an honesty check. AST, part names and masks are not recognition labels.",
+    "timing": "Report input-to-first-tool, input-to-first-expressive-tool and input-to-full-Native-turn-terminal separately. For each receipt report pending/accepted/rejected, applied, completed/cancelled and unknown with session/epoch/seq. Missing timings are null with a reason, never zero; completed is not visibility or settled recognition.",
+    "studyLimit": "Small formative synthetic-context study. Record all attempts, abstentions, failures and disagreement; no numerical human pass threshold or general naturalness claim is prespecified."
+  }
+}
