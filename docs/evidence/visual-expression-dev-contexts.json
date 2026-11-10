@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "id": "visual-expression-dev-01",
+  "status": "predeclared development pilot; not executed; not an untouched holdout",
+  "inputPath": "Actual MAIN user-conversation input with verified Live policy/catalog; never camera observations",
+  "attemptsPerCase": 1,
+  "maxModelTurns": 6,
+  "allowRetainOrSilence": true,
+  "expectedFormOrColor": null,
+  "cases": [
+    {
+      "id": "v01",
+      "text": "Mình vừa gỡ được nút thắt sau một lúc loay hoay. Cho mình nghỉ vài giây nhé."
+    },
+    {
+      "id": "v02",
+      "text": "Có hai hướng đều có vẻ hợp lý. Mình muốn cân nhắc thêm trước khi chọn."
+    },
+    {
+      "id": "v03",
+      "text": "Ơ, mình nói nhầm rồi. Bỏ ý vừa rồi đi, mình làm lại từ đầu."
+    },
+    {
+      "id": "v04",
+      "text": "Mình đang đọc kỹ đoạn này, cứ để mình yên một chút nhé."
+    },
+    {
+      "id": "v05",
+      "text": "Hôm nay mình muốn thử một cách làm khác, chưa biết kết quả ra sao."
+    },
+    {
+      "id": "v06",
+      "text": "Xong phần này rồi. Mình chưa cần làm gì tiếp, cứ thong thả thôi."
+    }
+  ],
+  "review": [
+    "Capture pre-state, first visible change, fixed 1s post-admission and end-of-declared-action samples; preserve no-action frames.",
+    "Review output under opaque IDs before revealing context, then assess relevance/restraint/pleasantness, then caption consistency.",
+    "Record every retain/silence/action/error/unrun case; no selective reruns, required geometry rate or invented enjoyment threshold."
+  ],
+  "limits": [
+    "MAIN already has rich authoring policy; this pilot is not a controlled test of the separate observer guide.",
+    "Do not infer recognition from part names/AST/renderer summaries, or completion from admission.",
+    "Use existing consent, Stop, user-priority and bounded DSL safeguards; no real camera/mic or credential transfer."
+  ]
+}

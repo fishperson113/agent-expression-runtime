@@ -74,3 +74,23 @@ choice, recognizable rendering or enjoyment. Test this candidate with actual
 observer input separately from the six public text contexts sent through MAIN.
 An animate payload with empty controls/poses is contract-valid but cannot by
 itself establish new visible movement or expressive usefulness.
+
+The [six public development contexts](evidence/visual-expression-dev-contexts.json)
+are supplied through MAIN conversation input, once each, with no named target
+form/color. MAIN already has its rich authoring instructions, so this pilot is
+not a causal test of the observer-only brief. Record all retained/quiet/error
+outcomes and blind visual review before judging contextual usefulness.
+
+## Continuity profile early stop — separate evidence
+
+The independent frozen `a304368` profile stopped at 176.288/550 seconds under
+its declared early-stop policy, without retry or timeout widening. Two actual
+Codex turns completed: the first greeting/retain was browser-confirmed; the next
+expression-coefficient event received that one historical entry and chose empty
+reply/retain, correctly creating no publication entry. No geometry was authored.
+Broker browserUnavailable/paused/uncertain latched while provider uncertainty
+was false and no inference was in flight. Source advanced only one sequence
+between checkpoints at 136.439 and 176.246 seconds and expired. The final main
+fixture snapshot timed out; later phases and ownership assertion were unrun.
+Product-versus-Cloud attribution remains unknown pending captured-log review.
+This is partial history-path evidence, not completed-session or enjoyment proof.
