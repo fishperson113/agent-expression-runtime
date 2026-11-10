@@ -8,6 +8,7 @@ let mounts = 0;
 const bytes = (value: string) => new TextEncoder().encode(value).length;
 const errors: Record<string, string> = {
   conversation_unknown: 'Chưa rõ yêu cầu đã được nhận. Không gửi lại; kiểm tra terminal hoặc khởi chạy lại Live.',
+  conversation_expression_failed: 'Một yêu cầu biểu đạt báo lỗi. Lượt trả lời hoàn tất không xác nhận tạo hình thành công; kiểm tra terminal.',
   conversation_completion_unknown: 'Chưa xác nhận kết quả lượt trả lời. Kiểm tra terminal.',
   conversation_restart_required: 'Phiên đã chuyển trang; hãy khởi chạy lại Live.',
   conversation_rejected: 'Yêu cầu chưa được nhận. Bản nháp vẫn được giữ để bạn kiểm tra.',

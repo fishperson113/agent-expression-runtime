@@ -59,3 +59,16 @@ it('keeps real transcript scrolling internally and composer/stop reachable acros
     expect(await page.evaluate(() => window.qaMediaCalls)).toBe(0);
   } finally { await page.close(); }
 }, 45000);
+
+it('shows expression failure separately from a completed reply without locking ordinary chat', async () => {
+  const { page, panel, input } = await open();
+  try {
+    await page.evaluate(value => window.fischLive.conversationStatus(value), { ...ready,
+      error: 'conversation_expression_failed', messages: [{ id: 'm', turn: 't', role: 'assistant', text: 'Nội dung trả lời', status: 'completed', truncated: false }] });
+    expect(await panel.locator('ol').textContent()).toContain('Đã hoàn tất');
+    expect(await panel.locator('.conversation-status').textContent()).toContain('Một yêu cầu biểu đạt báo lỗi');
+    await input.fill('Tiếp tục trò chuyện');
+    expect(await panel.getByRole('button', { name: 'Gửi', exact: true }).isEnabled()).toBe(true);
+    expect(await page.evaluate(() => window.qaMediaCalls)).toBe(0);
+  } finally { await page.close(); }
+}, 45000);
