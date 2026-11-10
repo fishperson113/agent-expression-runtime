@@ -77,7 +77,7 @@ it('only steers a current native turn and checks again after barrier', async () 
 it('retains one active transport across semantic revocation and unknown failure, but user input still works', async () => {
   let reject, signal; const f = fixture({ decide: (_value, value) => { signal = value; return new Promise((_resolve, fail) => { reject = fail; }); } });
   f.candidates.push(f.candidate('r')); await f.broker.poll({}); await flush();
-  f.broker.client({ id: 1, method: 'turn/start', params: { threadId: 'native' } }); await flush(); expect(signal.aborted).toBe(false);
+  f.broker.client({ id: 1, method: 'turn/start', params: { threadId: 'native' } }); expect(signal.aborted).toBe(true); await flush();
   reject(Object.assign(Error('reactive_decision_invalid'), { transportSettled: true })); await flush(); expect(f.failures).toEqual(['r']);
   const takes = f.state.takes; await f.broker.poll({}); expect(f.state.takes).toBe(takes);
   expect(f.forwarded).toHaveLength(1); f.broker.close();

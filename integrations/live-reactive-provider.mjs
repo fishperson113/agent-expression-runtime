@@ -1,11 +1,12 @@
 import { isAbsolute } from 'node:path';
 import { readModelBudget, reserveModelTurn } from './live-model-budget.mjs';
 import { reactiveProviderConfig, reactiveResponsesAdapter } from './reactive-provider.mjs';
+import { classifierGatedProvider } from './classifier-gated-provider.mjs';
 
 export function nativeLiveEnvironment(env = process.env) {
   return Object.fromEntries(Object.entries(env).filter(([name]) => !name.startsWith('FISCH_REACTIVE_')));
 }
-export function createLiveReactiveProvider(env = process.env, { fetch, now = Date.now } = {}) {
+export function createLiveReactiveProvider(env = process.env, { fetch, now = Date.now, classifier } = {}) {
   let config;
   try { config = reactiveProviderConfig(env); }
   catch { return { provider: null, reason: 'invalid_provider_config' }; }
@@ -22,5 +23,9 @@ export function createLiveReactiveProvider(env = process.env, { fetch, now = Dat
   const provider = reactiveResponsesAdapter(config, { fetch, reserve: ({ requestId }) => {
     reserveModelTurn(path, 'reactive:' + requestId, now()); return true;
   } });
+  if (classifier !== undefined) {
+    try { return { provider: classifierGatedProvider(provider, classifier), reason: 'ready_classifier_gated' }; }
+    catch { return { provider: null, reason: 'invalid_classifier_config' }; }
+  }
   return { provider, reason: 'ready' };
 }
