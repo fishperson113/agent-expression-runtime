@@ -59,3 +59,10 @@ it('bounds retained dedup records and rejects copied binding tokens', () => {
   expect(adapter.complete(binding, prediction()).reason).toBe('binding_unknown_or_completed');
   expect(adapter.bind(next).request.requestId).toBe('next');
 });
+
+it('fails closed when the clock throws and does not retry the consumed result', () => {
+  const adapter = new ClassifierShadowAdapter(options({ now: () => { throw Error('clock_unavailable'); } }));
+  const binding = adapter.bind(window());
+  expect(adapter.complete(binding, prediction())).toEqual({ status: 'dropped', reason: 'clock_failed' });
+  expect(adapter.complete(binding, prediction())).toEqual({ status: 'dropped', reason: 'binding_unknown_or_completed' });
+});
