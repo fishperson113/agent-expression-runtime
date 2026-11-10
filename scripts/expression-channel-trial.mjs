@@ -7,7 +7,7 @@ import { openLive, liveRoot } from '../integrations/live-launch.mjs';
 import { openModelClient } from '../integrations/live-model-client.mjs';
 import { readModelBudget, reserveModelTurn } from '../integrations/live-model-budget.mjs';
 import { startBodyVideo, finishBodyVideo, blindCodes } from '../integrations/live-holdout-video.mjs';
-import { ExpressionResponseChannel, expressionResponseSchema, runChannelTurn, isBodyMutation } from '../integrations/expression-response.mjs';
+import { ExpressionResponseChannel, expressionResponseSchema, runChannelTurn, isBodyMutation, boundedNativeError } from '../integrations/expression-response.mjs';
 import { compositionSchema } from '../integrations/compose-expression.mjs';
 const hash = value => createHash('sha256').update(value).digest('hex');
 const canonical = value => JSON.stringify(value, (_key, item) => item && typeof item === 'object' && !Array.isArray(item)
@@ -48,8 +48,25 @@ async function evidence(live, client, threadId, outcome, turn, directory, code, 
   return { video, status, metrics, modelBodyToolRequests: turn.toolRequests.filter(isBodyMutation).length,
     humanRecognition: null, contextualUtility: null, textQuality: null, interpretation: 'Full actual canvas clip, no audio/camera; admission and sampled output are not recognition or completed animation.' };
 }
+export function classifyTrial(arm, turn, outcome) {
+  if (turn.status !== 'completed') return { modelCompleted: false, status: 'failed', failureStage: 'model', errorCode: 'native_turn_' + turn.status };
+  if (arm === 'structured' && !['retained', 'suppressed', 'accepted', 'pending'].includes(outcome.dispatch)) return { modelCompleted: true, status: 'failed', failureStage: 'response', errorCode: 'structured_' + outcome.dispatch };
+  return { modelCompleted: true, status: 'recorded', failureStage: null, errorCode: null };
+}
+export function shouldStopTrial(row) {
+  if (row.status === 'failed' && ['startup', 'preflight'].includes(row.stage)) return true;
+  const errors = [row.rpcError, row.turn?.error, ...(row.turn?.errors ?? []).map(item => item.error)];
+  return errors.some(error => error?.truncated === true || JSON.stringify(error ?? null).includes('invalid_json_schema'));
+}
+export function summarizeTrials(rows, planned) {
+  const recorded = rows.filter(r => r.evidenceRecorded).length;
+  const successful = rows.filter(r => r.status === 'recorded').length;
+  return { recorded, successful, failed: rows.filter(r => r.status === 'failed').length, planned, humanAcceptance: 'pending',
+    actualModelTurnsReserved: rows.filter(r => r.reserved).length, collectionComplete: rows.length === planned && recorded === planned,
+    complete: rows.length === planned && successful === planned, interpretation: 'Evidence collection is separate from model/host success; neither proves expression utility.' };
+}
 async function trial(entry, arm, settings) {
-  let live, client, stage = 'startup', reserved = false;
+  let live, client, nativeTurn = null, stage = 'startup', reserved = false;
   const code = blindCodes(1)[0], startedAt = performance.now(), audit = policyAudit(settings.policy);
   try {
     live = await openLive({ headless: true, assets: false, production: false });
@@ -70,15 +87,16 @@ async function trial(entry, arm, settings) {
       beforeStart: () => { reserveModelTurn(settings.budget, `expression-channel:${arm}:${entry.id}`); reserved = true; },
       onStarted: turnId => arm !== 'structured' || channel.bind(token, turnId),
     });
+    nativeTurn = turn; save(join(settings.directory, 'private', code + '.native-turn.json'), turn);
     stage = 'response'; const dispatchAt = performance.now();
     const outcome = arm === 'structured' ? await channel.complete(token, turn) : { dispatch: 'not_requested', reply: turn.messages.at(-1)?.text ?? '', mode: null };
     stage = 'render'; const observed = await evidence(live, client, threadId, outcome, turn, settings.directory, code, videoStarted);
     if (await live.page.locator('video').evaluate(v => !!v.srcObject)) throw Error('unexpected_camera');
-    const row = { code, id: entry.id, arm, status: 'recorded', reserved, verified, requestedModel: settings.model, effectiveModel: started.model,
+    const row = { code, id: entry.id, arm, ...classifyTrial(arm, turn, outcome), evidenceRecorded: true, reserved, verified, requestedModel: settings.model, effectiveModel: started.model,
       timing: { ...turn.timing, modelToHostDecisionMs: dispatchAt - modelStart, totalTrialMs: performance.now() - startedAt }, turn, outcome, observed };
     writeFileSync(join(settings.directory, 'private', code + '.reply.txt'), outcome.reply ?? '', { mode: 0o600 });
     return row;
-  } catch (error) { return { code, id: entry.id, arm, status: 'failed', stage, reserved, errorCode: /^[a-z_]+$/.test(error.message) ? error.message : 'trial_failed', durationMs: performance.now() - startedAt }; }
+  } catch (error) { return { code, id: entry.id, arm, status: 'failed', stage, reserved, errorCode: /^[a-z_]+$/.test(error.message) ? error.message : 'trial_failed', rpcError: boundedNativeError(error.rpcError), turn: nativeTurn, durationMs: performance.now() - startedAt }; }
   finally { await client?.close(); await live?.close(); }
 }
 export async function runExpressionChannelTrial({ budget, output, model, seed = 'paired-dev-1', positiveControl = false }) {
@@ -97,16 +115,16 @@ export async function runExpressionChannelTrial({ budget, output, model, seed = 
     const row = await trial(entry, arm, { budget, directory, workspace, policy, model, catalog }); rows.push(row); save(join(directory, 'private', row.code + '.json'), row);
     save(join(directory, 'private', 'report.json'), manifest);
     save(join(directory, 'private', 'key.json'), rows.map(r => ({ code: r.code, arm: r.arm, message: cases.find(c => c.id === r.id).message })));
-    if (row.status === 'failed' && ['startup', 'preflight'].includes(row.stage)) break;
+    if (shouldStopTrial(row)) break;
   }
-  const codes = rows.filter(r => r.status === 'recorded').map(r => r.code).sort();
+  const codes = rows.filter(r => r.evidenceRecorded).map(r => r.code).sort();
   writeFileSync(join(directory, 'blind', 'review.csv'), 'code,visible_description,transition_notes,clarity_notes\n' + codes.map(c => c + ',,,').join('\n'), { mode: 0o600 });
-  save(join(directory, 'summary.json'), { recorded: codes.length, planned: planned.length, humanAcceptance: 'pending', actualModelTurnsReserved: rows.filter(r => r.reserved).length, complete: rows.length === planned.length && rows.every(r => r.status === 'recorded') });
-  return { directory, rows };
+  const summary = summarizeTrials(rows, planned.length); save(join(directory, 'summary.json'), summary);
+  return { directory, rows, summary };
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const option = key => { const index = process.argv.indexOf(key); return index < 0 ? undefined : process.argv[index + 1]; };
   runExpressionChannelTrial({ budget: option('--budget'), output: option('--output'), model: option('--model'), seed: option('--seed'), positiveControl: process.argv.includes('--positive-control') })
-    .then(result => console.log(JSON.stringify({ directory: result.directory, trials: result.rows.length })))
+    .then(result => { console.log(JSON.stringify({ directory: result.directory, ...result.summary })); if (!result.summary.complete) process.exitCode = 1; })
     .catch(error => { console.error(/^[a-z_]+$/.test(error.message) ? error.message : 'trial_failed'); process.exitCode = 1; });
 }

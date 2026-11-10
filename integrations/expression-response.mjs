@@ -7,7 +7,7 @@ const object = properties => ({ type: 'object', properties, required: Object.key
 function strictOptional(value) {
   if (Array.isArray(value)) return value.map(strictOptional);
   if (!value || typeof value !== 'object') return value;
-  const copy = Object.fromEntries(Object.entries(value).filter(([key]) => !['default', 'minProperties'].includes(key)).map(([key, item]) => [key, strictOptional(item)]));
+  const copy = Object.fromEntries(Object.entries(value).filter(([key]) => !['default', 'minProperties'].includes(key)).map(([key, item]) => [key === 'oneOf' ? 'anyOf' : key, strictOptional(item)]));
   if (copy.type === 'object') {
     const required = new Set(value.required ?? []);
     for (const key of Object.keys(copy.properties ?? {})) if (!required.has(key)) copy.properties[key] = { anyOf: [copy.properties[key], { type: 'null' }] };
@@ -125,11 +125,12 @@ export async function runChannelTurn(client, threadId, text, options = {}) {
 }
 function turnCapture(threadId, startedAt) {
   let resolve, reject, owned, terminal = false, truncated = false, firstTool = null, firstExpression = null;
-  const early = [], messages = [], tools = new Map();
+  const early = [], messages = [], errors = [], tools = new Map();
   const done = new Promise((yes, no) => { resolve = yes; reject = no; }); void done.catch(() => {});
   function process(message, at) {
     if (terminal) return;
     const p = message.params, turnId = p.turnId ?? p.turn?.id; if (turnId !== owned) return;
+    if (message.method === 'error') { if (errors.length < 8) errors.push({ error: boundedNativeError(p.error), willRetry: p.willRetry ?? null, atMs: at - startedAt }); else truncated = true; }
     if (['item/started', 'item/completed'].includes(message.method) && p.item?.type === 'mcpToolCall') {
       if (!validTool(p.item)) truncated = true;
       firstTool ??= at - startedAt; if (isBodyMutation(p.item)) firstExpression ??= at - startedAt;
@@ -142,10 +143,16 @@ function turnCapture(threadId, startedAt) {
     }
     if (message.method === 'turn/completed') {
       if (!p.turn || typeof p.turn.status !== 'string') { terminal = true; reject(Error('turn_terminal_invalid')); return; }
-      terminal = true; resolve({ threadId, turnId: owned, status: p.turn.status, messages, toolRequests: [...tools.values()], truncated,
+      terminal = true; resolve({ threadId, turnId: owned, status: p.turn.status, error: boundedNativeError(p.turn.error), errors, messages, toolRequests: [...tools.values()], truncated,
       timing: { firstToolMs: firstTool, firstExpressionMs: firstExpression, terminalMs: at - startedAt } }); }
   }
   return { done, reject, get turnId() { return owned; }, bind(id) { owned = id; for (const [m, at] of early) process(m, at); early.length = 0; },
     receive(message) { if (message.params?.threadId !== threadId) return; const at = performance.now();
       if (!owned) { if (early.length < 128) early.push([message, at]); else truncated = true; } else process(message, at); } };
+}
+
+export function boundedNativeError(error) {
+  if (error == null) return null;
+  const json = JSON.stringify(error);
+  return Buffer.byteLength(json) <= 65536 ? structuredClone(error) : { truncated: true, jsonPrefix: json.slice(0, 16000) };
 }

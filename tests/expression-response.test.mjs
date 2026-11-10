@@ -96,3 +96,23 @@ it('treats malformed tool metadata or uncorrelated accepted receipts as unknown 
     expect(await g.channel.complete(g.token, turn(compose()))).toMatchObject({ dispatch: 'unknown', reason: 'receipt_unverified' });
   }
 });
+it('uses supported output unions while the original host validator still enforces controls', () => {
+  expect(JSON.stringify(expressionResponseSchema)).not.toContain('"oneOf"');
+  const visit = node => {
+    if (!node || typeof node !== 'object') return;
+    if (node.type === 'object') { expect(node.additionalProperties).toBe(false); expect(node.required).toEqual(Object.keys(node.properties)); }
+    Object.values(node).forEach(visit);
+  };
+  visit(expressionResponseSchema);
+});
+it('preserves Native terminal errors and retry notifications without projecting them as an expression', async () => {
+  const events = new EventEmitter(), error = { message: 'HTTP 400 invalid_json_schema: oneOf is not permitted', codexErrorInfo: { httpConnectionFailed: { httpStatusCode: 400 } }, additionalDetails: null };
+  const client = { events, call: async () => {
+    events.emit('notification', { method: 'error', params: { threadId: 'thread', turnId: 'failed', error, willRetry: false } });
+    events.emit('notification', { method: 'turn/completed', params: { threadId: 'thread', turn: { id: 'failed', status: 'failed', error } } });
+    return { turn: { id: 'failed' } };
+  } };
+  const result = await runChannelTurn(client, 'thread', 'synthetic');
+  expect(result).toMatchObject({ status: 'failed', error, errors: [{ error, willRetry: false }] });
+  const f = fixture(); expect((await f.channel.complete(f.token, { ...result, turnId: 'turn' })).dispatch).toBe('dropped'); expect(f.call).not.toHaveBeenCalled();
+});
