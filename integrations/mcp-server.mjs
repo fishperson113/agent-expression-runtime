@@ -205,7 +205,9 @@ async function toolCall(params) {
         expressionStatus.reset('session_changed');
         session = undefined; pendingDefinitions.clear();
         if (live && params.name === 'express') throw Error('live_session_changed_request_not_replayed');
-        result = await invoke(params);
+        const retry = params.name === 'express'
+          ? { ...params, arguments: { ...params.arguments, requestId: randomUUID() } } : params;
+        result = await invoke(retry);
       } else if (error.message === 'unknown_macro' && definitions.size) {
         await restore();
         result = await invoke({ ...params, arguments: { ...params.arguments, requestId: randomUUID() } });

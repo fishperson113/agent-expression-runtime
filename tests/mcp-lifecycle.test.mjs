@@ -37,7 +37,7 @@ async function harness(work, live = false) {
     if (req.headers.authorization !== `Bearer ${token}`) { res.writeHead(401).end('{}'); return; }
     let bytes = ''; for await (const chunk of req) bytes += chunk;
     try { res.end(JSON.stringify(response(state, req, bytes ? JSON.parse(bytes) : {}))); }
-    catch (error) { res.writeHead(422).end(JSON.stringify({ code: error.code ?? error.message, path: error.path })); }
+    catch (error) { res.writeHead(422).end(JSON.stringify({ status: 'rejected', code: error.code ?? error.message, path: error.path })); }
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const child = spawn(process.execPath, ['integrations/mcp-server.mjs'], {
@@ -78,6 +78,9 @@ it.each(['lease expiry', 'browser refresh', 'compiler reset'])('restores accepte
     const result = await express(call, { ...macro, requestId: 'caller-request-id' });
     expect(result.isError).not.toBe(true);
     expect(JSON.parse(result.content[0].text).status).toBe('accepted');
+    expect(JSON.parse(result.content[0].text).requestId).not.toBe('caller-request-id');
+    const old = await call('tools/call', { name: 'expression_status', arguments: { requestId: 'caller-request-id' } });
+    expect(JSON.parse(old.content[0].text).status).toBe('rejected');
     expect(state.commands.filter(command => command.kind === 'define')).toHaveLength(2);
   });
 });

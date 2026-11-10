@@ -55,3 +55,12 @@ in [the observer contract](reactive-provider.md). Closing Live disposes the
 broker, native client and owned relay. Deterministic integration tests use an
 authenticated real relay, fake app-server/native client and injected provider;
 they do not establish actual model, camera or human-quality acceptance.
+
+## Legacy MCP reconnect receipts
+
+The reference MCP path may restore accepted macro definitions after session loss.
+Its retried expression receives a fresh request ID returned in the receipt; the
+original rejected receipt remains queryable within the existing bounded retention
+and is never reassigned to the new
+session. Live still rejects session-loss requests without automatic replay.
+This does not change camera observation or add a voice channel.
