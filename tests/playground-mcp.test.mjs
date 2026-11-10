@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { liveTestClient, toolValue } from '../integrations/live-test-client.mjs';
-import { createServer } from 'node:http';
+import { createServer, request as httpRequest } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -204,4 +204,38 @@ it.skipIf(!existsSync(gatewayExecutable()) && !requireGateway)('times out honest
     expect(toolValue(await edit(client, 'recover', 0)).status).toBe('recovered');
     expect(toolValue(await edit(client, 'create', 0, scene('requested-fresh'))).status).toBe('committed');
   } finally { await client?.close(); await live.close(); }
+}, 90000);
+
+async function heldBodyProxy(base) {
+  const state = { expressions: 0, held: false, release: () => {} };
+  const server = createServer((req, res) => {
+    const target = new URL(req.url, base);
+    const upstream = httpRequest(target, { method: req.method, headers: { ...req.headers, host: target.host } }, reply => {
+      const send = () => { res.writeHead(reply.statusCode, reply.headers); reply.pipe(res); };
+      if (req.method === 'POST' && target.pathname.endsWith('/expressions') && ++state.expressions === 1) {
+        state.held = true; state.release = () => { state.held = false; state.release = () => {}; if (!res.destroyed) send(); };
+      } else send();
+    });
+    upstream.on('error', () => { if (!res.destroyed) res.destroy(); });
+    res.on('close', () => upstream.destroy()); req.pipe(upstream);
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  return { state, base: `http://127.0.0.1:${server.address().port}`,
+    close: async () => { state.release(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); } };
+}
+it.skipIf(!existsSync(gatewayExecutable()))('commits through actual Rust and WebGL while the first HTTP receipt is held but correlated SSE admission flows', async () => {
+  const live = await openLive({ headless: true, assets: false, production: false }); let proxy, client;
+  try {
+    proxy = await heldBodyProxy(live.base); client = liveTestClient(proxy.base, live.token); await client.call('initialize');
+    const result = toolValue(await edit(client, 'create', 0, scene('correlated-creation')));
+    expect(result).toMatchObject({ status: 'committed', revision: 1, recoveryRequired: false });
+    expect(proxy.state.held).toBe(true); expect(proxy.state.expressions).toBe(2);
+    const events = await live.page.evaluate(() => window.fischLive.metrics().diagnostics.events);
+    for (const seq of [1, 2]) for (const phase of ['applied', 'completed'])
+      expect(events.some(event => event.origin === 'native' && event.seq === seq && event.phase === phase)).toBe(true);
+    expect(await live.page.evaluate(() => window.fischLive.metrics().parts)).toEqual(['correlated-creation']);
+    proxy.state.release(); await delay(50);
+    expect(toolValue(await client.tool('playground_state', {}))).toMatchObject({ revision: 1, recoveryRequired: false });
+    expect(proxy.state.expressions).toBe(2);
+  } finally { await client?.close(); await proxy?.close(); await live.close(); }
 }, 90000);

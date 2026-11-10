@@ -192,3 +192,54 @@ it('never sends baseline when pending admission lacks acceptance and reports typ
   expect(await rejected.result).toMatchObject({ status: 'uncertain', code: 'playground_admission_rejected' });
   expect(JSON.stringify(await rejected.result)).not.toContain('private raw error'); other.controller.close();
 });
+
+it('uses exactly correlated SSE admission when the body HTTP reply is held; both phases still must complete', async () => {
+  let reject, serial = 0; const sent = [];
+  const f = fixture({ send: (args, owner) => {
+    const receipt = { ...owner, session: owner.id, seq: ++serial, status: 'accepted', requestId: args.requestId };
+    sent.push(receipt); f.source.feedback(receipt);
+    if (serial === 1) return new Promise((_resolve, fail) => { reject = fail; });
+    return Promise.resolve(receipt);
+  } });
+  const job = await f.controller.begin({ operation: 'create', expectedRevision: 0, scene: scene() });
+  expect(sent).toHaveLength(2); expect((await f.controller.read()).revision).toBe(0);
+  for (const receipt of sent) for (const status of ['applied', 'completed']) f.feedback(receipt, status);
+  expect(await job.result).toMatchObject({ status: 'committed', revision: 1 });
+  reject(Error('late HTTP disconnect')); await tick(); expect(sent).toHaveLength(2);
+  expect((await f.controller.read()).recoveryRequired).toBe(false); f.controller.close();
+});
+it('ignores foreign correlation while HTTP is unresolved and does not dispatch baseline after timeout', async () => {
+  let sent = 0;
+  const f = fixture({ timeoutMs: 100, send: (args, owner) => {
+    sent++; f.source.feedback({ session: owner.id, epoch: owner.epoch, seq: 1, status: 'accepted', requestId: args.requestId + '-foreign' });
+    return new Promise(() => {});
+  } });
+  const job = await f.controller.begin({ operation: 'create', expectedRevision: 0, scene: scene() });
+  expect(await job.result).toMatchObject({ status: 'uncertain', code: 'playground_timeout', revision: 0, waitingFor: 'body_http_or_correlated_ack' });
+  expect(sent).toBe(1); f.controller.close();
+});
+it('scopes a contradictory late HTTP receipt to its still-active transaction', async () => {
+  let release, serial = 0;
+  const f = fixture({ send: (args, owner) => {
+    const receipt = { session: owner.id, epoch: owner.epoch, seq: ++serial, status: 'accepted', requestId: args.requestId };
+    f.source.feedback(receipt);
+    return serial === 1 ? new Promise(resolve => { release = resolve; }) : Promise.resolve(receipt);
+  } });
+  const job = await f.controller.begin({ operation: 'create', expectedRevision: 0, scene: scene() });
+  release({ session: 's', epoch, seq: 999, status: 'accepted' });
+  expect(await job.result).toMatchObject({ status: 'uncertain', code: 'playground_receipt_conflict', recoveryRequired: true });
+  f.controller.close();
+});
+
+it('treats a late explicit HTTP rejection as a conflict while preserving canonical transport-error success', async () => {
+  let reject, serial = 0;
+  const f = fixture({ send: (args, owner) => {
+    const receipt = { session: owner.id, epoch: owner.epoch, seq: ++serial, status: 'accepted', requestId: args.requestId };
+    f.source.feedback(receipt);
+    return serial === 1 ? new Promise((_resolve, fail) => { reject = fail; }) : Promise.resolve(receipt);
+  } });
+  const job = await f.controller.begin({ operation: 'create', expectedRevision: 0, scene: scene() });
+  reject(Object.assign(Error('HTTP rejection'), { receipt: { status: 'rejected' } }));
+  expect(await job.result).toMatchObject({ status: 'uncertain', code: 'playground_receipt_conflict' });
+  f.controller.close();
+});

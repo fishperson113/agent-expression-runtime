@@ -154,3 +154,37 @@ before continuing; uncertain recovery requires explicit user intent and clears
 history. It is not an automatic restore operation. This change documents existing
 behavior; it does not add canvas vision, automatic scene recovery or establish
 that real-model expressions became easier to recognize.
+
+### Playground admission over two response paths
+
+The gateway feedback stream includes the original requestId for a known receipt.
+Playground may advance from a matching canonical accepted event while the HTTP
+response remains delayed. Correlation must match the active session, epoch and
+host-generated phase requestId; a frame or completion of an unrelated command
+cannot substitute for admission. Both body and baseline still require applied and
+completed feedback before committed. There is no timeout extension or automatic
+resend. Late transport failure does not erase authoritative acceptance; a
+contradictory explicit receipt faults only the still-active original transaction.
+
+A held body HTTP response reproduced body completion without baseline dispatch
+and a playground timeout on the prior controller. The regression holds that
+response while real Rust feedback and WebGL continue, and requires both phases to
+complete before releasing HTTP. This establishes that failure path, not a claim
+that every timeout or the specific native test had the same transport cause.
+Timeout/uncertain remains an unknown or partial outcome, not proof nothing ran.
+
+Uncertain playground outcomes include a bounded waitingFor stage and monotonic
+elapsedMs for diagnosis. A stage describes what the host was waiting for; it
+does not prove whether the renderer had already applied the command. No scene,
+goal, prompt or model content is added to these diagnostics.
+
+Reproduce without a model, webcam or external dataset using the repository's
+locked dependencies and standalone gateway (root MIT license; no new dependency
+or upstream component added): run `npm ci`, install Chromium with
+`npx playwright install chromium`, then build the gateway with
+`cargo build --locked --no-default-features --bin fisch-gateway --manifest-path src-tauri/Cargo.toml`.
+Run `npx vitest run tests/playground-mcp.test.mjs -t 'first HTTP receipt is held'`.
+The fixture authors one ellipsoid scene and places a local HTTP proxy between MCP
+and Rust, withholding only the first expression response while streaming feedback.
+It requires exactly two expression requests and both receipts' applied/completed
+phases before HTTP release; a framebuffer image is not used as a commit oracle.

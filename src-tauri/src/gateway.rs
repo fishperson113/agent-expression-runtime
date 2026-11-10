@@ -201,9 +201,9 @@ impl Gateway {
             let _ = self.dispatch(next);
         }
     }
-    fn publish(&self, receipt: &Receipt, status: &str, code: Option<&str>) {
+    fn publish(&self, receipt: &Receipt, status: &str, code: Option<&str>, request_id: Option<String>) {
         let id = self.event_id.fetch_add(1, Ordering::SeqCst) + 1;
-        let _=self.events.send(json!({"id":id,"session":receipt.session,"epoch":receipt.epoch,"seq":receipt.seq,"expressionId":receipt.id,"status":status,"code":code,"path":receipt.path}));
+        let _=self.events.send(json!({"id":id,"session":receipt.session,"epoch":receipt.epoch,"seq":receipt.seq,"expressionId":receipt.id,"requestId":request_id,"status":status,"code":code,"path":receipt.path}));
     }
     pub fn finish(&self, id: String, status: String, code: Option<String>) {
         self.finish_diagnostic(id, status, code, None);
@@ -231,17 +231,15 @@ impl Gateway {
                 code: code.clone(),
                 path,
             };
-            if let Some(s) = self.session.lock().unwrap().as_mut() {
-                for (_, _, r) in s.dedup.iter_mut() {
-                    if r.id == receipt.id {
-                        *r = receipt.clone();
-                    }
-                }
-            }
-            self.publish(&receipt, &status, code.as_deref());
+            let request_id = self.session.lock().unwrap().as_mut().and_then(|s| {
+                s.dedup.iter_mut().find(|(_, _, r)| r.id == receipt.id).map(|(request, _, r)| {
+                    *r = receipt.clone(); request.clone()
+                })
+            });
+            self.publish(&receipt, &status, code.as_deref(), request_id.clone());
             if status == "accepted" {
                 for feedback in p.feedback {
-                    self.publish(&receipt, &feedback, None);
+                    self.publish(&receipt, &feedback, None, request_id.clone());
                 }
             }
             let _ = p.reply.send(receipt);
@@ -279,7 +277,8 @@ impl Gateway {
                     code: None,
                     path: None,
                 };
-                self.publish(&receipt, &status, None);
+                let request_id = s.dedup.iter().find(|(_, _, r)| r.epoch == receipt.epoch && r.seq == receipt.seq).map(|(request, _, _)| request.clone());
+                self.publish(&receipt, &status, None, request_id);
             }
         }
     }
@@ -322,6 +321,7 @@ impl Gateway {
                 path: None,
             },
             "closed",
+            None,
             None,
         );
         let epoch = Uuid::new_v4().to_string();
