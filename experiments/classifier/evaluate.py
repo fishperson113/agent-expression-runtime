@@ -81,7 +81,7 @@ def features(row):
 def paired_metrics(rows, predictions):
     pairs = {}
     for row, prediction in zip(rows, predictions):
-        if 'pairId' in row:
+        if row.get('pairId'):
             pairs.setdefault(row['pairId'], []).append((row, prediction))
     result = {}
     for key, pair in pairs.items():
@@ -112,7 +112,7 @@ def report_group(report, split, group, outputs, baselines, model_label):
         for gated in [False, True]:
             variants[name + ('_gated' if gated else '_raw')] = [choose(scores[row['id']], gated) for row in group]
     report['results'][split] = {name: metrics(group, preds) for name, preds in variants.items()}
-    if any('pairId' in row for row in group):
+    if any(row.get('pairId') for row in group):
         report['pairedProbes'] = {name: paired_metrics(group, preds) for name, preds in variants.items()}
     for slice_name in sorted({s for row in group for s in row.get('slices', [])}):
         indices = [i for i, row in enumerate(group) if slice_name in row.get('slices', [])]
