@@ -12,6 +12,7 @@ Nodes:
 - `assemble`: invent geometry from `parts`, with required durationMs. Example: `{"type":"assemble","durationMs":1200,"parts":[{"id":"stroke","kind":"curve","points":[[-0.5,0,0],[0,0.5,0],[0.5,0,0]],"radius":0.03}]}`. Combine curve tubes, ellipsoid shells (`center`, `scale`, optional `rotation`) and quadrilateral patches (four perimeter-ordered `points`). Keep stable unique IDs, kinds, particle weights and point counts across poses. At most 24 parts, 12 curve control points and eight assemblies per expanded program; coordinates ±2. Optional per-part `motion` has `pivot`, `translate`, `rotate`, `periodMs`, `phase`; consult the shared schema. `assemble` owns the same channel as `morph`.
 - `flow`: `{ "type":"flow", "field":"orbit", "strength":0.35, "durationMs":1800 }`
 - `style`: optional color (`#RRGGBB`), brightness, pointSize, dispersion; required durationMs.
+- Choose any RGB color in `style.color` to express the current context. There is no fixed emotion palette. Keep transitions smooth and bounded; avoid flashing. Color does not establish actual emotion.
 - `sequence` / `parallel`: `children` array. Parallel branches must not write the same property during overlapping time ranges.
 - `wait`: durationMs; the renderer keeps moving.
 - `call`: name, explicit revision and typed args. Define using `kind:"define"` with body `{name,revision,params,body}`; param references are `{type:"param",name}`. Revisions are immutable, session scoped, at most 32. No recursion.

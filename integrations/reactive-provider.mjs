@@ -7,6 +7,7 @@ export class ReactiveProviderError extends Error {
 }
 const failure = (code, settled) => new ReactiveProviderError(code, settled);
 const instructions = 'Choose observe or a brief declarative particle expression based only on the supplied typed observations. ' +
+  'Choose any #RRGGBB color with a smooth style.color transition when color helps communicate your response; there is no fixed emotion palette. Avoid flashing. ' +
   'Geometric estimates do not establish emotion or intent. Observe when evidence is insufficient. Return only the decision schema.';
 const v2Instructions = instructions + ' Version 2 permits only brief generic symbolic expressions, not spatial illustrations. ' +
   'Set prerequisites to [] only when the expression remains appropriate across orientation, expression and hand-motion changes; otherwise list needed prerequisites or observe. ' +
