@@ -139,3 +139,18 @@ it('rejects nonfinite perception before rendering and recovers on the next valid
   expect(invalid(renderer.mock.calls.at(-1)![0])).toBe(0);
   f.body.dispose();
 });
+it('reports a native live pose cancelled when Stop changes epoch after 470ms, not completed at wait-zero', () => {
+  const f = setup(), events: { seq: number; status: string }[] = [];
+  f.body.feedback = event => events.push(event);
+  f.body.epoch('11111111-1111-4111-8111-111111111111');
+  const epoch = f.body.scheduler.epoch;
+  expect(f.body.admit({ v: 1, epoch, seq: 99, kind: 'program', track: 'body', policy: 'replace',
+    body: { type: 'live', program: null, configuration: { controls: [], lifetimeMs: 8000,
+      poses: [{ type: 'pose', target: { part: 'body', prop: 'x' }, value: 0.1, durationMs: 8000 }] } } }).status).toBe('accepted');
+  f.frame(); f.advance(470); f.frame();
+  expect(events.filter(event => event.seq === 99).map(event => event.status)).toEqual(['applied']);
+  f.body.epoch('stopped'); f.advance(9000); f.frame();
+  expect(events.filter(event => event.seq === 99).map(event => event.status)).toEqual(['applied', 'cancelled']);
+  expect(f.body.metrics.diagnostics.events.some(event => event.seq === 99 && event.epoch === epoch && event.phase === 'cancelled')).toBe(true);
+  f.body.dispose();
+});
