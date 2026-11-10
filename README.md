@@ -4,6 +4,10 @@ A visible particle body for your coding agent.
 
 Fisch turns agent activity into motion and lets Codex create expressions and illustrations with particles. It runs locally in a browser, with Codex in your terminal.
 
+![Fisch Live in a blue-black single-screen layout, with the particle body on the left and camera-off and activity panels on the right.](docs/evidence/live-workspace.png)
+
+*Actual 1440 × 900 browser screenshot, camera off and Codex disconnected. No real camera imagery or simulated conversation; [validation limits](docs/validation.md) still apply.*
+
 ## Why Fisch?
 
 Working with an agent often means staring at scrolling text. Fisch explores a quieter, more expressive way to see what your agent is doing and give it a presence beside the conversation.
