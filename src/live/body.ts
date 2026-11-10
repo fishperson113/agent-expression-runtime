@@ -123,7 +123,8 @@ export class LiveBody {
   attachReactive(session: ReactiveSession) { this.reactive = session; }
   prepareUserMutation() { this.attention.revoke(); this.reactive?.userIntent(); }
   get userSceneOwned() { return this.userGeometryLocked; }
-  canReactive() { return !this.userGeometryLocked && this.controls.mode !== 'off' && performance.now() >= this.userLeaseUntil && !this.scheduler.busy; }
+  canConverse() { return this.controls.mode !== 'off' && performance.now() >= this.userLeaseUntil && !this.scheduler.busy; }
+  canReactive() { return !this.userGeometryLocked && this.canConverse(); }
   private userGeometry(compiled: LiveCompiled, at: number) {
     if (compiled.program.kind !== 'program') return;
     const shape = compiled.program.ops.filter(op => op.property === 'shape').at(-1)?.value;

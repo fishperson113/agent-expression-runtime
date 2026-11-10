@@ -94,10 +94,11 @@ export class ReactiveSession {
     const axes = { ...this.axes.snapshot(this.healthy()), handGeometry: this.nativeHandGeometry() };
     return Object.entries(read).every(([key, value]) => value !== null && axes[key as keyof typeof axes] === value);
   }
+  private canRequest() { return this.nativeConversation ? (this.options.canConverse ?? this.options.canAdmit)() : this.options.canAdmit(); }
   canPublish(request: ReactiveRequest, read: NativeReadSet = {}): boolean {
     this.tick();
     return this.matchesNativeReadSet(read) &&
-      this.enabled && this.available && this.healthy() && !this.userBusy && (this.options.canAdmit() || this.guard.owner?.requestId === request.requestId) &&
+      this.enabled && this.available && this.healthy() && !this.userBusy && (this.canRequest() || this.guard.owner?.requestId === request.requestId) &&
       this.options.now() < request.deadline && matchesCriticalState(request, this.readCurrent());
   }
   configure(available: boolean) {
@@ -212,7 +213,7 @@ export class ReactiveSession {
   }
   takeRequest(): { request: ReactiveRequest; observationWindow: ReactiveWindow } | null {
     this.tick(); const now = this.options.now();
-    if (!Number.isFinite(now) || now < 0 || !this.available || !this.enabled || this.userBusy || !this.sourceValid || !this.history.length || !this.options.canAdmit() ||
+    if (!Number.isFinite(now) || now < 0 || !this.available || !this.enabled || this.userBusy || !this.sourceValid || !this.history.length || !this.canRequest() ||
       this.transport || this.uncertain || this.guard.owner || !this.pending.size || now - this.firstAt < 750 ||
       now - this.lastStart < (this.nativeConversation ? this.nativePolicy.cooldownMs : 15000) || this.starts.length >= (this.nativeConversation ? this.nativePolicy.maxPerMinute : 4) || this.count >= 256) return null;
     const requestId = this.options.id();
@@ -259,7 +260,7 @@ export class ReactiveSession {
     if (transport.generation !== this.guard.generation) return this.authorization(transport, false, 'revoked');
     if (!this.enabled || !this.available) return this.authorization(transport, false, 'unavailable');
     if (!this.healthy()) return this.authorization(transport, false, 'stale');
-    if (this.userBusy || !this.options.canAdmit()) return this.authorization(transport, false, 'denied');
+    if (this.userBusy || !this.canRequest()) return this.authorization(transport, false, 'denied');
     const request = transport.request, state = this.readCurrent();
     if (transport.nativeReadSet && !this.canPublish(request, transport.nativeReadSet)) return this.authorization(transport, false, 'stale');
     if (this.options.now() >= request.deadline || !matchesCriticalState(request, state)) return this.authorization(transport, false, 'stale');

@@ -1,6 +1,7 @@
 import { freezeReactiveReceipt } from './reactive-receipt.mjs';
 import { ReactiveProviderError } from './reactive-provider.mjs';
 import { freezeReactiveCandidate } from './reactive-window.mjs';
+import { freezeNativeHostCapabilities } from './native-reaction-provider.mjs';
 
 function captureToken(value) {
   try {
@@ -133,19 +134,21 @@ export class LiveReactiveBroker {
         for (const text of entries) api.logActivity?.(text);
         if (native) api.configureReactive(available, 1, contractVersion, true, policy); else api.configureReactive(available, 1, contractVersion); api.setReactiveUserBusy(busy);
         let token = null; try { token = api.recordingCaptureToken?.() ?? null; } catch {}
-        return { candidate: take ? api.takeReactiveRequest() : null, captureToken: token, conversationApplied: !!publish, activeAllowed: !native || !activeId || api.canContinueNativeReaction?.(activeId) === true };
+        return { candidate: take ? api.takeReactiveRequest() : null, captureToken: token, hostCapabilities: native ? api.nativeReactionCapabilities?.() ?? { schemaVersion: 1, expressionAllowed: false } : undefined, conversationApplied: !!publish, activeAllowed: !native || !activeId || api.canContinueNativeReaction?.(activeId) === true };
       }, { activity, entries, busy, available, take: available && !this.active && !busy, receipts: queuedReceipts, projection, policy: this.provider?.policy, native: this.provider?.conversationLane === true, activeId: inference?.id ?? null, contractVersion: this.provider?.contractVersion === 2 ? 2 : 1 }, 'poll');
       if (polled?.activeAllowed === false && inference && this.active === inference && !inference.terminal) { inference.controller.abort(); this.provider?.discardPublication?.(inference.id); }
       if (polled?.conversationApplied) this.conversationFingerprint = fingerprint;
       const candidate = polled?.candidate, token = captureToken(polled?.captureToken);
       const currentBusy = this.reactionBusy() || conversationBusy(conversationSource?.()?.snapshot);
-      if (!this.closed && !this.browserUnavailable && candidate && !this.active && !currentBusy) this.start(candidate, token);
+      if (!this.closed && !this.browserUnavailable && candidate && !this.active && !currentBusy) this.start(candidate, token, polled?.hostCapabilities);
       else if (!this.closed && !this.browserUnavailable && candidate) await this.deliver(candidate.request.requestId, null);
     } catch { this.paused = true; this.log('reactive_browser_unavailable'); }
     finally { this.polling = false; }
   }
-  start(candidate, token = null) {
-    try { candidate = freezeReactiveCandidate(candidate); } catch {
+  start(candidate, token = null, hostCapabilities) {
+    try { candidate = freezeReactiveCandidate(candidate);
+      if (this.provider?.conversationLane) hostCapabilities = freezeNativeHostCapabilities(hostCapabilities);
+    } catch {
       const rejected = candidate?.request?.requestId;
       const id = typeof rejected === 'string' && rejected.length <= 64 ? rejected : '';
       void this.deliver(id, null).catch(() => { this.paused = true; }); return;
@@ -156,7 +159,7 @@ export class LiveReactiveBroker {
       this.log('reactive_request_rejected'); void this.deliver(id, null).catch(() => { this.paused = true; }); return;
     }
     this.requests.add(id);
-    const owned = { id, request: candidate.request, captureToken: token, receiptSeen: false, controller: new AbortController(), terminal: false };
+    const owned = { id, request: candidate.request, captureToken: token, receiptSeen: false, controller: new AbortController(), terminal: false, hostCapabilities };
     this.active = owned; void this.authorize(owned, candidate);
   }
   receipt(owned, value) {
@@ -190,7 +193,7 @@ export class LiveReactiveBroker {
     void Promise.resolve().then(() => {
       if (!this.closed && !this.browserUnavailable && this.active === owned && !this.reactionBusy() &&
         !conversationBusy(this.conversationSource?.()?.snapshot) && !owned.controller.signal.aborted) return this.provider.decide(candidate.observationWindow, owned.controller.signal,
-        owned.captureToken ? value => this.receipt(owned, value) : undefined);
+        owned.captureToken ? value => this.receipt(owned, value) : undefined, ...(this.provider?.conversationLane ? [owned.hostCapabilities] : []));
     })
       .then(value => this.finish(owned, value)).catch(error => this.failed(owned, error));
   }

@@ -17,7 +17,7 @@ function setup() {
   vi.stubGlobal('requestAnimationFrame', () => 1); vi.stubGlobal('cancelAnimationFrame', () => {});
   const body = new LiveBody({ getBoundingClientRect: () => ({ width: 800, height: 600 }) } as HTMLCanvasElement, () => {});
   const session = new ReactiveSession({ now: () => now, wallNow: () => wall, epoch: () => body.scheduler.epoch, id: () => `request_${++seq}`,
-    canAdmit: () => !hidden && body.canReactive(), admit: (compiled, owner) => body.admitReactive(compiled, owner), cancel: (owner, reason) => body.cancelReactive(owner, reason) });
+    canAdmit: () => !hidden && body.canReactive(), canConverse: () => !hidden && body.canConverse(), admit: (compiled, owner) => body.admitReactive(compiled, owner), cancel: (owner, reason) => body.cancelReactive(owner, reason) });
   body.attachReactive(session); session.configure(true); session.enable(true);
   const source = new FaceObservations('fixture');
   const observe = (present = true, event = false, handX = 0.2) => {
@@ -76,7 +76,7 @@ it('preserves user geometry after animation completes until an explicit return t
   expect(f.body.admit({ v: 1, epoch, seq: 1, kind: 'program', track: 'body', policy: 'replace',
     body: { type: 'morph', target: 'sphere', durationMs: 100 } }).status).toBe('accepted');
   f.advance(1000); f.frame();
-  expect(f.body.scheduler.busy).toBe(false); expect(f.body.metrics.userGeometryLocked).toBe(true); expect(f.body.canReactive()).toBe(false);
+  expect(f.body.scheduler.busy).toBe(false); expect(f.body.metrics.userGeometryLocked).toBe(true); expect(f.body.canReactive()).toBe(false); expect(f.body.canConverse()).toBe(true);
   expect(f.body.admit({ v: 1, epoch, seq: 2, kind: 'program', track: 'body', policy: 'replace',
     body: { type: 'live', program: faceProgram(100), configuration: { controls: [], poses: [], lifetimeMs: 60000 } } }).status).toBe('accepted');
   f.advance(101); f.frame();
@@ -236,4 +236,12 @@ it('keeps a complete face component living inside an agent-owned compound assemb
       { type: 'pose', target: { part: 'mouth', prop: 'scaleY' }, value: 0.4, durationMs: 1000, attackMs: 100, releaseMs: 100 }], lifetimeMs: 2000 } } }).status).toBe('accepted');
   for (let i = 0; i < 45; i++) { f.advance(16); f.frame(); }
   expect(matrix('mouth')?.[5]).toBeCloseTo(0.4, 1); expect(f.body.userSceneOwned).toBe(true); f.body.dispose();
+});
+
+it('permits conversation only after a protected user form is idle and keeps off mode blocked', () => {
+  const f = setup(), epoch = f.body.scheduler.epoch;
+  f.body.admit({ v: 1, epoch, seq: 1, kind: 'program', track: 'body', policy: 'replace', body: { type: 'morph', target: 'sphere', durationMs: 100 } });
+  expect(f.body.canConverse()).toBe(false); f.advance(1000); f.frame();
+  expect(f.body.canReactive()).toBe(false); expect(f.body.canConverse()).toBe(true);
+  f.body.motion('off'); expect(f.body.canConverse()).toBe(false); f.body.dispose();
 });
