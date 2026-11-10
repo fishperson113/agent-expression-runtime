@@ -202,11 +202,17 @@ element('cancel').onclick = () => { hands.reset(); resetReactive(); logActivity(
 element<HTMLSelectElement>('motion').value = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'reduced' : 'normal';
 element('motion').onchange = () => { if (element<HTMLSelectElement>('motion').value === 'off') resetReactive(); body.motion(element<HTMLSelectElement>('motion').value as 'normal' | 'reduced' | 'off'); };
 body.motion(element<HTMLSelectElement>('motion').value as 'normal' | 'reduced');
-const sharedContext = document.createElement('p'); sharedContext.className = 'observer-context'; sharedContext.style.overflowWrap = 'anywhere'; element('conversation-tools').prepend(sharedContext);
+const sharedContext = document.createElement('p'); sharedContext.hidden = true; sharedContext.className = 'observer-context'; sharedContext.style.overflowWrap = 'anywhere';
+sharedContext.tabIndex = 0; sharedContext.setAttribute('aria-label', 'Ngữ cảnh công khai Codex chia sẻ với Fisch');
+const sharedContextLabel = document.createTextNode(''), sharedContextText = document.createTextNode('');
+sharedContext.append(sharedContextLabel, sharedContextText); element('conversation-tools').prepend(sharedContext);
 element('reactivity-privacy').textContent += ' MAIN có thể chia sẻ brief công khai riêng, hiển thị cạnh hội thoại; không tự sao chép chat/code.';
 const timer = setInterval(() => {
   const context = body.observerContext();
-  sharedContext.hidden = !context; sharedContext.textContent = context ? `MAIN chia sẻ công khai (${context.mode === 'quiet' ? 'tạm yên lặng' : 'mở tương tác'}, còn ${Math.ceil(body.observerContextRemainingMs() / 1000)} giây): ${context.text}` : '';
+  sharedContext.hidden = !context;
+  const label = context ? `Codex chia sẻ công khai (${context.mode === 'quiet' ? 'tạm yên lặng' : 'mở tương tác'}, còn ${Math.ceil(body.observerContextRemainingMs() / 1000)} giây): ` : '';
+  if (sharedContextLabel.data !== label) sharedContextLabel.data = label;
+  if (sharedContextText.data !== (context?.text ?? '')) sharedContextText.data = context?.text ?? '';
   recording.tick();
   element('world-state').textContent = JSON.stringify(observations.snapshot, null, 2);
   const metrics = body.metrics;
@@ -216,7 +222,7 @@ const timer = setInterval(() => {
 function stop(reason: 'ui' | 'pagehide') {
   if (stopped) return;
   if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
-  logActivity('Đã dừng phiên Live.'); resetReactive(); reactive.configure(false); stopped = true;
+  logActivity('Đã dừng phiên Live.'); resetReactive(); sharedContextLabel.data = sharedContextText.data = ''; sharedContext.hidden = true; reactive.configure(false); stopped = true;
   recording.dispose(); camera.stop(); hands.reset(); cameraStatus('stopped', 'shutdown'); clearInterval(timer); bridge.stop(); body.dispose(); playground.dispose(); liveSetup.dispose(); conversation.dispose();
   element<HTMLButtonElement>('camera-start').disabled = true; element('connection').textContent = 'Đã dừng phiên Live';
   void (window as any).fischLiveStop?.(reason);

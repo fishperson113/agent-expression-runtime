@@ -124,3 +124,12 @@ trên brief hết hạn trước admission phải bị bỏ cả lời lẫn hì
 Intent mới thu hồi brief trước đó. Nếu hoạt động chung còn tiếp tục, MAIN có thể
 chủ động cập nhật brief bằng express live program:null và configuration rỗng
 controls/poses, lifetimeMs:1000; không cần tạo hình mới chỉ để cập nhật ngữ cảnh.
+
+`style.pointSize` là đường kính sprite hạt theo đơn vị gần pixel, không phải bán
+kính hình học hay tọa độ chuẩn hóa 0–1. Renderer nhân với DPR (tối đa 2) và hệ số
+độ sâu; driver có thể clamp/quantize. Hình thường có thể bắt đầu khoảng 2–4 trên
+renderer hiện tại, đây là gợi ý chứ không phải giới hạn hay đảm bảo dễ nhìn. Giá
+trị nhỏ vẫn hợp lệ cho nét cố ý tinh tế; brightness điều khiển cường độ riêng,
+có thể giảm mượt để fade. Không coi pointSize:0 là lệnh ẩn: backend có thể
+vẫn raster hạt do giới hạn tối thiểu. Không suy ra hình cuối rõ nghĩa từ ACK hay một chuyển
+tiếp bị ngắt.
