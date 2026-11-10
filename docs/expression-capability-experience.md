@@ -95,3 +95,32 @@ prove tool discovery by a real model: existing MCP/compiler integration tests
 cover execution separately. A canned delta is not conversation coherence, and
 a page fixture is not usability evidence. No hosted model, physical device,
 voice, GPU, human enjoyment or 12–20 minute session is certified by these tests.
+
+## Capability discovery and execution regression
+
+External hosts can read `aer://capabilities/v1` for the full shared limits and
+`aer://workflow/v1` for ownership, feedback and recovery. Read
+`aer://instructions/v1` and the discovered tool schemas before authoring work.
+`expression_status({requestId})` reads this MCP process's bounded journal of its
+own commands. Its subscription starts before dispatch, so early renderer
+feedback can be correlated after the admission receipt arrives. Reads never
+create/reconnect a session or replay work. Missing, expired or interrupted
+feedback remains unknown; a cancel ACK alone is not renderer cancellation.
+The visibility field remains unknown because generic gateway feedback does not
+carry raster evidence. Applied and completed must not be described as visible.
+
+`tests/expression-capability-e2e.test.mjs` exercises actual stdio MCP discovery,
+the Rust gateway and the Live browser renderer with camera off. A scripted
+external client authors three arbitrary RGB/motion programs, verifies terminal
+execution feedback and idempotent resubmission, rejects malformed color,
+interrupts active work and recovers with an explicit new request/epoch. Numeric
+WebGL pixel reads and shader values independently verify rendered color; these
+are separate from `expression_status`. The required gateway CI job runs this
+test without allowing a missing binary to turn it into a skip. It uses software
+WebGL in Cloud and no model calls, personal media or voice services.
+
+Native relay/input tests and this MCP execution test cover different integration
+boundaries. They do not prove that Codex or Claude actually discovers tools or
+chooses a relevant expression during a real conversation. Hosted-agent evaluation
+still needs the existing budget ledger/provider configuration reconciled; the
+human session above remains pending.
