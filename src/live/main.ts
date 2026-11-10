@@ -32,16 +32,17 @@ const hands = new HandGestures();
 const observations = new FaceObservations(crypto.randomUUID());
 const handEvents = new HandEventSource(() => performance.now());
 let handEventVersion = 0, reactiveAvailable = false, nativeConversation = false;
-const nativeReplies = new Map<string, { text: string; published: boolean }>();
-const nativeRequests = new Map<string, { request: ReactiveRequest; read: ReturnType<ReactiveSession['nativeReadSet']> }>();
+const nativeReplies = new Map<string, { text: string; published: boolean; contextRevision: number | null }>();
+const nativeRequests = new Map<string, { request: ReactiveRequest; read: ReturnType<ReactiveSession['nativeReadSet']>; contextRevision: number | null }>();
 const cameraTransitions: { status: string; source: string; at: number }[] = [];
 const bridge = new LiveBridge(body, observations, () => resetReactive(), () => observeReactive());
 const reactive = new ReactiveSession({ now: () => performance.now(), wallNow: () => Date.now(), epoch: () => body.scheduler.epoch,
   id: () => crypto.randomUUID(), canAdmit: () => !document.hidden && body.canReactive(),
   canConverse: () => !document.hidden && body.canConverse(),
   admit: (compiled, owner) => {
-    body.admitReactive(compiled, owner);
     const pending = nativeReplies.get(owner.requestId);
+    if (pending && !body.matchesObserverContext(pending.contextRevision)) throw Error('interaction_context_expired');
+    body.admitReactive(compiled, owner);
     if (pending?.text.trim()) { pending.published = conversation.reaction({ requestId: owner.requestId, text: pending.text }); if (!pending.published) throw Error('reaction_ui_unavailable'); }
   }, cancel: (owner, reason) => body.cancelReactive(owner, reason), record: recording.record, handState: () => handEvents.handState(), handMotion: () => handEvents.handMotion(), handResetVersion: () => handEvents.resetVersion });
 body.attachReactive(reactive);
@@ -64,21 +65,22 @@ Object.assign(window, { fischLive: { pair: (base: string, token: string) => brid
   setReactiveUserBusy: (busy: boolean) => reactive.setUserBusy(busy),
   reactiveUserIntent: () => { semanticEvents.length = 0; body.prepareUserMutation(); },
   takeReactiveRequest: () => { const candidate = reactive.takeRequest();
-    if (candidate && nativeConversation) { nativeRequests.set(candidate.request.requestId, { request: candidate.request, read: reactive.nativeReadSet(candidate.observationWindow.events) }); if (nativeRequests.size > 8) nativeRequests.delete(nativeRequests.keys().next().value!); }
+    if (candidate && nativeConversation) { nativeRequests.set(candidate.request.requestId, { request: candidate.request, read: reactive.nativeReadSet(candidate.observationWindow.events), contextRevision: body.observerContext()?.revision ?? null }); if (nativeRequests.size > 8) nativeRequests.delete(nativeRequests.keys().next().value!); }
     return candidate; },
   canRememberNativeReaction: (request: ReactiveRequest) => nativeConversation && !stopped && reactive.canPublish(request),
-  canContinueNativeReaction: (id: string) => { const held = nativeRequests.get(id); return !!held && reactive.canPublish(held.request, held.read); },
+  canContinueNativeReaction: (id: string) => { const held = nativeRequests.get(id); return !!held && body.matchesObserverContext(held.contextRevision) && reactive.canPublish(held.request, held.read); },
   deliverNativeReaction: async (id: string, data: any) => {
     const held = nativeRequests.get(id); nativeRequests.delete(id);
+    if (held && !body.matchesObserverContext(held.contextRevision)) { await reactive.deliver(id, null); return { reason: 'interaction_context_expired', chatPublished: false }; }
     if (data !== null && (typeof data?.reply !== 'string' || data.reply.length > 600)) { await reactive.deliver(id, null); return { reason: 'invalid_reply', chatPublished: false }; }
-    const pending = { text: data?.reply ?? '', published: false }; nativeReplies.set(id, pending);
+    const pending = { text: data?.reply ?? '', published: false, contextRevision: held?.contextRevision ?? null }; nativeReplies.set(id, pending);
     let result; try { result = await reactive.deliver(id, data?.decision ?? null); } finally { nativeReplies.delete(id); }
-    const admitted = !!held && !!result && ['accepted', 'observed'].includes(result.reason) && nativeConversation && !stopped && reactive.canPublish(held.request, held.read);
+    const admitted = !!held && body.matchesObserverContext(held.contextRevision) && !!result && ['accepted', 'observed'].includes(result.reason) && nativeConversation && !stopped && reactive.canPublish(held.request, held.read);
     const chatPublished = pending.published || (admitted && result?.reason === 'observed' && pending.text.trim() ? conversation.reaction({ requestId: id, text: pending.text }) : false);
     return { ...result, chatPublished, source: 'native-observation' };
   }, authorizeReactiveRequest: (id: string) => reactive.authorize(id),
   deliverReactiveDecision: (id: string, data: unknown) => reactive.deliver(id, data), failReactiveDecision: (id: string) => reactive.fail(id),
-  nativeReactionCapabilities: () => ({ schemaVersion: 1, expressionAllowed: !stopped && !document.hidden && body.canReactive() }),
+  nativeReactionCapabilities: () => { const context = body.observerContext(); return { schemaVersion: 1, expressionAllowed: !stopped && !document.hidden && body.canReactive(), ...(context ? { interactionContext: context } : {}) }; },
   reactiveStatus: () => reactive.status(),
   startRecording: () => recording.start(), stopRecording: () => recording.stop(), clearRecording: () => recording.clear(),
   recordingSnapshot: () => recording.snapshot(), recordingCaptureToken: () => recording.captureToken(),
@@ -200,7 +202,11 @@ element('cancel').onclick = () => { hands.reset(); resetReactive(); logActivity(
 element<HTMLSelectElement>('motion').value = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'reduced' : 'normal';
 element('motion').onchange = () => { if (element<HTMLSelectElement>('motion').value === 'off') resetReactive(); body.motion(element<HTMLSelectElement>('motion').value as 'normal' | 'reduced' | 'off'); };
 body.motion(element<HTMLSelectElement>('motion').value as 'normal' | 'reduced');
+const sharedContext = document.createElement('p'); sharedContext.className = 'observer-context'; sharedContext.style.overflowWrap = 'anywhere'; element('conversation-tools').prepend(sharedContext);
+element('reactivity-privacy').textContent += ' MAIN có thể chia sẻ brief công khai riêng, hiển thị cạnh hội thoại; không tự sao chép chat/code.';
 const timer = setInterval(() => {
+  const context = body.observerContext();
+  sharedContext.hidden = !context; sharedContext.textContent = context ? `MAIN chia sẻ công khai (${context.mode === 'quiet' ? 'tạm yên lặng' : 'mở tương tác'}, còn ${Math.ceil(body.observerContextRemainingMs() / 1000)} giây): ${context.text}` : '';
   recording.tick();
   element('world-state').textContent = JSON.stringify(observations.snapshot, null, 2);
   const metrics = body.metrics;

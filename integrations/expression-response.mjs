@@ -5,6 +5,8 @@ import { compositionSchema, composeExpression } from './compose-expression.mjs';
 const live = JSON.parse(readFileSync(new URL('../src/contracts/live-control.schema.json', import.meta.url), 'utf8'));
 // Observer/structured decisions cannot delegate MAIN scene authority.
 delete live.$defs.configuration.properties.observerHandoffMs;
+delete live.$defs.configuration.properties.observerContext;
+delete live.$defs.observerContext;
 const object = properties => ({ type: 'object', properties, required: Object.keys(properties), additionalProperties: false });
 function strictOptional(value) {
   if (Array.isArray(value)) return value.map(strictOptional);
@@ -22,7 +24,7 @@ function withoutNulls(value) {
   if (!value || typeof value !== 'object') return value;
   return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== null).map(([k, v]) => [k, withoutNulls(v)]));
 }
-const { requestId, expectedEpoch, observerHandoffMs, ...geometry } = compositionSchema.properties;
+const { requestId, expectedEpoch, observerHandoffMs, observerContext, ...geometry } = compositionSchema.properties;
 const configuration = structuredClone(live.$defs.configuration); configuration.properties.lifetimeMs.maximum = 10000;
 const reasonCode = { type: 'string', maxLength: 48, pattern: '^[a-z0-9_-]+$', description: 'Short audit label, not private reasoning or an emotional diagnosis.' };
 export const expressionResponseSchema = strictOptional({ ...object({

@@ -107,3 +107,20 @@ hồi tác phẩm cũ. Không dùng cho trò chơi/tác phẩm cần giữ hoặ
 yên. Intent MAIN/user mới, Stop, đổi epoch/nguồn hay motion-off thu hồi quyền chưa
 dùng. Observer không thể tự cấp quyền này. Không có lượt model theo timer chỉ vì
 cửa sổ đang mở; vẫn cần sự kiện hợp lệ và các causal checks.
+
+## Brief công khai để phối hợp observer
+
+Khi muốn observer tham gia hoạt động chung, MAIN có thể chủ động viết
+`observerContext:{text:"<brief do bạn tự soạn>",mode:"open",durationMs:60000}`
+trong compose hoặc configuration live. Text tối đa 240 ký tự trên một dòng, không chứa ký tự điều khiển. Chỉ chia sẻ ngữ cảnh tương tác công khai,
+không chép task riêng, transcript hay suy đoán camera. UI hiển thị nguyên brief.
+Cửa sổ có hạn bắt đầu sau lease hiện tại; intent mới/reset/nguồn lỗi thu hồi.
+Brief không mở quyền ghi đè hình: cần handoff riêng cho minh họa có thể bỏ.
+`mode:"quiet"` tạm chặn inference observer trong cửa sổ hữu hạn, không phải hứa
+yên cho tới khi người dùng quay lại. MAIN không phải phát hình mỗi lượt. Observer
+vẫn tự chọn lời, hình hay giữ yên; không có bảng ngữ cảnh → hiệu ứng. Kết quả dựa
+trên brief hết hạn trước admission phải bị bỏ cả lời lẫn hình.
+
+Intent mới thu hồi brief trước đó. Nếu hoạt động chung còn tiếp tục, MAIN có thể
+chủ động cập nhật brief bằng express live program:null và configuration rỗng
+controls/poses, lifetimeMs:1000; không cần tạo hình mới chỉ để cập nhật ngữ cảnh.

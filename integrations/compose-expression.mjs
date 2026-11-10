@@ -4,6 +4,7 @@ import Ajv from 'ajv';
 const read = path => JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8'));
 const protocol = read('../src/contracts/protocol.schema.json'), face = read('../src/core/live/face.json');
 const limits = read('../src/contracts/capabilities.json');
+const contextSchema = read('../src/contracts/live-control.schema.json').$defs.observerContext;
 const node = type => protocol.$defs.node.oneOf.map(item => item.$ref ? protocol.$defs[item.$ref.split('/').at(-1)] : item).find(item => item.properties?.type?.const === type);
 const pick = (source, keys) => Object.fromEntries(keys.map(key => [key, source.properties[key]]));
 const part = structuredClone(protocol.$defs.assemblyPart), motion = part.anyOf[0].properties.motion;
@@ -17,6 +18,7 @@ export const compositionSchema = {
     base: { enum: ['none', 'resting_face'], default: 'none', description: `none replaces the whole body. resting_face explicitly includes ${face.parts.length} canonical parts counting toward the ${limits.assembly.parts}-part total, plus your parts with noncolliding IDs. Never means the current scene.` },
     durationMs: { ...node('assemble').properties.durationMs, default: 600 },
     easing: node('assemble').properties.easing,
+    observerContext: { ...contextSchema, description: 'MAIN-authored public interaction brief displayed to the user. Not automatic task/transcript sharing or camera evidence. quiet pauses observer inference for a finite window; does not grant geometry permission.' },
     observerHandoffMs: { type: 'integer', minimum: 1000, maximum: 60000, description: 'MAIN only: explicitly disposable body, one-shot observer replacement after this program lease; bounded window, no overlay/restoration. Omit to protect your scene.' },
     style: { type: 'object', additionalProperties: false, minProperties: 1, properties: pick(node('style'), ['color', 'brightness', 'pointSize', 'dispersion']) },
     flow: { type: 'object', additionalProperties: false, required: ['field', 'strength'], properties: pick(node('flow'), ['field', 'strength']) },
@@ -60,7 +62,7 @@ export function composeExpression(input) {
   if (args.flow) children.push({ type: 'flow', ...args.flow, durationMs, easing });
   const body = { type: 'parallel', children };
   if (!validateProgram(body)) throw Error('composition_program');
-  const output = args.observerHandoffMs === undefined ? body : { type: 'live', program: body, configuration: { controls: [], poses: [], lifetimeMs: Math.max(1000, durationMs), observerHandoffMs: args.observerHandoffMs } };
+  const output = args.observerHandoffMs === undefined && args.observerContext === undefined ? body : { type: 'live', program: body, configuration: { controls: [], poses: [], lifetimeMs: Math.max(1000, durationMs), ...(args.observerHandoffMs === undefined ? {} : { observerHandoffMs: args.observerHandoffMs }), ...(args.observerContext === undefined ? {} : { observerContext: args.observerContext }) } };
   const result = { body: output, policy: 'replace', ...(args.requestId ? { requestId: args.requestId } : {}), ...(args.expectedEpoch ? { expectedEpoch: args.expectedEpoch } : {}) };
   if (Buffer.byteLength(JSON.stringify(result), 'utf8') > limits.limits.recordBytes - 512) throw Error('composition_bytes');
   return result;
