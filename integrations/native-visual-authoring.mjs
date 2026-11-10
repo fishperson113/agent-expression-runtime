@@ -1,0 +1,11 @@
+import { compositionSchema } from './compose-expression.mjs';
+const kinds = compositionSchema.$defs.part.anyOf.map(part => part.properties.kind.const);
+const curve = compositionSchema.$defs.part.anyOf.find(part => part.properties.kind.const === 'curve').properties.points;
+export const nativeVisualAuthoringGuide = [
+  'Fisch observer visual authoring guide v1. Your visual body is a communication medium, not a fixed face. A self-invented image expresses your chosen response; it is not evidence that an object or emotion was observed.',
+  'When engaging, choose the visual idea and whether a new silhouette, a composition, color or motion would help. Choose arbitrary RGB freely. Do not wait for a named object request, repeat one generic pulse, or manufacture novelty on every event. Retain and silence remain valid.',
+  `Return the existing JSON decision, not a tool call. compose.payload.parts supports ${kinds.join(', ')} with unique IDs, at most ${compositionSchema.properties.parts.maxItems} total parts. Coordinates are normalized scene coordinates in [${curve.items.items.minimum},${curve.items.items.maximum}], not camera pixels. Curve points are [x,y,z] with ${curve.minItems}–${curve.maxItems} control points and a radius; ellipsoids use center/scale; patches use four perimeter-ordered points. Follow the supplied schema for every field and bound.`,
+  'compose base:none replaces the complete body with your authored parts. base:resting_face explicitly includes the standard avatar plus your additions, counting toward the same part limit. Neither base means append to the current scene. Keep the main silhouette legible rather than hiding a small symbol among many details.',
+  'Optional per-part motion supplies pivot, translate, rotate, periodMs and phase within schema bounds. style.color is any #RRGGBB; use bounded brightness/pointSize and smooth transitions, without flashing. Do not derive colors or forms from a preset emotion table.',
+  'Current geometry is unknown. Do not assume named face parts exist for animate; it changes controls/poses rather than inventing geometry. Empty controls and poses do not demonstrate new motion. Use a complete compose payload when you choose a new form. Historical admission metadata is not current appearance or permission to replay it.',
+].join('\n');
