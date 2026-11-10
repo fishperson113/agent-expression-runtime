@@ -83,6 +83,15 @@ naturalness, retention or a replacement for the current semantic agent.
 
 ## Measured result, 2026-11-10
 
+**Split audit correction:** family names were disjoint, but after the logistic
+baseline excludes natural-language notes, eight of the 32 original holdout
+feature vectors exactly duplicate training vectors. The 26/32 baseline result
+below is a result on this mixed probe cohort, **not generalization evidence**.
+No original input or prediction was deleted or relabeled. The evaluator now
+reports exact feature overlaps and a separately named post-hoc nonoverlap subset.
+The 16 paired probes also include seven training-feature repeats; they are
+counterfactual probes, not independent held-out samples.
+
 Original Laya actually ran on Linux CPU with the pinned 842,609,210-byte weights.
 There were 152 offline forwards: 104 original fixtures, 16 exact paired probes,
 and 32 option-order probes. Nine further forwards used a persistent local Laya
@@ -97,6 +106,12 @@ thresholds were changed after predictions. No Laya training was performed.
 | Structured logistic, fixed gate | 15/32 | 6/12 | 3/16 | 10/32 |
 | Original Laya, raw | 14/32 | 4/12 | 4/16 | 18/32 |
 | Original Laya, fixed gate | 8/32 | 0/12 | 0/16 | 0/32 |
+
+After removing only those eight exact feature repeats, the remaining 24 rows
+represent six families. Always-observe gets 12/24 acceptable, logistic raw
+18/24 and Laya raw 6/24. Negative false positives are respectively 0/12, 6/12
+and 4/12. This is a **post-hoc diagnostic subset**, not a newly untouched test.
+No population-generalization claim follows from either cohort.
 
 On 12 must-abstain OOD rows, raw Laya correctly abstained on five but proposed
 an unsafe abstract reaction on five. Its fixed gate abstained on all 12, while

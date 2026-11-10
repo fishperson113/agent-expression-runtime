@@ -46,7 +46,7 @@ def metrics(rows, predictions):
     covered = [i for i, pred in enumerate(predictions) if pred != 'abstain']
     required = [i for i, row in enumerate(rows) if row.get('mustAbstain', False)]
     return dict(n=len(rows), acceptableAccuracy=np.mean(good).item(),
-                independentScenarioFamilies=len({row['scenarioFamily'] for row in rows}),
+                scenarioFamilyCount=len({row['scenarioFamily'] for row in rows}),
                 canonicalMacroF1=f1_score(expected, predictions, labels=LABELS, average='macro', zero_division=0),
                 reactPrecision=tp / predicted if predicted else None,
                 reactRecall=tp / sum(positives) if sum(positives) else None,
@@ -94,6 +94,31 @@ def paired_metrics(rows, predictions):
     return result
 
 
+def overlap_audit(rows):
+    canonical = lambda value: json.dumps(value, sort_keys=True, separators=(',', ':'))
+    trained = {canonical(features(row)): row['id'] for row in rows if row['split'] == 'train'}
+    full = {canonical(row['state']): row['id'] for row in rows if row['split'] == 'train'}
+    overlaps = [{'id': row['id'], 'split': row['split'], 'trainId': trained[canonical(features(row))],
+                 'fullStateAlsoIdentical': canonical(row['state']) in full}
+                for row in rows if row['split'] != 'train' and canonical(features(row)) in trained]
+    return {'method': 'Exact projected structured features, excluding note; preserves original cohorts.',
+            'overlaps': overlaps, 'holdoutOverlapCount': sum(row['split'] == 'holdout' for row in overlaps),
+            'warning': 'Family-name separation alone did not isolate baseline features. Deduplicated subset is post hoc, not fresh validation.'}
+
+
+def report_group(report, split, group, outputs, baselines):
+    variants = {'always_observe': ['observe'] * len(group)}
+    for name, scores in [('logistic', baselines), ('laya', {key: value['scores'] for key, value in outputs.items()})]:
+        for gated in [False, True]:
+            variants[name + ('_gated' if gated else '_raw')] = [choose(scores[row['id']], gated) for row in group]
+    report['results'][split] = {name: metrics(group, preds) for name, preds in variants.items()}
+    if any('pairId' in row for row in group):
+        report['pairedProbes'] = {name: paired_metrics(group, preds) for name, preds in variants.items()}
+    for slice_name in sorted({s for row in group for s in row.get('slices', [])}):
+        indices = [i for i, row in enumerate(group) if slice_name in row.get('slices', [])]
+        report['results'][split + '/' + slice_name] = {name: metrics([group[i] for i in indices], [preds[i] for i in indices]) for name, preds in variants.items()}
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('dataset', type=Path)
@@ -116,18 +141,13 @@ def main():
                         'Macro F1 always includes all five labels, including absent labels in individual slices.',
                         'Logistic baseline uses structured fields only; natural-language note excluded.',
                         'Synthetic policy labels do not establish real-world gesture or naturalness quality.'], 'results': {}}
+    report['featureOverlapAudit'] = overlap_audit(rows)
     for split in sorted({row['split'] for row in rows} - {'train'}):
-        group = [row for row in rows if row['split'] == split]
-        variants = {'always_observe': ['observe'] * len(group)}
-        for name, scores in [('logistic', baselines), ('laya', {key: value['scores'] for key, value in outputs.items()})]:
-            for gated in [False, True]:
-                variants[name + ('_gated' if gated else '_raw')] = [choose(scores[row['id']], gated) for row in group]
-        report['results'][split] = {name: metrics(group, preds) for name, preds in variants.items()}
-        if any('pairId' in row for row in group):
-            report['pairedProbes'] = {name: paired_metrics(group, preds) for name, preds in variants.items()}
-        for slice_name in sorted({s for row in group for s in row.get('slices', [])}):
-            indices = [i for i, row in enumerate(group) if slice_name in row.get('slices', [])]
-            report['results'][split + '/' + slice_name] = {name: metrics([group[i] for i in indices], [preds[i] for i in indices]) for name, preds in variants.items()}
+        report_group(report, split, [row for row in rows if row['split'] == split], outputs, baselines)
+    overlapping = {row['id'] for row in report['featureOverlapAudit']['overlaps']}
+    clean = [row for row in rows if row['split'] == 'holdout' and row['id'] not in overlapping]
+    if clean:
+        report_group(report, 'holdout_nonoverlap_posthoc', clean, outputs, baselines)
     args.output.write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report['results'].get('holdout', {}), indent=2))
 
