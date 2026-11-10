@@ -118,6 +118,7 @@ export function mountConversation(container: HTMLElement, request: Request) {
     } catch (error) {
       if (disposed || current !== attempt || state?.generation !== generation) return;
       if (action === 'cancel' && cancelScope !== scope) return;
+      if (action === 'cancel' && (lock || state.error === 'conversation_unknown')) return;
       const code = error instanceof Error ? error.message : '';
       localError = errors[code] || errors.conversation_unknown;
       localCancelError = action === 'cancel' ? scope : undefined;

@@ -184,16 +184,19 @@ it('ignores an old cancellation error when a new owner arrives without transcrip
   } finally { await page.close(); }
 }, 45000);
 
-it('keeps later send uncertainty when an overlapping cancellation error is superseded', async () => {
+it.each(['send-last', 'cancel-last'])('keeps send uncertainty when an overlapping cancellation error is superseded (%s)', async order => {
   const { page, panel, input } = await open();
   try {
     await page.evaluate(value => window.conversation.project(value), ready); await input.fill('Một yêu cầu đang chờ');
     await panel.getByRole('button', { name: 'Gửi', exact: true }).click();
     await page.evaluate(value => window.conversation.project(value), { ...ready, revision: 2, ownerTurn: 'turn-a', canSend: false, canCancel: true, pending: true });
     await panel.getByRole('button', { name: 'Dừng trả lời', exact: true }).click();
-    await page.evaluate(() => window.cancelReject(Error('conversation_stop_unconfirmed')));
-    await expect.poll(() => panel.locator('.conversation-status').textContent()).toContain('Chưa xác nhận đã dừng');
+    if (order === 'send-last') {
+      await page.evaluate(() => window.cancelReject(Error('conversation_stop_unconfirmed')));
+      await expect.poll(() => panel.locator('.conversation-status').textContent()).toContain('Chưa xác nhận đã dừng');
+    }
     await page.evaluate(() => window.sendReject(Error('conversation_unknown')));
+    if (order === 'cancel-last') await page.evaluate(() => window.cancelReject(Error('conversation_stop_unconfirmed')));
     await expect.poll(() => panel.locator('.conversation-status').textContent()).toContain('Không gửi lại');
     await page.evaluate(value => window.conversation.project(value), { ...ready, revision: 3 });
     expect(await panel.locator('.conversation-status').textContent()).toContain('Không gửi lại');
