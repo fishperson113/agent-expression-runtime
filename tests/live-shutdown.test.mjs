@@ -4,10 +4,11 @@ import { EventEmitter } from 'node:events';
 const state = vi.hoisted(() => ({ pollFailure: false, browserUnavailable: false, closeCalls: 0 }));
 vi.mock('../integrations/live-codex-transport.mjs', () => ({ openCodexTransport: async options => {
   state.transport = options; return { url: 'ws://127.0.0.1:1', token: 'synthetic',
-    close: () => ++state.closeCalls === 1 ? state.closeResult ?? Promise.resolve() : Promise.resolve(), forward() {}, reject() {} };
+    close: () => ++state.closeCalls === 1 ? state.closeResult ?? Promise.resolve() : Promise.resolve(), forward() {}, reject() {}, submitUser() {}, interruptUser() {} };
 } }));
 vi.mock('../integrations/live-reactive-broker.mjs', () => ({ LiveReactiveBroker: class {
   get browserUnavailable() { return state.browserUnavailable; }
+  busy() { return false; }
   close() {} evaluate() { return Promise.resolve(); }
   poll() { return state.pollFailure ? Promise.reject(Error('synthetic_failure')) : Promise.resolve(); }
 } }));
@@ -27,6 +28,8 @@ beforeEach(() => { state.pollFailure = false; state.browserUnavailable = false; 
 async function launch() {
   const page = new EventEmitter(), gateway = new EventEmitter(), child = new EventEmitter(), abort = new AbortController();
   let spawned; const ready = new Promise(resolve => { spawned = resolve; });
+  const frame = { url: () => 'http://127.0.0.1:1/live.html' };
+  page.url = frame.url; page.mainFrame = () => frame; page.exposeBinding = async () => {};
   page.isClosed = () => false; page.exposeFunction = async (_name, fn) => { page.stop = fn; };
   child.pid = 123; child.exitCode = null; child.signalCode = null;
   const live = { page, gateway, close: vi.fn(async () => {}), base: 'http://127.0.0.1:1', token: 'synthetic' };
