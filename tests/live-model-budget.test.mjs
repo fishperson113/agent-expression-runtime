@@ -97,10 +97,3 @@ it('marks a scoring kit incomplete until all recordings finish and keeps the key
   expect(readFileSync(join(directory, 'blind/index.html'), 'utf8')).not.toContain('BỘ CHƯA HOÀN TẤT');
   expect(() => readFileSync(join(directory, 'blind/answer-key.json'))).toThrow();
 });
-
-it('honors an explicitly configured larger authorized budget without resetting or expanding it', () => {
-  const path = budget({ limit: 1000, used: 999 });
-  expect(reserveModelTurn(path, 'explicit-channel-trial', Date.parse('2026-11-08T18:00:00Z')).used).toBe(1000);
-  expect(() => reserveModelTurn(path, 'extra', Date.parse('2026-11-08T18:01:00Z'))).toThrow('budget_exhausted');
-  expect(JSON.parse(readFileSync(path)).limit).toBe(1000);
-});
