@@ -1,6 +1,8 @@
-# Fisch Live POC — implementation and acceptance plan
+# Fisch Live POC — historical implementation and acceptance plan
 
-Status: bounded POC implementation and automated acceptance complete; manual/PRD gaps remain explicit below. C00 was pushed before runtime changes.
+**Historical scope:** This is the original 2026-11-08 plan and its recorded acceptance. Later changes made normal-terminal `fisch live` the default and removed `fisch run`; the original preserve-panel decision below is superseded. Use [the current Live guide](fisch-live.md) and [CLI migration](multiplexer.md), not these historical branch/launch instructions.
+
+Status at that checkpoint: bounded POC implementation and automated acceptance complete; manual/PRD gaps remain explicit below. C00 was pushed before runtime changes.
 Date: 2026-11-08 (Asia/Saigon). Baseline: `bbb2ede`, runtime `9863ba3`.
 Source: user-supplied PRD “Fisch Live POC: gương mặt có thị giác cho agent”, 2026-11-08.
 
