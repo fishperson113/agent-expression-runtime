@@ -284,7 +284,7 @@ async function handle(message) {
   if (method === 'tools/call') {
     if (live && params?.name === 'compose_expression') {
       try { params = { name: 'express', arguments: composeExpression(params.arguments) }; }
-      catch (error) { return { isError: true, content: [{ type: 'text', text: JSON.stringify({ status: 'rejected', code: error.message }) }] }; }
+      catch (error) { return { isError: true, content: [{ type: 'text', text: JSON.stringify({ status: 'rejected', code: error.message, ...(error.details ? { details: error.details } : {}) }) }] }; }
     }
     if (params?.name === 'express') {
       try { assertExpectedEpoch(params.arguments); }

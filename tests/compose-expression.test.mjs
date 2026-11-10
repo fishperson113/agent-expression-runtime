@@ -56,3 +56,18 @@ it('rejects invalid composition and stale epoch through actual MCP before any ga
     expect((await client.tool('compose_expression', { parts: [part()] })).isError).toBe(true); expect(requests).toBe(1);
   } finally { await client.close(); await new Promise(resolve => server.close(resolve)); }
 }, 15000);
+
+it('returns a bounded actionable patch constraint without echoing authored payloads', async () => {
+  const triangle = { id: 'private-authored-id', kind: 'patch', points: [[0,0,0],[1,0,0],[0,1,0]] };
+  const client = liveTestClient('http://127.0.0.1:1', 'synthetic-validation-only');
+  try {
+    const result = await client.tool('compose_expression', { parts: [triangle, { ...triangle, id: 'another-private-id' }] });
+    expect(result.isError).toBe(true);
+    const text = result.content[0].text;
+    expect(JSON.parse(text)).toEqual({ status: 'rejected', code: 'composition_arguments',
+      details: [{ path: '/parts/0/points', rule: 'minItems', limit: 4 },
+        { path: '/parts/1/points', rule: 'minItems', limit: 4 }] });
+    expect(text).not.toContain(triangle.id);
+    expect(() => composeExpression({ parts: [{ ...triangle, points: [...triangle.points, [0,0,0]] }] })).not.toThrow();
+  } finally { await client.close(); }
+});

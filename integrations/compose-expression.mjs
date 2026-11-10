@@ -25,12 +25,31 @@ export const compositionSchema = {
 };
 const ajv = new Ajv({ strict: false, strictNumbers: true });
 const validateInput = ajv.compile(compositionSchema);
+const partValidators = new Map(part.anyOf.map(schema => [schema.properties.kind.const,
+  ajv.compile({ ...schema, $defs: compositionSchema.$defs })]));
+function compositionInputError(input) {
+  const error = Error('composition_arguments');
+  const details = [];
+  const values = Array.isArray(input?.parts) ? input.parts.slice(0, limits.assembly.parts) : [];
+  for (const [index, value] of values.entries()) {
+    const validate = partValidators.get(value?.kind);
+    if (!validate || validate(value)) continue;
+    for (const issue of validate.errors) {
+      details.push({ path: `/parts/${index}${issue.instancePath}`.slice(0, 160), rule: issue.keyword,
+        ...(Number.isFinite(issue.params.limit) ? { limit: issue.params.limit } : {}) });
+      if (details.length === 3) break;
+    }
+    if (details.length === 3) break;
+  }
+  if (details.length) error.details = details;
+  return error;
+}
 const validateProgram = ajv.compile({ $defs: protocol.$defs, $ref: '#/$defs/node' });
 export const compositionTool = { name: 'compose_expression',
   description: `Author a new particle silhouette or spatial composition from your own geometry (v1, base ${compositionContract.baseFingerprint.slice(0, 12)}). Omitted base means standalone. Explicit resting_face adds your parts to that optional avatar without copying it. Freely choose RGB and bounded part motion. No semantic presets. Use express for existing-part gestures or advanced choreography; retaining the current form/no new call can be appropriate. Same admission/status/cancel contract as express; ACK is not completion or recognition.`,
   annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false }, inputSchema: compositionSchema };
 export function composeExpression(input) {
-  if (!validateInput(input)) throw Error('composition_arguments');
+  if (!validateInput(input)) throw compositionInputError(input);
   const args = structuredClone(input), parts = [...(args.base === 'resting_face' ? structuredClone(face.parts) : []), ...args.parts];
   if (parts.length > limits.assembly.parts) throw Error('composition_part_limit');
   if (new Set(parts.map(part => part.id)).size !== parts.length) throw Error('composition_part_collision');

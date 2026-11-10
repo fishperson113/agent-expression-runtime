@@ -17,7 +17,7 @@ phải gọi tên một vật thể rồi mới tự dựng hình, nhưng cũng 
 `base:"none"` (mặc định, toàn thân tự soạn) hoặc `base:"resting_face"` (ghép part
 mới vào avatar chuẩn), `durationMs` và `style` RGB tùy chọn. Có thể khai báo motion
 có giới hạn trên từng part. Không cần chép lại các part avatar hay bọc AST; host
-chỉ mở rộng dữ liệu này thành `assemble/style/flow` đã có. Không có tên cảm xúc,
+chỉ mở rộng dữ liệu này thành `assemble/style/flow` đã có. Patch cần đúng bốn điểm theo thứ tự quanh biên; curve cần 2–12 điểm và radius. Không có tên cảm xúc,
 vật thể định sẵn hay ánh xạ câu nói → hình. Đây không phải lệnh thêm vào scene
 hiện tại; luôn gửi đủ part riêng muốn giữ. Từ chối ID trùng, vượt giới hạn và epoch
 cũ trước mutation; ACK/status/cancel dùng cùng hợp đồng với `express`.
