@@ -241,11 +241,15 @@ normalized displacement from the last attended anchor is novel. Centered input
 needs no glance. Reported face tracking-stability quality and a 700 ms freshness bound reject
 unknown/stale cues. Hand tracking uses the typed tracked state, primary track and
 finite wrist coordinates; handedness confidence is not tracking confidence and is
-not used as such. One episode lasts 650 ms during working/replying or 1100 ms otherwise,
+not used as such. One episode lasts 850 ms during working/replying or 1100 ms otherwise,
 with bounded entry/release envelopes and a six-second cooldown. New compatible
 frames update the target instead of cancelling it. Quiet/cooldown inputs update
-anchors without queueing reactions for later. Declared pupil offsets are at most
-0.055 scene units, reduced to 8% in reduced-motion mode.
+anchors without queueing reactions for later. During an episode, pupils blend toward the eye centers and can travel up to
+0.12 horizontally / 0.075 vertically from those centers. Working eyes open and
+ambient blinking attenuates with the same envelope, leaving the mouth/activity
+state intact. The canonical eye/pupil bounds have a conservative ellipse test;
+these numbers are anatomy-specific, never applied to agent-authored shapes.
+Reduced-motion strength remains 8%; user controls remain the later layer.
 
 Epoch, Native intent, explicit user lease/creation, source loss/change, motion-off
 and disposal revoke/suppress this layer before rendering. Resume rebases to the
@@ -261,10 +265,17 @@ layer; an arbitrary part named like an eye is not recognized as anatomy.
 The memory-only visualAttention metric retains at most 32 transition records with
 epoch/intent generation, evidence-start/latest source sequences, target and reason.
 Lease expiry is logical timing, not proof of visibility. Run
-`npx vitest run tests/visual-attention.test.ts tests/live-reactive-body.test.ts tests/local-reflex-demo.test.mjs`
+`npx vitest run tests/visual-attention.test.ts tests/live-reactive-body.test.ts tests/local-reflex-demo.test.mjs tests/gaze-render.test.mjs`
 with the repository's locked dependencies/Chromium to reproduce virtual replay
 (including 20 virtual minutes), ownership/epoch tests and actual WebGL pupil motion
 with synthetic hand input and simulated Native work/intent callbacks. Replay does
 not call perception or a model; no real camera/mic is used. Identical virtual-clock
 input yields identical local trajectories in the same runtime. Human naturalness,
 physical-camera quality and actual Codex task acceptance remain separate gates.
+
+The gaze render test compares before/after at matching working/blink phases and
+body tilt. It isolates already-rendered particle groups with the camera/fitting
+held fixed, then measures pupil pixel centroids relative to their eye outlines.
+The direction-range metric is an engineering proxy; screenshot review and human
+naturalness are separate, not established by larger pixel displacement. Optional
+`FISCH_GAZE_EVIDENCE=/absolute/directory` writes synthetic PNGs/metrics outside Git.

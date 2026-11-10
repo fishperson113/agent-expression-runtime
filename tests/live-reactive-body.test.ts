@@ -186,7 +186,7 @@ it('glances during work with no semantic provider, then revokes on Native intent
   for (let i = 0; i < 25; i++) { f.observe(true, false, 0.2); f.advance(16); f.frame(); }
   const state = () => rendered.mock.calls.at(-1)![0] as any;
   const pupilX = () => state().liveMatrices[state().particleParts.findIndex((p: any) => p.id === 'pupil_left') + 1]?.[3] ?? 0;
-  expect(f.body.metrics.visualAttention.active).not.toBeNull(); expect(pupilX()).toBeGreaterThan(0.01);
+  expect(f.body.metrics.visualAttention.active).not.toBeNull(); expect(pupilX()).toBeLessThan(-0.01);
   const started = f.body.metrics.visualAttention.history.filter(e => e.status === 'started').length;
   f.body.prepareUserMutation(); f.frame(); expect(f.body.metrics.visualAttention.active).toBeNull();
   expect(Math.abs(pupilX())).toBeLessThan(1e-8);

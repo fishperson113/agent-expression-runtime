@@ -78,7 +78,7 @@ export class VisualAttention {
     e.point = point; this.anchor = point;
     const elapsed = now - e.start, envelope = Math.max(0, Math.min(1, elapsed / 120, (e.duration - elapsed) / 200));
     const weight = envelope * envelope * (3 - 2 * envelope) * (mode === 'reduced' ? 0.08 : 1);
-    return { x: clamp(point.x) * weight, y: clamp(point.y) * weight };
+    return { x: clamp(point.x) * weight, y: clamp(point.y) * weight, strength: weight };
   }
   private consider(point: Point, now: number, activity: string) {
     if (this.episode || now < this.cooldown) { this.anchor = point; this.candidate = undefined; return; }
@@ -90,7 +90,7 @@ export class VisualAttention {
     if (!this.candidate || this.candidate.key !== point.key) this.candidate = { key: point.key, at: now, samples: 0, fromSeq: point.seq };
     this.candidate.samples++;
     if (this.candidate.samples < 2 || now - this.candidate.at < 80) { this.reason = 'debouncing'; return; }
-    this.episode = { id: ++this.serial, point, start: now, evidenceStartSeq: this.candidate.fromSeq, duration: ['working', 'replying'].includes(activity) ? 650 : 1100 };
+    this.episode = { id: ++this.serial, point, start: now, evidenceStartSeq: this.candidate.fromSeq, duration: ['working', 'replying'].includes(activity) ? 850 : 1100 };
     this.cooldown = now + 6000; this.anchor = point; this.candidate = undefined; this.reason = 'geometric_novelty';
     this.record(this.episode, 'started', this.reason, now);
   }
