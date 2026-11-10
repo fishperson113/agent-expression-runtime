@@ -347,3 +347,27 @@ for (const mode of ['observe','express']) it.skipIf(!nativeGateway)(`keeps a pro
     expect(metrics.cameraActive).toBe(false);
   }finally{await client?.close();await f.close();}
 },60000);
+
+it.skipIf(!nativeGateway)('keeps raw hand reacquisition while avoiding a duplicate Native request through the production source',async()=>{
+  const requests=[];
+  const provider={conversationLane:true,contractVersion:1,policy:{deadlineMs:60000,cooldownMs:1000,maxPerMinute:4},decide:async window=>{
+    requests.push(window);return {decision:{schemaVersion:1,requestId:window.request.requestId,decisionId:'seen_'+window.request.requestId,
+      mode:'observe',validUntil:window.request.deadline,action:null},reply:''};}};
+  const f=await nativeBrowserLoop(provider);
+  try{
+    await f.live.page.evaluate(()=>{window.__observationMode='hand-only';});
+    await expect.poll(()=>requests.length,{timeout:10000}).toBe(1);
+    await f.live.page.waitForTimeout(1500);
+    await f.live.page.evaluate(()=>clearInterval(window.__observationTimer));
+    await f.live.page.waitForTimeout(400);
+    await f.live.page.evaluate(()=>{window.__observationTimer=setInterval(()=>window.fischLive.fixture(window.__observationMode),150);});
+    await expect.poll(async()=>(await f.live.page.locator('#events li').allTextContents()).filter(text=>text.includes('hand_appeared')).length,{timeout:10000}).toBeGreaterThanOrEqual(2);
+    await f.live.page.waitForTimeout(1800);expect(requests).toHaveLength(1);
+    await f.live.page.evaluate(()=>{window.__observationMode='hand-lost';});
+    await f.live.page.waitForTimeout(2000);const beforeReturn=requests.length;
+    await f.live.page.evaluate(()=>{window.__observationMode='hand-only';});
+    await expect.poll(()=>requests.length,{timeout:10000}).toBe(beforeReturn+1);
+    expect(requests.at(-1).events.some(event=>event.type==='hand_appeared')).toBe(true);
+    expect((await f.live.page.evaluate(()=>window.fischLive.metrics())).cameraActive).toBe(false);
+  }finally{await f.close();}
+},60000);

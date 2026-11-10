@@ -1,0 +1,118 @@
+{
+  "schemaVersion": 1,
+  "id": "main-playful-quiet-v2",
+  "status": "Prospective development profile only; no inference authorization or execution. Old617.260s run and its old6inputs remain immutable.",
+  "durationMs": 720000,
+  "inputPath": "Actual MAIN public conversation; observer receives only existing typed fixture observations, never these texts as camera data.",
+  "maxMainTurns": 6,
+  "maxObserverTurns": 4,
+  "attemptsPerCase": 1,
+  "sourceSchedule": "The literal sourceScheduleReference.sourcePhases below is copied from the verified prior predeclared artifact; pin its hash and the new candidate/source/context hashes before any inference.",
+  "cases": [
+    {
+      "id": "play-v2-01",
+      "atMs": 30000,
+      "type": "play_invitation",
+      "text": "Chơi với mình một trò ngắn ngay trong không gian này đi. Bạn tự nghĩ cách chơi, nói luật thật gọn để mình thử nhé."
+    },
+    {
+      "id": "play-v2-02",
+      "atMs": 130000,
+      "type": "play_continuation",
+      "text": "Mình tham gia nhé. Cho mình một lựa chọn hoặc lượt tiếp theo đủ dễ để bắt nhịp, còn phần bất ngờ để bạn quyết định."
+    },
+    {
+      "id": "play-v2-03",
+      "atMs": 230000,
+      "type": "play_remix_invitation",
+      "text": "Thử đổi cách chơi một chút cho mới mẻ xem. Nếu trò trước chưa bắt đầu thì chọn một cách đơn giản hơn, đừng giả vờ mình đã chơi rồi nhé."
+    },
+    {
+      "id": "play-v2-04",
+      "atMs": 330000,
+      "type": "elicited_nonverbal_positive_control",
+      "text": "Lượt này bạn tự chọn một ý tưởng để biểu đạt bằng phần hình của mình, không cần nói thêm. Mình muốn xem bạn chọn gì."
+    },
+    {
+      "id": "play-v2-05",
+      "atMs": 450000,
+      "type": "explicit_quiet",
+      "text": "Mình cần tập trung một lát. Cứ giữ yên không gian này, đừng thêm lời hay trò mới cho đến khi mình quay lại nhé."
+    },
+    {
+      "id": "play-v2-06",
+      "atMs": 610000,
+      "type": "quiet_continuation",
+      "text": "Mình vẫn đang đọc nốt, chưa cần tiếp tục. Bạn cứ ở đây yên lặng cùng mình nhé."
+    }
+  ],
+  "designNotes": [
+    "Four play/invitation/continuation cases and two explicit quiet cases. No named shape, color, movement effect, expected scene or semantic preset.",
+    "The fourth case explicitly elicits nonverbal expression; any action there is NOT spontaneous initiative. It is a capability/use-path positive control.",
+    "Continuations must be judged against actual prior outputs; no invented game/session progress.",
+    "The old mostly reflective/rest/quiet cases yielding no mutations do not establish a bug. This new invitation profile changes context distribution and is not a controlled proof of a policy fix.",
+    "No mandatory geometry count. Retain/silence remains legal and every outcome recorded; a positive control retain is recorded noncompliance/unexercised path, never host-forced fallback.",
+    "Respect live ownership, consent, Stop, stale-data and DSL bounds; no auto-retry, cap increase, selective omission or substitute model call."
+  ],
+  "minimumArtifacts": [
+    "Source/policy/toolcatalog/fixture/context hashes and actual per-lane provenance",
+    "Continuous renderer-only video reference with monotonic timestamps and frame samples for everycase, including noops/errors/unrun",
+    "MAIN and observer decisions separately: retain/silent/animate/compose; all tool outcomes and accepted/applied/completed/cancelled/unknown statuses",
+    "Per-case first visible response and full-turn time separately; actual elapsed720s or early-stop reason",
+    "Blind raster/clip descriptions before revealing context, then relevance/interest/restraint and caption consistency; reviewer count and comments"
+  ],
+  "interpretation": {
+    "canShow": "Whether a verified MAIN integration chooses existing expression capabilities during play invitations, whether the explicit nonverbal path executes, how it behaves during requests for quiet, and formative visible results.",
+    "cannotShow": [
+      "Spontaneous expression from the elicited control",
+      "General enjoyment or retention without human review",
+      "Emotion/object understanding from camera geometry",
+      "A causal benefit of hand-dedup or new policy from this changed input profile",
+      "Success merely because all6turns completed or a geometry quota was reached"
+    ]
+  },
+  "earlyStop": "Stop after720s or first authorization/budget/transport-unknown gate. Record remainingcases unrun; no deadline extension to recover missed turns.",
+  "sourceScheduleReference": {
+    "baselineSourceCommit": "97fdfeae77014992a5d3b8c9a88a1be9b5cc7ab5",
+    "baselinePredeclaredSha256": "0510d7076038c5398d092cda5a74b9747ef519e63ffdf9fd79e4a7f191b15d72",
+    "sourceCadenceMs": 150,
+    "sourcePhases": [
+      {
+        "seconds": [
+          0,
+          15
+        ],
+        "fixture": "absent"
+      },
+      {
+        "seconds": [
+          15,
+          215
+        ],
+        "fixture": "present-neutral"
+      },
+      {
+        "seconds": [
+          215,
+          415
+        ],
+        "fixture": "present-smile"
+      },
+      {
+        "seconds": [
+          415,
+          615
+        ],
+        "fixture": "present-hand",
+        "wristX": 0.2
+      },
+      {
+        "seconds": [
+          615,
+          720
+        ],
+        "fixture": "absent"
+      }
+    ]
+  }
+}

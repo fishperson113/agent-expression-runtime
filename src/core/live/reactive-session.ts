@@ -1,6 +1,7 @@
 import type { CausalKind, CausalPayloads } from './causal-recorder-types';
 import { matchesCriticalState } from './decision-contract';
 import { SemanticAxes } from './semantic-axes';
+import { HandOpportunityMemory } from './hand-opportunity';
 import { ReactiveDecisionHost } from './decision-host';
 import { ReactiveLeaseGuard, type LeaseRevokeReason } from './reactive-lease';
 import { handEventKinds, validateObservation, validateSourceEvent } from './observation';
@@ -48,6 +49,9 @@ export class ReactiveSession {
   private uncertain = false;
   private count = 0;
   private nativeConversation = false;
+  private handOpportunities = new HandOpportunityMemory();
+  private handOpportunityReset?: number;
+  private handOpportunityEnabled = false;
   private nativeOwnerRead?: NativeReadSet;
   private nativeOwnerUntil = 0;
   private nativePolicy = { deadlineMs: 60000, cooldownMs: 15000, maxPerMinute: 4 };
@@ -119,6 +123,7 @@ export class ReactiveSession {
     this.presenceRevision++; this.sourceValid = false; this.axes.clear();
   }
   private revoke(reason: CausalPayloads['revocation']['reason']) {
+    if (!['hand_changed', 'track_lost', 'semantic_changed'].includes(reason)) this.handOpportunities.reset();
     const transport = this.transport;
     if (!this.guard.owner && transport?.generation === this.guard.generation) this.record('revocation', { reason, requestId: transport.id });
     this.nativeOwnerRead = undefined; this.nativeOwnerUntil = 0; this.lastReason = reason; this.pending.clear(); this.host.revoke(); this.guard.revoke(revokeReasons[reason] ?? 'revoked');
@@ -150,6 +155,14 @@ export class ReactiveSession {
     this.handGeneration = generation;
     for (const [name, event] of this.pending) if (!this.handEligible(event, state)) this.pending.delete(name);
   }
+  private observeHandOpportunities(snapshot: Observation) {
+    let version;
+    try { version = this.options.handResetVersion?.(); } catch { /* Unknown reset provenance cannot suppress an opportunity. */ }
+    this.handOpportunityEnabled = Number.isSafeInteger(version) && (version as number) >= 0;
+    if (!this.handOpportunityEnabled || version !== this.handOpportunityReset) this.handOpportunities.reset();
+    this.handOpportunityReset = version;
+    if (this.handOpportunityEnabled) this.handOpportunities.observe(snapshot, this.options.now(), this.handState());
+  }
   observe(value: Observation, events: SessionEvent[]) {
     this.tick();
     let snapshot: Observation;
@@ -171,6 +184,7 @@ export class ReactiveSession {
     if (this.nativeOwnerRead && this.guard.owner && !this.matchesNativeReadSet(this.nativeOwnerRead)) this.revoke('semantic_changed');
     this.history.push(snapshot); this.history = this.history.filter(item => this.fresh(item.capturedAt, 1500)).slice(-4);
     this.record('observation', { ...snapshot, summary: '' });
+    if (this.nativeConversation) this.observeHandOpportunities(snapshot);
     this.events(events);
   }
   private events(events: SessionEvent[]) {
@@ -186,6 +200,7 @@ export class ReactiveSession {
       const candidate = { ...source, sessionId: this.snapshot!.sessionId, observationSeq: 'observationSeq' in source ? source.observationSeq : this.snapshot!.seq, seq: event.seq } as PendingEvent;
       this.record('event', candidate);
       if (!this.handEligible(candidate)) continue;
+      if (this.nativeConversation && this.handOpportunityEnabled && isHand(candidate) && this.handOpportunities.suppress(candidate)) continue;
       if (!this.nativeConversation && this.contractVersion === 1 && (this.guard.owner || this.transport?.generation === this.guard.generation)) this.revoke('semantic_changed');
       if (!this.pending.size) this.firstAt = this.options.now();
       this.pending.set(key(candidate), candidate);
@@ -287,6 +302,7 @@ export class ReactiveSession {
   status() {
     return { available: this.available, enabled: this.enabled, userBusy: this.userBusy, sourceValid: this.sourceValid,
       pending: this.pending.size, transport: this.transport?.id ?? null, authorized: this.transport?.authorized ?? false, owner: this.guard.owner?.actionId ?? null,
-      nativeReadSet: this.transport?.nativeReadSet ?? null, uncertain: this.uncertain, dispatches: this.count, reason: this.lastReason };
+      nativeReadSet: this.transport?.nativeReadSet ?? null, uncertain: this.uncertain, dispatches: this.count, reason: this.lastReason,
+      handOpportunities: this.handOpportunities.status() };
   }
 }
