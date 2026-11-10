@@ -12,6 +12,7 @@ function captureToken(value) {
   } catch { return null; }
 }
 const controlled = new Set(['turn/start', 'turn/steer', 'thread/start', 'thread/resume', 'thread/fork', 'turn/interrupt']);
+const conversationBusy = value => !!value && (value.pending || value.stopping || value.error === 'conversation_unknown');
 export class LiveReactiveBroker {
   closed = false; browserUnavailable = false; waiters = new Set(); polling = false; draining = false; active; uncertain = false; paused = false;
   providerReceipts = []; queue = []; pending = new Map(); turns = new Set(); completed = new Set(); receipts = new Set(); requests = new Set();
@@ -97,13 +98,19 @@ export class LiveReactiveBroker {
       if (this.completed.size > 64) this.completed.delete(this.completed.values().next().value);
     }
   }
-  async poll(activity, entries = []) {
+  async poll(activity, entries = [], conversationSource) {
+    this.conversationSource = conversationSource;
     if (this.closed || this.browserUnavailable || this.polling) return; this.polling = true;
     try {
       const available = !!this.provider && !this.paused && !this.uncertain;
+      const conversation = conversationSource?.(), busy = this.busy() || conversationBusy(conversation?.snapshot);
+      const fingerprint = conversation ? JSON.stringify(conversation) : undefined;
+      const projection = fingerprint !== this.conversationFingerprint ? conversation : undefined;
       const queuedReceipts = this.providerReceipts.splice(0, 8);
-      const polled = await this.evaluate(({ activity, entries, busy, available, take, receipts, contractVersion }) => {
+      const polled = await this.evaluate(({ activity, entries, busy, available, take, receipts, contractVersion, projection }) => {
         const api = window.fischLive;
+        const publish = projection && (projection.token ? api.conversationDocument === projection.token : !projection.snapshot.available);
+        if (publish) api.conversationStatus?.(projection.snapshot);
         for (const item of receipts) { try {
           const pending = api.recordProviderReceipt?.(item.token, item.receipt);
           if (pending !== undefined) void Promise.resolve(pending).catch(() => {});
@@ -112,10 +119,12 @@ export class LiveReactiveBroker {
         for (const text of entries) api.logActivity?.(text);
         api.configureReactive(available, 1, contractVersion); api.setReactiveUserBusy(busy);
         let token = null; try { token = api.recordingCaptureToken?.() ?? null; } catch {}
-        return { candidate: take ? api.takeReactiveRequest() : null, captureToken: token };
-      }, { activity, entries, busy: this.busy(), available, take: available && !this.active && !this.busy(), receipts: queuedReceipts, contractVersion: this.provider?.contractVersion === 2 ? 2 : 1 });
+        return { candidate: take ? api.takeReactiveRequest() : null, captureToken: token, conversationApplied: !!publish };
+      }, { activity, entries, busy, available, take: available && !this.active && !busy, receipts: queuedReceipts, projection, contractVersion: this.provider?.contractVersion === 2 ? 2 : 1 });
+      if (polled?.conversationApplied) this.conversationFingerprint = fingerprint;
       const candidate = polled?.candidate, token = captureToken(polled?.captureToken);
-      if (!this.closed && !this.browserUnavailable && candidate && !this.active && !this.busy()) this.start(candidate, token);
+      const currentBusy = this.busy() || conversationBusy(conversationSource?.()?.snapshot);
+      if (!this.closed && !this.browserUnavailable && candidate && !this.active && !currentBusy) this.start(candidate, token);
       else if (!this.closed && !this.browserUnavailable && candidate) await this.deliver(candidate.request.requestId, null);
     } catch { this.paused = true; this.log('reactive_browser_unavailable'); }
     finally { this.polling = false; }
@@ -158,13 +167,14 @@ export class LiveReactiveBroker {
     }
     catch { this.paused = true; this.log('reactive_authorization_failed'); }
     if (this.closed || this.browserUnavailable || this.active !== owned) return;
-    if (allowed !== true || this.busy()) { owned.terminal = true; await this.finishFailure(owned); return; }
+    if (allowed !== true || this.busy() || conversationBusy(this.conversationSource?.()?.snapshot) || owned.controller.signal.aborted) { owned.terminal = true; await this.finishFailure(owned); return; }
     owned.timer = setTimeout(() => { if (this.closed || this.browserUnavailable || this.active !== owned) return;
       owned.terminal = true; this.uncertain = true; owned.controller.abort(); this.log('reactive_transport_timeout');
       void this.fail(owned.id);
     }, 30000);
     void Promise.resolve().then(() => {
-      if (!this.closed && !this.browserUnavailable && this.active === owned) return this.provider.decide(candidate.observationWindow, owned.controller.signal,
+      if (!this.closed && !this.browserUnavailable && this.active === owned && !this.busy() &&
+        !conversationBusy(this.conversationSource?.()?.snapshot) && !owned.controller.signal.aborted) return this.provider.decide(candidate.observationWindow, owned.controller.signal,
         owned.captureToken ? value => this.receipt(owned, value) : undefined);
     })
       .then(value => this.finish(owned, value)).catch(error => this.failed(owned, error));
@@ -195,6 +205,7 @@ export class LiveReactiveBroker {
     catch { this.uncertain = true; this.log('reactive_delivery_unknown'); }
   }
   close() {
+    this.conversationSource = undefined; this.conversationFingerprint = undefined;
     this.closed = true; this.rejectEvaluations('reactive_user_closed'); clearTimeout(this.active?.timer); this.active?.controller.abort();
     for (const message of this.queue.splice(0)) this.rejectInput(message, 'reactive_user_closed');
     this.active = undefined; this.providerReceipts = []; this.pending.clear(); this.turns.clear(); this.completed.clear(); this.receipts.clear(); this.requests.clear();

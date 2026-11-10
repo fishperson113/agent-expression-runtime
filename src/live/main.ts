@@ -1,6 +1,7 @@
 import './style.css';
 import { mountLive, element, mountDisclosures } from './view';
 import { mountPlayground } from './playground-view';
+import { mountConversation } from './conversation-view';
 import { mountLiveSetup } from './setup-help';
 import { HandGestures } from './gestures';
 import { LiveBody } from './body';
@@ -20,6 +21,7 @@ const playgroundContainer = element('playground-tools');
 const playground = mountPlayground(playgroundContainer);
 const setupContainer = element('setup-tools');
 const liveSetup = mountLiveSetup(setupContainer);
+const conversation = mountConversation(element('conversation-tools'), value => (window as any).fischLiveConversation(value));
 mountDisclosures(element('app'));
 const synthetic = new URLSearchParams(location.search).get('fixture') === 'synthetic';
 const body = new LiveBody(element<HTMLCanvasElement>('body'), text => { element('body-status').textContent = text; });
@@ -79,7 +81,8 @@ Object.assign(window, { fischLive: { pair: (base: string, token: string) => brid
     body.activity(turn); events(handEvents.publish(observations.turn(turn, Date.now())));
     if (type === 'interrupted') void bridge.cancel();
   } } });
-Object.assign((window as any).fischLive, { setupStatus: (value: unknown) => liveSetup.project(value) });
+Object.assign((window as any).fischLive, { setupStatus: (value: unknown) => liveSetup.project(value),
+  conversationStatus: (value: unknown) => { if (!stopped) conversation.project(value); }, conversationClear: () => conversation.clear() });
 const recent: LiveSourceEvent[] = [];
 let sampleCount = 0, sampleAt = performance.now(), inferenceMs = 0, stopped = false;
 const camera = new VisionCamera(element<HTMLVideoElement>('camera'), sample, cameraStatus,
@@ -186,7 +189,7 @@ function stop(reason: 'ui' | 'pagehide') {
   if (stopped) return;
   if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
   logActivity('Đã dừng phiên Live.'); resetReactive(); reactive.configure(false); stopped = true;
-  recording.dispose(); camera.stop(); hands.reset(); cameraStatus('stopped', 'shutdown'); clearInterval(timer); bridge.stop(); body.dispose(); playground.dispose(); liveSetup.dispose();
+  recording.dispose(); camera.stop(); hands.reset(); cameraStatus('stopped', 'shutdown'); clearInterval(timer); bridge.stop(); body.dispose(); playground.dispose(); liveSetup.dispose(); conversation.dispose();
   element<HTMLButtonElement>('camera-start').disabled = true; element('connection').textContent = 'Đã dừng phiên Live';
   void (window as any).fischLiveStop?.(reason);
 }
