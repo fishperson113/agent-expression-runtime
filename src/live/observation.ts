@@ -1,7 +1,7 @@
 import { HandTracker } from '../core/live/hand-tracker';
 import { unavailableUser, type Observation, type LiveTurn, type LiveEventKind, type Expressions, type HandObservation } from '../core/live/types';
 
-export type FaceSample = { hands?: { categoryName: string; score: number }[]; handsFailed?: boolean; handObservation?: HandObservation; landmarks: { x: number; y: number; z: number }[];
+export type FaceSample = { sourceFrame?: { availableAt: number; requestedAt: number; mediaTime: number }; hands?: { categoryName: string; score: number }[]; handsFailed?: boolean; handObservation?: HandObservation; landmarks: { x: number; y: number; z: number }[];
   scores: Record<string, number>; matrix: number[]; durationMs: number; delegate: string };
 const clamp = (value: number, min = 0, max = 1) => Math.max(min, Math.min(max, value));
 type Cue = { type: LiveEventKind; at: number };
@@ -50,6 +50,12 @@ export class FaceObservations {
     return raw;
   }
   update(sample: FaceSample, at: number): Cue[] {
+    const source = sample.sourceFrame;
+    if (source) {
+      if (![source.availableAt, source.requestedAt, source.mediaTime, at].every(Number.isFinite) || source.mediaTime < 0 || source.availableAt > source.requestedAt || source.requestedAt > at || at - source.availableAt > 1500) return [];
+      if (this.previousAt !== undefined && source.availableAt <= this.previousAt) return [];
+      at = source.availableAt;
+    }
     const events: Cue[] = [], present = sample.landmarks.length >= 478;
     const dt = this.previousAt === undefined ? 100 : clamp(at - this.previousAt, 0, 200);
     this.previousAt = at; this.streak = present ? this.streak + 1 : 0;

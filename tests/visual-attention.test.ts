@@ -10,11 +10,11 @@ function fixture() {
       zMeaning: 'wrist-relative-image-width', mirrored: false, sourceWidth: 640, sourceHeight: 480, primaryTrackId: track,
       entities: [{ detectionId: 0, trackId: track, handedness: 'Unknown', confidence: 0.9,
         landmarks: Array.from({ length: 21 }, () => ({ x, y: 0.4, z: 0 })) }] } });
-  return { attention, observation, time: (value: number) => { at = value; },
+  return { attention, observation, reset: (epoch = 'e', barrier?: Pick<Observation, 'sessionId' | 'seq' | 'capturedAt'>) => { attention.reset(epoch, barrier); at += 1; }, time: (value: number) => { at = value; },
     sample: (blocked = false, mode: 'normal' | 'reduced' | 'off' = 'normal', activity = 'working') => attention.sample('e', activity, blocked, mode) };
 }
 function replay() {
-  const f = fixture(), output = []; f.attention.reset('e');
+  const f = fixture(), output = []; f.reset('e');
   for (let t = 0; t < 20000; t += 20) {
     f.time(t); if (t % 40 === 0) f.attention.observe(f.observation(t < 10000 ? 0.2 : 0.8));
     output.push(f.sample());
@@ -28,7 +28,7 @@ it('replays identical bounded glance trajectories and does not backlog continuou
   expect(a.trace.history.every(e => e.epoch === 'e' && e.sourceSeq >= e.evidenceStartSeq && e.evidenceStartSeq > 0)).toBe(true);
 });
 it('requires distinct measurements, retains compatible tracks, and revokes lost, stale or replaced targets', () => {
-  const f = fixture(); f.attention.reset('e'); f.attention.observe(f.observation()); f.sample();
+  const f = fixture(); f.reset('e'); f.attention.observe(f.observation()); f.sample();
   f.time(100); f.attention.observe(f.observation(0.2, 'hand_1', 10000)); f.sample();
   expect(f.attention.snapshot().active).toBeNull();
   f.time(120); f.attention.observe(f.observation()); f.sample(); expect(f.attention.snapshot().active).not.toBeNull();
@@ -38,18 +38,18 @@ it('requires distinct measurements, retains compatible tracks, and revokes lost,
 });
 it('cancels on intent, ownership, epoch and motion-off without reviving a cached measurement', () => {
   for (const stop of ['intent', 'owned', 'epoch', 'off']) {
-    const f = fixture(); f.attention.reset('e'); f.attention.observe(f.observation()); f.sample();
+    const f = fixture(); f.reset('e'); f.attention.observe(f.observation()); f.sample();
     f.time(100); const latest = f.observation(); f.attention.observe(latest); f.sample();
     expect(f.attention.snapshot().active).not.toBeNull();
     if (stop === 'intent') f.attention.revoke();
     if (stop === 'owned') f.sample(true);
-    if (stop === 'epoch') { f.attention.reset('e', latest); f.attention.observe(latest); }
+    if (stop === 'epoch') { f.reset('e', latest); f.attention.observe(latest); }
     if (stop === 'off') f.sample(false, 'off');
     f.time(120); expect(f.sample()).toBeNull(); expect(f.attention.snapshot().active).toBeNull();
   }
 });
 it('ignores out-of-order frames and bounds history in a 20-minute virtual replay', () => {
-  const f = fixture(); f.attention.reset('e'); const first = f.observation();
+  const f = fixture(); f.reset('e'); const first = f.observation();
   for (let t = 0; t < 1200000; t += 100) {
     f.time(t); f.attention.observe(f.observation(Math.floor(t / 10000) % 2 ? 0.2 : 0.8));
     f.attention.observe(first); const p = f.sample(); expect(!p || Number.isFinite(p.x + p.y)).toBe(true);
@@ -58,7 +58,7 @@ it('ignores out-of-order frames and bounds history in a 20-minute virtual replay
 });
 it('uses briefer working episodes and bounded reduced motion without changing cue meaning', () => {
   const busy = fixture(), idle = fixture();
-  for (const f of [busy, idle]) { f.attention.reset('e'); f.attention.observe(f.observation()); f.sample(); f.time(100); f.attention.observe(f.observation()); }
+  for (const f of [busy, idle]) { f.reset('e'); f.attention.observe(f.observation()); f.sample(); f.time(100); f.attention.observe(f.observation()); }
   busy.sample(false, 'normal', 'working'); idle.sample(false, 'normal', 'idle');
   expect(busy.attention.snapshot().active!.expiresAt).toBe(950);
   expect(idle.attention.snapshot().active!.expiresAt).toBe(1200);
@@ -67,20 +67,20 @@ it('uses briefer working episodes and bounded reduced motion without changing cu
   busy.time(951); expect(busy.sample()).toBeNull();
 });
 it('fails closed on clock rewind until an explicit epoch reset', () => {
-  const f = fixture(); f.attention.reset('e'); f.attention.observe(f.observation()); f.sample();
+  const f = fixture(); f.reset('e'); f.attention.observe(f.observation()); f.sample();
   f.time(100); f.attention.observe(f.observation()); f.sample(); expect(f.attention.snapshot().active).not.toBeNull();
   f.time(50); expect(f.sample()).toBeNull();
   f.time(200); f.attention.observe(f.observation()); expect(f.sample()).toBeNull();
   expect(f.attention.snapshot().reason).toBe('clock_discontinuity');
   expect(f.attention.snapshot().history.every(e => Number.isFinite(e.at))).toBe(true);
-  f.time(300); f.attention.reset('new'); f.attention.observe(f.observation()); f.attention.sample('new', 'working', false, 'normal');
+  f.time(300); f.reset('new'); f.attention.observe(f.observation()); f.attention.sample('new', 'working', false, 'normal');
   f.time(400); f.attention.observe(f.observation()); f.attention.sample('new', 'working', false, 'normal');
   expect(f.attention.snapshot().active).not.toBeNull();
 });
 it('ignores handedness confidence and permits a moving same-track target after distinct-measurement debounce', () => {
   const outputs = [];
   for (const confidence of [0.01, 0.99]) {
-    const f = fixture(); f.attention.reset('e');
+    const f = fixture(); f.reset('e');
     const observe = (x: number) => { const value = f.observation(x); value.hands!.entities[0].confidence = confidence; f.attention.observe(value); };
     observe(0.2); f.sample(); f.time(100); observe(0.8); f.sample();
     expect(f.attention.snapshot().active).not.toBeNull(); f.time(200); outputs.push(f.sample());
@@ -88,9 +88,32 @@ it('ignores handedness confidence and permits a moving same-track target after d
   expect(outputs[0]).toEqual(outputs[1]);
 });
 it('does not replay a motion opportunity that occurred entirely during cooldown', () => {
-  const f = fixture(); f.attention.reset('e');
+  const f = fixture(); f.reset('e');
   for (let t = 0; t <= 8000; t += 100) {
     f.time(t); f.attention.observe(f.observation(t < 2000 ? 0.2 : 0.8)); f.sample();
   }
   expect(f.attention.snapshot().history.filter(e => e.status === 'started')).toHaveLength(1);
+});
+
+it('rejects delayed pre-intent acquisitions but accepts a new post-intent opportunity', () => {
+  const f = fixture(); f.reset('e'); f.attention.observe(f.observation()); f.sample();
+  f.time(100); f.attention.observe(f.observation()); f.sample(); expect(f.attention.snapshot().active).not.toBeNull();
+  f.time(7000); f.attention.observe(f.observation()); f.sample();
+  f.time(7100); const pending = f.observation(0.8);
+  f.time(7150); const otherPending = f.observation(0.8);
+  f.time(7200); f.attention.revoke();
+  f.time(7300); f.attention.observe(pending); f.sample();
+  f.time(7400); f.attention.observe(otherPending); f.sample(); expect(f.attention.snapshot().active).toBeNull();
+  f.time(7500); f.attention.observe(f.observation(0.8)); f.sample();
+  f.time(7600); f.attention.observe(f.observation(0.8)); f.sample();
+  expect(f.attention.snapshot().active).not.toBeNull();
+  expect(f.attention.snapshot().history.at(-1)!.evidenceStartSeq).toBeGreaterThan(otherPending.seq);
+});
+
+it('fences a first in-flight acquisition when epoch changes before any observation arrived', () => {
+  const f = fixture(); f.reset('old'); const before = f.observation(0.8);
+  f.time(50); f.reset('e'); f.attention.observe(before); f.sample();
+  f.time(150); f.attention.observe({ ...before, seq: before.seq + 1, capturedAt: 10025 }); f.sample();
+  expect(f.attention.snapshot().active).toBeNull();
+  expect(f.attention.snapshot().history).toEqual([]);
 });

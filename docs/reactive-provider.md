@@ -256,9 +256,18 @@ and disposal revoke/suppress this layer before rendering. Resume rebases to the
 latest cue, so movement seen only while motion was off is not replayed. Cached pre-reset input
 cannot re-arm it. Epoch and source sequence provide ordering; capture timestamps
 only identify distinct measurements and map reported observation age into a monotonic deadline.
-The current camera adapter stamps observations after perception; this bound does
-not measure sensor-frame age or capture-to-display latency. The intent barrier
-rejects already-received observations, not an unreported frame still in perception. Clock
+The camera adapter now retains the host callback's frame-availability time before
+waiting for a worker/bitmap/inference, plus a separate bitmap-request time and the
+associated callback mediaTime. Matching frame ID and camera generation fence
+results; duplicate/retired replies cannot consume a newer pending frame. Camera
+observations use availability time as capturedAt; non-camera fixtures without
+sourceFrame keep their explicit caller-supplied time. Invalid/future/regressing
+source times or results older than 1500 ms cannot update the observation/event
+store. The 700 ms attention limit therefore includes host wait/inference age.
+Neither time is a sensor timestamp, and callback mediaTime is not asserted to be
+the exact bitmap PTS. Physical frame age and capture-to-display latency remain
+unverified. Intent/rebase and explicit epoch reset also fence delayed observations
+acquired before or at the barrier, even before any observation has arrived. Clock
 rewind fails closed until reset. Agent controls remain the later compositor
 layer; an arbitrary part named like an eye is not recognized as anatomy.
 
