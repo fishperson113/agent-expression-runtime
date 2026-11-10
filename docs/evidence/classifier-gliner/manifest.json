@@ -1,0 +1,22 @@
+{
+  "modelId": "fastino/GLiNER2.5-Decide",
+  "revision": "9d1bfb848cd16d93ee56ccbc59cd92bf0f284d90",
+  "license": "FastinoApache-2.0 + MicrosoftDeBERTaMIT",
+  "weightsSha256": "40a5a23ff860dc3dff426cecd1048cacdd29c648c96db209dad818e9686dc997",
+  "parameterCount": 486444053,
+  "actualLocalForwards": 158,
+  "actualRemoteCalls": 0,
+  "rawProbabilities": "genuine official single-label softmax; passive capture asserts public top1/score",
+  "comparison": "complete configurations; descriptive GLiNER labels vs bare original Laya labels; baseline feature overlap disclosed",
+  "rollout": "not accepted useful; optional default-off",
+  "files": {
+    "docs/evidence/classifier-gliner/product.json": "ccf7cf4417f639108721408c1a314613fdf45856610f98d2307fa2e10496fa85",
+    "docs/evidence/classifier-gliner/controls.json": "677d2125031d5596d1d89b9c348f9af96095b4c4b89681b000bf1c9090175041",
+    "docs/evidence/classifier-gliner/original-paired.jsonl": "42a1fba5a2d2962febe85010fd313a7e389b9f2836317ba153335d871ffd0a79",
+    "docs/evidence/classifier-gliner/fresh-metrics.json": "beab18504d101f39bcd593afbd2ba179f4af9a8fd25d561b335333e7afc0632a",
+    "docs/evidence/classifier-gliner/metrics.json": "9dac5492c127989c6fcbe3301ab4fbace78d7566c592ac048ec1562566532d6b",
+    "docs/evidence/classifier-gliner/fresh26.jsonl": "ff21e2deb3fc28597067eb7a0e5271c829a80406ace21796b3c0cb97566f0497",
+    "experiments/classifier/tiny-holdout-manifest.json": "96e3195ff0a8e55d6f8b38b047131f0cce15dc2848e6ce76add59eb3b0528ad3",
+    "experiments/classifier/tiny-holdout.jsonl": "ef8e081aabeaef067ac900ff98582401d641113f30a4991957915c929c0c2aff"
+  }
+}

@@ -1,0 +1,86 @@
+{
+  "frozenInputs": {
+    "provenance": "engineer-authored clear operational positive controls, frozen before predictions; not Fisch benchmark or official gold",
+    "task": {
+      "department": {
+        "labels": {
+          "billing": "Invoices, payments, duplicate charges and refund requests.",
+          "technical": "Software errors, broken functions and troubleshooting requests.",
+          "sales": "Product purchase inquiries, quotes and pricing for new orders."
+        },
+        "prompt": "Which department should handle this request?"
+      }
+    },
+    "rows": [
+      {
+        "id": "billing_refund",
+        "text": "I was charged twice for the same invoice. Please refund the duplicate payment.",
+        "expectedLabel": "billing"
+      },
+      {
+        "id": "technical_error",
+        "text": "The application crashes with error code E500 every time I click Save. Please help fix this software error.",
+        "expectedLabel": "technical"
+      },
+      {
+        "id": "sales_quote",
+        "text": "We would like to purchase 50 new licenses. Please send us a price quote for a new order.",
+        "expectedLabel": "sales"
+      }
+    ]
+  },
+  "results": {
+    "controlsSha256": "2b5a8dfc2230f9b2462ac7c1d6f7ca54903d570ddacd1202823a230cd9b6281a",
+    "modelId": "fastino/GLiNER2.5-Decide",
+    "modelRevision": "9d1bfb848cd16d93ee56ccbc59cd92bf0f284d90",
+    "loadMs": 7255.9947870031465,
+    "loadStateDictDiagnostics": [
+      {
+        "module": "SpanExtractor",
+        "strict": true,
+        "missingKeys": [],
+        "unexpectedKeys": []
+      }
+    ],
+    "actualLocalForwardAttempts": 3,
+    "remoteProviderCalls": 0,
+    "rows": [
+      {
+        "id": "billing_refund",
+        "expectedLabel": "billing",
+        "raw": {
+          "department": {
+            "label": "billing",
+            "confidence": 0.8802699446678162
+          }
+        },
+        "correct": true,
+        "elapsedMs": 706.0197710015927
+      },
+      {
+        "id": "technical_error",
+        "expectedLabel": "technical",
+        "raw": {
+          "department": {
+            "label": "technical",
+            "confidence": 0.9356362819671631
+          }
+        },
+        "correct": true,
+        "elapsedMs": 642.4770840021665
+      },
+      {
+        "id": "sales_quote",
+        "expectedLabel": "sales",
+        "raw": {
+          "department": {
+            "label": "sales",
+            "confidence": 0.9922230839729309
+          }
+        },
+        "correct": true,
+        "elapsedMs": 632.8361839987338
+      }
+    ]
+  }
+}
