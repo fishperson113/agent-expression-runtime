@@ -1,5 +1,5 @@
 import './style.css';
-import { mountLive, element } from './view';
+import { mountLive, element, mountDisclosures } from './view';
 import { mountPlayground } from './playground-view';
 import { mountLiveSetup } from './setup-help';
 import { HandGestures } from './gestures';
@@ -16,12 +16,11 @@ import { drawLandmarkOverlay } from './landmark-overlay';
 import { LiveRecording } from './recording';
 
 mountLive(element('app'));
-const playgroundContainer = document.createElement('div');
-element('body').parentElement!.before(playgroundContainer);
+const playgroundContainer = element('playground-tools');
 const playground = mountPlayground(playgroundContainer);
-const setupContainer = document.createElement('div');
-element('agent-activity').before(setupContainer);
+const setupContainer = element('setup-tools');
 const liveSetup = mountLiveSetup(setupContainer);
+mountDisclosures(element('app'));
 const synthetic = new URLSearchParams(location.search).get('fixture') === 'synthetic';
 const body = new LiveBody(element<HTMLCanvasElement>('body'), text => { element('body-status').textContent = text; });
 const recording = new LiveRecording(() => body.scheduler.epoch, synthetic ? 'synthetic' : 'live-structured');
@@ -153,7 +152,17 @@ element('enable-reactivity').onchange = () => {
   logActivity(element<HTMLInputElement>('enable-reactivity').checked ? 'Đã bật bộ quyết định từ quan sát local.' : 'Đã tắt bộ quyết định từ camera.');
 };
 element('enable-hands').onchange = () => { camera.hands = element<HTMLInputElement>('enable-hands').checked; hands.reset(); };
-element('fullscreen').onclick = () => { void element('body').parentElement!.requestFullscreen().catch(() => { element('fault').textContent = 'Trình duyệt chưa cho phép toàn màn hình.'; }); };
+const fullscreenPanel = element('body').closest<HTMLElement>('.body-panel')!;
+const stopHome = element('stop-all').parentElement!;
+element('fullscreen').onclick = () => {
+  const request = document.fullscreenElement ? document.exitFullscreen() : fullscreenPanel.requestFullscreen();
+  void request.catch(() => { element('fault').textContent = 'Trình duyệt chưa cho phép toàn màn hình.'; });
+};
+document.addEventListener('fullscreenchange', () => {
+  const active = document.fullscreenElement === fullscreenPanel, stopButton = element('stop-all');
+  element('fullscreen').textContent = active ? 'Thoát toàn màn hình' : 'Toàn màn hình';
+  if (!stopButton.closest('dialog[open]')) (active ? fullscreenPanel.querySelector('.body-actions')! : stopHome).append(stopButton);
+});
 element('camera-start').onclick = () => { sampleCount = 0; sampleAt = performance.now(); inferenceMs = 0; void camera.start(); };
 if (synthetic) {
   element<HTMLButtonElement>('camera-start').disabled = true;
@@ -174,7 +183,9 @@ const timer = setInterval(() => {
   element('render-metrics').textContent = `${metrics.particles.toLocaleString()} hạt / ${metrics.meanFps.toFixed(0)} FPS / p95 ${metrics.frameP95.toFixed(1)} ms`;
 }, 500);
 function stop(reason: 'ui' | 'pagehide') {
-  if (stopped) return; logActivity('Đã dừng phiên Live.'); resetReactive(); reactive.configure(false); stopped = true;
+  if (stopped) return;
+  if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+  logActivity('Đã dừng phiên Live.'); resetReactive(); reactive.configure(false); stopped = true;
   recording.dispose(); camera.stop(); hands.reset(); cameraStatus('stopped', 'shutdown'); clearInterval(timer); bridge.stop(); body.dispose(); playground.dispose(); liveSetup.dispose();
   element<HTMLButtonElement>('camera-start').disabled = true; element('connection').textContent = 'Đã dừng phiên Live';
   void (window as any).fischLiveStop?.(reason);

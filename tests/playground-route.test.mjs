@@ -67,6 +67,8 @@ async function soak(call, page) {
 async function holdReaction(page, requests) {
   await page.locator('.camera-options summary').click();
   await page.locator('#enable-reactivity').check();
+  await page.keyboard.press('Escape');
+  expect(await page.locator('.camera-options dialog[open]').count()).toBe(0);
   for (const wait of [1100, 800, 0]) {
     await page.evaluate(() => window.fischLive.fixture('present'));
     if (wait) await page.waitForTimeout(wait);
@@ -156,7 +158,10 @@ async function creationLoop(route, candidate, release, firstText) {
             configuration: { controls: [], poses: [], lifetimeMs: 1000 } } } });
         await expect.poll(() => page.evaluate(id => window.routeDeliveries.find(value => value.id === id)?.reason, request.requestId)).toBe('revoked');
         expect((await page.evaluate(() => window.fischLive.reactiveStatus())).owner).toBeNull();
+        await page.locator('.camera-options summary').click();
         await page.locator('#enable-reactivity').uncheck();
+        await page.keyboard.press('Escape');
+        expect(await page.locator('.camera-options dialog[open]').count()).toBe(0);
       }
       expect(await pending).toMatchObject({ status: 'committed', revision });
       await expect.poll(() => page.evaluate(() => window.fischLive.metrics().parts)).toEqual([part]);

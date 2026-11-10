@@ -64,7 +64,7 @@ export class ThreeRenderer implements RendererSink {
       antialias: false,
       powerPreference: 'high-performance',
     });
-    this.renderer.setClearColor(0x080e14, 1);
+    this.renderer.setClearColor(0x0b1020, 1);
     this.camera.position.set(0, 1.5, 3.8);
     this.camera.lookAt(0, 0, 0);
     this.geometry.setAttribute(
@@ -106,6 +106,10 @@ export class ThreeRenderer implements RendererSink {
     this.renderer.setSize(width, height, false);
     fitCamera(this.camera, Math.max(1, width) / Math.max(1, height));
     this.material.uniforms.dpr.value = Math.min(2, dpr);
+    if (!this.lost && this.submittedFrames > 0) {
+      this.renderer.render(this.scene, this.camera);
+      this.submittedFrames++;
+    }
   }
   quality(count: number) {
     this.count = count;
