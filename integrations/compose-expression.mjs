@@ -30,6 +30,14 @@ const ajv = new Ajv({ strict: false, strictNumbers: true });
 const validateInput = ajv.compile(compositionSchema);
 const partValidators = new Map(part.anyOf.map(schema => [schema.properties.kind.const,
   ajv.compile({ ...schema, $defs: compositionSchema.$defs })]));
+const diagnosticPaths = new Set(['', ...Object.keys(compositionSchema.properties).map(key => `/${key}`),
+  ...['style', 'flow'].flatMap(key => Object.keys(compositionSchema.properties[key].properties).map(field => `/${key}/${field}`))]);
+function rootInputDetails(errors) {
+  return (errors ?? []).filter(issue => diagnosticPaths.has(issue.instancePath)).slice(0, 3).map(issue => ({
+    path: issue.instancePath, rule: issue.keyword,
+    ...(Number.isFinite(issue.params.limit) ? { limit: issue.params.limit } : {}),
+  }));
+}
 function compositionInputError(input) {
   const error = Error('composition_arguments');
   const details = [];
@@ -44,6 +52,7 @@ function compositionInputError(input) {
     }
     if (details.length === 3) break;
   }
+  if (!details.length) details.push(...rootInputDetails(validateInput.errors));
   if (details.length) error.details = details;
   return error;
 }

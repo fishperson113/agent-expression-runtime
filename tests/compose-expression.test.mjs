@@ -71,3 +71,45 @@ it('returns a bounded actionable patch constraint without echoing authored paylo
     expect(() => composeExpression({ parts: [{ ...triangle, points: [...triangle.points, [0,0,0]] }] })).not.toThrow();
   } finally { await client.close(); }
 });
+
+const rootConstraints = [
+  ['point size', { style: { pointSize: 9 } }, { path: '/style/pointSize', rule: 'maximum', limit: 8 }],
+  ['RGB', { style: { color: 'PRIVATE_COLOR_VALUE' } }, { path: '/style/color', rule: 'pattern' }],
+  ['upper duration', { durationMs: 10001 }, { path: '/durationMs', rule: 'maximum', limit: 10000 }],
+  ['lower duration', { durationMs: -1 }, { path: '/durationMs', rule: 'minimum', limit: 0 }],
+];
+it.each(rootConstraints)('returns a sanitized root or style constraint for %s', (_name, invalid, expected) => {
+  let failure;
+  try { composeExpression({ parts: [{ ...part(), id: 'PRIVATE_PART_ID' }], ...invalid }); }
+  catch (error) { failure = error; }
+  expect(failure?.message).toBe('composition_arguments');
+  expect(failure?.details).toEqual([expected]);
+  expect(JSON.stringify(failure.details)).not.toContain('PRIVATE');
+});
+
+it('keeps valid arbitrary RGB and tiny point sizes unchanged', () => {
+  for (const [color, pointSize] of [['#000000', 0], ['#aB013f', 0.01], ['#FFFFFF', 8]]) {
+    const result = composeExpression({ parts: [part()], style: { color, pointSize } });
+    expect(result.body.children[1]).toMatchObject({ color, pointSize });
+    expect(compile(result.body).kind).toBe('program');
+  }
+});
+
+it('redacts unknown property names and submitted values through MCP before gateway access', async () => {
+  let requests = 0;
+  const server = createServer((_req, res) => { requests++; res.writeHead(500).end(); });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const client = liveTestClient(`http://127.0.0.1:${server.address().port}`, 'synthetic-diagnostics-only');
+  try {
+    const cases = [...rootConstraints.map(([_name, invalid, detail]) => [invalid, detail]),
+      [{ PRIVATE_ROOT_NAME: 'PRIVATE_ROOT_VALUE' }, { path: '', rule: 'additionalProperties' }],
+      [{ style: { PRIVATE_STYLE_NAME: 'PRIVATE_STYLE_VALUE' } }, { path: '/style', rule: 'additionalProperties' }]];
+    for (const [invalid, detail] of cases) {
+      const result = await client.tool('compose_expression', { parts: [{ ...part(), id: 'PRIVATE_PART_ID' }], ...invalid });
+      expect(result.isError).toBe(true);
+      expect(JSON.parse(result.content[0].text)).toEqual({ status: 'rejected', code: 'composition_arguments',
+        details: [detail] });
+      expect(result.content[0].text).not.toContain('PRIVATE'); expect(requests).toBe(0);
+    }
+  } finally { await client.close(); await new Promise(resolve => server.close(resolve)); }
+});
