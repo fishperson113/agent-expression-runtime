@@ -245,6 +245,7 @@ export class ReactiveSession {
       events: candidates.map(event => this.windowEvent(event)), observations: structuredClone(this.history) });
     this.record('request', { request, observationRefs: observationWindow.observations.map(value => ({ sessionId: value.sessionId, seq: value.seq })),
       eventRefs: candidates.map(value => ({ sessionId: value.sessionId, seq: value.seq })) });
+    this.handOpportunities.markDispatched(candidates.flatMap(event => isHand(event) ? [event] : []));
     this.pending.clear(); this.lastStart = now; this.starts.push(now); this.count++;
     this.dispatch(request, this.nativeConversation ? this.nativeReadSet(observationWindow.events) : undefined); return { request, observationWindow };
   }
