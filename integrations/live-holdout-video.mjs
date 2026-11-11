@@ -1,7 +1,10 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { promisify } from 'node:util';
+const encode = promisify(execFile);
 
 export function blindCodes(count) {
   const codes = new Set();
@@ -18,40 +21,69 @@ export function writeScoringPack(directory, codes, complete = false) {
   <p><a href="scoring.csv" download>Tải phiếu chấm</a> · Gửi lại phiếu sau khi xem hết. Chưa có kết luận đạt.</p>
   ${sorted.map(code => `<section><h2>${code}</h2><video controls preload="none" src="${code}.mp4" aria-label="Clip ${code}"></video></section>`).join('')}<p>Không có âm thanh. Đây là phần thân hạt, không phải camera người dùng.</p></html>`);
 }
-export async function startBodyVideo(page) {
-  await page.evaluate(() => {
-    const canvas = document.querySelector('#body');
-    const stream = canvas.captureStream(25), chunks = [];
+function startCapture() {
+  if (window.__bodyVideo) throw Error('body_video_active');
+  let stream, recorder, state;
+  const release = () => {
+    try { if (recorder && recorder.state !== 'inactive') recorder.stop(); } catch {}
+    for (const track of stream?.getTracks() ?? []) { try { track.stop(); } catch {} }
+  };
+  try {
+    stream = document.querySelector('#body').captureStream(25);
     if (stream.getAudioTracks().length) throw Error('unexpected_audio');
-    const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 2500000 });
-    let bytes = 0, overflow = false;
+    const chunks = []; let bytes = 0, overflow = false;
+    recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 2500000 });
+    state = { recorder, stream, chunks, overflow: () => overflow, started: performance.now(), failed: false, finishing: false };
     recorder.ondataavailable = event => {
       bytes += event.data.size;
-      if (bytes <= 64000000) chunks.push(event.data); else overflow = true;
+      if (bytes <= 64000000) chunks.push(event.data); else { overflow = true; release(); }
     };
-    window.__bodyVideo = { recorder, stream, chunks, overflow: () => overflow, started: performance.now() };
-    recorder.start(500);
-  });
-  return Date.now();
+    recorder.onerror = () => { state.failed = true; release(); };
+    window.__bodyVideo = state; recorder.start(500);
+  } catch (error) {
+    release(); if (state && window.__bodyVideo === state) delete window.__bodyVideo; throw error;
+  }
 }
-export async function finishBodyVideo(page, directory, code, started, firstTool, publish = true) {
-  const data = await page.evaluate(async () => {
-    const state = window.__bodyVideo;
-    await new Promise(resolve => { state.recorder.onstop = resolve; state.recorder.stop(); });
-    state.stream.getTracks().forEach(track => track.stop());
+async function readCapture() {
+  const state = window.__bodyVideo;
+  if (!state) throw Error('body_video_missing');
+  if (state.finishing) throw Error('body_video_finishing');
+  state.finishing = true;
+  try {
+    if (state.failed) throw Error('body_video_recording_error');
+    if (state.recorder.state !== 'inactive') await new Promise((resolve, reject) => {
+      const stopped = () => { cleanup(); resolve(); };
+      const failed = () => { cleanup(); reject(Error('body_video_recording_error')); };
+      const cleanup = () => { state.recorder.removeEventListener('stop', stopped); state.recorder.removeEventListener('error', failed); };
+      state.recorder.addEventListener('stop', stopped, { once: true }); state.recorder.addEventListener('error', failed, { once: true });
+      try { state.recorder.stop(); } catch (error) { cleanup(); reject(error); }
+    });
+    if (state.failed) throw Error('body_video_recording_error');
     if (state.overflow()) throw Error('body_video_size_limit');
     const blob = new Blob(state.chunks, { type: 'video/webm' });
-    const url = await new Promise(resolve => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.readAsDataURL(blob); });
-    delete window.__bodyVideo;
+    const url = await new Promise((resolve, reject) => {
+      const reader = new FileReader(); reader.onload = () => resolve(reader.result);
+      reader.onerror = reader.onabort = () => reject(Error('body_video_read_failed')); reader.readAsDataURL(blob);
+    });
+    if (typeof url !== 'string') throw Error('body_video_read_failed');
     return url.split(',')[1];
-  });
+  } finally {
+    try { if (state.recorder.state !== 'inactive') state.recorder.stop(); } catch {}
+    for (const track of state.stream.getTracks()) { try { track.stop(); } catch {} }
+    state.recorder.ondataavailable = state.recorder.onerror = null;
+    if (window.__bodyVideo === state) delete window.__bodyVideo;
+  }
+}
+export async function startBodyVideo(page) { await page.evaluate(startCapture); return Date.now(); }
+export async function finishBodyVideo(page, directory, code, started, firstTool, publish = true) {
+  const data = await page.evaluate(readCapture);
   const raw = resolve(directory, 'private', code + '.webm');
-  mkdirSync(resolve(directory, 'private'), { recursive: true });
-  mkdirSync(resolve(directory, 'blind'), { recursive: true });
-  writeFileSync(raw, Buffer.from(data, 'base64'));
+  await mkdir(resolve(directory, 'private'), { recursive: true });
+  await mkdir(resolve(directory, 'blind'), { recursive: true });
+  await writeFile(raw, Buffer.from(data, 'base64'));
   const offset = firstTool ? Math.max(0, (firstTool - started) / 1000 - 1) : 0;
   const output = resolve(directory, publish ? 'blind' : 'private', code + '.mp4');
-  execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-i', raw, '-ss', String(offset), '-an',
+  await encode('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-i', raw, '-ss', String(offset), '-an',
     '-vf', 'pad=ceil(iw/2)*2:ceil(ih/2)*2', '-c:v', 'libx264', '-preset', 'fast', '-crf', '20', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', output]);
   return { code, file: code + '.mp4', offsetSeconds: offset, source: 'actual WebGL canvas captureStream; no still-image reconstruction', audioTracks: 0 };
 }
