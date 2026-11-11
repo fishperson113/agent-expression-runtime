@@ -59,3 +59,25 @@ it('bounds optional reads without consuming broker waiters or changing MAIN avai
  channel.token='doc-b';finish(chatObservation(sample(),'epoch-a',1100));expect(await first).toBe(unavailableChatObservation);
  expect(broker).toMatchObject({closed:false,browserUnavailable:false});
 });
+it('fences source revocation at the actual broker barrier without replacing compatible frame snapshots',async()=>{
+ const {createServer}=await import('vite'),{chromium}=await import('@playwright/test'),{LiveReactiveBroker}=await import('../integrations/live-reactive-broker.mjs');
+ const server=await createServer({server:{host:'127.0.0.1',port:0}});let browser;
+ try{
+  await server.listen();browser=await chromium.launch({headless:true});
+  for(const mode of ['present-neutral','denied']){
+   const page=await browser.newPage();await page.goto(server.resolvedUrls.local[0]+'live.html?fixture=synthetic');await page.waitForFunction(()=>!!window.fischLive?.chatObservationScope);
+   await page.evaluate(()=>{window.fischLive.conversationDocument='doc-a';window.fischLive.fixture('present-smile');});
+   const before=await page.evaluate(()=>window.fischLive.chatObservation()),held=Promise.withResolvers(),entered=Promise.withResolvers();let conversation,guard,resolve,submitted;
+   const output={thread:'thread-a'},broker=new LiveReactiveBroker({output,page:{evaluate:async(fn,arg)=>{entered.resolve();await held.promise;return page.evaluate(fn,arg);}},
+    beforeForward:(message,source)=>conversation.fenceObservation(message.id,source),forward:message=>{expect(guard(message)).toBe(true);submitted=message.params;resolve({result:{turn:{id:'turn-a',status:'inProgress'}}});},reject:()=>{throw Error('unexpected rejection');}});
+   const transport={interruptUser:async()=>{},submitUser:(params,g)=>new Promise(done=>{guard=g;resolve=done;const message={id:'owned-send',method:'turn/start',params};expect(guard(message)).toBe(true);broker.client(message);})};
+   conversation=new LiveConversation({output,broker,transport,captureObservation:job=>captureChatObservation({page},{token:'doc-a'},job)});
+   const sending=conversation.send({generation:conversation.snapshot().generation,text:'Keep exact chat'});await entered.promise;
+   await page.evaluate(mode=>window.fischLive.fixture(mode),mode);held.resolve();await sending;
+   expect(submitted.input[0].text).toBe('Keep exact chat');
+   if(mode==='denied')expect(submitted.input[1].text).toContain('unavailable');
+   else{const data=JSON.parse(submitted.input[1].text.split('\n')[1]);expect(data.source.seq).toBe(before.source.seq);expect(data.geometry.expressionCoefficients.smile).toBe(before.geometry.expressionCoefficients.smile);}
+   conversation.close();broker.close();await page.close();
+  }
+ }finally{await browser?.close();await server.close();}
+},45000);
