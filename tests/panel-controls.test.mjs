@@ -107,3 +107,14 @@ it('keeps the production composer clickable after tool history and approval reso
   await send.click();expect(sent).toHaveLength(1);
  }finally{await page.close();}
 },45000);
+
+it('keeps sanitized startup failure visible with sending disabled in the production panel',async()=>{
+ const page=await browser.newPage();try{
+  await page.goto(server.resolvedUrls.local[0]+'live.html?fixture=synthetic');await page.waitForFunction(()=>!!window.fischLive);
+  await page.evaluate(()=>{window.fischLive.panelControlStatus({type:'mode'});window.fischLive.conversationStatus({generation:1,revision:1,ownerTurn:null,available:false,canSend:false,canCancel:false,pending:false,stopping:false,waiting:false,error:'conversation_startup_failed',messages:[]});window.fischLive.panelControlStatus({type:'startup_failed',code:-32603});});
+  expect(await page.locator('.conversation-status').textContent()).toContain('chưa thể khởi tạo');
+  expect(await page.locator('.fisch-panel-controls').textContent()).toContain('RPC -32603');
+  expect(await page.locator('.fisch-conversation button[type=submit]').isDisabled()).toBe(true);
+  expect(parsePanelControl({type:'startup_failed',code:-32603,error:'PRIVATE'})).toBeUndefined();
+ }finally{await page.close();}
+},45000);

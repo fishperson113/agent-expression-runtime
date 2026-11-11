@@ -39,6 +39,7 @@ export class LiveConversation {
   }
   selectionAttempt() { this.#intent++; this.#revision++; }
   navigation() { this.#navigated = true; this.#clear(); this.#error = 'conversation_restart_required'; }
+  startupFailed() { this.close(); this.#error = 'conversation_startup_failed'; }
   close() { this.#closed = true; this.#unknown.clear(); this.#clear(); }
   #available() {
     return !this.#closed && !this.#navigated && id(this.#thread) && !this.#broker.closed && !this.#broker.browserUnavailable;

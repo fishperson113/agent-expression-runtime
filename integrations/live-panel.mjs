@@ -55,7 +55,29 @@ export async function runPanelCodex({ live, cwd, signal, host: suppliedHost, rea
     timer = startLivePolling(live, state, () => state.fail(1));
     if (signal.aborted) onAbort();
     return await done.promise;
-  } catch (error) { if (signal.aborted) return liveShutdownCode(signal.reason) ?? 130; failed = true; throw error; }
+  } catch (error) {
+    if (signal.aborted) return liveShutdownCode(signal.reason) ?? 130;
+    failed = true;
+    if (state.output.thread || !Number.isSafeInteger(error?.rpcError?.code) || state.broker.browserUnavailable) throw error;
+    state.conversation.startupFailed();
+    const token = state.channel.token, code = error.rpcError.code, snapshot = state.conversation.snapshot();
+    try {
+      const published = await state.broker.evaluate(({ token, code, snapshot }) => {
+        const api = window.fischLive;
+        if (api.conversationDocument !== token || typeof api.conversationStatus !== 'function' || typeof api.panelControlStatus !== 'function') return false;
+        api.conversationStatus(snapshot); api.panelControlStatus({ type: 'startup_failed', code });
+        api.setupStatus?.({ native: 'unavailable', observer: 'unavailable' });
+        api.configureReactive?.(false); return true;
+      }, { token, code, snapshot });
+      if (!published) throw Error('panel_startup_publication_failed');
+    } finally {
+      state.channel.stale = true; state.broker.close();
+      await closeLiveOwned([() => client?.close(), () => state.transport.close()], true);
+    }
+    // Connection closure can settle `done`; only an explicit Stop ends this offline screen.
+    await new Promise(resolve => { if (signal.aborted) resolve(); else signal.addEventListener('abort', resolve, { once: true }); });
+    return 1;
+  }
   finally {
     clearInterval(timer); signal.removeEventListener('abort', onAbort); state.channel.stale = true;
     state.conversation.close(); state.broker.close();
