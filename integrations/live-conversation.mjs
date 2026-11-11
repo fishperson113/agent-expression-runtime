@@ -39,6 +39,10 @@ export class LiveConversation {
   }
   selectionAttempt() { this.#intent++; this.#revision++; }
   navigation() { this.#navigated = true; this.#clear(); this.#error = 'conversation_restart_required'; }
+  transportLost() {
+    const messages = this.#messages.map(value => ({ ...value, status: value.status === 'streaming' ? 'unknown' : value.status }));
+    this.close(); this.#messages = messages; this.#error = 'conversation_transport_lost'; this.#revision++;
+  }
   startupFailed() { this.close(); this.#error = 'conversation_startup_failed'; }
   close() { this.#closed = true; this.#unknown.clear(); this.#clear(); }
   #available() {
@@ -81,7 +85,7 @@ export class LiveConversation {
       const unknown = error?.uncertain !== false;
       if (unknown && !this.#closed) this.#unknown.add(job.thread);
       const code = unknown ? 'conversation_unknown' : (job.generation !== this.#generation || job.intent !== this.#intent) ? 'conversation_changed' : 'conversation_rejected';
-      if (job.thread === this.#output.thread) this.#error = code;
+      if (job.thread === this.#output.thread && this.#error !== 'conversation_transport_lost') this.#error = code;
       throw failure(code);
     } finally { if (this.#pending === job) this.#pending = undefined; this.#revision++; }
   }
