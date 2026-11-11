@@ -82,9 +82,11 @@ function messageProjection(list: HTMLOListElement) {
   };
   const readerScroll = (event: Event) => {
     if (event instanceof KeyboardEvent && !['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key)) return;
+    if (event.type === 'pointermove' && !((event as PointerEvent).buttons > 0)) return;
+    if (event.type === 'touchmove' && !(event as TouchEvent).touches?.length) return;
     resizing = false; layout = measure(); following = layout.top + layout.height >= layout.total - 40;
   };
-  const inputs = ['wheel', 'keydown', 'pointerdown', 'touchstart'];
+  const inputs = ['wheel', 'keydown', 'pointerdown', 'touchstart', 'pointermove', 'touchmove'];
   for (const type of inputs) list.addEventListener(type, readerScroll, { passive: true });
   const resize = new ResizeObserver(settle);
   list.addEventListener('scroll', capture); resize.observe(list);

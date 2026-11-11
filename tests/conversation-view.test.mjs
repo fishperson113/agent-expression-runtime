@@ -65,6 +65,60 @@ it('honors a new reader scroll while a transcript resize callback is pending', a
   } finally { await page.close(); }
 },45000);
 
+it.each(['pointer', 'touch'])('preserves an ongoing %s reading gesture across pending transcript resize', async kind => {
+  const { page, panel, input } = await open();
+  try {
+    const messages=Array.from({length:20},(_,i)=>({id:'gesture'+i,turn:'t',role:'assistant',text:'Nội dung đọc khi giữ thao tác '.repeat(20),status:'completed',truncated:false}));
+    await page.evaluate(value=>window.conversation.project(value),{...ready,messages});
+    const list=panel.locator('ol');await list.focus();await page.keyboard.press('End');
+    await expect.poll(()=>list.evaluate(node=>node.scrollHeight-node.clientHeight-node.scrollTop)).toBeLessThanOrEqual(1);
+    await input.fill('Bản nháp trong thao tác đọc liên tục.');
+    const readerTop=await list.evaluate((node,mode)=>{
+      window.holdConversationResize=true;
+      const event=(phase)=>{
+        if(mode==='pointer')return new PointerEvent('pointer'+phase,{bubbles:true,pointerId:7,pointerType:'touch',buttons:phase==='up'?0:1});
+        const contact=new Touch({identifier:7,target:node,clientX:30,clientY:phase==='down'?400:240});
+        return new TouchEvent('touch'+(phase==='down'?'start':phase==='up'?'end':'move'),{bubbles:true,touches:phase==='up'?[]:[contact],changedTouches:[contact]});
+      };
+      node.dispatchEvent(event('down'));
+      const panel=node.closest('.fisch-conversation');panel.style.maxHeight=(panel.clientHeight-120)+'px';
+      node.scrollTop=Math.max(0,node.scrollTop-160);const top=node.scrollTop;
+      node.dispatchEvent(event('move'));node.dispatchEvent(new Event('scroll'));
+      return top;
+    },kind);
+    await expect.poll(()=>page.evaluate(()=>window.heldConversationResizes.length)).toBeGreaterThan(0);
+    await page.evaluate(()=>{window.holdConversationResize=false;for(const callback of window.heldConversationResizes.splice(0))callback();});
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    expect(await list.evaluate(node=>node.scrollTop)).toBe(readerTop);
+    await list.evaluate((node,mode)=>node.dispatchEvent(mode==='pointer'?new PointerEvent('pointerup',{bubbles:true,pointerId:7,pointerType:'touch'}):new TouchEvent('touchend',{bubbles:true})),kind);
+    await page.evaluate(value=>window.conversation.project(value),{...ready,revision:2,messages:[...messages,{...messages[0],id:'gesture-latest',text:'Lời mới đến sau thao tác đang diễn ra.'}]});
+    expect(await list.evaluate(node=>node.scrollTop)).toBe(readerTop);expect(await input.inputValue()).toBe('Bản nháp trong thao tác đọc liên tục.');
+    if(process.env.FISCH_SCROLL_EVIDENCE)writeFileSync(process.env.FISCH_SCROLL_EVIDENCE+'/ongoing-'+kind+'.json',JSON.stringify({actualModelCalls:0,nativeHardwareAcceptance:false,readerTop,after:await list.evaluate(node=>node.scrollTop)}));
+  } finally { await page.close(); }
+},45000);
+
+it.each(['pointer', 'touch'])('ignores %s movement without contact while following a resizing transcript', async kind => {
+  const { page, panel } = await open();
+  try {
+    const messages=Array.from({length:20},(_,i)=>({id:'hover'+i,turn:'t',role:'assistant',text:'Nội dung vẫn đang theo cuối '.repeat(20),status:'completed',truncated:false}));
+    await page.evaluate(value=>window.conversation.project(value),{...ready,messages});
+    const list=panel.locator('ol');await list.focus();await page.keyboard.press('End');
+    await expect.poll(()=>list.evaluate(node=>node.scrollHeight-node.clientHeight-node.scrollTop)).toBeLessThanOrEqual(1);
+    await list.evaluate((node,mode)=>{
+      window.holdConversationResize=true;
+      const panel=node.closest('.fisch-conversation');panel.style.maxHeight=(panel.clientHeight-120)+'px';
+      void node.clientHeight;
+      node.dispatchEvent(mode==='pointer'?new PointerEvent('pointermove',{bubbles:true,pointerType:'mouse',buttons:0}):new TouchEvent('touchmove',{bubbles:true,touches:[]}));
+      node.dispatchEvent(new Event('scroll'));
+    },kind);
+    await expect.poll(()=>page.evaluate(()=>window.heldConversationResizes.length)).toBeGreaterThan(0);
+    await page.evaluate(()=>{window.holdConversationResize=false;for(const callback of window.heldConversationResizes.splice(0))callback();});
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    expect(await list.evaluate(node=>node.scrollHeight-node.clientHeight-node.scrollTop)).toBeLessThanOrEqual(1);
+    if(process.env.FISCH_SCROLL_EVIDENCE)writeFileSync(process.env.FISCH_SCROLL_EVIDENCE+'/no-contact-'+kind+'.json',JSON.stringify({actualModelCalls:0,nativeHardwareAcceptance:false,bottomGap:await list.evaluate(node=>node.scrollHeight-node.clientHeight-node.scrollTop)}));
+  } finally { await page.close(); }
+},45000);
+
 it('settles total-only transcript reflow without losing later reader scrolling', async () => {
   const { page, panel } = await open();
   try {
