@@ -1,11 +1,11 @@
 import type { Observation } from '../core/live/types';
 
 // A historical reading, not a claim about the scene at response time.
-export function chatObservation(snapshot: Observation, epoch: string, readAt: number, unavailable = false) {
+export function chatObservation(snapshot: Observation, epoch: string, readAt: number, unavailable = false, revision = 0) {
   const ageMs = readAt - snapshot.capturedAt;
   const state = unavailable || !['tracking', 'absent'].includes(snapshot.camera) ? 'unavailable' :
     !Number.isFinite(ageMs) || ageMs < 0 || ageMs > 1500 ? 'stale' : 'fresh';
-  const source = { sessionId: snapshot.sessionId, seq: snapshot.seq, epoch, capturedAt: snapshot.capturedAt, readAt, ageMs: Number.isFinite(ageMs) && ageMs >= 0 ? ageMs : null, camera: snapshot.camera };
+  const source = { revision, sessionId: snapshot.sessionId, seq: snapshot.seq, epoch, capturedAt: snapshot.capturedAt, readAt, ageMs: Number.isFinite(ageMs) && ageMs >= 0 ? ageMs : null, camera: snapshot.camera };
   if (state !== 'fresh') return { schemaVersion: 1, state, source, geometry: null };
   const user = snapshot.user;
   return { schemaVersion: 1, state, source, geometry: {

@@ -7,8 +7,8 @@ export function formatChatObservation(raw, scope) {
   try {
     if (!keys(raw, ['schemaVersion','state','source','geometry']) || raw.schemaVersion !== 1 || !['fresh','stale','unavailable'].includes(raw.state)) return unavailableChatObservation;
     const s = raw.source, g = raw.geometry;
-    if (!keys(s, ['sessionId','seq','epoch','capturedAt','readAt','ageMs','camera']) || !label(s.sessionId) || !label(s.epoch) ||
-      !Number.isSafeInteger(s.seq) || s.seq < 0 || !number(s.capturedAt,0,Number.MAX_SAFE_INTEGER) || !number(s.readAt,0,Number.MAX_SAFE_INTEGER) ||
+    if (!keys(s, ['revision','sessionId','seq','epoch','capturedAt','readAt','ageMs','camera']) || !label(s.sessionId) || !label(s.epoch) ||
+      !Number.isSafeInteger(s.revision) || s.revision < 0 || !Number.isSafeInteger(s.seq) || s.seq < 0 || !number(s.capturedAt,0,Number.MAX_SAFE_INTEGER) || !number(s.readAt,0,Number.MAX_SAFE_INTEGER) ||
       !['starting','tracking','absent','denied','error','stopped','stale'].includes(s.camera)) return unavailableChatObservation;
     const age = s.readAt - s.capturedAt;
     if (s.ageMs !== null && (!number(s.ageMs,0,Number.MAX_SAFE_INTEGER) || s.ageMs !== age)) return unavailableChatObservation;
@@ -41,7 +41,7 @@ export async function captureChatObservation(broker, channel, scope) {
     const text = formatChatObservation(raw, scope), elapsed = performance.now() - started;
     if (text === unavailableChatObservation) return text;
     const validForMs = raw?.state === 'fresh' ? Math.max(0, Math.min(1000, 1500 - raw.source.ageMs - elapsed)) : 1000;
-    return { text, validForMs };
+    return { text, validForMs, sourceFence: { documentToken: token, sessionId: raw.source.sessionId, revision: raw.source.revision } };
   } catch { return unavailableChatObservation; }
   finally { capturing.delete(broker); }
 }

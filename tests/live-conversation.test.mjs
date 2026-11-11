@@ -415,3 +415,19 @@ it.each([0,-1,1001,NaN,Infinity])('rejects expired or invalid context freshness 
   await vi.waitFor(()=>expect(f.calls).toHaveLength(1));expect(f.calls[0].message.params.input[1].text).toContain('unavailable');
   f.reply(0,{result:{turn:{id:'invalid-freshness-turn',status:'completed'}}});await pending;
 });
+
+
+it.each(['matching','document','session','revision','missing'])('fences observation at a held user barrier: %s', async change => {
+  const scope={documentToken:'document-a',sessionId:'source-a',revision:7};
+  const captureObservation=vi.fn(()=>({text:'camera snapshot',validForMs:1000,sourceFence:scope}));
+  const f=fixture({captureObservation}),pending=f.send('original human text');await vi.waitFor(()=>expect(f.calls).toHaveLength(1));
+  const call=f.calls[0], current=change==='missing'?null:{...scope};
+  if(change==='document')current.documentToken='document-b';if(change==='session')current.sessionId='source-b';if(change==='revision')current.revision++;
+  // The barrier is held within TTL; a source lifecycle change still revokes old data.
+  f.conversation.fenceObservation('unrelated-rpc',null);expect(call.guard(call.message)).toBe(true);expect(call.message.params.input[1].text).toBe('camera snapshot');
+  f.conversation.fenceObservation(call.message.id,current);expect(call.guard(call.message)).toBe(true);
+  expect(call.message.params.input[0].text).toBe('original human text');
+  expect(call.message.params.input[1].text).toEqual(change==='matching'?'camera snapshot':expect.stringContaining('unavailable'));
+  if(change!=='matching'){f.conversation.fenceObservation(call.message.id,scope);expect(call.guard(call.message)).toBe(true);expect(call.message.params.input[1].text).toContain('unavailable');}
+  expect(captureObservation).toHaveBeenCalledTimes(1);f.reply(0,{result:{turn:{id:'fenced-turn',status:'completed'}}});await pending;
+});
