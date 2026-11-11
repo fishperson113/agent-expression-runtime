@@ -32,6 +32,19 @@ it('bounds concurrent leases and unknown end never releases another owner', asyn
   for (const lease of leases.slice(0, 7)) await client.end(lease);
   expect(s.busy()).toBe(true); await client.end(leases[7]); expect(s.busy()).toBe(false);
 });
+it('keeps begin, end and uncertainty payloads bound to their exact route without changing owner state', async () => {
+  const begin = vi.fn(), end = vi.fn(), s = await server({ onBegin: begin, onEnd: end });
+  const client = createDesktopIntentClient({ base: s.base, token }), lease = await client.begin();
+  expect((await post(s.base, 'begin', { leaseId: lease })).status).toBe(400);
+  expect((await post(s.base, 'uncertain', {})).status).toBe(400);
+  expect((await post(s.base, 'end', {})).status).toBe(400);
+  expect((await post(s.base, 'begin', {}, { 'Content-Type': 'text/plain' })).status).toBe(415);
+  expect((await fetch(s.base + '/v1/intent/begin', { headers })).status).toBe(404);
+  expect((await post(s.base, 'unknown', { leaseId: lease })).status).toBe(404);
+  expect(s.busy()).toBe(true); expect(s.uncertain()).toBe(false);
+  expect(begin).toHaveBeenCalledOnce(); expect(end).not.toHaveBeenCalled();
+  await client.end(lease); expect(s.busy()).toBe(false);
+});
 it('expiry frees capacity but latches uncertainty instead of silently resuming the observer', async () => {
   const timers = new Map(), pause = vi.fn(), leaseTimers = { set: fn => { const key = {}; timers.set(key, fn); return key; }, clear: key => timers.delete(key) };
   const s = await server({ leaseTimers, onUncertain: pause }), client = createDesktopIntentClient({ base: s.base, token });
@@ -58,6 +71,7 @@ async function gateway() {
     state.requests.push(request.url);
     if (request.url.endsWith('/events')) { response.writeHead(200, { 'Content-Type': 'text/event-stream' }); response.write(': ready\n\n'); state.streams.add(response); response.on('close', () => state.streams.delete(response)); return; }
     let text = ''; for await (const chunk of request) text += chunk;
+    if (request.url.endsWith('/expressions') && state.rejectExpressions) { response.writeHead(400, { 'Content-Type': 'application/json' }); response.end(JSON.stringify({ code: 'fixture_mutation_rejected' })); return; }
     const result = request.url === '/v1/sessions' ? { id: 'owner', epoch: 'epoch-1' }
       : request.url.endsWith('/expressions') ? { session: 'owner', epoch: 'epoch-1', seq: ++state.expressions, status: 'accepted' } : {};
     response.writeHead(request.method === 'DELETE' ? 204 : 200, { 'Content-Type': 'application/json' }); response.end(JSON.stringify(result));
@@ -101,4 +115,14 @@ it('failed begin prevents forwarding; unknown end retains the actual result and 
   expect(m.state.expressions).toBe(1); expect(s.uncertain()).toBe(true);
   expect(toolValue(await m.invoke('express', { ...command, requestId: 'next-main-command' })).status).toBe('accepted');
   expect(m.state.expressions).toBe(2); expect(s.uncertain()).toBe(true);
+});
+it('keeps a known mutation rejection alongside end uncertainty without exposing barrier errors', async () => {
+  const s = await server({ onEnd() { throw Error('PRIVATE_BARRIER_DETAIL'); } }), m = await mcp(s);
+  m.state.rejectExpressions = true; await m.invoke('bind_controller');
+  const value = await m.invoke('express', command);
+  expect(value.isError).toBe(true);
+  expect(JSON.parse(value.content[0].text)).toMatchObject({ status: 'rejected', code: 'fixture_mutation_rejected' });
+  expect(JSON.parse(value.content[1].text)).toEqual({ status: 'uncertain', code: 'desktop_intent_end_unknown', retry: false });
+  expect(JSON.stringify(value)).not.toContain('PRIVATE_BARRIER_DETAIL'); expect(s.uncertain()).toBe(true);
+  expect(m.state.requests.filter(path => path.endsWith('/expressions'))).toHaveLength(1);
 });

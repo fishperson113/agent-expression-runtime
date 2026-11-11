@@ -67,9 +67,9 @@ class DesktopIntentServer {
     try {
       const value = await boundedJson(req);
       if (!object(value)) throw Error();
-      if (req.url.endsWith('/begin') && Object.keys(value).length === 0) await this.begin(res);
+      if (req.url === '/v1/intent/begin') { if (Object.keys(value).length !== 0) throw Error(); await this.begin(res); }
       else if (Object.keys(value).join() === 'leaseId' && typeof value.leaseId === 'string' && leasePattern.test(value.leaseId)) {
-        if (req.url.endsWith('/end')) await this.end(res, value.leaseId);
+        if (req.url === '/v1/intent/end') await this.end(res, value.leaseId);
         else if (this.leases.has(value.leaseId) || this.ended.has(value.leaseId)) { this.pause('client_end_unknown'); response(res, 200, { schemaVersion: 1, paused: true, uncertain: true }); }
         else response(res, 409, { code: 'desktop_intent_lease' });
       } else throw Error();
