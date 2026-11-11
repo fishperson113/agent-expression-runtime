@@ -8,17 +8,56 @@ or emotion-to-color table is used.
 
 ## Run and boundaries
 
-Use the normal Live entry point with an existing approved budget ledger:
+MAIN Codex may separately ask for persistent **Folder access** before opening a
+working thread. Review that Native prompt yourself; Fisch does not accept it or
+change trust settings for you. Being signed in does not grant folder trust. The
+data-only observer runs in its own read-only temporary directory; its readiness
+does not require or grant MAIN's folder trust. A test that withholds observation
+events while waiting for MAIN has not tested the observer's independence.
+
+Use the normal Live entry point from an interactive terminal:
+
+```sh
+fisch live
+```
+
+The app-server must already be usable in its own writable authenticated home.
+Do not move credentials between environments. Plain production Live prepares the
+Native reaction lane and arms reactions by default; no reactive environment
+variables, manual ledger creation or checkbox selection is required. Camera
+capture remains off until you select **Bật camera** and grant browser/OS
+permission. You can disable reactions in camera settings or stop the session.
+Configuration-ready and a selected thread do not prove authentication or a
+successful model response; inspect the displayed status and terminal errors.
+
+Live stores a cumulative counter and append-only reservation history under
+`fisch/native-live` in the OS user-data directory: `%LOCALAPPDATA%` on Windows
+(fallback `%USERPROFILE%\AppData\Local`), `~/Library/Application Support` on
+macOS, and `$XDG_DATA_HOME` or `~/.local/share` on Linux. It does not invent a
+test quota/deadline or reset existing history. Invalid/inaccessible history
+leaves the lane unavailable rather than replacing it. Reservations are not
+proof of completed inference or actual billed usage.
+
+Explicit backend/off settings remain authoritative. An explicit
+`FISCH_REACTIVE_BUDGET` still selects the existing approved ledger with its
+original limit/deadline; missing, corrupt, expired or exhausted explicit state
+never falls back to a replacement. For a deliberately bounded experiment:
 
 ```sh
 FISCH_REACTIVE_BACKEND=codex \
 FISCH_REACTIVE_BUDGET=/absolute/path/to/existing-ledger.json npm start
 ```
 
-The app-server must already be usable in its own writable authenticated home.
-Do not move credentials between environments. The factory neither creates nor
-resets the ledger. Observation/reactivity is opt-in in the Live controls; camera
-capture is a separate permission and starts off. Voice is outside this slice.
+The lower-level provider factory still defaults off. Production Live opts into
+its Native default; an injected provider or explicit disabled configuration is
+not replaced. The optional [Responses adapter](reactive-provider.md) remains
+separately configured and requires its approved budget.
+
+Voice input is intended to use Codex's own dictation, recording then submitting
+text, not a separate STT/TTS engine. Its route into the exact active Fisch relay
+and thread is not yet verified. A desktop Dictate composer or CLI `/voice` live
+conversation is not evidence of that route. No microphone is opened by this
+reaction lane; use the existing text input until the native route is verified.
 
 The reaction process owns ephemeral threads independent of the coding transport.
 It receives typed presence/quality, event-specific facing-screen estimates,
@@ -71,6 +110,16 @@ coding conversation or prove the resulting dialogue feels natural.
 
 ## Reproducible acceptance
 
+The independent PR #166 observer-only validation used the unchanged production
+default with no reactive environment variables, checkbox interaction or provider
+replacement. One actual Native turn completed, chose greeting/retain, and
+published a browser-confirmed caption. Managed usage advanced from 0 to 1 while
+old explicit ledgers stayed unchanged. MAIN trust remained unanswered and MAIN
+turns were 0. This establishes the scoped observer-default path, not full MAIN
+launch, expressive geometry, dictation, real-camera accuracy or natural UX. The
+earlier stdin harness failure and a separate MAIN-readiness-gated attempt remain
+distinct evidence; neither sent an arrival event or dispatched a model turn.
+
 The existing `tests/live-conversation-host.test.mjs` contains both scripted
 lifecycle checks and opt-in actual-model checks. Build the gateway and install
 the browser dependencies described in the repository validation guide first.
@@ -85,6 +134,8 @@ PLAYWRIGHT_BROWSERS_PATH=/absolute/path/to/browser-cache \
 npm test -- tests/live-conversation-host.test.mjs -t 'signed-in Codex'
 ```
 
+These explicit test commands retain their approved cumulative test ledger;
+the managed plain-Live usage journal does not replace that authorization.
 These calls consume actual model budget. Do not rerun a silent/retain result to
 select an expressive example. Keep original failures and each subsequent run
 separate. Record the exact commit, projected input sequence, policy/schema/model/

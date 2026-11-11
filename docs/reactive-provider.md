@@ -4,8 +4,12 @@ For the separate signed-in Codex conversation lane, see
 [Native observation loop](native-observation-loop.md). This page describes the
 optional Responses API adapter.
 
-Live terminal wiring uses this separate data-only adapter for explicitly configured
-reactive inference; it defaults off. Camera decisions never enter the Native coding
+The optional Responses adapter defaults off and is used only for explicitly
+configured HTTP inference. Plain production Live instead prepares the existing
+Native Codex lane by default, with managed persistent usage history; it needs no
+Responses API key or manual reactive variables. See the Native guide above for
+camera consent, explicit overrides and current acceptance limits.
+Camera decisions never enter the Native coding
 thread. This contains the shared-thread capability route; the historical unrelated
 output's cause remains unproven, and real-provider semantic acceptance is pending.
 Tests use injected responses and loopback fake HTTP without production model budget.
