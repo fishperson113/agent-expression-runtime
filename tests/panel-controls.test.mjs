@@ -96,3 +96,14 @@ it('bounds lifecycle history and keeps the page/composer reachable in narrow and
   expect(await page.evaluate(()=>window.__mediaCalls)).toBe(0);
  }finally{await page.close();}
 },45000);
+it('keeps the production composer clickable after tool history and approval resolution',async()=>{
+ const page=await browser.newPage(),sent=[];try{
+  await page.exposeFunction('fischLiveConversation',value=>{sent.push(value);return{status:'accepted'};});await page.goto(server.resolvedUrls.local[0]+'live.html?fixture=synthetic');await page.waitForFunction(()=>!!window.fischLive);
+  await page.evaluate(()=>{window.fischLive.panelControlStatus({type:'mode'});window.fischLive.conversationStatus({generation:1,revision:1,ownerTurn:null,available:true,canSend:true,canCancel:false,pending:false,stopping:false,waiting:false,error:'',messages:[]});});
+  for(let i=0;i<12;i++)await page.evaluate(i=>window.fischLive.panelControlStatus({type:'tool',phase:'completed',threadId:'t',turnId:'u',item:{id:'tool'+i,type:'mcpToolCall',tool:'observe',status:'completed'}}),i);
+  await page.evaluate(value=>window.fischLive.panelControlStatus(value),browserRequest());await page.evaluate(()=>window.fischLive.panelControlStatus({type:'resolved',id:'r',threadId:'t',turnId:'u',reason:'submitted'}));
+  const panel=page.locator('.fisch-panel-controls'),input=page.locator('.fisch-conversation textarea'),send=page.locator('.fisch-conversation button[type=submit]');
+  for(const[width,height]of[[1280,800],[390,844],[844,390]]){await page.setViewportSize({width,height});if(!await panel.evaluate(n=>n.open))await panel.locator('summary').click();await input.fill('Public next message');expect(await panel.evaluate(n=>n.open)).toBe(false);await send.click({trial:true});}
+  await send.click();expect(sent).toHaveLength(1);
+ }finally{await page.close();}
+},45000);

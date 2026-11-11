@@ -78,13 +78,14 @@ class PanelControls {
   private host: HTMLDetailsElement; private summary: HTMLElement; private list: HTMLElement; private status: HTMLElement;
   private pending = new Map<string, Entry>(); private tools = new Map<string, { value: Data; node: HTMLElement }>(); private settled = new Set<string>();
   private mount = ++mounts; private disposed = false; private serial = 0;
-  constructor(container: HTMLElement, private respond: (value: PanelResponse) => Promise<unknown>) {
+  private composerFocus = (event: Event) => { if (!this.pending.size && event.target instanceof HTMLTextAreaElement && event.target.closest('.fisch-conversation')) this.host.open = false; };
+  constructor(private container: HTMLElement, private respond: (value: PanelResponse) => Promise<unknown>) {
     const host = element('details'), summary = element('summary', 'Yêu cầu và công cụ'), list = element('div'), status = element('p');
     host.className = 'fisch-panel-controls'; status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
     host.append(summary, status, list); container.append(host);
     const style = element('style', `.fisch-panel-controls{flex:0 1 auto;min-width:0;min-height:30px;max-height:min(28vh,220px);overflow:auto;overflow-wrap:anywhere;border-top:1px solid var(--line,#344650);font-size:12px}.fisch-panel-controls summary{position:sticky;top:0;background:var(--bg,#080e14);padding:6px;cursor:pointer;z-index:1}.fisch-panel-controls article{padding:8px;border-top:1px solid var(--line,#344650)}.fisch-panel-controls p,.fisch-panel-controls pre{margin:4px 0;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word}.fisch-panel-controls fieldset{min-width:0;margin:6px 0}.fisch-panel-controls label{display:block}.fisch-panel-controls small{display:block}.fisch-panel-controls textarea{box-sizing:border-box;width:100%;min-width:0;max-height:100px;color:inherit;background:var(--bg,#080e14)}.fisch-panel-controls button{min-height:36px;margin:4px 6px 0 0;max-width:100%;white-space:normal}.fisch-panel-controls :focus-visible{outline:2px solid var(--focus,#fff);outline-offset:2px}`);
     host.prepend(style);
-    this.host = host; this.summary = summary; this.list = list; this.status = status;
+    this.host = host; this.summary = summary; this.list = list; this.status = status; container.addEventListener('focusin', this.composerFocus);
   }
   private refresh() { this.summary.textContent = `Yêu cầu và công cụ${this.pending.size ? ' · ' + this.pending.size + ' chờ' : ''}`; }
   private remember(value: string) { this.settled.add(value); if (this.settled.size > 64) this.settled.delete(this.settled.values().next().value!); }
@@ -163,10 +164,10 @@ class PanelControls {
     if (dto.type === 'request') this.request(dto as Control);
     if (dto.type === 'tool') this.tool(dto);
     if (dto.type === 'unsupported') { this.status.textContent = 'Panel không xử lý yêu cầu Native này; không tự cấp quyền.'; this.host.open = true; }
-    if (dto.type === 'resolved') { const identity = key(dto); this.pending.get(identity)?.node.remove(); this.pending.delete(identity); this.remember(identity); this.status.textContent = reasons[dto.reason]; this.refresh(); }
+    if (dto.type === 'resolved') { const identity = key(dto); this.pending.get(identity)?.node.remove(); this.pending.delete(identity); this.remember(identity); this.status.textContent = reasons[dto.reason]; if (!this.pending.size && dto.reason !== 'response_unknown') this.host.open = false; this.refresh(); }
   }
   clear() { for (const identity of this.pending.keys()) this.remember(identity); this.pending.clear(); this.tools.clear(); this.list.replaceChildren(); this.status.textContent = ''; this.host.open = false; this.refresh(); }
-  dispose() { if (this.disposed) return; this.clear(); this.disposed = true; this.host.remove(); }
+  dispose() { if (this.disposed) return; this.clear(); this.disposed = true; this.container.removeEventListener('focusin', this.composerFocus); this.host.remove(); }
 }
 export function mountPanelControls(container: HTMLElement, respond: (value: PanelResponse) => Promise<unknown>) {
   const panel = new PanelControls(container, respond);
