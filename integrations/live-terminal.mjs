@@ -78,6 +78,7 @@ export async function runTerminalCodex({ live, cwd, signal, spawnClient = spawn,
   signal.addEventListener('abort', onAbort, { once: true });
   try {
     state.unbind = await bindLiveConversation(live.page, { send: value => state.conversation.send(value), cancel: value => state.conversation.cancel(value),
+      authorizeObserverContext: id => state.broker.authorizeObserverContext(id),
       navigation: () => { state.channel.stale = true; state.channel.token = undefined; state.conversation.navigation(); } });
     await state.publishSetup('waiting', state.channel.token);
     child = spawnClient(host.command, [...host.args, '--remote', state.transport.url, '--remote-auth-token-env', 'FISCH_CODEX_TRANSPORT_TOKEN', '--no-alt-screen', '-C', cwd],

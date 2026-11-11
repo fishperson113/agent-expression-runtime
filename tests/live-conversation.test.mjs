@@ -507,3 +507,12 @@ it('does not let a late old failed terminal erase a newer confirmed context', as
   f.event({method:'turn/completed',params:{threadId:'thread-a',turn:{id:'old-completed-ack',status:'failed'}}});
   expect(f.conversation.observerContext()).toMatchObject({revision:context.revision,turnId:'new-confirmed-turn',text:'new turn'});
 });
+it('uses a strict same-frame read-only observer authorization action without a new Native turn',async()=>{
+ let binding;const frame={url:()=> 'http://127.0.0.1:123/live.html'},page={url:frame.url,mainFrame:()=>frame,isClosed:()=>false,on(){},off(){},exposeBinding:async(_name,fn)=>{binding=fn;}};
+ const calls=[],dispose=await bindLiveConversation(page,{authorizeObserverContext:id=>{calls.push(id);return id==='r';},navigation(){}});
+ expect(binding({page,frame},{action:'authorize_observer_context',requestId:'r'})).toBe(true);
+ expect(binding({page,frame},{action:'authorize_observer_context',requestId:'other'})).toBe(false);
+ expect(()=>binding({page,frame},{action:'authorize_observer_context',requestId:'r',text:'PRIVATE'})).toThrow('source_rejected');
+ expect(()=>binding({page,frame:{url:frame.url}},{action:'authorize_observer_context',requestId:'r'})).toThrow('source_rejected');
+ expect(calls).toEqual(['r','other']);dispose();
+});

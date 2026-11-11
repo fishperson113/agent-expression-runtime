@@ -14,7 +14,7 @@ function fixture(provider = null, options = {}) {
     deliverReactiveDecision: async (id, data) => { deliveries.push({ id, data }); return { reason: data ? 'accepted' : 'invalid_decision' }; },
     failReactiveDecision: async id => { failures.push(id); return { reason: 'transport_unknown' }; } };
   const page = { evaluate: async (fn, arg) => {
-    const old = globalThis.window; globalThis.window = { fischLive: api };
+    const old = globalThis.window; globalThis.window = { fischLive: api, fischLiveConversation: value => value.action === 'authorize_observer_context' && broker.authorizeObserverContext(value.requestId) };
     try { return await fn(arg); } finally { globalThis.window = old; }
   } };
   const broker = new LiveReactiveBroker({ page, provider, output, forward: message => { order.push('forward'); forwarded.push(message); },
@@ -377,4 +377,13 @@ it('does not repaint a disconnected document from a poll callback queued before 
  const polling=f.broker.poll({},[],()=>({token:'doc',snapshot:{available:true,canSend:true,messages:[]}}));await queued.promise;
  f.broker.close();view={available:false,canSend:false,messages:[{text:'Public partial',status:'unknown'}]};f.api.conversationOffline=true;f.api.conversationDocument=null;f.state.available=false;
  await execute();await polling;expect(view.messages[0].text).toBe('Public partial');expect(view.available).toBe(false);expect(f.state.available).toBe(false);expect(f.candidates).toEqual([]);
+});
+it('revalidates revoked context from Node inside a queued browser delivery while TTL is valid',async()=>{
+ let current={revision:1,submissionId:'s-a',threadId:'native',turnId:'u-a',text:'OLD CONTEXT',ageMs:0};
+ const f=fixture({conversationLane:true,decide:async()=>({reply:'OLD CONTEXT',decision:{validUntil:60000}})},{contextSource:()=>current});
+ f.api.nativeReactionCapabilities=()=>({schemaVersion:1,expressionAllowed:false});f.api.deliverNativeReaction=async(id,data)=>{f.deliveries.push({id,data});return{reason:data?'observed':'invalid_decision'};};
+ const evaluate=f.page.evaluate.bind(f.page),held=Promise.withResolvers();let queued;
+ f.page.evaluate=async(fn,arg)=>{if(arg?.native && Object.hasOwn(arg,'data')){queued=arg;await held.promise;}return evaluate(fn,arg);};
+ f.candidates.push(f.candidate('r'));await f.broker.poll({});await flush();expect(queued.contextDeadline-performance.now()).toBeGreaterThan(1000);
+ current=null;held.resolve();await flush();expect(f.deliveries).toEqual([{id:'r',data:null}]);f.broker.close();
 });
