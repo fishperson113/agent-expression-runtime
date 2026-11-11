@@ -159,3 +159,12 @@ it('keeps an unavailable partial response visibly uncertain instead of completed
   expect(await page.locator('.fisch-conversation button[type=submit]').isDisabled()).toBe(true);expect(sent).toEqual([]);expect(await page.evaluate(()=>window.PWNED)).toBeUndefined();
  }finally{await page.close();}
 },45000);
+it('does not revive offline approvals when complete file details arrive late',async()=>{
+ const {page,panel}=await open();try{
+  const request={...browserRequest('offline-file','item/fileChange/requestApproval',{}),choices:['decline','cancel']};
+  await project(page,request);await project(page,{type:'offline'});
+  await project(page,{type:'tool',phase:'started',threadId:'t',turnId:'u',item:{id:'i',type:'fileChange',changes:[{path:'public.txt',kind:{type:'update',move_path:null},diff:'+public'}]}});
+  await project(page,{type:'eligibility',id:'offline-file',threadId:'t',turnId:'u',itemId:'i',choices:['accept','decline','cancel']});
+  await project(page,request);expect(await panel.locator('button').count()).toBe(0);expect(await page.evaluate(()=>window.__calls)).toEqual([]);
+ }finally{await page.close();}
+},45000);
