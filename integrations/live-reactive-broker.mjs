@@ -28,9 +28,9 @@ export class LiveReactiveBroker {
   }
   closed = false; browserUnavailable = false; waiters = new Set(); polling = false; draining = false; active; uncertain = false; paused = false;
   providerReceipts = []; queue = []; pending = new Map(); turns = new Set(); completed = new Set(); receipts = new Set(); requests = new Set();
-  constructor({ page, provider = null, output, forward, reject, log = () => {}, externalBusy = () => false, evaluateTimeoutMs = 10000 }) {
+  constructor({ page, provider = null, output, forward, reject, log = () => {}, externalBusy = () => false, beforeForward = () => {}, evaluateTimeoutMs = 10000 }) {
     if (!Number.isInteger(evaluateTimeoutMs) || evaluateTimeoutMs < 1 || evaluateTimeoutMs > 10000) throw Error('reactive_timeout_invalid');
-    Object.assign(this, { page, provider, output, forward, reject, log, externalBusy, evaluateTimeoutMs });
+    Object.assign(this, { page, provider, output, forward, reject, log, externalBusy, beforeForward, evaluateTimeoutMs });
   }
   evaluate(fn, arg, operation = 'other') {
     if (this.closed || this.browserUnavailable) {
@@ -85,11 +85,14 @@ export class LiveReactiveBroker {
       while (!this.closed && this.queue.length) {
         const message = this.queue.shift();
         try {
-          await this.evaluate(() => window.fischLive.reactiveUserIntent(), undefined, 'user_barrier');
+          const source = await this.evaluate(async () => {
+            const api = window.fischLive; await api.reactiveUserIntent();
+            try { return { ...api.chatObservationScope?.(), documentToken: api.conversationDocument }; } catch { return null; }
+          }, undefined, 'user_barrier');
           if (this.closed || this.browserUnavailable) { this.rejectInput(message, 'reactive_user_closed'); continue; }
           if (message.method === 'turn/steer' && (message.params?.threadId !== this.output.thread ||
             message.params?.expectedTurnId !== this.output.turn)) throw Error('steer_changed');
-          try { this.forward(message); } catch {
+          try { this.beforeForward(message, source); this.forward(message); } catch {
             this.rejectInput(message, 'reactive_user_forward_unknown', false);
           }
         } catch { this.rejectInput(message, 'reactive_user_barrier_failed'); }

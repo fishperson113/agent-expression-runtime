@@ -8,6 +8,7 @@ type Cue = { type: LiveEventKind; at: number };
 
 export class FaceObservations {
   snapshot: Observation;
+  sourceRevision = 0;
   private previousAt?: number;
   private handTracker = new HandTracker();
   private streak = 0;
@@ -28,6 +29,7 @@ export class FaceObservations {
     this.states.set(key, state);
   }
   status(camera: Observation['camera'], at: number) {
+    this.sourceRevision++;
     this.handTracker.reset();
     this.streak = 0; this.previousAt = undefined; this.states.clear(); this.mouthAt = -Infinity;
     this.snapshot = { ...this.snapshot, seq: this.snapshot.seq + 1, capturedAt: at, camera,

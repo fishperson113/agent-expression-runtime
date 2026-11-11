@@ -2,6 +2,8 @@
 
 Fisch Live là trang web local gồm camera debug và cơ thể hạt WebGL, dùng cùng Codex CLI trong terminal thông thường; Herdr là adapter tùy chọn. Bạn trò chuyện trong terminal hoặc panel hội thoại của cùng phiên Native Codex; Codex đọc quan sát có kiểu bằng MCP và tự chọn cách biểu đạt bằng DSL. Camera và phản xạ local không chờ model.
 
+Tin nhắn gửi từ **panel hội thoại** được host gắn một context máy riêng: snapshot hình học gần thời điểm gửi, session/sequence/epoch, thời gian đọc và tuổi dữ liệu. Camera tắt, bị từ chối, thiếu hoặc cũ vẫn gửi text bình thường, với dữ liệu thị giác là unknown. Không gửi ảnh, âm thanh, summary tự do hay lịch sử chat cho observer. Context này là dữ liệu không tin cậy, không phải lời người dùng; hệ số nét mặt không xác nhận cảm xúc. Tắt/thu hồi camera, suspend hoặc đổi nguồn trước forward sẽ bỏ context quan sát chưa gửi, nhưng vẫn gửi câu chat. Frame mới cùng nguồn không tự thu hồi snapshot lịch sử. Nếu chờ forward quá lâu, hình học bị bỏ thay vì lấy frame mới âm thầm. Native terminal/Dictate bên ngoài panel vẫn dùng `observe` qua MCP; đường đó chưa tự gắn context này. Observer vẫn chỉ nhận brief công khai có giới hạn do MAIN chia sẻ và nhường intent mới qua barrier hiện có. Đây là hợp đồng dữ liệu, chưa là nghiệm thu hiểu camera hay trải nghiệm thật.
+
 ## Hội thoại cùng agent hiện có
 
 Panel text dùng đường Native mặc định; adapter `--agent` legacy tiếp tục nhập
