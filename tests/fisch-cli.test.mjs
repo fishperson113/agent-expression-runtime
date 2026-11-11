@@ -88,3 +88,29 @@ it('preserves status and stop for the explicit Live Herdr adapter', async () => 
   await expect(dispatch(['status', '--all'], {})).rejects.toThrow('Unexpected option');
   await expect(dispatch(['stop', 'other-pane'], {})).rejects.toThrow('Unexpected option');
 });
+
+it('routes Desktop host and fast MCP separately without changing Live', async () => {
+  const desktop = vi.fn(async () => 4), mcp = vi.fn(async () => 5);
+  expect(await dispatch(['desktop', '--mcp-config'], { desktop })).toBe(4);
+  expect(desktop).toHaveBeenCalledWith({ config: true });
+  expect(await dispatch(['mcp'], { mcp })).toBe(5);
+  await expect(dispatch(['mcp', '--hands'], { mcp })).rejects.toThrow();
+  await expect(dispatch(['desktop', '--mcp-config', '--hands'], { desktop })).rejects.toThrow();
+  await expect(dispatch(['desktop', '--agent', 'pane'], { desktop })).rejects.toThrow();
+});
+it('prints static Desktop config and fails missing-host MCP without bootstrap or stdout noise', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'fisch-desktop-cli-'));
+  const env = { ...process.env, XDG_DATA_HOME: home, LOCALAPPDATA: home };
+  try {
+    const config = await promisify(execFile)(process.execPath, ['bin/fisch.mjs', 'desktop', '--mcp-config'], { env });
+    expect(config.stdout).toContain('[mcp_servers.fisch]');
+    expect(config.stdout).toContain('"mcp"');
+    expect(config.stdout).not.toMatch(/token|AER_|FISCH_/i);
+    expect(config.stderr).toBe('');
+    expect(existsSync(join(home, 'fisch'))).toBe(false);
+    await expect(promisify(execFile)(process.execPath, ['bin/fisch.mjs', 'mcp'], { env })).rejects.toMatchObject({
+      code: 1, stdout: '', stderr: expect.stringContaining('desktop_host_not_running'),
+    });
+    expect(existsSync(join(home, 'fisch'))).toBe(false);
+  } finally { rmSync(home, { recursive: true, force: true }); }
+});

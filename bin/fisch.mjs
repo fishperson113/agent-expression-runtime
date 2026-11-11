@@ -9,6 +9,9 @@ const usage = `Fisch ${version} — a particle body for your agent
 Usage: fisch <command>
 
   live [--hands] [--no-assets]  Prepare and open the local body and Codex in this terminal (Herdr optional)
+  desktop [--hands] [--no-assets]  Open a model-free body controlled by Codex Desktop MCP
+  desktop --mcp-config  Print a token-free Codex MCP configuration; write nothing
+  mcp        Serve stdio MCP through the running Desktop body (no bootstrap)
   status     Inspect Live from its dedicated --agent Herdr pane
   stop       Stop Live from its dedicated --agent Herdr pane
   capabilities  Debug: print the expression contract
@@ -36,6 +39,28 @@ async function live(options) {
     if (abort.signal.aborted) return 130;
     error.public = true; throw error;
   } finally { process.removeListener('SIGINT', stop); process.removeListener('SIGTERM', stop); }
+}
+async function desktop(options) {
+  if (options.config) {
+    const { desktopMcpConfig } = await import('../integrations/desktop-runtime.mjs');
+    console.log(desktopMcpConfig()); return 0;
+  }
+  const abort = new AbortController(), stop = () => abort.abort();
+  process.once('SIGINT', stop); process.once('SIGTERM', stop);
+  try {
+    const { ensureLiveDependencies } = await import('../scripts/prepare-live.mjs');
+    await ensureLiveDependencies({ signal: abort.signal });
+    const { runDesktopHost } = await import('../integrations/desktop-live-host.mjs');
+    return await runDesktopHost({ ...options, signal: abort.signal });
+  } catch (error) { if (abort.signal.aborted) return 130; error.public = true; throw error; }
+  finally { process.removeListener('SIGINT', stop); process.removeListener('SIGTERM', stop); }
+}
+async function mcp() {
+  const abort = new AbortController(), stop = () => abort.abort();
+  process.once('SIGINT', stop); process.once('SIGTERM', stop);
+  try { const { runDesktopMcp } = await import('../integrations/desktop-mcp-launch.mjs'); return await runDesktopMcp({ signal: abort.signal }); }
+  catch (error) { error.public = true; throw error; }
+  finally { process.removeListener('SIGINT', stop); process.removeListener('SIGTERM', stop); }
 }
 async function build() {
   const { prepareSession } = await import('../scripts/start-session.mjs');
@@ -83,6 +108,12 @@ export async function dispatch(args, handlers = { live, build, test, evaluate, d
   if (['status', 'stop'].includes(args[0])) return control(args);
   if (args[0] === 'hooks') return (handlers.hooks ?? hooks)(args.slice(1));
   if (args[0] === 'live') return handlers.live(parseLiveOptions(args.slice(1)));
+  if (args[0] === 'desktop') {
+    const options = args.length === 2 && args[1] === '--mcp-config' ? { config: true } : parseLiveOptions(args.slice(1));
+    if (options.agentPane) throw Object.assign(Error('Desktop mode does not launch a terminal agent.'), { public: true });
+    return (handlers.desktop ?? desktop)(options);
+  }
+  if (args[0] === 'mcp' && args.length === 1) return (handlers.mcp ?? mcp)();
   if (args.length !== 1 || !['build', 'test', 'evaluate', 'doctor'].includes(args[0]) || !Object.hasOwn(handlers, args[0]))
     throw Object.assign(Error('Unknown command or option. Run fisch --help.'), { public: true });
   return await handlers[args[0]]() ?? 0;
