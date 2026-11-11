@@ -1,3 +1,4 @@
+import { ReactiveEvaluationTrace } from './reactive-evaluation-trace.mjs';
 import { freezeReactiveReceipt } from './reactive-receipt.mjs';
 import { ReactiveProviderError } from './reactive-provider.mjs';
 import { freezeReactiveCandidate } from './reactive-window.mjs';
@@ -18,6 +19,8 @@ const operations = new Set(['poll', 'authorize', 'deliver', 'user_barrier', 'pub
 const failureReasons = new Set(['eval_rejected', 'deadline', 'capacity', 'closed', 'unknown']);
 export class LiveReactiveBroker {
   #failureDiagnostic;
+  #evaluations = new ReactiveEvaluationTrace();
+  evaluationDiagnostics() { return this.#evaluations.snapshot(); }
   diagnostics() { return this.#failureDiagnostic ? { ...this.#failureDiagnostic } : null; }
   recordFailure(reason, operation) {
     this.#failureDiagnostic ??= Object.freeze({ reason: failureReasons.has(reason) ? reason : 'unknown',
@@ -36,10 +39,11 @@ export class LiveReactiveBroker {
     }
     if (this.waiters.size >= 4) { this.browserFailed('capacity', operation); return Promise.reject(Error('reactive_browser_unavailable')); }
     return new Promise((resolve, reject) => {
+      const trace = this.#evaluations.start(operations.has(operation) ? operation : 'other', this.waiters.size + 1);
       const owned = { reject: error => settle(reject, error) };
       const settle = (callback, value) => {
         if (!this.waiters.delete(owned)) return;
-        clearTimeout(owned.timer); callback(value);
+        clearTimeout(owned.timer); this.#evaluations.finish(trace, callback === resolve ? 'fulfilled' : 'rejected', this.waiters.size); callback(value);
       };
       owned.timer = setTimeout(() => this.browserFailed('deadline', operation), this.evaluateTimeoutMs); this.waiters.add(owned);
       void Promise.resolve().then(() => {

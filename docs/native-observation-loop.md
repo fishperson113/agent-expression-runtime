@@ -202,3 +202,20 @@ Review continuous clips first under opaque identifiers without model claims;
 then reveal cues and captions to assess relevance, repetition and continuity.
 Report reviewer priming and do not invent a recognition/enjoyment pass score.
 Caption-only retention validates conversational publication, not geometry utility.
+
+## Browser-operation investigation
+
+The host broker exposes `evaluationDiagnostics()` for a bounded in-memory snapshot:
+up to 32 start/settlement records and the current pending operations (at most four).
+Each record contains a host-local sequence, allowlisted operation, monotonic
+`atMs`, phase, elapsed milliseconds and waiter count. Pending entries report age.
+Copies contain no observation payload, page exception text or model response.
+These are host RPC timings, not source age, camera latency or render-frame timings.
+No files or continuous diagnostic logs are written automatically.
+
+Read this snapshot from the owning host in a test/diagnostic harness, alongside
+`diagnostics()`'s first fixed failure reason/operation. A source discontinuity
+alone does not establish a browser RPC timeout. The existing evaluate deadline,
+capacity limit, revocation and late-result rejection are unchanged. A bounded
+trace can help investigate the next failure; it does not reconstruct earlier
+stalls or prove that their cause is fixed.

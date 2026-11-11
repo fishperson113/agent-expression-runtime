@@ -297,6 +297,8 @@ it.each(['eval_rejected', 'deadline', 'capacity', 'closed'])('records fixed %s d
     expect((await rejected).message).toBe('reactive_browser_unavailable'); await Promise.all(pending);
     expect(f.broker.diagnostics()).toEqual({ reason, operation: 'publication_fence' });
     expect(JSON.stringify(f.broker.diagnostics())).not.toContain('PRIVATE'); expect(f.broker.waiters.size).toBe(0);
+    expect(f.broker.evaluationDiagnostics().pending).toEqual([]);
+    expect(JSON.stringify(f.broker.evaluationDiagnostics())).not.toContain('PRIVATE');
     expect(f.broker.browserUnavailable).toBe(reason !== 'closed');
     expect(f.broker.paused).toBe(reason !== 'closed'); expect(f.broker.uncertain).toBe(reason !== 'closed');
     const copy = f.broker.diagnostics(); copy.reason = 'changed'; expect(f.broker.diagnostics().reason).toBe(reason);
@@ -309,4 +311,25 @@ it('labels actual poll rejections and normalizes unknown caller labels without r
   const g = fixture(); g.page.evaluate = async () => { throw Error('PRIVATE'); };
   await g.broker.evaluate(() => {}, null, 'PRIVATE_UNTRUSTED_LABEL').catch(() => {});
   expect(g.broker.diagnostics()).toEqual({ reason: 'eval_rejected', operation: 'other' }); g.broker.close();
+});
+it('retains bounded numeric evaluation chronology across a stalled operation and late callback', async () => {
+  vi.useFakeTimers();
+  let release; const f = fixture(null, { evaluateTimeoutMs: 10 });
+  try {
+    for (let i = 0; i < 40; i++) await f.broker.evaluate(() => 7, { private: 'PRIVATE_INPUT' }, 'PRIVATE_LABEL');
+    f.page.evaluate = () => new Promise(resolve => { release = resolve; });
+    const pending = f.broker.evaluate(() => {}, null, 'deliver').catch(error => error); await flush();
+    await vi.advanceTimersByTimeAsync(7);
+    const live = f.broker.evaluationDiagnostics();
+    expect(live.recent.length).toBeLessThanOrEqual(32);
+    expect(live.pending).toEqual([{ id: 41, operation: 'deliver', ageMs: 7 }]);
+    await vi.advanceTimersByTimeAsync(3); await pending;
+    const failed = f.broker.evaluationDiagnostics();
+    expect(failed.pending).toEqual([]);
+    expect(failed.recent.at(-1)).toMatchObject({ id: 41, operation: 'deliver', phase: 'rejected', elapsedMs: 10, waiters: 0 });
+    expect(JSON.stringify(failed)).not.toContain('PRIVATE');
+    release('PRIVATE_LATE_RESULT'); await flush(); expect(f.broker.evaluationDiagnostics()).toEqual(failed);
+    failed.recent[0].operation = 'changed'; expect(f.broker.evaluationDiagnostics().recent[0].operation).not.toBe('changed');
+    expect(f.broker.browserUnavailable).toBe(true);
+  } finally { f.broker.close(); vi.useRealTimers(); }
 });
