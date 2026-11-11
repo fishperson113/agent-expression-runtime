@@ -254,7 +254,7 @@ function configureReactive(available: boolean, handVersion = 0, contractVersion 
   if (enabled && !wasAvailable && choice.checked) reactive.enable(true);
   updateHandProducer();
   element('reactivity-status').textContent = !enabled ? nativeConversation ? 'Lane chủ động chưa sẵn sàng hoặc kết quả chưa rõ; kiểm tra terminal rồi khởi chạy lại Live. Hội thoại chính vẫn độc lập.' : 'Phản xạ cục bộ dùng tín hiệu hợp lệ; observer ngữ nghĩa chưa kết nối.'
-    : body.userSceneOwned ? nativeConversation ? body.canReactive() ? 'MAIN đã cho phép observer thay minh họa dùng một lần; không khôi phục hình cũ.' : 'Đang giữ hình bạn tạo; hội thoại chủ động vẫn có thể tiếp tục, không thay hình.' : 'Đang giữ hình bạn tạo; phản ứng tự động tạm nhường quyền.' : nativeConversation ? choice.checked ? 'Codex chủ động đã cấu hình. Bật camera và cấp quyền để bắt đầu; chỉ dùng dữ liệu hình học, không nhận diện cảm xúc/đồ vật. Chưa xác nhận lượt trả lời thành công.' : 'Đã tạm tắt phản ứng chủ động theo lựa chọn của bạn.' : 'Bộ quyết định đã kết nối; phản ứng camera là tùy chọn.';
+    : body.userSceneOwned ? nativeConversation ? body.canReactive() ? 'MAIN đã cho phép observer thay minh họa dùng một lần; không khôi phục hình cũ.' : 'Đang giữ hình bạn tạo; hội thoại chủ động vẫn có thể tiếp tục, không thay hình.' : 'Đang giữ hình bạn tạo; phản ứng tự động tạm nhường quyền.' : nativeConversation ? choice.checked ? 'Codex chủ động đã cấu hình. Chỉ dùng dữ liệu hình học khi bạn cho phép camera; không nhận diện cảm xúc/đồ vật. Đây chưa phải xác nhận lượt trả lời thành công.' : 'Đã tạm tắt phản ứng chủ động theo lựa chọn của bạn.' : 'Bộ quyết định đã kết nối; phản ứng camera là tùy chọn.';
 }
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) return;

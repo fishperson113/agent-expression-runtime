@@ -24,7 +24,7 @@ it('arms Native by default without camera or a model request, and asks for video
     expect(await page.locator('#enable-reactivity').isChecked()).toBe(true);
     expect(await page.evaluate(() => window.mediaCalls)).toEqual([]);
     expect(await page.evaluate(() => window.fischLive.takeReactiveRequest())).toBeNull();
-    expect((await page.locator('#reactivity-status').textContent())).toContain('Chưa xác nhận');
+    expect((await page.locator('#reactivity-status').textContent())).toContain('chưa phải xác nhận');
     await page.locator('#camera-start').click();
     await expect.poll(() => page.evaluate(() => window.mediaCalls.length)).toBe(1);
     expect(await page.evaluate(() => window.mediaCalls[0].audio)).toBe(false);

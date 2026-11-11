@@ -9,7 +9,7 @@ const observerMessages = {
   budget_unavailable: 'Ngân sách hiện chưa khả dụng.',
   budget_expired: 'Ngân sách đã hết thời hạn.',
   budget_exhausted: 'Ngân sách đã dùng hết.',
-  ready: 'Observer đã cấu hình; Codex chủ động mặc định, camera vẫn tắt. Chưa xác nhận lượt phản hồi.',
+  ready: 'Observer đã cấu hình; Codex chủ động mặc định. Camera chỉ bật khi bạn chọn và cấp quyền. Trạng thái cấu hình không xác nhận lượt phản hồi.',
   unavailable: 'Chưa xác nhận cấu hình observer.'
 } as const;
 type Observer = keyof typeof observerMessages;
