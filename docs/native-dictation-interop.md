@@ -29,8 +29,9 @@ surface or future version. The actual Windows surface remains uninspected.
 - Native `_meta.sessionId` can group the root and descendant threads;
   [it is not one chat](https://github.com/openai/codex/blob/fb036d4ebd89f263d34a1f888c279ce85bb383c6/codex-rs/core/src/session/session.rs#L706).
 - A Fisch controller has a separate authenticated gateway session and epoch.
-  Current MCP retains that controller per process and does not enforce Native
-  `_meta.threadId` ownership. Routing metadata is not authentication.
+  Legacy MCP retains that controller per process. The explicit `fisch desktop` /
+  `fisch mcp` path opts into host-thread binding before controller tools; ordinary
+  legacy clients remain unchanged. Routing metadata is not authentication.
 
 Fisch advertises MCP `2025-06-18`. The pinned Native
 [pool implementation](https://github.com/openai/codex/blob/fb036d4ebd89f263d34a1f888c279ce85bb383c6/codex-rs/codex-mcp/src/connection_pool.rs#L1)
@@ -53,7 +54,14 @@ one row; foreign/realtime events are not resubmitted. This is useful if a verifi
 Native Dictate client sends normal `turn/start` through that same relay. It does
 not prove that Desktop currently does so. No model or speech recognition is used.
 
-## Smallest next integration, conditional on the target client
+## External capability route and remaining target-client acceptance
+
+The [Desktop capability host](desktop-host.md) is now implemented. A single
+independent Native expression-client positive control on `0aa25d6` verified actual
+host-supplied thread metadata, binding, a model-authored blue sphere, matching
+renderer completion and Stop cleanup. The receipt reported visibility unknown;
+independent screenshot review observed the sphere. This was an ephemeral
+expression-tool client, not the Desktop application, dictation or full coding MAIN.
 
 First inspect the user's actual Desktop version and selected conversation without
 opening a microphone. Verify its supported MCP configuration and host-authored
@@ -61,8 +69,7 @@ thread context, then explicitly pair one permitted thread with a Fisch controlle
 Keep existing loopback authentication, epoch fencing and controller exclusivity;
 never authorize from a model-supplied thread label or replay recognized text.
 
-Only add a narrow host/session adapter once that route is demonstrated. Desktop
-conversation projection and user/speech-start priority are separate gaps: standard
+Desktop conversation projection and user/speech-start priority remain separate gaps: standard
 MCP tool calls alone do not expose all earlier user input. If lifecycle events
 cannot be observed, report that limit instead of promising the private TUI's
 pre-dispatch barrier. Native Windows Dictate, Vietnamese recognition, microphone
