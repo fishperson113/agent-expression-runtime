@@ -414,3 +414,12 @@ it('drops a settled permission mismatch without retrying or permanently muting t
     expect(f.provider.uncertain).not.toBe(true);
   } finally { f.provider.close(); }
 });
+
+it('allows only one bounded confirmed-turn excerpt without granting geometry permission',()=>{
+ const context={revision:1,submissionId:'submission-a',threadId:'thread-a',turnId:'turn-a',text:'Public current question',ageMs:100};
+ const caps=freezeNativeHostCapabilities({schemaVersion:1,expressionAllowed:false,currentTurnContext:context});
+ expect(caps.currentTurnContext).toEqual(context);expect(caps.expressionAllowed).toBe(false);context.text='changed';expect(caps.currentTurnContext.text).toBe('Public current question');
+ for(const invalid of [{...context,text:'x'.repeat(241)},{...context,ageMs:60000},{...context,transcript:['PRIVATE']},{...context,get text(){throw Error('do not read');}}]){
+  expect(()=>freezeNativeHostCapabilities({schemaVersion:1,expressionAllowed:false,currentTurnContext:invalid})).toThrow('native_host_capabilities_invalid');
+ }
+});

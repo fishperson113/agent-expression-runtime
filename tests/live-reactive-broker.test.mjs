@@ -333,3 +333,40 @@ it('retains bounded numeric evaluation chronology across a stalled operation and
     expect(f.broker.browserUnavailable).toBe(true);
   } finally { f.broker.close(); vi.useRealTimers(); }
 });
+
+it('shares only host-confirmed turn context and drops replies when its scope changes or expires',async()=>{
+ for(const change of ['same','next','expired']){
+  let current={revision:1,submissionId:'submission-a',threadId:'native',turnId:'turn-a',text:'Public question',ageMs:10},release,received;
+  const provider={conversationLane:true,decide:async(_window,_signal,_receipt,caps)=>{received=caps;return new Promise(resolve=>{release=resolve;});}};
+  const f=fixture(provider,{contextSource:()=>current});
+  f.api.nativeReactionCapabilities=()=>({schemaVersion:1,expressionAllowed:false,currentTurnContext:{text:'BROWSER_INJECTION'}});
+  f.api.deliverNativeReaction=async(id,data)=>{f.deliveries.push({id,data});return{reason:data?'observed':'invalid_decision'};};
+  f.candidates.push(f.candidate('r'));await f.broker.poll({});await flush();
+  expect(received.currentTurnContext.text).toBe('Public question');expect(received.expressionAllowed).toBe(false);
+  if(change==='next')current={...current,revision:2,submissionId:'submission-b'};if(change==='expired')current=null;
+  release({reply:'response',decision:{mode:'retain'}});await flush();
+  expect(f.deliveries.some(value=>value.data?.reply==='response')).toBe(change==='same');
+  expect(f.forwarded).toEqual([]);f.broker.close();
+ }
+});
+it('checks confirmed context again after asynchronous authorization before provider cost',async()=>{
+ let current={revision:1,submissionId:'s-a',threadId:'native',turnId:'u-a',text:'Public',ageMs:0},release,calls=0;
+ const f=fixture({conversationLane:true,decide:async()=>{calls++;return{};}},{contextSource:()=>current});
+ f.api.nativeReactionCapabilities=()=>({schemaVersion:1,expressionAllowed:false});f.api.deliverNativeReaction=async()=>({reason:'invalid_decision'});
+ f.state.authorize=()=>new Promise(resolve=>{release=resolve;});f.candidates.push(f.candidate('r'));await f.broker.poll({});await flush();current=null;release(true);await flush();expect(calls).toBe(0);f.broker.close();
+});
+it('checks context expiry in the final browser delivery callback after queue delay',async()=>{
+ let current={revision:1,submissionId:'s-a',threadId:'native',turnId:'u-a',text:'Public',ageMs:59999.5};
+ const f=fixture({conversationLane:true,decide:async()=>({reply:'must not publish',decision:{mode:'retain'}})},{contextSource:()=>current});
+ f.api.nativeReactionCapabilities=()=>({schemaVersion:1,expressionAllowed:false});f.api.deliverNativeReaction=async(id,data)=>{f.deliveries.push({id,data});return{reason:data?'observed':'invalid_decision'};};
+ const evaluate=f.page.evaluate.bind(f.page),held=Promise.withResolvers();let queued;
+ f.page.evaluate=async(fn,arg)=>{if(arg?.native&&Object.hasOwn(arg,'data')){queued=arg;await held.promise;}return evaluate(fn,arg);};
+ f.candidates.push(f.candidate('r'));await f.broker.poll({});await flush();expect(queued.data.reply).toBe('must not publish');
+ current=null;await new Promise(resolve=>setTimeout(resolve,5));held.resolve();await flush();expect(f.deliveries).toEqual([{id:'r',data:null}]);f.broker.close();
+});
+it('caps Native decision validity for the existing final admission and lease checks',async()=>{
+ const original={reply:'public',decision:{validUntil:10000}},f=fixture({conversationLane:true});
+ f.api.deliverNativeReaction=async(_id,data)=>data;
+ const deadline=performance.now()+1000,result=await f.broker.deliver('r',original,deadline);
+ expect(result.decision.validUntil).toBe(Math.min(10000,deadline));expect(original.decision.validUntil).toBe(10000);f.broker.close();
+});
