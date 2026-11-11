@@ -65,7 +65,7 @@ Downloading assets never enables camera or hand tracking. Use the browser contro
 5. Yêu cầu `look` để kiểm thử thị giác: chỉ có ảnh tổng hợp hình tròn/mã số, có indicator và reason. Không dùng tool này để xem mặt thật của bạn.
 6. Tắt camera giữa phiên; Codex tiếp tục dùng được và dữ liệu khuôn mặt trở thành unknown.
 
-Không có TTS hoặc STT riêng. `/voice` tiếng Việt chưa được nghiệm thu bằng giọng nói người dùng; nhập chữ là fallback đã thống nhất.
+Không có TTS hoặc STT riêng. Đầu vào mong muốn là Dictate có sẵn của Codex (ghi âm rồi gửi text); đường vào đúng thread Fisch chưa được nghiệm thu. Không coi CLI `/voice` là dictation-only. Xem [bản thử nhanh](try-tonight.md) và [ranh giới dictation](native-dictation-interop.md).
 
 ## Quyền riêng tư của POC này
 
