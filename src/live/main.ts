@@ -32,6 +32,7 @@ const hands = new HandGestures();
 const observations = new FaceObservations(crypto.randomUUID());
 const handEvents = new HandEventSource(() => performance.now());
 let handEventVersion = 0, reactiveAvailable = false, nativeConversation = false;
+let reactiveChoice: boolean | undefined;
 const nativeReplies = new Map<string, { text: string; published: boolean; contextRevision: number | null }>();
 const nativeRequests = new Map<string, { request: ReactiveRequest; read: ReturnType<ReactiveSession['nativeReadSet']>; contextRevision: number | null }>();
 const cameraTransitions: { status: string; source: string; at: number }[] = [];
@@ -180,6 +181,7 @@ function cameraStatus(status: string, source = 'vision') {
   if (!active) recording.stop();
 }
 element('enable-reactivity').onchange = () => {
+  reactiveChoice = element<HTMLInputElement>('enable-reactivity').checked;
   body.revokeObserverHandoff(); semanticEvents.length = 0; updateHandProducer(); reactive.enable(element<HTMLInputElement>('enable-reactivity').checked); observeReactive();
   logActivity(element<HTMLInputElement>('enable-reactivity').checked ? 'Đã bật bộ quyết định từ quan sát local.' : 'Đã tắt bộ quyết định từ camera.');
 };
@@ -239,16 +241,20 @@ function observeReactive() { body.observe(observations.snapshot); reactive.obser
 function resetReactive() { body.revokeObserverHandoff(); nativeReplies.clear(); nativeRequests.clear(); handEvents.reset(); reactive.reset(); semanticEvents.length = 0; }
 function updateHandProducer() { handEvents.configure(reactiveAvailable && handEventVersion === 1 && element<HTMLInputElement>('enable-reactivity').checked); }
 function configureReactive(available: boolean, handVersion = 0, contractVersion = 1, native = false, policy?: { deadlineMs: number; cooldownMs: number; maxPerMinute: number }) {
+  const wasAvailable = reactiveAvailable;
   nativeConversation = native === true; reactive.configureNativeConversation(nativeConversation, policy);
   const knownContract = contractVersion === 1 || contractVersion === 2;
   const enabled = available === true && !stopped && knownContract;
   if (knownContract) reactive.configureContract(contractVersion);
   reactiveAvailable = enabled; handEventVersion = handVersion;
-  reactive.configure(enabled); element<HTMLInputElement>('enable-reactivity').disabled = !enabled;
-  if (!enabled) element<HTMLInputElement>('enable-reactivity').checked = false;
+  liveSetup.observerState(nativeConversation ? enabled : undefined);
+  reactive.configure(enabled); const choice = element<HTMLInputElement>('enable-reactivity'); choice.disabled = !enabled;
+  if (enabled && nativeConversation && reactiveChoice === undefined) reactiveChoice = true;
+  choice.checked = enabled && reactiveChoice === true;
+  if (enabled && !wasAvailable && choice.checked) reactive.enable(true);
   updateHandProducer();
   element('reactivity-status').textContent = !enabled ? nativeConversation ? 'Lane chủ động chưa sẵn sàng hoặc kết quả chưa rõ; kiểm tra terminal rồi khởi chạy lại Live. Hội thoại chính vẫn độc lập.' : 'Phản xạ cục bộ dùng tín hiệu hợp lệ; observer ngữ nghĩa chưa kết nối.'
-    : body.userSceneOwned ? nativeConversation ? body.canReactive() ? 'MAIN đã cho phép observer thay minh họa dùng một lần; không khôi phục hình cũ.' : 'Đang giữ hình bạn tạo; hội thoại chủ động vẫn có thể tiếp tục, không thay hình.' : 'Đang giữ hình bạn tạo; phản ứng tự động tạm nhường quyền.' : nativeConversation ? 'Codex chủ động đã kết nối: dữ liệu hình học có kiểu; không nhận diện cảm xúc/đồ vật. Bật Phản ứng theo camera để bắt đầu.' : 'Bộ quyết định đã kết nối; phản ứng camera là tùy chọn.';
+    : body.userSceneOwned ? nativeConversation ? body.canReactive() ? 'MAIN đã cho phép observer thay minh họa dùng một lần; không khôi phục hình cũ.' : 'Đang giữ hình bạn tạo; hội thoại chủ động vẫn có thể tiếp tục, không thay hình.' : 'Đang giữ hình bạn tạo; phản ứng tự động tạm nhường quyền.' : nativeConversation ? choice.checked ? 'Codex chủ động đã cấu hình. Chỉ dùng dữ liệu hình học khi bạn cho phép camera; không nhận diện cảm xúc/đồ vật. Đây chưa phải xác nhận lượt trả lời thành công.' : 'Đã tạm tắt phản ứng chủ động theo lựa chọn của bạn.' : 'Bộ quyết định đã kết nối; phản ứng camera là tùy chọn.';
 }
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) return;
