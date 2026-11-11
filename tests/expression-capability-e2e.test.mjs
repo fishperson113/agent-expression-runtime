@@ -126,14 +126,17 @@ it.skipIf(!existsSync(gatewayExecutable()) && !required)('keeps the MCP controll
     const receipt = toolValue(await owner.tool('express', args));
     expect(receipt.status).toBe('accepted'); await completed(owner, args.requestId);
     const held = await status(owner, args.requestId); expect(held.receipt).toMatchObject({ session: receipt.session, epoch: receipt.epoch, seq: receipt.seq });
+    const appliedCount = () => live.page.evaluate(value => window.fischLive.metrics().diagnostics.events.filter(event => event.epoch === value.epoch && event.seq === value.seq && event.phase === 'applied').length, receipt);
+    const initialAppliedCount = await appliedCount(); expect(initialAppliedCount).toBe(1);
     expect(toolValue(await owner.tool('express', args))).toMatchObject({ session: receipt.session, epoch: receipt.epoch, seq: receipt.seq });
+    expect(await appliedCount()).toBe(1);
     const competing = await competitor.tool('express', { requestId: 'not_a_fork_guard', body: { type: 'style', color: '#ff0000', durationMs: 100 } });
     expect(competing.isError).toBe(true); expect(competing.content[0].text).toContain('controller_active');
     const denied = await fetch(live.base + '/v1/sessions', { method: 'POST', headers: { Authorization: 'Bearer ' + live.token } });
     expect(denied.status).toBe(409); expect(await denied.json()).toEqual({ status: 'rejected', code: 'controller_active' });
     const cancelled = toolValue(await owner.tool('cancel_expression'));
     expect(cancelled.epoch).not.toBe(receipt.epoch);
-    const before = await live.page.evaluate(value => window.fischLive.metrics().diagnostics.events.filter(event => event.epoch === value.epoch && event.seq === value.seq && event.phase === 'applied').length, receipt);
+    const before = await appliedCount(); expect(before).toBe(1);
     const stale = await fetch(live.base + '/v1/sessions/' + receipt.session + '/expressions', { method: 'POST', headers: { Authorization: 'Bearer ' + live.token, 'Content-Type': 'application/json' },
       body: JSON.stringify({ requestId: 'stale_controller_contract', epoch: receipt.epoch, body: { type: 'style', color: '#ff0000', durationMs: 100 } }) });
     expect(stale.status).toBe(409); expect(await stale.json()).toEqual({ status: 'rejected', code: 'stale_epoch' });
@@ -143,13 +146,12 @@ it.skipIf(!existsSync(gatewayExecutable()) && !required)('keeps the MCP controll
     const fresh = toolValue(await owner.tool('inspect_expression'));
     expect(fresh.session).toBe(receipt.session); expect(fresh.epoch).toBe(cancelled.epoch); expect(fresh.summary.contextLost).toBe(false);
     expect(fresh.summary.contentFrame).toBeGreaterThan(0);
-    const after = await live.page.evaluate(value => window.fischLive.metrics().diagnostics.events.filter(event => event.epoch === value.epoch && event.seq === value.seq && event.phase === 'applied').length, receipt);
-    expect(after).toBe(before);
+    const after = await appliedCount(); expect(after).toBe(1);
     expect(fresh.summary.color).not.toBe('#ff0000'); expect(await live.page.locator('video').evaluate(video => video.srcObject)).toBeNull();
     if (process.env.FISCH_NATIVE_TEXT_CONTROLLER_EVIDENCE) writeFileSync(process.env.FISCH_NATIVE_TEXT_CONTROLLER_EVIDENCE,
       JSON.stringify({ mode: 'protocol_fixture_actual_stdio_mcp_rust_software_webgl', actualModelCalls: 0, realMedia: false, nativeChatIdentityVerified: false, nativeDictationVerified: false,
         receipt, completed: held, competitor: JSON.parse(competing.content[0].text), competingHttpStatus: denied.status, cancelled,
-        staleHttpStatus: stale.status, fenced: JSON.parse(fenced.content[0].text), renderer: fresh, appliedCountBeforeReplay: before, appliedCountAfterReplay: after }, null, 2), { mode: 0o600 });
+        staleHttpStatus: stale.status, fenced: JSON.parse(fenced.content[0].text), renderer: fresh, initialAppliedCount, appliedCountBeforeReplay: before, appliedCountAfterReplay: after }, null, 2), { mode: 0o600 });
   } finally { await competitor?.close(); await owner?.close(); await live.close(); }
 }, 60000);
 it.skipIf(!existsSync(gatewayExecutable()) && !required)('discovers, authors, executes, cancels and recovers over actual MCP, Rust and WebGL with camera off', async () => {
