@@ -17,13 +17,14 @@ function sample(snapshot: Observation, at: number, state?: HandReadSet): Sample 
 
 /** Opportunity memory only: never establishes identity or extends tracking/owner leases. */
 export class HandOpportunityMemory {
+  private unserved?: Sample & { observationSeq: number; expiresAt: number };
   private previous?: Sample;
   private confirmed?: Sample;
   private reacquire?: Reacquire;
   private stable?: Reacquire;
   private suppressed = 0;
   private last?: { reason: 'technical_hand_reacquire'; observationSeq: number; sourceGeneration: number };
-  reset() { this.previous = this.confirmed = this.reacquire = this.stable = undefined; }
+  reset() { this.unserved = this.previous = this.confirmed = this.reacquire = this.stable = undefined; }
   observe(snapshot: Observation, at: number, state?: HandReadSet) {
     const next = sample(snapshot, at, state), old = this.previous;
     if (!next) { this.reset(); return; }
@@ -59,13 +60,24 @@ export class HandOpportunityMemory {
     if (event.type !== 'hand_appeared') return false;
     const current = this.previous, candidate = this.reacquire;
     if (!current || current.track !== event.trackId || current.generation !== event.sourceGeneration) return false;
-    const suppress = !!candidate && candidate.samples >= 3 && current.at - candidate.at >= 150;
+    const technical = !!candidate && candidate.samples >= 3 && current.at - candidate.at >= 150;
+    if (this.unserved && current.at > this.unserved.expiresAt) this.unserved = undefined;
+    const unserved = this.unserved;
+    const carriesUnserved = !!unserved && technical && unserved.source === current.source &&
+      unserved.generation + 1 === current.generation;
+    const suppress = technical && !carriesUnserved;
+    if (!suppress) this.unserved = { ...current, observationSeq: event.observationSeq, expiresAt: carriesUnserved ? unserved!.expiresAt : current.at + 5000 };
     this.confirmed = current; this.reacquire = undefined;
     if (suppress) {
       this.suppressed = Math.min(Number.MAX_SAFE_INTEGER, this.suppressed + 1);
       this.last = { reason: 'technical_hand_reacquire', observationSeq: event.observationSeq, sourceGeneration: event.sourceGeneration };
     }
     return suppress;
+  }
+  markDispatched(events: readonly HandWireEvent[]) {
+    const episode = this.unserved;
+    if (episode && events.some(event => event.type === 'hand_appeared' && event.trackId === episode.track &&
+      event.sourceGeneration === episode.generation && event.observationSeq === episode.observationSeq)) this.unserved = undefined;
   }
   status() { return { suppressed: this.suppressed, last: this.last ? { ...this.last } : null }; }
 }
