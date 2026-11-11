@@ -3,6 +3,7 @@ import { herdrCall } from '../integrations/herdr.mjs';
 import { openLive, createLivePane } from '../integrations/live-launch.mjs';
 import { OutputActivity } from '../integrations/output-activity.mjs';
 import { openControl } from '../integrations/terminal-ipc.mjs';
+import { runPanelCodex } from '../integrations/live-panel.mjs';
 import { runTerminalCodex } from '../integrations/live-terminal.mjs';
 import { liveShutdown, liveShutdownCode, closeLiveOwned } from '../integrations/live-shutdown.mjs';
 
@@ -56,7 +57,7 @@ async function activityLoop(live, pane, call, signal, proxy) {
     await delay(100, undefined, { signal }).catch(() => {});
   }
 }
-export async function runLiveSession({ hands, assets, agentPane, call = herdrCall, headless = false, signal, launchCodex = true, runHost = runTerminalCodex, open = openLive } = {}) {
+export async function runLiveSession({ hands, assets, agentPane, panel = false, resumeThreadId, call = herdrCall, headless = false, signal, launchCodex = true, runHost, open = openLive } = {}) {
   if (signal?.aborted) return 130;
   const host = await selectLiveHost({ call, agentPane });
   const abort = new AbortController(), stop = kind => abort.abort(liveShutdown(kind));
@@ -70,8 +71,8 @@ export async function runLiveSession({ hands, assets, agentPane, call = herdrCal
     await live.page.exposeFunction('fischLiveStop', reason => stop(reason === 'ui' ? 'ui' : 'failure'));
     if (abort.signal.aborted) return liveShutdownCode(abort.signal.reason) ?? 1;
     if (host.kind === 'terminal') {
-      console.log('Fisch Live ready. Camera is off. Codex runs in this terminal; exit Codex or close the body to stop.');
-      return await runHost({ live, cwd: host.cwd, signal: abort.signal });
+      console.log(panel ? 'Fisch Live ready. Chat and Native approval requests are in the browser panel. Camera is off.' : 'Fisch Live ready. Camera is off. Codex runs in this terminal; exit Codex or close the body to stop.');
+      return await (runHost ?? (panel ? runPanelCodex : runTerminalCodex))({ live, cwd: host.cwd, signal: abort.signal, ...(resumeThreadId ? { resumeThreadId } : {}) });
     }
     const source = host.source;
     const pane = launchCodex ? await createLivePane(call, source, live.base, live.token) : source;

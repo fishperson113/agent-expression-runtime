@@ -2,6 +2,7 @@ import type { ReactiveRequest } from '../core/live/decision-types';
 import './style.css';
 import { mountLive, element, mountDisclosures } from './view';
 import { mountPlayground } from './playground-view';
+import { mountPanelControls } from './panel-controls';
 import { mountConversation } from './conversation-view';
 import { mountLiveSetup } from './setup-help';
 import { HandGestures } from './gestures';
@@ -23,6 +24,7 @@ const playground = mountPlayground(playgroundContainer);
 const setupContainer = element('setup-tools');
 const liveSetup = mountLiveSetup(setupContainer);
 const conversation = mountConversation(element('conversation-tools'), value => { if (nativeConversation) (window as any).fischLive?.reactiveUserIntent?.(); return (window as any).fischLiveConversation(value); });
+let panelControls: ReturnType<typeof mountPanelControls> | undefined;
 mountDisclosures(element('app'));
 const synthetic = new URLSearchParams(location.search).get('fixture') === 'synthetic';
 const body = new LiveBody(element<HTMLCanvasElement>('body'), text => { element('body-status').textContent = text; });
@@ -66,6 +68,7 @@ function logActivity(text: string) {
 }
 Object.assign(window, { fischLive: { pair: (base: string, token: string) => bridge.connect(base, token),
   selectThread: () => { hands.reset(); resetReactive(); logActivity('Đã chọn phiên Codex.'); return bridge.cancel(); },
+  panelControlStatus: (value: any) => { if (stopped) return; panelControls ??= mountPanelControls(element('conversation-tools'), value => (window as any).fischPanelRespond(value)); if (['mode', 'ready'].includes(value?.type)) { conversation.panelOwner(); liveSetup.panelOwner(); } else panelControls.project(value); },
   logActivity, playgroundStatus: (value: unknown) => playground.project(value), playgroundClear: () => playground.clear(),
   configureReactive: (available: boolean, handVersion = 0, contractVersion = 1, native = false, policy?: { deadlineMs: number; cooldownMs: number; maxPerMinute: number }) => configureReactive(available, handVersion, contractVersion, native, policy),
   setReactiveUserBusy: (busy: boolean) => reactive.setUserBusy(busy),
@@ -114,7 +117,7 @@ Object.assign(window, { fischLive: { pair: (base: string, token: string) => brid
 Object.assign((window as any).fischLive, { setupStatus: (value: unknown) => liveSetup.project(value),
   externalHostPresentation: () => { if (!stopped) liveSetup.externalHost(); },
   externalObserverStatus: (reason: unknown) => { if (!stopped) liveSetup.externalObserver(reason); },
-  conversationStatus: (value: unknown) => { if (!stopped) conversation.project(value); }, conversationClear: () => conversation.clear() });
+  conversationStatus: (value: unknown) => { if (!stopped) conversation.project(value); }, conversationClear: () => { conversation.clear(); panelControls?.clear(); } });
 const recent: LiveSourceEvent[] = [];
 let sampleCount = 0, sampleAt = performance.now(), inferenceMs = 0, stopped = false;
 const camera = new VisionCamera(element<HTMLVideoElement>('camera'), sample, cameraStatus,
@@ -232,7 +235,7 @@ function stop(reason: 'ui' | 'pagehide') {
   if (stopped) return;
   if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
   logActivity('Đã dừng phiên Live.'); resetReactive(); sharedContextLabel.data = sharedContextText.data = ''; sharedContext.hidden = true; reactive.configure(false); stopped = true;
-  recording.dispose(); camera.stop(); hands.reset(); cameraStatus('stopped', 'shutdown'); clearInterval(timer); bridge.stop(); body.dispose(); playground.dispose(); liveSetup.dispose(); conversation.dispose();
+  recording.dispose(); camera.stop(); hands.reset(); cameraStatus('stopped', 'shutdown'); clearInterval(timer); bridge.stop(); body.dispose(); playground.dispose(); liveSetup.dispose(); conversation.dispose(); panelControls?.dispose();
   element<HTMLButtonElement>('camera-start').disabled = true; element('connection').textContent = 'Đã dừng phiên Live';
   void (window as any).fischLiveStop?.(reason);
 }
