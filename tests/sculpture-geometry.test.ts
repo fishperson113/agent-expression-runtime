@@ -28,6 +28,21 @@ it('samples deterministically with stable allocation regardless of part order', 
   const map = spatialAssignment(a.positions, b.positions);
   expect(new Set(map).size).toBe(1000);
 });
+it('divides a fixed particle budget by relative weight without scaling geometry', () => {
+  const part = { kind: 'ellipsoid', center: [0, 0, 0], scale: [0.2, 0.3, 0.4] };
+  const counts = (weights: number[]) => {
+    const form = validateSculpture({ parts: weights.map((weight, i) => ({ ...part, id: `p${i}`, weight })) }, '$');
+    const cloud = sculptureCloud(form, 400);
+    for (let i = 0; i < 400; i++) {
+      const [x, y, z] = cloud.positions.slice(i * 3, i * 3 + 3);
+      expect((x / 0.2) ** 2 + (y / 0.3) ** 2 + (z / 0.4) ** 2).toBeCloseTo(1, 5);
+    }
+    return weights.map((_, i) => [...cloud.partIndices].filter(index => index === i).length);
+  };
+  expect(counts([1, 1])).toEqual([200, 200]);
+  expect(counts([3, 1])).toEqual([300, 100]);
+  expect(counts([6, 2])).toEqual([300, 100]);
+});
 it('starts interrupted morphs at the exact current particle positions and reuses part identity', () => {
   const f = new ParticleFormation(512), form = validateSculpture(scene(), '$'), op = {};
   f.sample(op, form, 0.4, [1, 0, 0, 0, 0, 0, 0], 42, 0); f.tick(0);
