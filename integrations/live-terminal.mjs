@@ -59,7 +59,7 @@ async function createBridge({ live, host, cwd, env, configured, instructions }) 
 export async function runTerminalCodex({ live, cwd, signal, spawnClient = spawn, host: suppliedHost, reactiveProvider }) {
   const host = suppliedHost ?? await codexCommand();
   const env = { ...nativeLiveEnvironment(process.env), AER_BASE_URL: live.base, AER_PAIRING_TOKEN: live.token, FISCH_LIVE: '1', FISCH_PLANNER_BACKEND: 'off' };
-  const configured = reactiveProvider === undefined ? createLiveReactiveProvider(process.env) : { provider: reactiveProvider, reason: reactiveProvider ? 'ready' : 'disabled_by_config' };
+  const configured = reactiveProvider === undefined ? createLiveReactiveProvider(process.env, { defaultNative: true }) : { provider: reactiveProvider, reason: reactiveProvider ? 'ready' : 'disabled_by_config' };
   const instructions = readFileSync(new URL('./live-instructions.md', import.meta.url), 'utf8');
   const state = await createBridge({ live, host, cwd, env, configured, instructions });
   let child, stopping = false, stoppedCode = 1, closing, failed = false;

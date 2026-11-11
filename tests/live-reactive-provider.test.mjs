@@ -3,6 +3,7 @@ import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createLiveReactiveProvider, nativeLiveEnvironment } from '../integrations/live-reactive-provider.mjs';
+import { nativeUsagePaths } from '../integrations/native-live-usage.mjs';
 vi.mock('node:fs', async importOriginal => {
   const actual = await importOriginal(); return { ...actual, readFileSync: vi.fn(actual.readFileSync) };
 });
@@ -83,4 +84,33 @@ it('contains invalid configuration errors without returning credentials or readi
       .toEqual({ provider: null, reason: 'invalid_provider_config' });
   }
   expect(readFileSync).not.toHaveBeenCalled(); expect(fetch).not.toHaveBeenCalled();
+});
+it('enables only the production Native default with managed persistent usage, without API keys or inference', () => {
+  const home = mkdtempSync(join(tmpdir(), 'fisch-native-default-')); directories.push(home);
+  const env = { XDG_DATA_HOME: home, LOCALAPPDATA: home }, options = { defaultNative: true, usageOptions: { home }, now };
+  const first = createLiveReactiveProvider(env, options);
+  expect(first.reason).toBe('ready_native_conversation'); expect(first.provider.conversationLane).toBe(true);
+  expect(first.provider.policy).toEqual({ deadlineMs: 60000, cooldownMs: 15000, maxPerMinute: 4 });
+  first.provider.config.reserve({ requestId: 'r' }); first.provider.close();
+  const path = nativeUsagePaths({ env, home }).state;
+  expect(JSON.parse(readFileSync(path)).used).toBe(1);
+  const second = createLiveReactiveProvider(env, options); second.provider.close();
+  expect(JSON.parse(readFileSync(path)).used).toBe(1); expect(JSON.stringify(second)).not.toContain(home);
+});
+it('never bypasses an explicit off, unknown backend or invalid/exhausted/expired budget in production default mode', () => {
+  expect(createLiveReactiveProvider({ FISCH_REACTIVE_BACKEND: 'off' }, { defaultNative: true, now })).toEqual({ provider: null, reason: 'disabled_by_config' });
+  expect(createLiveReactiveProvider({ FISCH_REACTIVE_BACKEND: 'unknown' }, { defaultNative: true, now })).toEqual({ provider: null, reason: 'invalid_provider_config' });
+  expect(createLiveReactiveProvider({ FISCH_REACTIVE_BUDGET: '' }, { defaultNative: true, now })).toEqual({ provider: null, reason: 'missing_budget' });
+  expect(createLiveReactiveProvider({ FISCH_REACTIVE_BUDGET: 'relative' }, { defaultNative: true, now })).toEqual({ provider: null, reason: 'invalid_budget_path' });
+  for (const [values, reason] of [[{ used: 120 }, 'budget_exhausted'], [{ deadline: new Date(100).toISOString() }, 'budget_expired']]) {
+    const path = ledger(values), before = readFileSync(path, 'utf8');
+    expect(createLiveReactiveProvider({ FISCH_REACTIVE_BUDGET: path }, { defaultNative: true, now })).toEqual({ provider: null, reason });
+    expect(readFileSync(path, 'utf8')).toBe(before);
+  }
+});
+it('fails closed with fixed metadata if the managed data directory cannot be written', () => {
+  const home = mkdtempSync(join(tmpdir(), 'fisch-native-default-denied-')); directories.push(home);
+  const file = join(home, 'not-a-directory'); writeFileSync(file, 'preserve');
+  expect(createLiveReactiveProvider({ LOCALAPPDATA: file, XDG_DATA_HOME: file }, { defaultNative: true, usageOptions: { home: file }, now })).toEqual({ provider: null, reason: 'budget_unavailable' });
+  expect(readFileSync(file, 'utf8')).toBe('preserve');
 });
