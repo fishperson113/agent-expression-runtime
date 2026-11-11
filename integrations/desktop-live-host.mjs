@@ -20,7 +20,6 @@ export async function runDesktopHost({ signal, open, claim = claimDesktopRuntime
   const stop = code => { if (!closing) closing = Promise.resolve().then(async () => { try { await live?.close(); } finally { runtime.close(); finish(code); } }); return closing; };
   const onAbort = () => { if (live) void stop(130); }, onClose = () => { void stop(0); }, onFail = () => { void stop(1); };
   const presentation = async () => { await live.page.waitForFunction(() => !!window.fischLive); await live.page.evaluate(presentDesktopHost); };
-  const onReload = () => { if (!closing) void presentation().catch(() => { if (!closing) onFail(); }); };
   signal?.addEventListener('abort', onAbort, { once: true });
   try {
     const start = open ?? (await import('./live-launch.mjs')).openLive;
@@ -29,14 +28,12 @@ export async function runDesktopHost({ signal, open, claim = claimDesktopRuntime
     runtime.publish({ base: live.base, token: live.token });
     live.page.once('close', onClose); live.page.once('crash', onFail); live.gateway.once('exit', onFail);
     await live.page.exposeFunction('fischLiveStop', () => { void stop(0); });
-    live.page.on('domcontentloaded', onReload);
     await presentation();
     console.error('Fisch Desktop capability host ready. Camera is off. Use the configured MCP server from Codex Desktop; close this body or press Ctrl+C to stop.');
     return await done;
   } finally {
     signal?.removeEventListener('abort', onAbort);
     live?.page.removeListener('close', onClose); live?.page.removeListener('crash', onFail); live?.gateway.removeListener('exit', onFail);
-    live?.page.removeListener('domcontentloaded', onReload);
     await stop(1);
   }
 }

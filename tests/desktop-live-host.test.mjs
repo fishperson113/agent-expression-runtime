@@ -9,13 +9,13 @@ function host() {
   const runtime = { publish: vi.fn(), close: vi.fn() }, open = vi.fn(async () => live);
   return { page, live, runtime, open, claim: vi.fn(() => runtime) };
 }
-it.each(['close', 'crash', 'gateway', 'abort', 'stop'])('closes the owned Desktop body on %s without launching Native or reopening it', async event => {
+it.each(['close', 'crash', 'gateway', 'abort', 'stop', 'pagehide'])('closes the owned Desktop body on %s without launching Native or reopening it', async event => {
   const f = host(), abort = new AbortController(), log = vi.spyOn(console, 'error').mockImplementation(() => {});
   try {
     const running = runDesktopHost({ signal: abort.signal, open: f.open, claim: f.claim });
     await vi.waitFor(() => expect(f.runtime.publish).toHaveBeenCalledOnce());
     await vi.waitFor(() => expect(f.page.exposeFunction).toHaveBeenCalledOnce());
-    if (event === 'gateway') f.live.gateway.emit('exit'); else if (event === 'abort') abort.abort(); else if (event === 'stop') f.page.exposeFunction.mock.calls[0][1](); else f.page.emit(event);
+    if (event === 'gateway') f.live.gateway.emit('exit'); else if (event === 'abort') abort.abort(); else if (['stop', 'pagehide'].includes(event)) f.page.exposeFunction.mock.calls[0][1](event === 'pagehide' ? 'pagehide' : 'ui'); else f.page.emit(event);
     expect(await running).toBe(event === 'abort' ? 130 : ['crash', 'gateway'].includes(event) ? 1 : 0);
     expect(f.live.close).toHaveBeenCalledOnce(); expect(f.runtime.close).toHaveBeenCalledOnce(); expect(f.open).toHaveBeenCalledOnce();
     expect(f.page.listenerCount('close')).toBe(0); expect(JSON.stringify(log.mock.calls)).not.toContain(f.live.token);
@@ -36,15 +36,15 @@ it('labels Desktop ownership and disables browser submission without inventing a
     expect(fischLive.configureReactive).toHaveBeenCalledWith(false); expect(Object.keys(fischLive)).toEqual(['configureReactive', 'logActivity']);
   } finally { vi.unstubAllGlobals(); }
 });
-it('reapplies external-host presentation after reload and removes its listener on stop', async () => {
+it('does not install an automatic browser reload or restart handler', async () => {
   const f = host(), log = vi.spyOn(console, 'error').mockImplementation(() => {});
   try {
     const running = runDesktopHost({ open: f.open, claim: f.claim });
     await vi.waitFor(() => expect(f.page.evaluate).toHaveBeenCalledOnce());
     expect(f.page.evaluate).toHaveBeenCalledWith(presentDesktopHost);
-    f.page.emit('domcontentloaded');
-    await vi.waitFor(() => expect(f.page.evaluate).toHaveBeenCalledTimes(2));
-    expect(f.page.waitForFunction).toHaveBeenCalledTimes(2);
+    expect(f.page.listenerCount('domcontentloaded')).toBe(0);
+    f.page.emit('domcontentloaded'); expect(f.page.evaluate).toHaveBeenCalledOnce();
+    expect(f.page.waitForFunction).toHaveBeenCalledOnce();
     f.page.emit('close'); expect(await running).toBe(0); expect(f.page.listenerCount('domcontentloaded')).toBe(0);
   } finally { log.mockRestore(); }
 });

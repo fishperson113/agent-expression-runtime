@@ -18,6 +18,8 @@ An exclusive lock prevents another host from taking over. Missing host fails `de
 
 Closing the browser, pressing its Stop control, or stopping the host closes the gateway and removes only that instance's runtime record. MCP EOF/signals close the child server. Stopping the body does not claim to cancel inference already running inside Codex Desktop. A later MCP invocation cannot restart a stopped host.
 
+Reloading or leaving the browser page also stops this host. Run `fisch desktop` deliberately to start a new body, then reconnect the Desktop MCP server; refresh never silently resumes an old controller or expression. A refresh may show a browser navigation-aborted message because the host closes its owned browser.
+
 ## Validation boundary
 
 Unit tests cover private registry ownership, corruption, symlinks, no-clobber publication, process liveness, host cleanup and raw stdio forwarding. CLI tests cover static configuration and missing-host failure without dependency/bootstrap output. Actual Desktop discovery, host thread metadata, user-reviewed configuration and end-to-end expression rendering require separate integration acceptance. No camera, microphone or model invocation is necessary for these unit checks.
