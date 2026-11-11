@@ -32,10 +32,10 @@ footer{display:flex;align-items:center;gap:16px;color:var(--muted);font-size:11p
 .fisch-conversation .conversation-composer{border:1px solid var(--line);border-radius:16px;padding:10px;background:var(--bg);gap:6px}
 .fisch-conversation .conversation-composer:focus-within{border-color:var(--accent)}
 .fisch-conversation .composer-label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
-.conversation-panel .fisch-conversation .conversation-composer textarea{border:0;background:transparent;border-radius:6px;font-size:14px;line-height:1.45;padding:4px;min-height:44px;outline-offset:0}
+.conversation-panel .fisch-conversation .conversation-composer textarea{border:0;background:transparent;border-radius:6px;font-size:14px;line-height:1.45;padding:4px;min-height:49px;outline-offset:0}
 .fisch-conversation .conversation-composer textarea::placeholder{color:var(--muted)}
 .fisch-conversation .conversation-composer .conversation-actions{align-items:center;justify-content:flex-end;gap:6px;flex-wrap:wrap}
 .fisch-conversation .conversation-composer .conversation-count{flex:1 1 120px;color:var(--muted);font-size:10px;line-height:1.3}
 .conversation-panel .fisch-conversation .conversation-composer button{min-height:36px;border-radius:10px;padding:6px 10px}
 .fisch-conversation .conversation-composer button[type=button]{background:transparent;color:var(--text)}
-@media(max-height:600px){.fisch-conversation .conversation-composer{padding:6px}.conversation-panel .fisch-conversation .conversation-composer textarea{font-size:12px;min-height:34px}.conversation-panel .fisch-conversation .conversation-composer button{min-height:30px;padding:4px 8px}.fisch-conversation .conversation-composer .conversation-count{flex-basis:90px;font-size:9px}}
+@media(max-height:600px){.fisch-conversation .conversation-composer{padding:6px}.conversation-panel .fisch-conversation .conversation-composer textarea{font-size:12px;min-height:43px}.conversation-panel .fisch-conversation .conversation-composer button{min-height:30px;padding:4px 8px}.fisch-conversation .conversation-composer .conversation-count{flex-basis:90px;font-size:9px}}
