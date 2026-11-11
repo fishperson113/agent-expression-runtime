@@ -20,24 +20,47 @@ function sourceScope(value) {
 const clip = (value, limit) => new TextDecoder().decode(Buffer.from(value.slice(0, limit)).subarray(0, limit), { stream: true });
 
 export class LiveConversation {
+  #observer; #observerRevision = 0; #now;
   #output; #transport; #broker; #captureObservation; #thread; #selection; #generation = 0; #revision = 0;
   #ownedContexts = new Map(); #terminal = new Set(); #intent = 0; #messages = []; #unknown = new Set(); #pending; #stopping; #stopErrorTurn; #expressionFailureTurn; #error = ''; #closed = false; #navigated = false;
-  constructor({ output, transport, broker, captureObservation }) {
+  constructor({ output, transport, broker, captureObservation, now = () => performance.now() }) {
     if (!output || typeof broker?.busy !== 'function' || typeof transport?.submitUser !== 'function' || typeof transport?.interruptUser !== 'function')
       throw failure('conversation_configuration');
     if (captureObservation !== undefined && typeof captureObservation !== 'function') throw failure('conversation_configuration');
-    this.#captureObservation = captureObservation;
+    if (typeof now !== 'function') throw failure('conversation_configuration');
+    this.#now = now; this.#captureObservation = captureObservation;
     this.#output = output; this.#transport = transport; this.#broker = broker;
     this.#thread = output.thread; this.#selection = output.selection;
   }
+  #clearObserver() { this.#observer = undefined; this.#observerRevision++; }
+  observerContext() {
+    this.#sync();
+    if (!this.#observer) return null;
+    const ageMs = this.#now() - this.#observer.at;
+    if (!this.#available() || !Number.isFinite(ageMs) || ageMs < 0 || ageMs >= 60000) { this.#clearObserver(); return null; }
+    const { at, ...context } = this.#observer;
+    return freeze({ ...context, ageMs });
+  }
+  #confirmObserver(job, turn, text) {
+    this.#sync();
+    if (!this.#available() || job.observerRevision !== this.#observerRevision || job.generation !== this.#generation ||
+      job.intent !== this.#intent || job.thread !== this.#thread || this.#pending !== job || this.#output.selection !== undefined ||
+      !['inProgress', 'completed'].includes(turn.status)) return;
+    const normalized = Array.from(text.replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ')).slice(0, 240).join('');
+    if (!normalized.trim()) return;
+    this.#observerRevision++;
+    this.#observer = freeze({ revision: this.#observerRevision, submissionId: job.submissionId, threadId: job.thread,
+      turnId: turn.id, text: normalized, at: this.#now() });
+  }
   #clear() {
+    this.#clearObserver();
     this.#ownedContexts.clear(); this.#expressionFailureTurn = undefined; this.#terminal.clear(); this.#messages = []; this.#stopping = this.#stopErrorTurn = undefined; this.#error = '';
     this.#generation++; this.#revision++;
   }
   #sync() {
     if (this.#output.selection !== this.#selection) {
       this.#selection = this.#output.selection;
-      if (this.#selection !== undefined) { this.#intent++; this.#revision++; }
+      if (this.#selection !== undefined) { this.#clearObserver(); this.#intent++; this.#revision++; }
     }
     if (this.#thread !== this.#output.thread) { this.#thread = this.#output.thread; this.#clear(); }
     const owner = this.#owner();
@@ -51,7 +74,11 @@ export class LiveConversation {
       this.#stopErrorTurn = undefined; this.#revision++;
     }
   }
-  selectionAttempt() { this.#intent++; this.#revision++; }
+  inputAttempt(message) {
+    if (['turn/start', 'turn/steer', 'turn/interrupt'].includes(message?.method) &&
+      (this.#pending?.rpcId === undefined || message.id !== this.#pending.rpcId)) this.#clearObserver();
+  }
+  selectionAttempt() { this.#clearObserver(); this.#intent++; this.#revision++; }
   navigation() { this.#navigated = true; this.#clear(); this.#error = 'conversation_restart_required'; }
   transportLost() {
     const messages = this.#messages.map(value => ({ ...value, status: value.status === 'streaming' ? 'unknown' : value.status }));
@@ -116,10 +143,10 @@ export class LiveConversation {
     return { type: 'text', text: job.contextText, text_elements: [] };
   }
   async send(value) {
-    this.#sync();
+    this.#clearObserver(); this.#sync();
     if (!this.#canSend() || value?.generation !== this.#generation) throw failure('conversation_unavailable');
     if (typeof value.text !== 'string' || !value.text.trim() || bytes(value.text) > 16000) throw failure('conversation_invalid_text');
-    const job = { generation: this.#generation, intent: this.#intent, thread: this.#thread, submissionId: randomUUID() };
+    const job = { generation: this.#generation, intent: this.#intent, thread: this.#thread, submissionId: randomUUID(), observerRevision: this.#observerRevision, observerText: value.text };
     this.#pending = job; this.#error = ''; this.#revision++;
     try {
       const input = [{ type: 'text', text: value.text, text_elements: [] }];
@@ -130,8 +157,10 @@ export class LiveConversation {
       if (!id(reply?.result?.turn?.id) || !['inProgress', 'completed', 'interrupted', 'failed'].includes(reply.result.turn.status))
         throw Object.assign(failure('conversation_unknown'), { uncertain: true });
       if (job.contextText !== undefined) this.#rememberContext(reply.result.turn.id, job);
+      this.#confirmObserver(job, reply.result.turn, job.observerText);
       return Object.freeze({ status: 'accepted' });
     } catch (error) {
+      this.#clearObserver();
       const unknown = error?.uncertain !== false;
       if (unknown && !this.#closed) this.#unknown.add(job.thread);
       const code = unknown ? 'conversation_unknown' : (job.generation !== this.#generation || job.intent !== this.#intent) ? 'conversation_changed' : 'conversation_rejected';
@@ -153,7 +182,7 @@ export class LiveConversation {
     this.#broker.pending?.delete(key); this.#output.turnRequests?.delete(key);
   }
   async cancel(value) {
-    this.#sync(); const turn = this.#owner();
+    this.#clearObserver(); this.#sync(); const turn = this.#owner();
     if (!turn || value?.generation !== this.#generation) throw failure('conversation_no_turn');
     if (this.#stopping?.turn === turn) return Object.freeze({ status: 'stopping' });
     if (this.#stopErrorTurn === turn && this.#error === 'conversation_stop_unconfirmed') {
@@ -188,9 +217,14 @@ export class LiveConversation {
     this.#sync();
     if (!this.#available() || this.#output.selection !== undefined) return;
     const { method, params = {} } = message;
-    if (message.id === this.#pending?.rpcId && this.#pending?.contextText !== undefined && !message.error)
-      this.#rememberContext(message.result?.turn?.id, this.#pending);
+    if (message.id === this.#pending?.rpcId && this.#pending && !message.error && id(message.result?.turn?.id)) {
+      this.#pending.observerTurnId = message.result.turn.id;
+      if (this.#pending.contextText !== undefined) this.#rememberContext(message.result.turn.id, this.#pending);
+    }
     if (params.threadId !== this.#thread) return;
+    if (method === 'turn/started' && this.#pending?.rpcId && id(params.turn?.id) && this.#output.turn === params.turn.id)
+      this.#pending.observerTurnId = params.turn.id;
+    if (method === 'turn/started' && !this.#pending?.rpcId && this.#observer?.turnId !== params.turn?.id) this.#clearObserver();
     if (method === 'turn/started' && this.#pending?.rpcId && this.#pending.contextText !== undefined)
       this.#rememberContext(params.turn?.id, this.#pending);
     if (method === 'turn/completed' && id(params.turn?.id) && this.#output.completed?.has(params.turn.id)) {
@@ -198,6 +232,7 @@ export class LiveConversation {
       this.#terminal.add(params.turn.id);
       if (this.#terminal.size > 64) this.#terminal.delete(this.#terminal.values().next().value);
       const status = ['completed', 'interrupted', 'failed'].includes(params.turn.status) ? params.turn.status : 'unknown';
+      if (status !== 'completed' && (this.#observer?.turnId === params.turn.id || this.#pending?.observerTurnId === params.turn.id)) this.#clearObserver();
       for (const item of this.#messages) if (item.turn === params.turn.id && item.status === 'streaming') item.status = status;
       if (status === 'unknown') this.#error = 'conversation_completion_unknown';
       if (this.#stopping?.turn === params.turn.id) this.#stopping = undefined;
@@ -251,8 +286,12 @@ export async function bindLiveConversation(page, conversation) {
     let current;
     try { current = new URL(source.frame.url()); } catch { throw failure('conversation_source_rejected'); }
     if (source.page !== page || source.frame !== frame || page.isClosed() || current.origin !== expected.origin ||
-      current.pathname !== expected.pathname || current.search !== expected.search || !value || !['send', 'cancel'].includes(value.action))
+      current.pathname !== expected.pathname || current.search !== expected.search || !value || !['send', 'cancel', 'authorize_observer_context'].includes(value.action))
       throw failure('conversation_source_rejected');
+    if (value.action === 'authorize_observer_context') {
+      if (Object.keys(value).sort().join() !== 'action,requestId' || !id(value.requestId)) throw failure('conversation_source_rejected');
+      return conversation.authorizeObserverContext?.(value.requestId) === true;
+    }
     return value.action === 'send' ? conversation.send(value) : conversation.cancel(value);
   });
   const navigate = current => {

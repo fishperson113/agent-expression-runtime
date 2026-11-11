@@ -391,3 +391,7 @@ Trả về avatar chuẩn qua `return_to_face`, hoặc reset/cancel rõ ràng, m
 quyền này. Gửi thêm một chuyển động ngắn không tự xóa lease của binding trước đó.
 Các handler điều khiển trực tiếp phải gọi `LiveBody.prepareUserMutation()` trước
 khi chờ I/O; `LiveBody.admit()` luôn kiểm tra lại hàng rào này trước compilation.
+
+### Context hội thoại giới hạn cho observer
+
+Tin nhắn gửi từ panel chỉ trở thành context observer sau ACK Native hợp lệ. Host chia sẻ tối đa 240 ký tự của đúng câu người dùng vừa gửi, kèm thread/turn/submission/revision, trong tối đa 60 giây; không chia toàn transcript, câu trả lời MAIN, ảnh hay context máy. Lượt mới, đổi thread, hủy, lỗi hoặc kết quả chưa rõ thu hồi context. Kết quả observer dựa trên context hết hạn/đã đổi bị bỏ, không replay. Brief công khai do MAIN tự soạn vẫn độc lập và quiet có ưu tiên; đoạn trích không cấp quyền thay hình. Nguồn hội thoại ngoài panel không tự được suy thành context. Đây là wiring/protocol đã kiểm thử bằng fixture, chưa xác nhận chất lượng hội thoại qua Codex thật.
