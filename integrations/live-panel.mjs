@@ -27,6 +27,28 @@ function panelPublication(state, value) {
     }, { token, value });
   }).catch(() => state.fail?.(1)).finally(() => { state.controlPending--; });
 }
+async function keepDisconnectedPanel(state, client, signal, page) {
+  state.conversation.transportLost();
+  const token = state.channel.token, snapshot = state.conversation.snapshot();
+  state.channel.stale = true; state.broker.close();
+  await closeLiveOwned([() => client?.close(), () => state.transport.close()], true);
+  if (signal.aborted) return 1;
+  let timer;
+  try {
+    const published = await Promise.race([page.evaluate(async ({ token, snapshot }) => {
+      const api = window.fischLive;
+      if (api.conversationDocument !== token || typeof api.conversationStatus !== 'function') return false;
+      api.conversationOffline = true; api.conversationDocument = null; api.configureReactive?.(false);
+      await api.reactiveUserIntent?.();
+      api.conversationStatus(snapshot); api.setupStatus?.({ native: 'unavailable', observer: 'unavailable' });
+      api.panelControlStatus?.({ type: 'offline' }); return true;
+    }, { token, snapshot }), new Promise((_, reject) => { timer = setTimeout(() => reject(Error('panel_disconnect_publication_failed')), 10000); })]);
+    if (!published) throw Error('panel_disconnect_publication_failed');
+  } catch { throw Error('panel_disconnect_publication_failed'); }
+  finally { clearTimeout(timer); }
+  await new Promise(resolve => { if (signal.aborted) resolve(); else signal.addEventListener('abort', resolve, { once: true }); });
+  return 1;
+}
 export async function runPanelCodex({ live, cwd, signal, host: suppliedHost, reactiveProvider, resumeThreadId, clientFactory = openPanelClient }) {
   if (signal?.aborted) return liveShutdownCode(signal.reason) ?? 130;
   const host = suppliedHost ?? await codexCommand();
@@ -54,8 +76,33 @@ export async function runPanelCodex({ live, cwd, signal, host: suppliedHost, rea
     await panelPublication(state, { type: 'ready', threadId: client.threadId });
     timer = startLivePolling(live, state, () => state.fail(1));
     if (signal.aborted) onAbort();
-    return await done.promise;
-  } catch (error) { if (signal.aborted) return liveShutdownCode(signal.reason) ?? 130; failed = true; throw error; }
+    const code = await done.promise;
+    if (code !== 1 || signal.aborted || state.broker.browserUnavailable || state.channel.stale) return code;
+    failed = true; clearInterval(timer);
+    return await keepDisconnectedPanel(state, client, signal, live.page);
+  } catch (error) {
+    if (signal.aborted) return liveShutdownCode(signal.reason) ?? 130;
+    failed = true;
+    if (state.output.thread || !Number.isSafeInteger(error?.rpcError?.code) || state.broker.browserUnavailable) throw error;
+    state.conversation.startupFailed();
+    const token = state.channel.token, code = error.rpcError.code, snapshot = state.conversation.snapshot();
+    try {
+      const published = await state.broker.evaluate(({ token, code, snapshot }) => {
+        const api = window.fischLive;
+        if (api.conversationDocument !== token || typeof api.conversationStatus !== 'function' || typeof api.panelControlStatus !== 'function') return false;
+        api.conversationStatus(snapshot); api.panelControlStatus({ type: 'startup_failed', code });
+        api.setupStatus?.({ native: 'unavailable', observer: 'unavailable' });
+        api.configureReactive?.(false); return true;
+      }, { token, code, snapshot });
+      if (!published) throw Error('panel_startup_publication_failed');
+    } finally {
+      state.channel.stale = true; state.broker.close();
+      await closeLiveOwned([() => client?.close(), () => state.transport.close()], true);
+    }
+    // Connection closure can settle `done`; only an explicit Stop ends this offline screen.
+    await new Promise(resolve => { if (signal.aborted) resolve(); else signal.addEventListener('abort', resolve, { once: true }); });
+    return 1;
+  }
   finally {
     clearInterval(timer); signal.removeEventListener('abort', onAbort); state.channel.stale = true;
     state.conversation.close(); state.broker.close();

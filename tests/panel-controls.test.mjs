@@ -107,3 +107,26 @@ it('keeps the production composer clickable after tool history and approval reso
   await send.click();expect(sent).toHaveLength(1);
  }finally{await page.close();}
 },45000);
+
+it('keeps sanitized startup failure visible with sending disabled in the production panel',async()=>{
+ const page=await browser.newPage();try{
+  await page.goto(server.resolvedUrls.local[0]+'live.html?fixture=synthetic');await page.waitForFunction(()=>!!window.fischLive);
+  await page.evaluate(()=>{window.fischLive.panelControlStatus({type:'mode'});window.fischLive.conversationStatus({generation:1,revision:1,ownerTurn:null,available:false,canSend:false,canCancel:false,pending:false,stopping:false,waiting:false,error:'conversation_startup_failed',messages:[]});window.fischLive.panelControlStatus({type:'startup_failed',code:-32603});});
+  expect(await page.locator('.conversation-status').textContent()).toContain('chưa thể khởi tạo');
+  expect(await page.locator('.fisch-panel-controls').textContent()).toContain('RPC -32603');
+  expect(await page.locator('.fisch-conversation button[type=submit]').isDisabled()).toBe(true);
+  expect(parsePanelControl({type:'startup_failed',code:-32603,error:'PRIVATE'})).toBeUndefined();
+ }finally{await page.close();}
+},45000);
+
+it('keeps an unavailable partial response visibly uncertain instead of completed or resent',async()=>{
+ const page=await browser.newPage(),sent=[];try{
+  await page.exposeFunction('fischLiveConversation',value=>{sent.push(value);return{};});await page.goto(server.resolvedUrls.local[0]+'live.html?fixture=synthetic');await page.waitForFunction(()=>!!window.fischLive);
+  await page.evaluate(()=>{window.fischLive.panelControlStatus({type:'mode'});window.fischLive.conversationStatus({generation:2,revision:3,ownerTurn:null,available:false,canSend:false,canCancel:false,pending:false,stopping:false,waiting:false,error:'conversation_transport_lost',messages:[{id:'agent-item',turn:'turn-a',role:'assistant',text:'Public partial <script>window.PWNED=1</script>',status:'unknown',truncated:false}]});});
+  await page.evaluate(()=>window.fischLive.panelControlStatus({type:'offline'}));
+  expect(await page.locator('.fisch-panel-controls').textContent()).toContain('đã hết hiệu lực');expect(await page.locator('.fisch-panel-controls button').count()).toBe(0);
+  expect(await page.locator('.conversation-status').textContent()).toContain('Mất kết nối');
+  expect(await page.locator('.fisch-conversation ol li').textContent()).toContain('Public partial');expect(await page.locator('.fisch-conversation ol li').textContent()).toContain('Chưa rõ kết quả');
+  expect(await page.locator('.fisch-conversation button[type=submit]').isDisabled()).toBe(true);expect(sent).toEqual([]);expect(await page.evaluate(()=>window.PWNED)).toBeUndefined();
+ }finally{await page.close();}
+},45000);
