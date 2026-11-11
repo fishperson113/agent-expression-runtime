@@ -2,9 +2,9 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { stopChild } from '../scripts/start-session.mjs';
 
-export function liveTestClient(base, token) {
+export function liveTestClient(base, token, { env = {} } = {}) {
   const script = fileURLToPath(new URL('./mcp-server.mjs', import.meta.url));
-  const child = spawn(process.execPath, [script], { env: { ...process.env, AER_BASE_URL: base, AER_PAIRING_TOKEN: token, FISCH_LIVE: '1' },
+  const child = spawn(process.execPath, [script], { env: { ...process.env, ...env, AER_BASE_URL: base, AER_PAIRING_TOKEN: token, FISCH_LIVE: '1' },
     stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true });
   let buffer = '', id = 0; const pending = new Map();
   child.stdout.on('data', chunk => {
