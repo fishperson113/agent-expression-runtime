@@ -8,17 +8,49 @@ or emotion-to-color table is used.
 
 ## Run and boundaries
 
-Use the normal Live entry point with an existing approved budget ledger:
+Use the normal Live entry point from an interactive terminal:
+
+```sh
+fisch live
+```
+
+The app-server must already be usable in its own writable authenticated home.
+Do not move credentials between environments. Plain production Live prepares the
+Native reaction lane and arms reactions by default; no reactive environment
+variables, manual ledger creation or checkbox selection is required. Camera
+capture remains off until you select **Bật camera** and grant browser/OS
+permission. You can disable reactions in camera settings or stop the session.
+Configuration-ready and a selected thread do not prove authentication or a
+successful model response; inspect the displayed status and terminal errors.
+
+Live stores a cumulative counter and append-only reservation history under
+`fisch/native-live` in the OS user-data directory: `%LOCALAPPDATA%` on Windows
+(fallback `%USERPROFILE%\AppData\Local`), `~/Library/Application Support` on
+macOS, and `$XDG_DATA_HOME` or `~/.local/share` on Linux. It does not invent a
+test quota/deadline or reset existing history. Invalid/inaccessible history
+leaves the lane unavailable rather than replacing it. Reservations are not
+proof of completed inference or actual billed usage.
+
+Explicit backend/off settings remain authoritative. An explicit
+`FISCH_REACTIVE_BUDGET` still selects the existing approved ledger with its
+original limit/deadline; missing, corrupt, expired or exhausted explicit state
+never falls back to a replacement. For a deliberately bounded experiment:
 
 ```sh
 FISCH_REACTIVE_BACKEND=codex \
 FISCH_REACTIVE_BUDGET=/absolute/path/to/existing-ledger.json npm start
 ```
 
-The app-server must already be usable in its own writable authenticated home.
-Do not move credentials between environments. The factory neither creates nor
-resets the ledger. Observation/reactivity is opt-in in the Live controls; camera
-capture is a separate permission and starts off. Voice is outside this slice.
+The lower-level provider factory still defaults off. Production Live opts into
+its Native default; an injected provider or explicit disabled configuration is
+not replaced. The optional [Responses adapter](reactive-provider.md) remains
+separately configured and requires its approved budget.
+
+Voice input is intended to use Codex's own dictation, recording then submitting
+text, not a separate STT/TTS engine. Its route into the exact active Fisch relay
+and thread is not yet verified. A desktop Dictate composer or CLI `/voice` live
+conversation is not evidence of that route. No microphone is opened by this
+reaction lane; use the existing text input until the native route is verified.
 
 The reaction process owns ephemeral threads independent of the coding transport.
 It receives typed presence/quality, event-specific facing-screen estimates,
@@ -85,6 +117,8 @@ PLAYWRIGHT_BROWSERS_PATH=/absolute/path/to/browser-cache \
 npm test -- tests/live-conversation-host.test.mjs -t 'signed-in Codex'
 ```
 
+These explicit test commands retain their approved cumulative test ledger;
+the managed plain-Live usage journal does not replace that authorization.
 These calls consume actual model budget. Do not rerun a silent/retain result to
 select an expressive example. Keep original failures and each subsequent run
 separate. Record the exact commit, projected input sequence, policy/schema/model/

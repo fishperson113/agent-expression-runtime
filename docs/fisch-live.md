@@ -294,27 +294,34 @@ Explicit `fisch live --agent <pane>` retains the legacy Herdr adapter; its camer
 reflexes work, but agent-triggered camera reactions are unavailable there and the
 control stays disabled. No keystrokes are injected into an unrelated agent.
 
-Camera starts off. Automatic camera reactions additionally require a separately
-configured data-only provider and an existing approved budget ledger; otherwise
-the control stays unavailable. See [provider setup and privacy](reactive-provider.md).
-After explicit browser opt-in, stable typed geometric events can produce a frozen
-observation window for that provider. Observation summaries are stripped; typed
+Camera starts off. Plain production Live prepares the separate Native Codex
+reaction lane by default: select **Bật camera** and grant permission to start
+observing, without manually configuring reactive variables, creating a ledger or
+enabling a reaction switch. Reactions can still be disabled in camera settings.
+Native usage history is preserved in the OS user-data directory; explicit
+backend/off/budget settings are respected and never reset or bypassed. A missing
+or failed provider is shown as unavailable, not as successful authentication.
+See [Native launch and boundaries](native-observation-loop.md). The optional
+[Responses API adapter](reactive-provider.md) remains explicitly configured.
+With an enabled source, stable typed geometric events can produce a frozen
+observation window. Observation summaries are stripped; typed
 coordinates, including structured hand observations when available, may remain.
 No image or audio is sent. This path never adds camera events, model decisions or
 `toolOutput` messages to the selected Native coding thread. Explicit native MCP
 `observe` calls remain available and are a separate path.
 
 Typed hand reactions use this same isolated provider after explicit hand-tracking
-and reaction opt-in. The versioned event gate and semantic read-sets preserve
+opt-in; hand tracking is still optional. The event gate and semantic read-sets preserve
 hand context; the agent still authors the effect. See [hand events](hand-event-gate.md)
 and [synthetic opportunity diagnostics](reactive-opportunities.md) for scope and measurements.
 
 Events coalesce for 750ms after local debounce, expire after five seconds, and
-start at most once every 15 seconds/four times per minute. The causal request has
-its own five-second deadline and consume-once authorization. Unchanging input and
-idle timers do not start inference. A separate 30-second provider watchdog aborts
-only the provider request and marks its transport uncertain; it does not extend
-the request's execution authority or interrupt a Native Codex turn.
+start at most once every 15 seconds/four times per minute. Unchanging input and
+idle timers do not start inference. Native defaults to a 60-second admission
+deadline; current source/read-set freshness and consume-once authorization still
+apply independently. The optional Responses path retains its five-second request
+deadline and separate 30-second transport watchdog. Neither transport timeout
+extends execution authority or interrupts a different Native coding turn.
 
 User input first awaits the browser's revocation barrier, then its original Native
 RPC is forwarded unchanged. It does not wait for provider cancellation to settle.
@@ -325,15 +332,24 @@ thread selection and new user intent invalidate pending reaction authority. An
 unknown provider transport pauses automatic requests while ordinary Native input
 remains independent, provided the browser barrier is healthy.
 
-The separate provider receives no chat history or coding-thread identifier and
-has no MCP/process/tool executor: requests use `tools=[]`, `tool_choice=none` and
-a strict data-only decision schema. The browser causal host and shared compiler
+The optional Responses provider receives no chat history or coding-thread identifier
+and has no MCP/process/tool executor: its requests use `tools=[]`, `tool_choice=none`
+and a strict data-only decision schema. Native uses a separate constrained process
+and can receive only an explicitly shared public brief and confirmed public
+reaction history, not private coding context. The browser causal host and shared compiler
 still validate and admit any returned expression. Metadata-only provider receipts
 are optional diagnostics, not evidence that an expression executed or that an
 unknown request was cancelled. Deterministic tests and camera-off visual checks
 do not establish real-camera accuracy, native-GPU performance, semantic quality
 or enjoyment. The old Native `TurnStartParams.toolOutput` route is not wired into
 current `fisch live`.
+
+The intended voice input is Codex's built-in dictation (record, then submit text),
+not a new STT/TTS stack. Submission into the exact active Fisch relay/thread is
+still unverified; do not assume a separate desktop Dictate composer shares it or
+that CLI `/voice` is a dictation-only interface. Camera-off text chat works
+independently. Historical voice exclusions elsewhere describe their original tests,
+not completed acceptance of this new input goal.
 
 
 Historical verification of the superseded shared-thread increment: 28 focused
