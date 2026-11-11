@@ -1,10 +1,10 @@
 import { expect, it, vi } from 'vitest';
 import { EventEmitter, once } from 'node:events';
 import { PassThrough } from 'node:stream';
-import { runDesktopHost } from '../integrations/desktop-live-host.mjs';
+import { runDesktopHost, presentDesktopHost } from '../integrations/desktop-live-host.mjs';
 import { runDesktopMcp } from '../integrations/desktop-mcp-launch.mjs';
 function host() {
-  const page = Object.assign(new EventEmitter(), { exposeFunction: vi.fn(async () => {}), evaluate: vi.fn(async () => {}) });
+  const page = Object.assign(new EventEmitter(), { waitForFunction: vi.fn(async () => {}), exposeFunction: vi.fn(async () => {}), evaluate: vi.fn(async () => {}) });
   const live = { page, gateway: new EventEmitter(), base: 'http://127.0.0.1:1234', token: 'private-test-token', close: vi.fn(async () => {}) };
   const runtime = { publish: vi.fn(), close: vi.fn() }, open = vi.fn(async () => live);
   return { page, live, runtime, open, claim: vi.fn(() => runtime) };
@@ -19,6 +19,33 @@ it.each(['close', 'crash', 'gateway', 'abort', 'stop'])('closes the owned Deskto
     expect(await running).toBe(event === 'abort' ? 130 : ['crash', 'gateway'].includes(event) ? 1 : 0);
     expect(f.live.close).toHaveBeenCalledOnce(); expect(f.runtime.close).toHaveBeenCalledOnce(); expect(f.open).toHaveBeenCalledOnce();
     expect(f.page.listenerCount('close')).toBe(0); expect(JSON.stringify(log.mock.calls)).not.toContain(f.live.token);
+  } finally { log.mockRestore(); }
+});
+it('labels Desktop ownership and disables browser submission without inventing a conversation snapshot', () => {
+  const controls = [{ disabled: false }, { disabled: false }, { disabled: false }], status = { textContent: '' }, activity = { textContent: '' };
+  const form = { hidden: false, querySelectorAll: () => controls }, setAttribute = vi.fn();
+  const conversation = { setAttribute, querySelector: name => name === 'form' ? form : status };
+  const fischLive = { configureReactive: vi.fn(), logActivity: vi.fn() };
+  const document = { title: '', getElementById: () => activity, querySelector: () => conversation };
+  vi.stubGlobal('window', { fischLive }); vi.stubGlobal('document', document);
+  try {
+    presentDesktopHost();
+    expect(form.hidden).toBe(true); expect(controls.every(item => item.disabled)).toBe(true);
+    expect(status.textContent).toContain('Codex Desktop đã kết nối Fisch MCP');
+    expect(status.textContent).not.toContain('terminal'); expect(setAttribute).toHaveBeenCalledWith('aria-label', 'Biểu đạt từ Codex Desktop qua MCP');
+    expect(fischLive.configureReactive).toHaveBeenCalledWith(false); expect(Object.keys(fischLive)).toEqual(['configureReactive', 'logActivity']);
+  } finally { vi.unstubAllGlobals(); }
+});
+it('reapplies external-host presentation after reload and removes its listener on stop', async () => {
+  const f = host(), log = vi.spyOn(console, 'error').mockImplementation(() => {});
+  try {
+    const running = runDesktopHost({ open: f.open, claim: f.claim });
+    await vi.waitFor(() => expect(f.page.evaluate).toHaveBeenCalledOnce());
+    expect(f.page.evaluate).toHaveBeenCalledWith(presentDesktopHost);
+    f.page.emit('domcontentloaded');
+    await vi.waitFor(() => expect(f.page.evaluate).toHaveBeenCalledTimes(2));
+    expect(f.page.waitForFunction).toHaveBeenCalledTimes(2);
+    f.page.emit('close'); expect(await running).toBe(0); expect(f.page.listenerCount('domcontentloaded')).toBe(0);
   } finally { log.mockRestore(); }
 });
 it('releases its registry claim when startup fails and does nothing if already aborted', async () => {
