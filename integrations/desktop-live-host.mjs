@@ -1,6 +1,7 @@
 import { claimDesktopRuntime, desktopMcpConfig } from './desktop-runtime.mjs';
 
 export function presentDesktopHost() {
+  window.fischLive.externalHostPresentation();
   window.fischLive.configureReactive(false);
   window.fischLive.logActivity('Desktop MCP capability host: hội thoại thuộc Codex Desktop; không chạy Native TUI hoặc observer trong host này.');
   document.title = 'Fisch · Desktop MCP capability';

@@ -1,6 +1,8 @@
 import { beforeAll, afterAll, expect, it } from 'vitest';
 import { createServer } from 'vite';
 import { chromium } from '@playwright/test';
+import { presentDesktopHost } from '../integrations/desktop-live-host.mjs';
+import { join } from 'node:path';
 let server, browser;
 beforeAll(async () => {
   server = await createServer({ server: { host: '127.0.0.1', port: 0 } }); await server.listen();
@@ -79,5 +81,43 @@ it('rejects hostile data without getters or private content and avoids repeated 
     expect(await panel.textContent()).not.toContain('PRIVATE_ENDPOINT'); expect(await panel.locator('img').count()).toBe(0);
     await page.getByRole('button', { name: 'Dừng toàn bộ', exact: true }).click();
     expect(await panel.count()).toBe(0);
+  } finally { await page.close(); }
+}, 45000);
+it('keeps external MCP setup honest through late status paints on mobile and desktop', async () => {
+  const { page, panel } = await open();
+  try {
+    expect(await panel.locator('.setup-state').textContent()).toBe('Chờ Codex');
+    await page.evaluate(() => {
+      window.externalMediaRequests = 0;
+      navigator.mediaDevices.getUserMedia = async () => { window.externalMediaRequests++; throw Error('no real media'); };
+    });
+    await page.evaluate(presentDesktopHost);
+    await panel.locator('summary').click();
+    const expected = await panel.innerText();
+    expect(expected).toContain('MCP bên ngoài'); expect(expected).toContain('Fisch không biết phiên Native');
+    expect(expected).not.toContain('Chờ Codex'); expect(expected).not.toContain('Chạy fisch live');
+    expect(await panel.getByRole('link', { name: 'Hướng dẫn cấu hình observer' }).isVisible()).toBe(false);
+    expect(await panel.locator('.setup-local-guide').isVisible()).toBe(false);
+    expect(await panel.locator('.setup-external-guide').isVisible()).toBe(true);
+    await page.evaluate(() => {
+      for (let i = 0; i < 20; i++) {
+        window.fischLive.setupStatus({ native: i % 2 ? 'waiting' : 'connected', observer: i % 2 ? 'missing_budget' : 'ready' });
+        window.fischLive.configureReactive(i % 2 === 0, 0, 1, true);
+      }
+    });
+    expect(await panel.innerText()).toBe(expected);
+    expect(await page.locator('.fisch-conversation form').isVisible()).toBe(false);
+    expect(await page.locator('.fisch-conversation textarea').isDisabled()).toBe(true);
+    expect(await page.locator('.fisch-conversation button').nth(0).isDisabled()).toBe(true);
+    for (const viewport of [{ width: 375, height: 812 }, { width: 1440, height: 900 }]) {
+      await page.setViewportSize(viewport);
+      expect(await panel.locator('.setup-state').isVisible()).toBe(true);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      const stop = await page.locator('#stop-all').boundingBox();
+      expect(stop.y).toBeGreaterThanOrEqual(0); expect(stop.y + stop.height).toBeLessThanOrEqual(viewport.height);
+      if (process.env.FISCH_TEST_ARTIFACT_DIR) await page.screenshot({ path: join(process.env.FISCH_TEST_ARTIFACT_DIR, `desktop-external-setup-${viewport.width}.png`) });
+    }
+    expect(await page.evaluate(() => window.externalMediaRequests)).toBe(0);
+    expect(await page.locator('video').evaluate(node => node.srcObject)).toBeNull();
   } finally { await page.close(); }
 }, 45000);
