@@ -1,8 +1,8 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { LiveOutput } from '../integrations/live-output.mjs';
 import { LiveConversation, bindLiveConversation } from '../integrations/live-conversation.mjs';
 
-function fixture() {
+function fixture(options = {}) {
   const output = new LiveOutput(); output.thread = 'thread-a';
   const broker = { pending: new Map(), turns: new Set(), queue: [], busy() { return !!(this.pending.size || this.turns.size || output.turn || output.selection !== undefined); } };
   const calls = []; let conversation;
@@ -13,7 +13,7 @@ function fixture() {
     calls.push({ message, guard, discard, resolve, reject });
   });
   const transport = { submitUser: (p, g, d) => request('turn/start', p, g, d), interruptUser: (p, g, d) => request('turn/interrupt', p, g, d) };
-  conversation = new LiveConversation({ output, broker, transport });
+  conversation = new LiveConversation({ output, broker, transport, ...options });
   const event = message => { output.accept(message); conversation.accept(message); };
   const reply = (index, response) => {
     const call = calls[index], message = { id: call.message.id, ...response };
@@ -332,4 +332,86 @@ it('clears the request-failure notice when a different Native terminal turn owns
   f.output.request({ id: 'native-next', method: 'turn/start', params: { threadId: 'thread-a' } });
   f.event({ id: 'native-next', result: { turn: { id: 'turn-b', status: 'inProgress' } } });
   expect(f.conversation.snapshot()).toMatchObject({ ownerTurn: 'turn-b', error: '' });
+});
+
+
+it('freezes observation context per send while preserving the original first text', async () => {
+  let release, identity;
+  const f = fixture({ captureObservation: job => { identity = job; return new Promise(resolve => { release = resolve; }); } });
+  const pending = f.send('  exact user text  ');
+  expect(f.calls).toHaveLength(0); expect(f.conversation.snapshot().pending).toBe(true);
+  await Promise.resolve(); expect(identity).toMatchObject({ thread: 'thread-a', generation: 0 }); expect(Object.isFrozen(identity)).toBe(true);
+  release('bounded observation snapshot'); await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  await vi.waitFor(() => expect(f.calls).toHaveLength(1));
+  expect(f.calls[0].message.params.input).toEqual([{ type:'text',text:'  exact user text  ',text_elements:[] },{ type:'text',text:'bounded observation snapshot',text_elements:[] }]);
+  f.reply(0,{result:{turn:{id:'context-turn',status:'completed'}}}); await pending;
+});
+
+it.each(['selection','close'])('does not dispatch captured context after %s', async mode => {
+  let release; const f = fixture({ captureObservation: () => new Promise(resolve => { release = resolve; }) });
+  const pending = f.send(); const rejected = expect(pending).rejects.toThrow('conversation_changed');
+  await Promise.resolve(); if(mode==='selection') f.select('thread-b'); else f.conversation.close();
+  release('stale context'); await rejected; expect(f.calls).toHaveLength(0);
+  expect(f.conversation.snapshot().error).not.toBe('conversation_unknown');
+});
+
+it.each(['throw','reject','missing','object','oversize','timeout'])('keeps text chat usable when context is %s', async mode => {
+  vi.useFakeTimers();
+  try {
+    const captureObservation = () => { if(mode==='throw')throw Error('PRIVATE_CAPTURE_ERROR'); if(mode==='reject')return Promise.reject(Error('PRIVATE_CAPTURE_ERROR')); if(mode==='timeout')return new Promise(()=>{}); return mode==='object'?{ text:'untrusted' }:mode==='oversize'?'x'.repeat(8193):null; };
+    const f=fixture({captureObservation}), pending=f.send('ordinary text');
+    await vi.advanceTimersByTimeAsync(250);
+    expect(f.calls).toHaveLength(1); const inputs=f.calls[0].message.params.input;
+    expect(inputs[0].text).toBe('ordinary text'); expect(inputs[1].text).toContain('unavailable'); expect(inputs[1].text).not.toContain('PRIVATE');
+    f.reply(0,{result:{turn:{id:'fallback-turn',status:'completed'}}}); await pending;
+  } finally { vi.useRealTimers(); }
+});
+
+
+it('replaces queued observation context after one second without recapturing', async () => {
+  vi.useFakeTimers();
+  try {
+    const captureObservation=vi.fn(()=> 'fresh geometry'), f=fixture({captureObservation});
+    const pending=f.send('unchanged user text'); await vi.advanceTimersByTimeAsync(0);
+    const call=f.calls[0]; expect(call.message.params.input[1].text).toBe('fresh geometry');
+    await vi.advanceTimersByTimeAsync(1001); expect(call.guard(call.message)).toBe(true);
+    expect(call.message.params.input[0].text).toBe('unchanged user text');expect(call.message.params.input[1].text).toContain('unavailable');
+    expect(captureObservation).toHaveBeenCalledTimes(1);
+    f.reply(0,{result:{turn:{id:'aged-turn',status:'completed'}}});await pending;
+  } finally { vi.useRealTimers(); }
+});
+
+
+it.each(['started-first','ack-first'])('hides only owned host context for canonical user items (%s)', async order => {
+  const context='machine geometry snapshot', f=fixture({captureObservation:()=>context});
+  const pending=f.send('human text'); await vi.waitFor(()=>expect(f.calls).toHaveLength(1));
+  if(order==='started-first')f.event({method:'turn/started',params:{threadId:'thread-a',turn:{id:'context-turn'}}});
+  else f.reply(0,{result:{turn:{id:'context-turn',status:'inProgress'}}});
+  f.event({method:'item/completed',params:{threadId:'thread-a',turnId:'context-turn',item:{id:'owned-user',type:'userMessage',content:[{type:'text',text:'human text'},{type:'text',text:context}]}}});
+  expect(f.conversation.snapshot().messages.find(m=>m.id==='owned-user').text).toBe('human text');
+  f.event({method:'item/completed',params:{threadId:'thread-a',turnId:'context-turn',item:{id:'ordinary-user',type:'userMessage',content:[{type:'text',text:context}]}}});
+  expect(f.conversation.snapshot().messages.find(m=>m.id==='ordinary-user').text).toBe(context);
+  f.event({method:'item/completed',params:{threadId:'thread-a',turnId:'context-turn',item:{id:'different-user',type:'userMessage',content:[{type:'text',text:'different human text'},{type:'text',text:context}]}}});
+  expect(f.conversation.snapshot().messages.find(m=>m.id==='different-user').text).toBe('different human text\n'+context);
+  if(order==='started-first')f.reply(0,{result:{turn:{id:'context-turn',status:'inProgress'}}}); await pending;
+});
+
+
+it('honors the remaining source freshness budget without recapturing', async () => {
+  vi.useFakeTimers();
+  try {
+    // A 1400ms-old snapshot has only 100ms left of the source's 1500ms lifetime.
+    const captureObservation=vi.fn(()=>({text:'snapshot aged 1400ms',validForMs:100})), f=fixture({captureObservation});
+    const pending=f.send('human question');await vi.advanceTimersByTimeAsync(0);
+    const call=f.calls[0];expect(call.message.params.input[1].text).toBe('snapshot aged 1400ms');
+    await vi.advanceTimersByTimeAsync(200);expect(call.guard(call.message)).toBe(true);
+    expect(call.message.params.input[1].text).toContain('unavailable');expect(captureObservation).toHaveBeenCalledTimes(1);
+    f.reply(0,{result:{turn:{id:'aged-source-turn',status:'completed'}}});await pending;
+  } finally {vi.useRealTimers();}
+});
+
+it.each([0,-1,1001,NaN,Infinity])('rejects expired or invalid context freshness %s', async validForMs => {
+  const f=fixture({captureObservation:()=>({text:'unsafe freshness',validForMs})}),pending=f.send();
+  await vi.waitFor(()=>expect(f.calls).toHaveLength(1));expect(f.calls[0].message.params.input[1].text).toContain('unavailable');
+  f.reply(0,{result:{turn:{id:'invalid-freshness-turn',status:'completed'}}});await pending;
 });
