@@ -17,7 +17,9 @@ async function selectThread(state, thread, previous) {
   state.projection.select(thread);
   if (!state.channel.stale) state.channel.token = randomUUID();
   await state.broker.evaluate(async ({ token, snapshot, clear }) => {
-    const api = window.fischLive; api.conversationDocument = token; await api.selectThread();
+    const api = window.fischLive; if (api.conversationOffline === true) return;
+    api.conversationDocument = token; await api.selectThread();
+    if (api.conversationOffline === true) return;
     if (clear) { api.playgroundClear?.(); api.conversationClear?.(); }
     api.conversationStatus?.(snapshot);
   }, { ...state.publication(), clear: !!previous });
@@ -47,7 +49,8 @@ export async function createBridge({ live, host, cwd, env, configured, instructi
       }, log: text => { state.logs.push(text); state.logs.splice(0, Math.max(0, state.logs.length - 20)); } });
     state.conversation = new LiveConversation({ output: state.output, transport: state.transport, broker: state.broker });
     state.publishSetup = (native, token) => state.broker.evaluate(({ value, token }) => {
-      const api = window.fischLive; if (token) api.conversationDocument = token; api.setupStatus?.(value);
+      const api = window.fischLive; if (api.conversationOffline === true) return;
+      if (token) api.conversationDocument = token; api.setupStatus?.(value);
     }, { value: liveSetupStatus(native, configured), token }).catch(() => {});
     state.publication = () => ({ token: state.channel.token, snapshot: state.channel.stale
       ? { ...state.conversation.snapshot(), available: false, canSend: false, canCancel: false, error: 'conversation_restart_required' }

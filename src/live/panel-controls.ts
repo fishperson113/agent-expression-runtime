@@ -31,6 +31,8 @@ function copy(value: unknown, depth = 0, budget = { nodes: 0, text: 0 }): any {
 export function parsePanelControl(value: unknown): Data | undefined {
   try {
     const dto = copy(value); if (!dto || bytes(dto) > 32768) return;
+    if (dto.type === 'offline') return Object.keys(dto).length === 1 ? dto : undefined;
+    if (dto.type === 'startup_failed') return Object.keys(dto).length === 2 && Number.isSafeInteger(dto.code) ? dto : undefined;
     if (dto.type === 'unsupported') return id(dto.id) && label(dto.method) && dto.reason === 'unsupported_or_unavailable' ? dto : undefined;
     if (![dto.threadId, dto.turnId].every(label)) return;
     if (dto.type === 'resolved') return id(dto.id) && Object.hasOwn(reasons, dto.reason) ? dto : undefined;
@@ -161,6 +163,8 @@ class PanelControls {
   project(value: unknown) {
     if (this.disposed) return; const dto = parsePanelControl(value);
     if (!dto) { this.status.textContent = 'Dữ liệu điều khiển không hợp lệ; chưa gửi phản hồi.'; this.host.open = true; return; }
+    if (dto.type === 'offline') { this.clear(); this.status.textContent = 'Mất kết nối Codex; yêu cầu phê duyệt cũ đã hết hiệu lực.'; this.host.open = true; }
+    if (dto.type === 'startup_failed') { this.clear(); this.status.textContent = 'Codex chưa thể khởi tạo phiên (RPC ' + dto.code + '). Hãy dừng Live, kiểm tra môi trường Codex rồi khởi chạy lại; chưa có yêu cầu nào được gửi lại.'; this.host.open = true; }
     if (dto.type === 'request') this.request(dto as Control);
     if (dto.type === 'tool') this.tool(dto);
     if (dto.type === 'unsupported') { this.status.textContent = 'Panel không xử lý yêu cầu Native này; không tự cấp quyền.'; this.host.open = true; }
