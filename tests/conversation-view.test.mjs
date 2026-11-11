@@ -47,8 +47,9 @@ it('shows only real projected plaintext, counts UTF8 bytes and sends explicitly 
     await page.evaluate(value => window.conversation.project(value), { ...ready, messages: [{ id: 'a', turn: 't', role: 'assistant', text: '<img src=x onerror=alert(1)>', status: 'unknown', truncated: true }] });
     expect(await panel.locator('img').count()).toBe(0); expect(await panel.textContent()).toContain('Chưa rõ kết quả');
     await input.fill('🙂'.repeat(4001)); expect(await panel.textContent()).toContain('16004 / 16000'); expect(await panel.getByRole('button', { name: 'Gửi', exact: true }).isDisabled()).toBe(true);
-    await input.fill('Một hình ảnh tôi muốn thử'); await input.press('Enter'); expect(await page.evaluate(() => window.calls.length)).toBe(0);
-    await panel.getByRole('button', { name: 'Gửi', exact: true }).click();
+    await input.fill('Một hình ảnh tôi muốn thử'); await input.press('Shift+Enter'); expect(await page.evaluate(() => window.calls.length)).toBe(0);
+    await input.dispatchEvent('keydown', { key: 'Enter', isComposing: true }); expect(await page.evaluate(() => window.calls.length)).toBe(0);
+    await input.press('Enter'); await input.press('Enter');
     expect(await page.evaluate(() => window.calls)).toEqual([{ action: 'send', generation: 1, text: 'Một hình ảnh tôi muốn thử\n' }]);
     await page.evaluate(() => window.rejectRequest(Error('conversation_rejected'))); await expect.poll(() => panel.locator('.conversation-status').textContent()).toContain('chưa được nhận');
     expect(await input.inputValue()).toContain('Một hình ảnh'); expect(await page.evaluate(() => window.sideEffects)).toBe(0);
