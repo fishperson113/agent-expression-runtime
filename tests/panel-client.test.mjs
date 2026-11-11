@@ -10,6 +10,49 @@ function fixture() {
     params: { threadId: 'thread', turnId: 'turn', itemId: 'item', command: 'echo public', cwd: '/public', startedAtMs: 0, ...extra } });
   return { writes, controls, client, request };
 }
+const fileItem = (diff = '+public') => ({ id: 'item', type: 'fileChange', status: 'inProgress', changes: [{ path: '/public/file', diff, kind: { type: 'update', move_path: null } }] });
+const sendItem = (f, item = fileItem(), extra = {}, method = 'item/started') => f.client.receive({ method, params: { threadId: 'thread', turnId: 'turn', item, ...extra } });
+it('enables an unchanged pending file review only after matching complete details arrive', () => {
+  const f = fixture(); f.request(1, 'item/fileChange/requestApproval', { grantRoot: null });
+  expect(f.client.controls.get(1).choices).toEqual(['decline', 'cancel']); expect(f.writes).toEqual([]);
+  sendItem(f); expect(f.controls.slice(-2).map(event => event.type)).toEqual(['tool', 'eligibility']);
+  expect(f.controls.at(-1)).toEqual({ type: 'eligibility', id: 1, threadId: 'thread', turnId: 'turn', itemId: 'item', choices: ['accept', 'decline', 'cancel'] });
+  sendItem(f, { ...fileItem(), status: 'completed' }, {}, 'item/completed');
+  expect(f.controls.filter(event => event.type === 'eligibility')).toHaveLength(1);
+  f.client.respond({ id: 1, decision: 'accept' }); expect(f.writes).toEqual([{ id: 1, result: { decision: 'accept' } }]); f.client.close();
+});
+it.each(['changed', 'truncated', 'evicted', 'wrongType'])('permanently revokes a file review after %s evidence', reason => {
+  const f = fixture(); sendItem(f); f.request(1, 'item/fileChange/requestApproval', { grantRoot: null });
+  const reordered = { id: 'item', type: 'fileChange', changes: [{ kind: { move_path: null, type: 'update' }, diff: '+public', path: '/public/file' }], status: 'completed' };
+  sendItem(f, reordered, {}, 'item/completed'); expect(f.controls.filter(event => event.type === 'eligibility')).toHaveLength(0);
+  if (reason === 'changed') sendItem(f, fileItem('+different'));
+  if (reason === 'truncated') sendItem(f, fileItem('x'.repeat(17000)));
+  if (reason === 'wrongType') sendItem(f, { id: 'item', type: 'unhandled' });
+  if (reason === 'evicted') for (let i = 0; i < 32; i++) sendItem(f, { id: `other-${i}`, type: 'webSearch' });
+  expect(f.controls.at(-1)).toMatchObject({ type: 'eligibility', choices: ['decline', 'cancel'] });
+  sendItem(f); expect(() => f.client.respond({ id: 1, decision: 'accept' })).toThrow('invalid');
+  expect(f.controls.filter(event => event.type === 'eligibility')).toHaveLength(1);
+  f.client.respond({ id: 1, decision: 'decline' }); expect(f.client.reviews.size).toBe(0); f.client.close();
+});
+it('ignores foreign or unrelated evidence and does not broaden original session-root requests', () => {
+  const f = fixture(); f.request(1, 'item/fileChange/requestApproval', { grantRoot: null });
+  sendItem(f, fileItem(), { threadId: 'foreign' }); sendItem(f, fileItem(), { turnId: 'foreign' }); sendItem(f, { ...fileItem(), id: 'unrelated' });
+  expect(f.controls.filter(event => event.type === 'eligibility')).toHaveLength(0);
+  expect(() => f.client.respond({ id: 1, decision: 'accept' })).toThrow('invalid');
+  for (const [id, grantRoot] of [[2, ''], [3, '/public']]) f.request(id, 'item/fileChange/requestApproval', { grantRoot });
+  sendItem(f); for (const id of [2, 3]) expect(() => f.client.respond({ id, decision: 'accept' })).toThrow('invalid');
+  expect(f.client.reviews.size).toBe(3);
+  f.client.receive({ method: 'turn/completed', params: { threadId: 'thread', turn: { id: 'turn', status: 'completed' } } });
+  sendItem(f); expect(f.client.reviews.size).toBe(0); expect(() => f.client.respond({ id: 1, decision: 'accept' })).toThrow('stale'); f.client.close();
+});
+it('revalidates current evidence at response time and preserves immutable request parameters', () => {
+  const f = fixture(), params = { threadId: 'thread', turnId: 'turn', itemId: 'item', grantRoot: '/protected' };
+  f.client.receive({ id: 1, method: 'item/fileChange/requestApproval', params }); params.grantRoot = null;
+  sendItem(f); expect(() => f.client.respond({ id: 1, decision: 'accept' })).toThrow('invalid');
+  f.request(2, 'item/fileChange/requestApproval', { grantRoot: null }); f.client.items.delete('item');
+  expect(() => f.client.respond({ id: 2, decision: 'accept' })).toThrow('invalid');
+  expect(f.writes).toEqual([]); f.client.close(); expect(f.client.reviews.size).toBe(0);
+});
 it('requires explicit one-time choice; preserves RPC id type and refuses broadened permissions', () => {
   const f = fixture(); f.request(0); expect(f.writes).toEqual([]);
   expect(f.controls[0].choices).toEqual(['accept', 'decline', 'cancel']);

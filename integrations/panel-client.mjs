@@ -6,6 +6,16 @@ const label = value => typeof value === 'string' && value.length > 0 && value.le
 const bounded = (value, limit) => Buffer.byteLength(JSON.stringify(value), 'utf8') <= limit;
 const approvalMethods = new Set(['item/commandExecution/requestApproval', 'item/fileChange/requestApproval']);
 const fail = code => Error(code);
+const fileApproval = method => method === 'item/fileChange/requestApproval';
+function reviewFingerprint(item) {
+  if (item?.type !== 'fileChange' || item.truncated || !bounded(item, 16384) || !Array.isArray(item.changes) || !item.changes.length) return null;
+  const changes = [];
+  for (const c of item.changes) {
+    if (typeof c?.path !== 'string' || !c.path || typeof c.diff !== 'string' || !['add', 'delete', 'update'].includes(c.kind?.type) || c.kind.move_path != null && typeof c.kind.move_path !== 'string') return null;
+    changes.push([c.path, c.kind.type, c.kind.move_path ?? null, c.diff]);
+  }
+  return JSON.stringify(changes);
+}
 
 function requestControl(message, item) {
   const p = message.params;
@@ -13,9 +23,7 @@ function requestControl(message, item) {
   const identity = { type: 'request', id: message.id, method: message.method, threadId: p.threadId, turnId: p.turnId, itemId: p.itemId };
   if (approvalMethods.has(message.method)) {
     const command = message.method.includes('commandExecution');
-    const completeChanges = item?.type === 'fileChange' && Array.isArray(item.changes) && item.changes.length > 0 &&
-      item.changes.every(c => typeof c?.path === 'string' && !!c.path && typeof c.diff === 'string' && ['add', 'delete', 'update'].includes(c.kind?.type));
-    const canAccept = command ? typeof p.command === 'string' && !!p.command && typeof p.cwd === 'string' && !!p.cwd && (!p.kind || p.kind === 'command') : !p.grantRoot && completeChanges;
+    const canAccept = command ? typeof p.command === 'string' && !!p.command && typeof p.cwd === 'string' && !!p.cwd && (!p.kind || p.kind === 'command') : p.grantRoot == null && reviewFingerprint(item) !== null;
     return { ...identity, details: structuredClone(p), choices: canAccept ? ['accept', 'decline', 'cancel'] : ['decline', 'cancel'] };
   }
   if (message.method !== 'item/tool/requestUserInput' || typeof p.isBlocking !== 'boolean' || !Array.isArray(p.questions) || p.questions.length < 1 || p.questions.length > 8) return null;
@@ -45,7 +53,7 @@ function answerResult(control, value) {
 }
 
 export class PanelProtocol {
-  pending = new Map(); controls = new Map(); seen = new Set(); terminal = new Set(); items = new Map(); threadId; turnId; closed = false; serial = 0;
+  pending = new Map(); controls = new Map(); reviews = new Map(); seen = new Set(); terminal = new Set(); items = new Map(); threadId; turnId; closed = false; serial = 0;
   prefix = 'panel:' + randomBytes(12).toString('hex') + ':';
   constructor({ write, onControl = () => {}, onFailure = () => {} }) { Object.assign(this, { write, onControl, onFailure }); }
   emit(value) { this.onControl(structuredClone(value)); }
@@ -87,14 +95,29 @@ export class PanelProtocol {
       this.write({ id: message.id, error: { code: -32601, message: 'Panel request unsupported or unavailable; no approval granted.' } });
       this.emit({ type: 'unsupported', id: message.id, method: String(message.method).slice(0, 128), reason: 'unsupported_or_unavailable' }); return;
     }
-    this.controls.set(message.id, control); this.emit(control);
+    this.controls.set(message.id, control);
+    if (fileApproval(control.method)) this.reviews.set(control.id, { fingerprint: reviewFingerprint(this.items.get(control.itemId)), revoked: false });
+    this.emit(control);
+  }
+  updateEligibility() {
+    for (const [id, review] of this.reviews) {
+      const control = this.controls.get(id), fingerprint = reviewFingerprint(this.items.get(control.itemId));
+      if (review.fingerprint !== null && review.fingerprint !== fingerprint) review.revoked = true;
+      if (review.fingerprint === null && !review.revoked && fingerprint !== null) review.fingerprint = fingerprint;
+      const accept = !review.revoked && fingerprint !== null && control.details.grantRoot == null;
+      const choices = accept ? ['accept', 'decline', 'cancel'] : ['decline', 'cancel'];
+      if (choices.join() === control.choices.join()) continue;
+      control.choices = choices;
+      this.emit({ type: 'eligibility', id, threadId: control.threadId, turnId: control.turnId, itemId: control.itemId, choices });
+    }
   }
   respond(value) {
     if (this.closed || !value || !validId(value.id)) throw fail('panel_response_unavailable');
     const control = this.controls.get(value.id);
     if (!control || control.threadId !== this.threadId || control.turnId !== this.turnId) throw fail('panel_response_stale');
+    this.updateEligibility();
     const result = answerResult(control, value);
-    this.controls.delete(value.id);
+    this.controls.delete(value.id); this.reviews.delete(value.id);
     try { this.write({ id: value.id, result }); }
     catch {
       try { this.emit({ type: 'resolved', id: value.id, threadId: control.threadId, turnId: control.turnId, reason: 'response_unknown' }); }
@@ -106,7 +129,7 @@ export class PanelProtocol {
   }
   settleControls(reason, predicate = () => true) {
     for (const [id, control] of this.controls) if (predicate(control)) {
-      this.controls.delete(id); this.emit({ type: 'resolved', id, threadId: control.threadId, turnId: control.turnId, reason });
+      this.controls.delete(id); this.reviews.delete(id); this.emit({ type: 'resolved', id, threadId: control.threadId, turnId: control.turnId, reason });
     }
   }
   notification(message) {
@@ -121,17 +144,20 @@ export class PanelProtocol {
       if (p.turn.id === this.turnId) { this.settleControls('turn_terminal'); this.items.clear(); this.turnId = undefined; }
     }
     if (!['item/started', 'item/completed'].includes(message.method) || p.turnId !== this.turnId || !label(p.item?.id)) return;
-    if (!['commandExecution', 'fileChange', 'mcpToolCall', 'dynamicToolCall', 'webSearch'].includes(p.item.type)) return;
+    if (!['commandExecution', 'fileChange', 'mcpToolCall', 'dynamicToolCall', 'webSearch'].includes(p.item.type)) {
+      this.items.delete(p.item.id); this.updateEligibility(); return;
+    }
     const item = bounded(p.item, 16384) ? structuredClone(p.item) : { id: p.item.id, type: p.item.type, status: p.item.status, truncated: true };
     this.items.set(item.id, item); if (this.items.size > 32) this.items.delete(this.items.keys().next().value);
     this.emit({ type: 'tool', phase: message.method === 'item/started' ? 'started' : 'completed', threadId: p.threadId, turnId: p.turnId, item });
+    this.updateEligibility();
   }
   close() {
     if (this.closed) return;
     this.closed = true;
     for (const entry of this.pending.values()) { clearTimeout(entry.timer); entry.reject(fail('panel_closed')); }
     this.pending.clear();
-    try { this.settleControls('closed'); } finally { this.controls.clear(); this.seen.clear(); this.terminal.clear(); this.items.clear(); }
+    try { this.settleControls('closed'); } finally { this.controls.clear(); this.reviews.clear(); this.seen.clear(); this.terminal.clear(); this.items.clear(); }
   }
 }
 

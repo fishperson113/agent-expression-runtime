@@ -2,6 +2,7 @@ import { beforeAll, afterAll, expect, it } from 'vitest';
 import { createServer } from 'vite';
 import { chromium } from '@playwright/test';
 import { parsePanelControl } from '../src/live/panel-controls';
+import { PanelProtocol } from '../integrations/panel-client.mjs';
 const request = (id = 'r') => ({ type: 'request', id, method: 'item/commandExecution/requestApproval', threadId: 't', turnId: 'u', itemId: 'i', details: { command: 'echo public', cwd: '/public' }, choices: ['accept', 'decline', 'cancel'] });
 it('preserves exact typed IDs and clones bounded request details', () => {
   const raw = request(1), parsed = parsePanelControl(raw);
@@ -31,6 +32,11 @@ it('accepts only canonical lifecycle event phases and resolution reasons', () =>
   expect(parsePanelControl({ type: 'tool', phase: 'completed', ...scope, item: { id: 'i', type: 'mcpToolCall', status: 'failed' } }).item.status).toBe('failed');
   expect(parsePanelControl({ type: 'tool', phase: 'success', ...scope, item: { id: 'i', type: 'mcpToolCall' } })).toBeUndefined();
 });
+it('strictly decodes bounded file eligibility without accepting fields or broadened choices', () => {
+  const event = { type: 'eligibility', id: 0, threadId: 't', turnId: 'u', itemId: 'i', choices: ['accept', 'decline', 'cancel'] };
+  expect(parsePanelControl(event).id).toBe(0);
+  for (const raw of [{ ...event, extra: true }, { ...event, itemId: '' }, { ...event, choices: ['acceptForSession'] }, { ...event, choices: [['decline'], ['cancel']] }, { ...event, choices: ['accept', 'accept'] }]) expect(parsePanelControl(raw)).toBeUndefined();
+});
 
 let server,browser;
 const browserRequest=(id='r',method='item/commandExecution/requestApproval',details={command:'echo <img src=x onerror="window.PWNED=1">',cwd:'/public/project'})=>({type:'request',id,method,threadId:'t',turnId:'u',itemId:'i',details,choices:['accept','decline','cancel']});
@@ -45,6 +51,29 @@ async function open(mode='pending'){
  return{page,panel:page.locator('.fisch-panel-controls')};
 }
 const project=(page,value)=>page.evaluate(value=>window.__panel.project(value),value);
+it('links real protocol late file eligibility to an explicit one-time choice and revokes changed review', async () => {
+ const events=[],writes=[],protocol=new PanelProtocol({write:value=>writes.push(value),onControl:value=>events.push(value)});
+ protocol.threadId='t';protocol.receive({method:'turn/started',params:{threadId:'t',turn:{id:'u'}}});
+ const {page,panel}=await open();const flush=async()=>{while(events.length)await project(page,events.shift());};
+ const fileRequest=id=>({id,method:'item/fileChange/requestApproval',params:{threadId:'t',turnId:'u',itemId:'i',grantRoot:null,startedAtMs:0}});
+ const tool=diff=>({method:'item/started',params:{threadId:'t',turnId:'u',item:{id:'i',type:'fileChange',status:'inProgress',changes:[{path:'src/public.ts',diff,kind:{type:'update',move_path:null}}]}}});
+ try{
+  await page.exposeFunction('__backendRespond',value=>protocol.respond(value));
+  await page.evaluate(()=>{window.__panel.dispose();window.__panel=window.__mountPanelControls(document.querySelector('.fisch-conversation'),value=>window.__backendRespond(value));});
+  protocol.receive(fileRequest('late'));await flush();expect(await panel.getByRole('button',{name:'Cho phép lần này',exact:true}).count()).toBe(0);expect(writes).toEqual([]);
+  await project(page,{type:'eligibility',id:'late',threadId:'foreign',turnId:'u',itemId:'i',choices:['accept','decline','cancel']});
+  expect(await panel.getByRole('button',{name:'Cho phép lần này',exact:true}).count()).toBe(0);
+  protocol.receive(tool('+public'));await flush();expect(await panel.locator('pre').allTextContents()).toContain('+public');
+  await panel.getByRole('button',{name:'Cho phép lần này',exact:true}).click();await flush();
+  expect(writes).toEqual([{id:'late',result:{decision:'accept'}}]);
+  protocol.receive(fileRequest('changed'));await flush();expect(await panel.getByRole('button',{name:'Cho phép lần này',exact:true}).isEnabled()).toBe(true);
+  protocol.receive(tool('+different'));await flush();expect(await panel.getByRole('button',{name:'Cho phép lần này',exact:true}).count()).toBe(0);
+  expect(()=>protocol.respond({id:'changed',decision:'accept'})).toThrow('invalid');expect(writes).toHaveLength(1);
+  protocol.receive(tool('+public'));await flush();expect(await panel.getByRole('button',{name:'Cho phép lần này',exact:true}).count()).toBe(0);
+  await project(page,{type:'request',id:'changed',method:'item/fileChange/requestApproval',threadId:'t',turnId:'u',itemId:'i',details:fileRequest('changed').params,choices:['accept','decline','cancel']});
+  expect(await panel.getByRole('button',{name:'Không cho phép',exact:true}).isEnabled()).toBe(true);
+ }finally{protocol.close();await page.close();}
+},45000);
 it('shows actual command/cwd safely and sends once without inventing Native acknowledgement',async()=>{
  const {page,panel}=await open();try{
   await project(page,browserRequest());expect(await panel.locator('pre').allTextContents()).toEqual([browserRequest().details.command,'/public/project']);expect(await panel.locator('img').count()).toBe(0);
@@ -128,5 +157,14 @@ it('keeps an unavailable partial response visibly uncertain instead of completed
   expect(await page.locator('.conversation-status').textContent()).toContain('Mất kết nối');
   expect(await page.locator('.fisch-conversation ol li').textContent()).toContain('Public partial');expect(await page.locator('.fisch-conversation ol li').textContent()).toContain('Chưa rõ kết quả');
   expect(await page.locator('.fisch-conversation button[type=submit]').isDisabled()).toBe(true);expect(sent).toEqual([]);expect(await page.evaluate(()=>window.PWNED)).toBeUndefined();
+ }finally{await page.close();}
+},45000);
+it('does not revive offline approvals when complete file details arrive late',async()=>{
+ const {page,panel}=await open();try{
+  const request={...browserRequest('offline-file','item/fileChange/requestApproval',{}),choices:['decline','cancel']};
+  await project(page,request);await project(page,{type:'offline'});
+  await project(page,{type:'tool',phase:'started',threadId:'t',turnId:'u',item:{id:'i',type:'fileChange',changes:[{path:'public.txt',kind:{type:'update',move_path:null},diff:'+public'}]}});
+  await project(page,{type:'eligibility',id:'offline-file',threadId:'t',turnId:'u',itemId:'i',choices:['accept','decline','cancel']});
+  await project(page,request);expect(await panel.locator('button').count()).toBe(0);expect(await page.evaluate(()=>window.__calls)).toEqual([]);
  }finally{await page.close();}
 },45000);

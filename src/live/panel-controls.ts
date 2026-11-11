@@ -36,6 +36,8 @@ export function parsePanelControl(value: unknown): Data | undefined {
     if (dto.type === 'unsupported') return id(dto.id) && label(dto.method) && dto.reason === 'unsupported_or_unavailable' ? dto : undefined;
     if (![dto.threadId, dto.turnId].every(label)) return;
     if (dto.type === 'resolved') return id(dto.id) && Object.hasOwn(reasons, dto.reason) ? dto : undefined;
+    if (dto.type === 'eligibility') return Object.keys(dto).length === 6 && Object.keys(dto).every(key => ['type', 'id', 'threadId', 'turnId', 'itemId', 'choices'].includes(key)) &&
+      id(dto.id) && label(dto.itemId) && Array.isArray(dto.choices) && dto.choices.every((choice: unknown) => typeof choice === 'string') && ['decline,cancel', 'accept,decline,cancel'].includes(dto.choices.join()) ? dto : undefined;
     if (dto.type === 'tool') return ['started', 'completed'].includes(dto.phase) && dto.item && label(dto.item.id) &&
       ['commandExecution', 'fileChange', 'mcpToolCall', 'dynamicToolCall', 'webSearch'].includes(dto.item.type) && bytes(dto.item) <= 16384 ? dto : undefined;
     if (dto.type !== 'request' || !id(dto.id) || !label(dto.itemId) || !methods.includes(dto.method) || !dto.details || bytes(dto.details) > 16384 ||
@@ -167,6 +169,12 @@ class PanelControls {
     if (dto.type === 'startup_failed') { this.clear(); this.status.textContent = 'Codex chưa thể khởi tạo phiên (RPC ' + dto.code + '). Hãy dừng Live, kiểm tra môi trường Codex rồi khởi chạy lại; chưa có yêu cầu nào được gửi lại.'; this.host.open = true; }
     if (dto.type === 'request') this.request(dto as Control);
     if (dto.type === 'tool') this.tool(dto);
+    if (dto.type === 'eligibility') {
+      const entry = this.pending.get(key(dto));
+      if (entry && !entry.sent && entry.control.method === methods[1] && entry.control.itemId === dto.itemId) {
+        entry.control.choices = dto.choices; this.paintApproval(entry);
+      }
+    }
     if (dto.type === 'unsupported') { this.status.textContent = 'Panel không xử lý yêu cầu Native này; không tự cấp quyền.'; this.host.open = true; }
     if (dto.type === 'resolved') { const identity = key(dto); this.pending.get(identity)?.node.remove(); this.pending.delete(identity); this.remember(identity); this.status.textContent = reasons[dto.reason]; if (!this.pending.size && dto.reason !== 'response_unknown') this.host.open = false; this.refresh(); }
   }
