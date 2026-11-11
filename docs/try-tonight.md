@@ -72,8 +72,11 @@ thử hiện có; không có STT/TTS riêng. Xem [ranh giới dictation](native-
 Nếu muốn Native app sở hữu hội thoại, có đường thử riêng: `fisch desktop` mở body
 và in cấu hình MCP để bạn review một lần; làm theo [hướng dẫn Desktop MCP](desktop-host.md).
 Đường expression-client đã có một positive control Codex thật, nhưng ứng dụng
-Desktop/Dictate chưa được nghiệm thu. Chế độ này không chạy observer model, không
-nối Desktop vào private TUI của `fisch live`, và không thay thế vòng chủ động mặc định.
+Desktop/Dictate chưa được nghiệm thu. Host chuẩn bị observer Codex mặc định cùng
+với capability MCP; camera vẫn cần bạn bật và cấp quyền. Native sở hữu Dictate và
+hội thoại, caption quan sát nằm riêng ở Fisch. Không gửi lại text Native thành một
+lượt user mới. Xem hướng dẫn để phân biệt quyền hình học, public brief và giới hạn
+ưu tiên trước lúc Native gọi MCP; Desktop không được nối vào private TUI của Live.
 
 **Cloud:** một lần full MAIN launch sau trust đã dừng trước inference vì sandbox
 Cloud che `/tmp/codex-daemon-1000` thành read-only mode `000`, trong khi Codex yêu
