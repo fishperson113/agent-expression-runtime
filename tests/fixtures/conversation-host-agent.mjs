@@ -24,7 +24,7 @@ function server() {
       else reply({ thread: { id: params.threadId } }); return;
     }
     if (method === 'turn/start') {
-      last = { id: message.id, thread: params.threadId, turn: 'turn-' + ++turn };
+      last = { id: message.id, thread: params.threadId, turn: 'turn-' + ++turn, input: params.input };
       if (process.argv.includes('--silent')) { emit({ method: 'test/sent', params: { turn: last.turn } }); return; }
       reply({ turn: { id: last.turn, status: 'inProgress' } });
       emit({ method: 'item/started', params: { threadId: last.thread, turnId: last.turn, item: { id: 'user-' + turn, type: 'userMessage', content: params.input } } });
@@ -32,6 +32,12 @@ function server() {
     }
     if (method === 'turn/interrupt') emit({ method: 'turn/completed', params: { threadId: params.threadId, turn: { id: params.turnId, status: 'interrupted' } } });
     if (method === 'test/late') { emit({ id: last.id, result: { turn: { id: last.turn, status: 'inProgress' } } }); emit({ method: 'turn/started', params: { threadId: last.thread, turn: { id: last.turn } } }); }
+    if (method === 'test/canonical-duplicates' && last) {
+      const params = { threadId: last.thread, turnId: last.turn, item: { id: 'user-' + turn, type: 'userMessage', content: last.input } };
+      emit({ method: 'item/completed', params }); emit({ method: 'item/completed', params });
+      emit({ method: 'item/completed', params: { ...params, threadId: 'foreign-thread', item: { ...params.item, id: 'foreign-user' } } });
+      emit({ method: 'thread/realtime/transcript/delta', params: { threadId: last.thread, text: 'UNSUBMITTED_REALTIME_CANARY' } });
+    }
     if (method === 'test/approval') emit({ id: 900, method: 'item/commandExecution/requestApproval', params: { threadId: last.thread, turnId: last.turn } });
     reply(method === 'test/snapshot' ? { seen, keys: Object.keys(process.env).filter(key => key.startsWith('FISCH_REACTIVE_')) } : {});
   });

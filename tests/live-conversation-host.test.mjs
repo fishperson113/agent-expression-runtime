@@ -120,6 +120,27 @@ it('binds actual host sends, canonical ACK-only cancellation, notifications and 
     expect(state.seen.filter(value => value.method === 'turn/start')).toHaveLength(1); expect(state.keys).toEqual([]);
   } finally { await f.close(); }
 });
+it('projects a Native normal-text submission once without resending canonical or realtime text', async () => {
+  const f = await start(); let release, revoked = false;
+  try {
+    await vi.waitFor(() => expect(f.api.last?.canSend).toBe(true));
+    const threadId = 'thread-1', text = 'Synthetic recognised text; no microphone or transcription was used.';
+    f.api.reactiveUserIntent = async () => { await new Promise(resolve => { release = resolve; }); revoked = true; };
+    const submitted = f.call('turn/start', { threadId, input: [{ type: 'text', text, text_elements: [] }] });
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+    expect((await f.call('test/snapshot')).result.seen.filter(row => row.method === 'turn/start')).toEqual([]);
+    release(); await submitted; expect(revoked).toBe(true);
+    await f.call('test/canonical-duplicates');
+    await vi.waitFor(() => expect(f.api.last.messages).toHaveLength(2));
+    expect(f.api.last.messages.map(row => [row.role, row.text])).toEqual([['user', text], ['assistant', 'Public synthetic reply.']]);
+    const starts = (await f.call('test/snapshot')).result.seen.filter(row => row.method === 'turn/start');
+    expect(starts).toEqual([{ method: 'turn/start', thread: threadId, text }]);
+    expect(JSON.stringify(f.api.last)).not.toContain('UNSUBMITTED_REALTIME_CANARY');
+    if (process.env.FISCH_NATIVE_TEXT_RELAY_EVIDENCE) writeFileSync(process.env.FISCH_NATIVE_TEXT_RELAY_EVIDENCE,
+      JSON.stringify({ mode: 'scripted_native_protocol_actual_websocket_relay', actualModelCalls: 0, realMedia: false, nativeDictationVerified: false,
+        heldUntilRevocation: true, revokedBeforeAcknowledgement: revoked, forwardedStarts: starts, messages: f.api.last.messages, transcriptResubmissions: starts.length - 1 }, null, 2), { mode: 0o600 });
+  } finally { release?.(); await f.close(); }
+});
 it('publishes a late canonical Cancel without a revision change while unknown send stays sticky', async () => {
   const f = await start({ silent: true });
   try {
