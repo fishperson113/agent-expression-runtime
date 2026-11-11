@@ -21,7 +21,7 @@ function requestControl(message, item) {
   if (message.method !== 'item/tool/requestUserInput' || typeof p.isBlocking !== 'boolean' || !Array.isArray(p.questions) || p.questions.length < 1 || p.questions.length > 8) return null;
   const ids = new Set();
   for (const q of p.questions) {
-    if (!q || !label(q.id) || ids.has(q.id) || q.isSecret || typeof q.header !== 'string' || typeof q.question !== 'string') return null;
+    if (!q || !label(q.id) || ['__proto__', 'constructor', 'prototype'].includes(q.id) || ids.has(q.id) || q.isSecret || typeof q.header !== 'string' || typeof q.question !== 'string') return null;
     if (q.options != null && (!Array.isArray(q.options) || q.options.length > 16 || q.options.some(o => typeof o?.label !== 'string' || typeof o?.description !== 'string'))) return null;
     ids.add(q.id);
   }

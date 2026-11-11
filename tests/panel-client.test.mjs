@@ -50,6 +50,13 @@ it('validates bounded structured questions and answers without guessing or secre
   f.request(2, 'item/tool/requestUserInput', { isBlocking: true, questions: [{ ...questions[0], isSecret: true }] });
   expect(f.writes.at(-1).error.code).toBe(-32601); expect(f.controls.at(-1).type).toBe('unsupported'); f.client.close();
 });
+it.each(['__proto__', 'constructor', 'prototype'])('rejects ambiguous question key %s before presenting or answering', key => {
+  const f = fixture(); f.request(1, 'item/tool/requestUserInput', { isBlocking: true, questions: [{ id: key, header: 'Choice', question: 'Which?' }] });
+  expect(f.controls).toEqual([expect.objectContaining({ type: 'unsupported', id: 1 })]);
+  expect(f.writes).toEqual([{ id: 1, error: expect.objectContaining({ code: -32601 }) }]);
+  expect(() => f.client.respond({ id: 1, answers: Object.fromEntries([[key, { answers: ['public'] }]]) })).toThrow('stale');
+  expect(f.writes.some(value => value.result?.answers)).toBe(false); f.client.close();
+});
 it('keeps sixteen requests bounded, rejects unknown/cross-owner/oversized requests without approval', () => {
   const f = fixture(); for (let id = 0; id < 16; id++) f.request(id);
   f.request(16); f.request(17, 'other/requestApproval'); f.request(18, undefined, { threadId: 'other' });
