@@ -50,7 +50,7 @@ function elements() {
 }
 
 export function mountLiveSetup(container: HTMLElement) {
-  const ui = elements(); container.append(ui.host); let disposed = false, external = false, externalObserver: Observer = 'unavailable', active: boolean | undefined, dto = projection(undefined);
+  const ui = elements(); container.append(ui.host); let disposed = false, external = false, panel = false, externalObserver: Observer = 'unavailable', active: boolean | undefined, dto = projection(undefined);
   const paint = () => {
     if (disposed) return;
     if (external) {
@@ -64,7 +64,7 @@ export function mountLiveSetup(container: HTMLElement) {
       if (close && close.getAttribute('aria-label') !== 'Đóng Kết nối · MCP bên ngoài') close.setAttribute('aria-label', 'Đóng Kết nối · MCP bên ngoài');
       return;
     }
-    const native = dto.native === 'connected'
+    const native = panel ? (dto.native === 'connected' ? 'Codex đã chọn thread do panel sở hữu; chưa xác nhận lượt trả lời.' : 'Đang khởi tạo Codex cho panel; chưa thể gửi.') : dto.native === 'connected'
       ? 'Native Codex đã chọn phiên; chưa xác nhận lượt trả lời.'
       : dto.native === 'waiting' ? 'Native Codex đang chờ chọn phiên trong terminal.' : 'Chưa xác nhận phiên Native Codex.';
     const paused = active === false && dto.observer === 'ready';
@@ -76,7 +76,7 @@ export function mountLiveSetup(container: HTMLElement) {
   };
   const project = (value: unknown) => { if (!disposed) { dto = projection(value); paint(); } };
   project(undefined);
-  return { project, externalHost: () => { external = true; paint(); }, externalObserver: (value: unknown) => {
+  return { project, panelOwner: () => { panel = true; ui.local.textContent = 'Gửi tin nhắn và xử lý yêu cầu Native trong panel. Không tự cấp quyền hoặc gắn vào hội thoại Desktop bên ngoài. Camera vẫn cần bật và cấp quyền riêng; caption observer nằm ở nhật ký riêng. Reload hoặc đóng trang cần khởi chạy lại; không tự gửi lại yêu cầu cũ.'; paint(); }, externalHost: () => { external = true; paint(); }, externalObserver: (value: unknown) => {
     externalObserver = typeof value === 'string' && Object.hasOwn(observerMessages, value) ? value as Observer : 'unavailable'; paint();
   }, observerState: (value: boolean | undefined) => { active = value; paint(); }, dispose: () => { if (!disposed) { disposed = true; ui.host.remove(); } } };
 }

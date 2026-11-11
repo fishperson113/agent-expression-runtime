@@ -7,16 +7,16 @@ const cancelSettled = (state: Snapshot, scope: CancelScope) => state.generation 
 let mounts = 0;
 const bytes = (value: string) => new TextEncoder().encode(value).length;
 const errors: Record<string, string> = {
-  conversation_unknown: 'Chưa rõ yêu cầu đã được nhận. Không gửi lại; kiểm tra terminal hoặc khởi chạy lại Live.',
-  conversation_expression_failed: 'Một yêu cầu biểu đạt báo lỗi. Lượt trả lời hoàn tất không xác nhận tạo hình thành công; kiểm tra terminal.',
-  conversation_completion_unknown: 'Chưa xác nhận kết quả lượt trả lời. Kiểm tra terminal.',
+  conversation_unknown: 'Chưa rõ yêu cầu đã được nhận. Không gửi lại; kiểm tra kết nối Codex hoặc khởi chạy lại Live.',
+  conversation_expression_failed: 'Một yêu cầu biểu đạt báo lỗi. Lượt trả lời hoàn tất không xác nhận tạo hình thành công; kiểm tra kết nối Codex.',
+  conversation_completion_unknown: 'Chưa xác nhận kết quả lượt trả lời. Kiểm tra kết nối Codex.',
   conversation_restart_required: 'Phiên đã chuyển trang; hãy khởi chạy lại Live.',
   conversation_rejected: 'Yêu cầu chưa được nhận. Bản nháp vẫn được giữ để bạn kiểm tra.',
-  conversation_changed: 'Phiên đang thay đổi. Kiểm tra terminal trước khi gửi.',
-  conversation_unavailable: 'Chưa thể gửi trong phiên này. Kiểm tra terminal.',
+  conversation_changed: 'Phiên đang thay đổi. Kiểm tra kết nối Codex trước khi gửi.',
+  conversation_unavailable: 'Chưa thể gửi trong phiên này. Kiểm tra kết nối Codex.',
   conversation_capacity: 'Đã đạt giới hạn phiên; hãy khởi chạy lại Live.',
   conversation_no_turn: 'Chưa có lượt trả lời hiện tại để dừng.',
-  conversation_stop_unconfirmed: 'Chưa xác nhận đã dừng trả lời. Kiểm tra terminal.',
+  conversation_stop_unconfirmed: 'Chưa xác nhận đã dừng trả lời. Kiểm tra kết nối Codex.',
   conversation_invalid_text: 'Nhập nội dung không trống, tối đa 16000 byte UTF-8.'
 };
 function record(value: unknown): Record<string, unknown> {
@@ -101,10 +101,11 @@ function messageProjection(list: HTMLOListElement) {
     dispose() { resize.disconnect(); if (frame) cancelAnimationFrame(frame); list.removeEventListener('scroll', capture); for (const type of inputs) list.removeEventListener(type, readerScroll); }
   };
 }
-function statusText(state: Snapshot | undefined, busy: boolean) {
+function statusText(state: Snapshot | undefined, busy: boolean, panel = false) {
+  if (panel && !state?.error && (!state?.available || state.waiting)) return state?.available ? 'Codex cần lựa chọn trong mục Yêu cầu và công cụ.' : 'Đang khởi tạo thread Codex của panel; chưa thể gửi.';
   return state?.error ? errors[state.error] : !state?.available ? 'Chọn hoặc bắt đầu phiên trong terminal Native Codex đang chạy cùng Fisch.' :
     state.waiting ? 'Codex cần bạn xác nhận trong terminal.' : state.stopping ? 'Đang dừng trả lời; chưa xác nhận đã dừng.' :
-    state.pending || busy ? 'Đang gửi; chưa xác nhận kết quả.' : state.canSend ? 'Bạn có thể nhắn trong phiên hiện tại.' : 'Phiên đang bận hoặc đang được chọn trong terminal.';
+    state.pending || busy ? 'Đang gửi; chưa xác nhận kết quả.' : state.canSend ? 'Bạn có thể nhắn trong phiên hiện tại.' : 'Phiên đang bận hoặc đang thay đổi.';
 }
 function reactionView(host: HTMLElement, disposed: () => boolean) {
   const reactionIds = new Set<string>();
@@ -122,23 +123,24 @@ function reactionView(host: HTMLElement, disposed: () => boolean) {
   }
   return { publish: reaction, snapshot, clear: () => { history = []; reactionIds.clear(); host.querySelector('.observation-messages')?.replaceChildren(); } };
 }
-function paintConversation(ui: ReturnType<typeof elements>, state: Snapshot | undefined, flags: { disposed: boolean; busy: boolean; cancelling: boolean; localError: string; lock: boolean; acknowledged: number }) {
+function paintConversation(ui: ReturnType<typeof elements>, state: Snapshot | undefined, flags: { disposed: boolean; busy: boolean; cancelling: boolean; localError: string; lock: boolean; acknowledged: number; panel: boolean }) {
     const { disposed, busy, cancelling, localError, lock, acknowledged } = flags;
     const length = bytes(ui.input.value), invalid = !ui.input.value.trim() || length > 16000;
     ui.count.textContent = `${length} / 16000 byte UTF-8 · chỉ gửi khi bạn bấm Gửi.`;
     ui.input.disabled = disposed || !state?.available;
     ui.send.disabled = !state?.canSend || busy || lock || state?.error === 'conversation_unknown' || state?.revision === acknowledged || invalid;
     ui.cancel.disabled = !state?.canCancel || cancelling;
-    const text = localError || statusText(state, busy);
+    const text = localError || statusText(state, busy, flags.panel);
     if (ui.status.textContent !== text) ui.status.textContent = text;
   }
 export function mountConversation(container: HTMLElement, request: Request) {
   const ui = elements(); container.append(ui.host);
   let state: Snapshot | undefined, disposed = false, attempt = 0, busy = false, cancelling = false, localError = '', lock = false, acknowledged = -1, highGeneration = -1, highRevision = -1, cleared = false;
+  let panel = false;
   const reactions = reactionView(ui.host, () => disposed);
   const messages = messageProjection(ui.list);
   let cancelScope: CancelScope | undefined, localCancelError: CancelScope | undefined;
-  const paint = () => paintConversation(ui, state, { disposed, busy, cancelling, localError, lock, acknowledged });
+  const paint = () => paintConversation(ui, state, { disposed, busy, cancelling, localError, lock, acknowledged, panel });
   function clear() { reactions.clear(); cleared = true; attempt++; busy = false; cancelling = false; cancelScope = localCancelError = undefined; lock = false; acknowledged = -1; localError = ''; ui.input.value = ''; messages.clear(); state = undefined; paint(); }
   function project(value: unknown) {
     if (disposed) return;
@@ -174,5 +176,5 @@ export function mountConversation(container: HTMLElement, request: Request) {
     } finally { if (!disposed && current === attempt) { if (action === 'send') busy = false; else if (cancelScope === scope) cancelling = false; paint(); } }
   }
   ui.input.oninput = paint; ui.form.onsubmit = event => { event.preventDefault(); void act('send'); }; ui.cancel.onclick = () => { void act('cancel'); }; paint();
-  return { project, clear, reaction: reactions.publish, reactionHistory: reactions.snapshot, dispose: () => { if (disposed) return; clear(); disposed = true; messages.dispose(); ui.input.oninput = null; ui.form.onsubmit = null; ui.cancel.onclick = null; ui.host.remove(); } };
+  return { project, clear, panelOwner: () => { panel = true; paint(); }, reaction: reactions.publish, reactionHistory: reactions.snapshot, dispose: () => { if (disposed) return; clear(); disposed = true; messages.dispose(); ui.input.oninput = null; ui.form.onsubmit = null; ui.cancel.onclick = null; ui.host.remove(); } };
 }
