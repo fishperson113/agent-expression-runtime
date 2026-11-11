@@ -1,4 +1,4 @@
-import { claimDesktopRuntime } from './desktop-runtime.mjs';
+import { claimDesktopRuntime, desktopMcpConfig } from './desktop-runtime.mjs';
 
 export function presentDesktopHost() {
   window.fischLive.configureReactive(false);
@@ -30,6 +30,7 @@ export async function runDesktopHost({ signal, open, claim = claimDesktopRuntime
     await live.page.exposeFunction('fischLiveStop', () => { void stop(0); });
     await presentation();
     console.error('Fisch Desktop capability host ready. Camera is off. Use the configured MCP server from Codex Desktop; close this body or press Ctrl+C to stop.');
+    console.error('Review this token-free Codex MCP configuration once; Fisch does not write it:\n' + desktopMcpConfig());
     return await done;
   } finally {
     signal?.removeEventListener('abort', onAbort);

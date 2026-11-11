@@ -19,6 +19,7 @@ it.each(['close', 'crash', 'gateway', 'abort', 'stop', 'pagehide'])('closes the 
     expect(await running).toBe(event === 'abort' ? 130 : ['crash', 'gateway'].includes(event) ? 1 : 0);
     expect(f.live.close).toHaveBeenCalledOnce(); expect(f.runtime.close).toHaveBeenCalledOnce(); expect(f.open).toHaveBeenCalledOnce();
     expect(f.page.listenerCount('close')).toBe(0); expect(JSON.stringify(log.mock.calls)).not.toContain(f.live.token);
+    expect(JSON.stringify(log.mock.calls)).toContain('[mcp_servers.fisch]');
   } finally { log.mockRestore(); }
 });
 it('labels Desktop ownership and disables browser submission without inventing a conversation snapshot', () => {

@@ -2,8 +2,8 @@
 
 This mode gives an existing Codex Desktop agent access to Fisch's expression engine. It does not launch a private Codex TUI, start an observer model, project Desktop transcripts, or provide speech recognition. Existing `fisch live` retains its default proactive behavior.
 
-1. Run `fisch desktop --mcp-config` and review the printed `[mcp_servers.fisch]` configuration. Add it using Codex's supported MCP configuration workflow; Fisch does not edit application configuration or folder trust.
-2. Run `fisch desktop` in a terminal. This prepares the normal Live browser and loopback gateway. Keep it running.
+1. Run `fisch desktop` in a terminal. This prepares the normal Live browser and loopback gateway. Keep it running.
+2. On first use, review the token-free `[mcp_servers.fisch]` configuration printed by that command and add it using Codex's supported MCP configuration workflow. Fisch does not edit application configuration or folder trust. `fisch desktop --mcp-config` can print the same configuration without starting a body.
 3. Connect the configured MCP server from Codex Desktop. Its `fisch mcp` process connects only to the already-running body; it never bootstraps or reopens the browser.
 
 The MCP launcher requires host-provided thread binding before mutation (`FISCH_MCP_REQUIRE_THREAD=1`). The binding contract must be installed alongside this host. A shared session identifier is not a conversation identifier. Desktop dictation must submit into the actual connected conversation; this increment does not establish that workflow or claim Windows microphone acceptance.

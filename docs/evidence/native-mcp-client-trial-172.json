@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "name": "Native Codex client to Desktop capability host",
+  "scope": "Explicit model/tool positive control; not Desktop application or dictation acceptance and not a workaround for the full MAIN Cloud sandbox blocker",
+  "limits": { "nativeTurns": 1, "observerTurns": 0, "wallTimeSeconds": 120, "outcomeRetries": 0, "cameraRequests": 0, "microphoneRequests": 0 },
+  "setup": [
+    "Freeze the exact PR head after all seven CI checks succeed. Keep the existing authenticated CODEX_HOME local; never copy credentials.",
+    "Start the actual runDesktopHost/openLive production browser and Rust gateway with assets false and headless true, using an isolated owner-private XDG_DATA_HOME shared only with this test client. Do not inject a fake gateway, MCP server or model.",
+    "Configure only the fisch stdio MCP server using the token-free desktopMcpConfig command/args. The spawned child must be the actual bin/fisch.mjs mcp entry. Do not put pairing credentials into static configuration or model input.",
+    "Use the actual signed-in Codex app-server with one ephemeral read-only thread in an empty temporary working directory, project_doc_max_bytes=0, shell/apps/plugins/hooks/web/image/multi-agent disabled, and all unrelated MCP servers disabled. This is a limited expression-tool client, not the user's repository coding MAIN. Do not weaken sandbox or change folder trust.",
+    "Verify the effective tool catalog and policy from the actual process before inference; require the actual Native host to provide _meta.threadId. Record host metadata in an instrumented transparent MCP relay if necessary; never fabricate it or place it in tool arguments."
+  ],
+  "prompt": "Đây là một lần kiểm tra capability Fisch, không cần camera hay âm thanh. Đọc chỉ dẫn của Fisch, bind controller bằng công cụ với arguments rỗng, rồi tự chọn một hình học đơn giản và màu RGB rõ để tạo một biểu đạt ngắn bằng compose_expression. Hỏi expression_status để báo đúng accepted/applied/completed hay lỗi thực tế. Không dùng shell, mạng, file, tool khác hoặc thử lại payload nếu bị từ chối. Cuối cùng mô tả ngắn điều đã thật sự xác nhận; không nói rằng bạn đã nhìn thấy pixel nếu chưa có bằng chứng ảnh.",
+  "evidence": [
+    "Exact source SHA, gateway executable hash, Native version, actual outbound policy/catalog hashes and actual thread/turn IDs; no credential values.",
+    "Actual Native MCP request host metadata, tool arguments/results, canonical Native terminal status/error, renderer phases and timestamped body screenshot. Tool accepted and Native completed alone do not establish rendered success.",
+    "Record all failures and absent actions without outcome retries. If the temporary expression client is blocked by sandbox/auth, stop and report that exact blocker; do not alter security settings.",
+    "Stop the body, verify runtime connection/lock removal and passive MCP cannot reopen it. Capture no real camera/microphone. Keep existing ledgers and prior failed runs unchanged."
+  ]
+}
