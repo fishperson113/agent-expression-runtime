@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import { posix, win32 } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { desktopIntentBase } from './desktop-intent.mjs';
 
 export function desktopRuntimePaths({ env = process.env, home = homedir(), platform = process.platform } = {}) {
   const path = platform === 'win32' ? win32 : posix;
@@ -21,10 +22,11 @@ function json(path, platform) { inspect(path, false, platform); return JSON.pars
 function present(path) { try { lstatSync(path); return true; } catch (error) { if (error.code === 'ENOENT') return false; throw error; } }
 function directory(path, platform, privateMode = true) { if (!present(path)) mkdirSync(path, { recursive: true, mode: 0o700 }); inspect(path, true, platform, privateMode); }
 function connection(value) {
-  if (!value || Object.keys(value).sort().join() !== 'base,instance,pid,schemaVersion,token' || value.schemaVersion !== 1
+  if (!value || Object.keys(value).sort().join() !== (Object.hasOwn(value, 'controlBase') ? 'base,controlBase,instance,pid,schemaVersion,token' : 'base,instance,pid,schemaVersion,token') || value.schemaVersion !== 1
     || !/^[a-f0-9-]{36}$/.test(value.instance) || !Number.isSafeInteger(value.pid) || value.pid < 1 || !/^[a-f0-9]{64}$/.test(value.token)) throw Error('desktop_runtime_unavailable');
   const url = new URL(value.base);
   if (url.protocol !== 'http:' || !['127.0.0.1', 'localhost'].includes(url.hostname) || !url.port || url.username || url.password || url.search || url.hash || url.pathname !== '/') throw Error('desktop_runtime_unavailable');
+  if (Object.hasOwn(value, 'controlBase')) { if (typeof value.controlBase !== 'string') throw Error('desktop_runtime_unavailable'); desktopIntentBase(value.controlBase); }
   return value;
 }
 function owned(paths, platform, instance, pid) {
@@ -40,8 +42,8 @@ export function claimDesktopRuntime(options = {}) {
   try { writeFileSync(paths.owner, JSON.stringify({ instance, pid }), { flag: 'wx', mode: 0o600 }); }
   catch { rmdirSync(paths.lock); throw Error('desktop_runtime_unavailable'); }
   return {
-    publish({ base, token }) {
-      const value = connection({ schemaVersion: 1, instance, pid, base, token });
+    publish({ base, token, controlBase }) {
+      const value = connection({ schemaVersion: 1, instance, pid, base, token, ...(controlBase === undefined ? {} : { controlBase }) });
       if (!owned(paths, platform, instance, pid) || present(paths.connection)) throw Error('desktop_runtime_unavailable');
       const temporary = paths.connection + '.' + instance;
       try { writeFileSync(temporary, JSON.stringify(value), { flag: 'wx', mode: 0o600 }); linkSync(temporary, paths.connection); }
@@ -67,7 +69,7 @@ export function readDesktopRuntime(options = {}) {
     const value = connection(json(paths.connection, platform));
     if (!owned(paths, platform, value.instance, value.pid)) throw Error('desktop_runtime_unavailable');
     try { if ((options.alive ?? (pid => process.kill(pid, 0)))(value.pid) === false) throw Error(); } catch { throw Error('desktop_host_not_running'); }
-    return { base: value.base, token: value.token };
+    return { base: value.base, token: value.token, ...(value.controlBase === undefined ? {} : { controlBase: value.controlBase }) };
   } catch (error) { throw Error(error.message === 'desktop_host_not_running' ? error.message : 'desktop_runtime_unavailable'); }
 }
 export function desktopMcpConfig({ node = process.execPath, entry = fileURLToPath(new URL('../bin/fisch.mjs', import.meta.url)) } = {}) {

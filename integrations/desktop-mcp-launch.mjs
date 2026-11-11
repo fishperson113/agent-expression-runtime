@@ -8,7 +8,7 @@ export async function runDesktopMcp({ signal, input = process.stdin, output = pr
   if (signal?.aborted) return 130;
   const connection = read({ ...runtimeOptions, env });
   const child = spawnChild(process.execPath, [fileURLToPath(new URL('./mcp-server.mjs', import.meta.url))], {
-    env: { ...env, AER_BASE_URL: connection.base, AER_PAIRING_TOKEN: connection.token, FISCH_LIVE: '1', FISCH_MCP_REQUIRE_THREAD: '1' },
+    env: { ...env, AER_BASE_URL: connection.base, AER_PAIRING_TOKEN: connection.token, FISCH_LIVE: '1', FISCH_MCP_REQUIRE_THREAD: '1', FISCH_DESKTOP_INTENT_BASE: connection.controlBase ?? '' },
     stdio: ['pipe', 'pipe', 'pipe'], shell: false, windowsHide: true
   });
   const closed = new Promise((resolve, reject) => { child.once('error', () => reject(Error('desktop_mcp_start_failed'))); child.once('close', code => resolve(code ?? 1)); });

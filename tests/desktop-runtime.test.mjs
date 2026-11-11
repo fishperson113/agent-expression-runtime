@@ -15,6 +15,15 @@ it('publishes one private owned local capability and removes only its own instan
   expect(owner.close()).toBe(true); expect(owner.close()).toBe(false); expect(existsSync(f.paths.connection)).toBe(false);
   expect(() => readDesktopRuntime(f.options)).toThrow('desktop_host_not_running');
 });
+it('round trips the optional intent endpoint while retaining v1 capability-only records', () => {
+  const f = fixture(), owner = claimDesktopRuntime(f.options), controlBase = 'http://127.0.0.1:12346';
+  owner.publish({ base, token, controlBase });
+  expect(readDesktopRuntime(f.options)).toEqual({ base, token, controlBase }); expect(owner.close()).toBe(true);
+  for (const invalid of ['https://127.0.0.1:12', 'http://example.com:12', 'http://127.0.0.1:12/?token=x', null]) {
+    const g = fixture(), held = claimDesktopRuntime(g.options);
+    expect(() => held.publish({ base, token, controlBase: invalid })).toThrow(); expect(held.close()).toBe(true);
+  }
+});
 it('does not steal or delete corrupt, replaced, or dead host registrations', () => {
   const f = fixture(), owner = claimDesktopRuntime(f.options); owner.publish({ base, token });
   expect(() => readDesktopRuntime({ ...f.options, alive: () => false })).toThrow('desktop_host_not_running');

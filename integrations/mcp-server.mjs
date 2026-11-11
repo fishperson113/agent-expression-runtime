@@ -10,6 +10,7 @@ import { playgroundToolDefinitions } from './playground-tools.mjs';
 import { capabilityResource, capabilityResourceList } from './capability-contract.mjs';
 import { composeExpression, compositionTool } from './compose-expression.mjs';
 import { createExpressionStatus, expressionStatusTool } from './expression-status.mjs';
+import { createDesktopIntentClient } from './desktop-intent.mjs';
 const base = process.env.AER_BASE_URL,
   token = process.env.AER_PAIRING_TOKEN;
 if (!base || !token) {
@@ -31,8 +32,11 @@ if (
 const expressionStatus = createExpressionStatus({ base, token });
 const live = process.env.FISCH_LIVE === '1';
 const requireThread = process.env.FISCH_MCP_REQUIRE_THREAD === '1';
+const desktopIntent = process.env.FISCH_DESKTOP_INTENT_BASE ? createDesktopIntentClient({ base: process.env.FISCH_DESKTOP_INTENT_BASE, token }) : null;
+if (desktopIntent && (!live || !requireThread)) throw Error('desktop_intent_configuration');
 const instructions = readFileSync(new URL(live ? './live-instructions.md' : './instructions-v1.md', import.meta.url), 'utf8') + (requireThread
-  ? '\nBefore calling controller tools, call bind_controller with empty arguments. The host must supply top-level _meta.threadId; do not invent a thread ID in tool arguments. Binding pins this MCP process to that host thread until exit. It does not authenticate a Native client or acquire gateway control; normal pairing, controller exclusivity and epoch checks still apply. No transcript should be submitted through these tools.\n' : '');
+  ? '\nBefore calling controller tools, call bind_controller with empty arguments. The host must supply top-level _meta.threadId; do not invent a thread ID in tool arguments. Binding pins this MCP process to that host thread until exit. It does not authenticate a Native client or acquire gateway control; normal pairing, controller exclusivity and epoch checks still apply. No transcript should be submitted through these tools.\n' : '') + (desktopIntent
+  ? '\nThis external host may have an independent camera observer. Use observe to check actual availability; a configured intent fence is not proof that the observer is ready. When relevant, use existing bounded observerContext, quiet mode or finite observerHandoffMs to share only public Fisch context and permissions. Never submit a raw Native Dictate transcript, private chat or code. Native owns user submission once; do not synthesize or resend a turn/start.\n' : '');
 let hostThread;
 const bindingResource = { uri: 'aer://controller-binding/v1', name: 'Host thread routing binding', mimeType: 'application/json', description: 'Process-local routing state only; not Native identity, gateway authentication or current engine ownership.' };
 const bindingState = () => ({ schemaVersion: 1, scope: 'mcp_host_thread', status: hostThread ? 'bound' : 'unbound', authority: 'routing_context_not_authentication' });
@@ -289,6 +293,26 @@ async function playgroundEdit(args) {
   try { return playgroundReply(await (await started).result); }
   catch (error) { return playgroundError(error); }
 }
+const mutations = new Set(['express', 'cancel_expression', 'return_to_face', 'playground_edit']);
+async function mutation(params) {
+  if (live && (['express', 'cancel_expression', 'return_to_face'].includes(params?.name) ||
+      (params?.name === 'playground_edit' && params.arguments?.operation === 'recover'))) {
+    playgroundGeneration++; playground.interrupt('user_interrupt');
+  }
+  if (live && params?.name === 'playground_edit') return playgroundEdit(params.arguments);
+  const result = calls.then(() => toolCall(params)); calls = result.catch(() => {}); return result;
+}
+async function fencedMutation(params) {
+  const rejected = code => ({ isError: true, content: [{ type: 'text', text: JSON.stringify({ status: 'rejected', code }) }] });
+  let lease;
+  try { lease = await desktopIntent.begin(); } catch { return rejected('desktop_intent_unavailable'); }
+  let result, failed;
+  try { result = await mutation(params); } catch (error) { failed = error; }
+  try { await desktopIntent.end(lease); }
+  catch { return { isError: true, content: [...(result?.content ?? []), { type: 'text', text: JSON.stringify({ status: 'uncertain', code: 'desktop_intent_end_unknown', retry: false }) }] }; }
+  if (failed) throw failed;
+  return result;
+}
 async function handle(message) {
   const { method } = message; let params = message.params;
   if (method === 'initialize') return {
@@ -316,20 +340,17 @@ async function handle(message) {
       try { assertExpectedEpoch(params.arguments); }
       catch (error) { return { isError: true, content: [{ type: 'text', text: JSON.stringify({ status: 'rejected', code: error.message }) }] }; }
     }
+    if (desktopIntent && ['cancel_expression', 'return_to_face'].includes(params?.name) &&
+        (!params.arguments || typeof params.arguments !== 'object' || Array.isArray(params.arguments) || Object.keys(params.arguments).length))
+      return { isError: true, content: [{ type: 'text', text: JSON.stringify({ status: 'rejected', code: 'invalid_arguments' }) }] };
     if (params?.name === 'expression_status') {
       try { return { content: [{ type: 'text', text: JSON.stringify(expressionStatus.read(params.arguments)) }] }; }
       catch { return { isError: true, content: [{ type: 'text', text: JSON.stringify({ status: 'rejected', code: 'invalid_arguments' }) }] }; }
     }
     if (live && ['observe', 'look', 'inspect_expression'].includes(params?.name)) return liveCall(params.name, params.arguments);
     if (live && params?.name === 'playground_state') return playgroundRead(params.arguments);
-    if (live && (['express', 'cancel_expression', 'return_to_face'].includes(params?.name) ||
-        (params?.name === 'playground_edit' && params.arguments?.operation === 'recover'))) {
-      playgroundGeneration++; playground.interrupt('user_interrupt');
-    }
-    if (live && params?.name === 'playground_edit') return playgroundEdit(params.arguments);
-    const result = calls.then(() => toolCall(params));
-    calls = result.catch(() => {});
-    return result;
+    if (desktopIntent && mutations.has(params?.name)) return fencedMutation(params);
+    return mutation(params);
   }
   throw Error('method_not_found');
 }
