@@ -26,7 +26,7 @@ it('labels Desktop ownership and disables browser submission without inventing a
   const controls = [{ disabled: false }, { disabled: false }, { disabled: false }], status = { textContent: '' }, activity = { textContent: '' };
   const form = { hidden: false, querySelectorAll: () => controls }, setAttribute = vi.fn();
   const conversation = { setAttribute, querySelector: name => name === 'form' ? form : status };
-  const fischLive = { configureReactive: vi.fn(), logActivity: vi.fn() };
+  const fischLive = { configureReactive: vi.fn(), logActivity: vi.fn(), externalHostPresentation: vi.fn() };
   const document = { title: '', getElementById: () => activity, querySelector: () => conversation };
   vi.stubGlobal('window', { fischLive }); vi.stubGlobal('document', document);
   try {
@@ -34,7 +34,8 @@ it('labels Desktop ownership and disables browser submission without inventing a
     expect(form.hidden).toBe(true); expect(controls.every(item => item.disabled)).toBe(true);
     expect(status.textContent).toContain('Codex Desktop đã kết nối Fisch MCP');
     expect(status.textContent).not.toContain('terminal'); expect(setAttribute).toHaveBeenCalledWith('aria-label', 'Biểu đạt từ Codex Desktop qua MCP');
-    expect(fischLive.configureReactive).toHaveBeenCalledWith(false); expect(Object.keys(fischLive)).toEqual(['configureReactive', 'logActivity']);
+    expect(fischLive.configureReactive).toHaveBeenCalledWith(false); expect(fischLive.externalHostPresentation).toHaveBeenCalledOnce();
+    expect(Object.keys(fischLive)).toEqual(['configureReactive', 'logActivity', 'externalHostPresentation']);
   } finally { vi.unstubAllGlobals(); }
 });
 it('does not install an automatic browser reload or restart handler', async () => {

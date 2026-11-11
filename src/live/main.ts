@@ -112,6 +112,7 @@ Object.assign(window, { fischLive: { pair: (base: string, token: string) => brid
     if (type === 'interrupted') void bridge.cancel();
   } } });
 Object.assign((window as any).fischLive, { setupStatus: (value: unknown) => liveSetup.project(value),
+  externalHostPresentation: () => { if (!stopped) liveSetup.externalHost(); },
   conversationStatus: (value: unknown) => { if (!stopped) conversation.project(value); }, conversationClear: () => conversation.clear() });
 const recent: LiveSourceEvent[] = [];
 let sampleCount = 0, sampleAt = performance.now(), inferenceMs = 0, stopped = false;

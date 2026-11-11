@@ -69,6 +69,12 @@ chứng minh composer Codex Desktop gửi vào đúng private app-server/thread 
 chat Desktop khác rồi mặc định nó đang điều khiển body này. Nhập text là đường dùng
 thử hiện có; không có STT/TTS riêng. Xem [ranh giới dictation](native-dictation-interop.md).
 
+Nếu muốn Native app sở hữu hội thoại, có đường thử riêng: `fisch desktop` mở body
+và in cấu hình MCP để bạn review một lần; làm theo [hướng dẫn Desktop MCP](desktop-host.md).
+Đường expression-client đã có một positive control Codex thật, nhưng ứng dụng
+Desktop/Dictate chưa được nghiệm thu. Chế độ này không chạy observer model, không
+nối Desktop vào private TUI của `fisch live`, và không thay thế vòng chủ động mặc định.
+
 **Cloud:** một lần full MAIN launch sau trust đã dừng trước inference vì sandbox
 Cloud che `/tmp/codex-daemon-1000` thành read-only mode `000`, trong khi Codex yêu
 cầu `0700`. Đây không phải lỗi đăng nhập hay bằng chứng Fisch inference thất bại.

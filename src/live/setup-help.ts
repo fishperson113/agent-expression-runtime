@@ -32,21 +32,36 @@ function elements() {
   const host = document.createElement('section'); host.className = 'fisch-live-setup'; host.setAttribute('aria-label', 'Kết nối agent và hướng dẫn');
   host.innerHTML = `<details><summary>Kết nối · <span class="setup-state" role="status" aria-live="polite"></span></summary><div><p class="setup-observer"></p><p class="setup-native"></p></div>
 
-    <p>Kết nối gateway chỉ nối trang với Fisch; không xác nhận Native Codex đã chọn phiên hoặc observer đã sẵn sàng.</p>
+    <div class="setup-local-guide"><p>Kết nối gateway chỉ nối trang với Fisch; không xác nhận Native Codex đã chọn phiên hoặc observer đã sẵn sàng.</p>
     <ol><li>Chạy fisch live, dùng Codex đã đăng nhập trong terminal đang mở cùng Fisch. Nếu chưa đăng nhập, hoàn tất hướng dẫn của Codex tại đó; trạng thái cấu hình chưa chứng minh xác thực thành công.</li>
     <li>Chờ Codex chọn phiên rồi trò chuyện ở khung chat hoặc terminal. Trong Cùng sáng tạo, yêu cầu mẫu chỉ được chép để bạn tự gửi, không tự gửi.</li>
     <li>Bật camera và cấp quyền khi bạn muốn quan sát. Codex chủ động được chuẩn bị mặc định, không cần tự đặt biến môi trường hay tạo ledger; lịch sử sử dụng được giữ tại máy. Bạn có thể tắt phản ứng trong Thiết lập ở Góc của bạn. Phản xạ vị trí chạy cục bộ; observer chỉ nhận dữ liệu hình học, không nhận ảnh hay suy ra cảm xúc/đồ vật. Camera tắt vẫn có chat; nhập giọng nói bằng dictation của Codex chưa được kiểm chứng trong phiên Fisch.</li></ol>
     <p><a href="https://github.com/fishperson113/agent-expression-runtime/blob/main/docs/reactive-provider.md" target="_blank" rel="noopener noreferrer">Hướng dẫn cấu hình observer</a></p>
     <p><a href="https://github.com/fishperson113/agent-expression-runtime/blob/main/docs/live-windows-qa.md" target="_blank" rel="noopener noreferrer">Chạy và cập nhật CLI trên Windows</a></p>
-    <p>Dừng hoặc khởi chạy lại từ terminal. Tạo hình riêng trong phiên không tự được khôi phục sau khi khởi chạy lại.</p></details>`;
+    <p>Dừng hoặc khởi chạy lại từ terminal. Tạo hình riêng trong phiên không tự được khôi phục sau khi khởi chạy lại.</p></div>
+    <div class="setup-external-guide" hidden><p>Gửi tin nhắn trong cuộc trò chuyện Codex Desktop đã kết nối Fisch MCP. Trang này chỉ hiển thị engine; không nhận hay sao chép hội thoại của ứng dụng.</p>
+    <p>Dùng Dictate trong Codex Desktop nếu phiên bản của bạn hỗ trợ, rồi kiểm tra và gửi văn bản tại đó. Fisch không cung cấp STT/TTS và không xác nhận microphone hoặc dictation đang hoạt động.</p>
+    <p>Camera mặc định tắt; chỉ bật và cấp quyền khi muốn theo dõi cục bộ. Host Desktop này không chạy observer chủ động hoặc terminal Native Codex riêng.</p>
+    <p>Dừng toàn bộ, đóng hoặc tải lại trang sẽ dừng host. Chạy lại fisch desktop và kết nối lại MCP để bắt đầu một body mới; không tự khôi phục hình cũ.</p></div></details>`;
   const style = document.createElement('style'); style.textContent = css; host.prepend(style);
-  return { host, state: host.querySelector<HTMLElement>('.setup-state')!, native: host.querySelector<HTMLElement>('.setup-native')!, observer: host.querySelector<HTMLElement>('.setup-observer')! };
+  return { host, state: host.querySelector<HTMLElement>('.setup-state')!, native: host.querySelector<HTMLElement>('.setup-native')!, observer: host.querySelector<HTMLElement>('.setup-observer')!,
+    local: host.querySelector<HTMLElement>('.setup-local-guide')!, external: host.querySelector<HTMLElement>('.setup-external-guide')! };
 }
 
 export function mountLiveSetup(container: HTMLElement) {
-  const ui = elements(); container.append(ui.host); let disposed = false, active: boolean | undefined, dto = projection(undefined);
+  const ui = elements(); container.append(ui.host); let disposed = false, external = false, active: boolean | undefined, dto = projection(undefined);
   const paint = () => {
     if (disposed) return;
+    if (external) {
+      ui.local.hidden = true; ui.external.hidden = false;
+      const values = [[ui.state, 'MCP bên ngoài'], [ui.native, 'Hội thoại thuộc Codex Desktop bên ngoài; Fisch không biết phiên Native đã chọn hay trạng thái trả lời.'],
+        [ui.observer, 'Chế độ capability MCP; không có observer trong host này.'] ] as const;
+      for (const [element, text] of values) if (element.textContent !== text) element.textContent = text;
+      const title = ui.host.querySelector('.dialog-heading h2'), close = ui.host.querySelector('.dialog-heading button[aria-label]');
+      if (title && title.textContent !== 'Kết nối · MCP bên ngoài') title.textContent = 'Kết nối · MCP bên ngoài';
+      if (close && close.getAttribute('aria-label') !== 'Đóng Kết nối · MCP bên ngoài') close.setAttribute('aria-label', 'Đóng Kết nối · MCP bên ngoài');
+      return;
+    }
     const native = dto.native === 'connected'
       ? 'Native Codex đã chọn phiên; chưa xác nhận lượt trả lời.'
       : dto.native === 'waiting' ? 'Native Codex đang chờ chọn phiên trong terminal.' : 'Chưa xác nhận phiên Native Codex.';
@@ -59,5 +74,5 @@ export function mountLiveSetup(container: HTMLElement) {
   };
   const project = (value: unknown) => { if (!disposed) { dto = projection(value); paint(); } };
   project(undefined);
-  return { project, observerState: (value: boolean | undefined) => { active = value; paint(); }, dispose: () => { if (!disposed) { disposed = true; ui.host.remove(); } } };
+  return { project, externalHost: () => { external = true; paint(); }, observerState: (value: boolean | undefined) => { active = value; paint(); }, dispose: () => { if (!disposed) { disposed = true; ui.host.remove(); } } };
 }
