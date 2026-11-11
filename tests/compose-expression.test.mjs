@@ -113,3 +113,49 @@ it('redacts unknown property names and submitted values through MCP before gatew
     }
   } finally { await client.close(); await new Promise(resolve => server.close(resolve)); }
 });
+
+it('locates missing and unsupported kinds without echoing authored values', () => {
+  const cases = [[{ ...part(), kind: 'PRIVATE_KIND' }, '/parts/0/kind', 'enum'],
+    [{ id: 'PRIVATE_ID' }, '/parts/0/kind', 'required'], [null, '/parts/0', 'type']];
+  for (const [value, path, rule] of cases) {
+    let failure;
+    try { composeExpression({ parts: [value] }); } catch (error) { failure = error; }
+    expect(failure?.message).toBe('composition_arguments');
+    expect(failure?.details).toEqual([{ path, rule }]);
+    expect(JSON.stringify(failure.details)).not.toContain('PRIVATE');
+  }
+});
+it('locates duplicate authored or base IDs and reports remaining part capacity', () => {
+  const face = JSON.parse(readFileSync(new URL('../src/core/live/face.json', import.meta.url), 'utf8')).parts;
+  const cases = [
+    [{ parts: [part(), part()] }, 'composition_part_collision', [{ path: '/parts/1/id', rule: 'unique' }]],
+    [{ base: 'resting_face', parts: [{ ...part(), id: face[0].id }] }, 'composition_part_collision', [{ path: '/parts/0/id', rule: 'unique' }]],
+    [{ base: 'resting_face', parts: Array.from({ length: compositionSchema.properties.parts.maxItems }, (_, i) => ({ ...part(), id: `p${i}` })) },
+      'composition_part_limit', [{ path: '/parts', rule: 'maxItems', limit: compositionSchema.properties.parts.maxItems - face.length }]]
+  ];
+  for (const [input, code, details] of cases) {
+    let failure;
+    try { composeExpression(input); } catch (error) { failure = error; }
+    expect(failure?.message).toBe(code); expect(failure?.details).toEqual(details);
+  }
+  expect(() => composeExpression({ parts: [part(), { ...part(), id: 'distinct' }] })).not.toThrow();
+});
+it('bounds repair details through MCP and never sends rejected geometry to gateway', async () => {
+  let requests = 0;
+  const server = createServer((_req, res) => { requests++; res.writeHead(500).end(); });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const client = liveTestClient(`http://127.0.0.1:${server.address().port}`, 'synthetic-repair-only');
+  try {
+    const cases = [
+      [{ parts: Array.from({ length: 8 }, () => ({ ...part(), kind: 'PRIVATE_KIND' })) }, 'composition_arguments',
+        [0, 1, 2].map(index => ({ path: `/parts/${index}/kind`, rule: 'enum' }))],
+      [{ parts: Array.from({ length: 8 }, () => ({ ...part(), id: 'PRIVATE_ID' })) }, 'composition_part_collision',
+        [1, 2, 3].map(index => ({ path: `/parts/${index}/id`, rule: 'unique' }))]
+    ];
+    for (const [input, code, details] of cases) {
+      const result = await client.tool('compose_expression', input), text = result.content[0].text;
+      expect(result.isError).toBe(true); expect(JSON.parse(text)).toEqual({ status: 'rejected', code, details });
+      expect(text).not.toContain('PRIVATE'); expect(requests).toBe(0);
+    }
+  } finally { await client.close(); await new Promise(resolve => server.close(resolve)); }
+});
