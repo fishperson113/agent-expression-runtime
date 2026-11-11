@@ -30,7 +30,7 @@ async function observeMessage(state, message) {
   const value = state.projection.accept(message) ?? started;
   if (value) await state.broker.evaluate(value => window.fischLive.playgroundStatus?.(value), value).catch(() => {});
 }
-async function createBridge({ live, host, cwd, env, configured, instructions }) {
+export async function createBridge({ live, host, cwd, env, configured, instructions }) {
   const state = { logs: [], projection: new PlaygroundProjection(), channel: { token: randomUUID(), stale: false } };
   state.output = new LiveOutput((thread, previous) => selectThread(state, thread, previous));
   const original = liveCodexArguments(liveRoot, cwd), config = original.slice(original.indexOf('-c'));
@@ -84,7 +84,7 @@ export async function runTerminalCodex({ live, cwd, signal, spawnClient = spawn,
   } catch (error) { failed = true; throw error; }
   finally { signal.removeEventListener('abort', onAbort); closeConversation(); state.broker.close(); await closeLiveOwned([cleanup], failed); }
 }
-function startLivePolling(live, state, stop) {
+export function startLivePolling(live, state, stop) {
   return setInterval(() => {
     if (live.page.isClosed()) { stop(); return; }
     void state.broker.poll(state.output.sample(), state.logs.splice(0), state.publication)
