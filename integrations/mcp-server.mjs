@@ -30,7 +30,29 @@ if (
 }
 const expressionStatus = createExpressionStatus({ base, token });
 const live = process.env.FISCH_LIVE === '1';
-const instructions = readFileSync(new URL(live ? './live-instructions.md' : './instructions-v1.md', import.meta.url), 'utf8');
+const requireThread = process.env.FISCH_MCP_REQUIRE_THREAD === '1';
+const instructions = readFileSync(new URL(live ? './live-instructions.md' : './instructions-v1.md', import.meta.url), 'utf8') + (requireThread
+  ? '\nBefore calling controller tools, call bind_controller with empty arguments. The host must supply top-level _meta.threadId; do not invent a thread ID in tool arguments. Binding pins this MCP process to that host thread until exit. It does not authenticate a Native client or acquire gateway control; normal pairing, controller exclusivity and epoch checks still apply. No transcript should be submitted through these tools.\n' : '');
+let hostThread;
+const bindingResource = { uri: 'aer://controller-binding/v1', name: 'Host thread routing binding', mimeType: 'application/json', description: 'Process-local routing state only; not Native identity, gateway authentication or current engine ownership.' };
+const bindingState = () => ({ schemaVersion: 1, scope: 'mcp_host_thread', status: hostThread ? 'bound' : 'unbound', authority: 'routing_context_not_authentication' });
+const bindingTool = { name: 'bind_controller', description: 'Explicitly pin this MCP process to the host-supplied thread before using controller tools. Empty arguments; top-level _meta.threadId is supplied by the host. Does not acquire gateway control or grant workspace access.',
+  annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false }, inputSchema: { type: 'object', properties: {}, additionalProperties: false } };
+function threadGate(params) {
+  const rejected = code => ({ isError: true, content: [{ type: 'text', text: JSON.stringify({ status: 'rejected', code }) }] });
+  const metadata = params?._meta;
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata) || !Object.hasOwn(metadata, 'threadId')) return rejected('host_thread_required');
+  const thread = metadata.threadId;
+  if (typeof thread !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(thread)) return rejected('host_thread_invalid');
+  if (hostThread && hostThread !== thread) return rejected('host_thread_mismatch');
+  if (params?.name === 'bind_controller') {
+    const args = params.arguments === undefined ? {} : params.arguments;
+    if (!args || typeof args !== 'object' || Array.isArray(args) || Object.keys(args).length) return rejected('binding_arguments');
+    hostThread = thread;
+    return { content: [{ type: 'text', text: JSON.stringify(bindingState()) }] };
+  }
+  if (!hostThread) return rejected('controller_unbound');
+}
 let session, connecting;
 const definitions = new Map(), pendingDefinitions = new Map(), commands = new Map();
 const protocol = JSON.parse(readFileSync(new URL('../src/contracts/protocol.schema.json', import.meta.url), 'utf8'));
@@ -83,6 +105,7 @@ function assertExpectedEpoch(args) {
 
 function tools() {
   return { tools: [
+    ...(requireThread ? [bindingTool] : []),
     { name: 'express', description: live ? 'Advanced expression AST for existing-part motion, free geometry or choreography. For direct authored parts/optional avatar composition use compose_expression; choose the representation from context, not a fixed face pose. Read aer://instructions/v1. ACK is admission, not completion.' : 'Choose a short particle expression. Read aer://instructions/v1. ACK is admission, not completion.',
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false }, inputSchema: live ? liveInputSchema(inputSchema) : inputSchema },
     { name: 'cancel_expression', description: 'Cancel body work and reset posture; keep the agent running.',
@@ -94,6 +117,7 @@ function tools() {
 }
 function resources(params) {
   const uri = params?.uri;
+  if (requireThread && uri === bindingResource.uri) return { contents: [{ uri, mimeType: bindingResource.mimeType, text: JSON.stringify(bindingState()) }] };
   const capability = capabilityResource(uri); if (capability) return capability;
   if (uri === 'aer://instructions/v1') return { contents: [{ uri, mimeType: 'text/markdown', text: instructions }] };
   if (uri === 'aer://schema/v1') return { contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(protocol) }] };
@@ -275,6 +299,7 @@ async function handle(message) {
   if (method === 'ping') return {};
   if (method === 'tools/list') return tools();
   if (method === 'resources/list') return { resources: [
+    ...(requireThread ? [bindingResource] : []),
     { uri: 'aer://instructions/v1', name: 'Expression instructions v1', mimeType: 'text/markdown', description: 'Agent authoring, free RGB/motion, priority, privacy and bounded recovery instructions.' },
     { uri: 'aer://schema/v1', name: 'Expression protocol schema v1', mimeType: 'application/json', description: 'Complete declarative program, baseline state and immutable macro schemas.' },
     ...capabilityResourceList(),
@@ -282,6 +307,7 @@ async function handle(message) {
   ] };
   if (method === 'resources/read') return resources(params);
   if (method === 'tools/call') {
+    if (requireThread) { const gated = threadGate(params); if (gated) return gated; }
     if (live && params?.name === 'compose_expression') {
       try { params = { name: 'express', arguments: composeExpression(params.arguments) }; }
       catch (error) { return { isError: true, content: [{ type: 'text', text: JSON.stringify({ status: 'rejected', code: error.message, ...(error.details ? { details: error.details } : {}) }) }] }; }
