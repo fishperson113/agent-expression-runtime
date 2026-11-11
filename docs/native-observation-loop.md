@@ -8,6 +8,11 @@ or emotion-to-color table is used.
 
 ## Run and boundaries
 
+Codex may separately ask for persistent **Folder access** before opening a
+working thread. Review that Native prompt yourself; Fisch does not accept it or
+change trust settings for you. Being signed in does not grant folder trust. A
+launch stopped at this prompt has not verified a proactive model reaction.
+
 Use the normal Live entry point from an interactive terminal:
 
 ```sh
