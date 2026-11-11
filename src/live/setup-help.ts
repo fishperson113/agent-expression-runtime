@@ -9,7 +9,7 @@ const observerMessages = {
   budget_unavailable: 'Ngân sách hiện chưa khả dụng.',
   budget_expired: 'Ngân sách đã hết thời hạn.',
   budget_exhausted: 'Ngân sách đã dùng hết.',
-  ready: 'Observer đã cấu hình; chưa có nghĩa camera hoặc phản ứng đang bật.',
+  ready: 'Observer đã cấu hình; Codex chủ động mặc định, camera vẫn tắt. Chưa xác nhận lượt phản hồi.',
   unavailable: 'Chưa xác nhận cấu hình observer.'
 } as const;
 type Observer = keyof typeof observerMessages;
@@ -30,31 +30,34 @@ function projection(value: unknown): { native?: Native; observer: Observer } {
 
 function elements() {
   const host = document.createElement('section'); host.className = 'fisch-live-setup'; host.setAttribute('aria-label', 'Kết nối agent và hướng dẫn');
-  host.innerHTML = `<details><summary>Kết nối</summary><div role="status" aria-live="polite" aria-atomic="true"><p class="setup-native"></p><p class="setup-observer"></p></div>
+  host.innerHTML = `<details><summary>Kết nối · <span class="setup-state" role="status" aria-live="polite"></span></summary><div><p class="setup-observer"></p><p class="setup-native"></p></div>
 
     <p>Kết nối gateway chỉ nối trang với Fisch; không xác nhận Native Codex đã chọn phiên hoặc observer đã sẵn sàng.</p>
-    <ol><li>Trò chuyện trong terminal Native Codex đang chạy cùng Fisch. Chờ Codex chọn phiên trước khi gửi yêu cầu.</li>
-    <li>Trong Cùng sáng tạo, chép yêu cầu rồi tự dán vào terminal đó; trang không tự gửi.</li>
-    <li>Camera chỉ bật khi bạn chủ động chọn và xử lý tại máy. Phản xạ vị trí mặt/tay chạy cục bộ khi có dữ liệu hợp lệ; đây không phải hiểu ngữ nghĩa camera. Chat và biểu đạt Codex không cần observer riêng; bật camera không tự bật observer ngữ nghĩa. Observer cần bộ quyết định riêng, ngân sách đã được cho phép và bạn chọn ô phản ứng tự động. Xem trạng thái phản ứng hiện tại trong Thiết lập ở Góc của bạn.</li></ol>
+    <ol><li>Chạy fisch live, dùng Codex đã đăng nhập trong terminal đang mở cùng Fisch. Nếu chưa đăng nhập, hoàn tất hướng dẫn của Codex tại đó; trạng thái cấu hình chưa chứng minh xác thực thành công.</li>
+    <li>Chờ Codex chọn phiên rồi trò chuyện ở khung chat hoặc terminal. Trong Cùng sáng tạo, yêu cầu mẫu chỉ được chép để bạn tự gửi, không tự gửi.</li>
+    <li>Bật camera và cấp quyền khi bạn muốn quan sát. Codex chủ động được chuẩn bị mặc định, không cần tự đặt biến môi trường hay tạo ledger; lịch sử sử dụng được giữ tại máy. Bạn có thể tắt phản ứng trong Thiết lập ở Góc của bạn. Phản xạ vị trí chạy cục bộ; observer chỉ nhận dữ liệu hình học, không nhận ảnh hay suy ra cảm xúc/đồ vật. Camera tắt vẫn có chat; nhập giọng nói bằng dictation của Codex chưa được kiểm chứng trong phiên Fisch.</li></ol>
     <p><a href="https://github.com/fishperson113/agent-expression-runtime/blob/main/docs/reactive-provider.md" target="_blank" rel="noopener noreferrer">Hướng dẫn cấu hình observer</a></p>
     <p><a href="https://github.com/fishperson113/agent-expression-runtime/blob/main/docs/live-windows-qa.md" target="_blank" rel="noopener noreferrer">Chạy và cập nhật CLI trên Windows</a></p>
     <p>Dừng hoặc khởi chạy lại từ terminal. Tạo hình riêng trong phiên không tự được khôi phục sau khi khởi chạy lại.</p></details>`;
   const style = document.createElement('style'); style.textContent = css; host.prepend(style);
-  return { host, native: host.querySelector<HTMLElement>('.setup-native')!, observer: host.querySelector<HTMLElement>('.setup-observer')! };
+  return { host, state: host.querySelector<HTMLElement>('.setup-state')!, native: host.querySelector<HTMLElement>('.setup-native')!, observer: host.querySelector<HTMLElement>('.setup-observer')! };
 }
 
 export function mountLiveSetup(container: HTMLElement) {
-  const ui = elements(); container.append(ui.host); let disposed = false;
-  const project = (value: unknown) => {
+  const ui = elements(); container.append(ui.host); let disposed = false, active: boolean | undefined, dto = projection(undefined);
+  const paint = () => {
     if (disposed) return;
-    const dto = projection(value);
     const native = dto.native === 'connected'
-      ? 'Native Codex đã chọn phiên; nhập tại terminal hiện tại, chưa xác nhận lượt trả lời của agent.'
+      ? 'Native Codex đã chọn phiên; chưa xác nhận lượt trả lời.'
       : dto.native === 'waiting' ? 'Native Codex đang chờ chọn phiên trong terminal.' : 'Chưa xác nhận phiên Native Codex.';
-    const observer = observerMessages[dto.observer];
+    const paused = active === false && dto.observer === 'ready';
+    const observer = paused ? 'Codex chủ động chưa khả dụng. Kiểm tra đăng nhập hoặc lỗi trong terminal rồi khởi chạy lại Fisch; chat vẫn độc lập.' : observerMessages[dto.observer];
+    const label = paused ? 'Đang tạm dừng' : dto.observer === 'disabled_by_config' ? 'Đã tắt chủ động' : !['ready', 'unavailable'].includes(dto.observer) ? 'Cần kiểm tra' : dto.native !== 'connected' ? 'Chờ Codex' : dto.observer === 'ready' ? 'Đã cấu hình' : 'Chưa sẵn sàng';
+    if (ui.state.textContent !== label) ui.state.textContent = label;
     if (ui.native.textContent !== native) ui.native.textContent = native;
     if (ui.observer.textContent !== observer) ui.observer.textContent = observer;
   };
+  const project = (value: unknown) => { if (!disposed) { dto = projection(value); paint(); } };
   project(undefined);
-  return { project, dispose: () => { if (!disposed) { disposed = true; ui.host.remove(); } } };
+  return { project, observerState: (value: boolean | undefined) => { active = value; paint(); }, dispose: () => { if (!disposed) { disposed = true; ui.host.remove(); } } };
 }

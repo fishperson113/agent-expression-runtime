@@ -23,6 +23,7 @@ it('separates gateway, selected Native session and configured observer without e
     await page.evaluate(() => window.setupUnderTest.project({ native: 'waiting', observer: 'unavailable' }));
     expect(await panel.textContent()).toContain('chờ chọn phiên');
     expect(await panel.locator('details').getAttribute('open')).toBeNull();
+    expect(await panel.locator('.setup-state').isVisible()).toBe(true);
     await page.evaluate(() => window.setupUnderTest.project({ native: 'connected', observer: 'ready' }));
     expect(await panel.textContent()).toContain('chưa xác nhận lượt trả lời');
     expect(await panel.textContent()).toContain('đã cấu hình');
@@ -34,7 +35,8 @@ it('separates gateway, selected Native session and configured observer without e
     expect(await guide.getAttribute('href')).toBe('https://github.com/fishperson113/agent-expression-runtime/blob/main/docs/reactive-provider.md');
     expect(await guide.getAttribute('rel')).toBe('noopener noreferrer');
     expect(await panel.textContent()).toContain('không tự gửi');
-    expect(await panel.textContent()).toContain('không tự bật observer');
+    expect(await panel.textContent()).toContain('Codex chủ động được chuẩn bị mặc định');
+    expect(await panel.textContent()).toContain('không cần tự đặt biến môi trường hay tạo ledger');
     expect(await panel.textContent()).toContain('Thiết lập ở Góc của bạn');
     expect(await page.locator('video').evaluate(node => node.srcObject)).toBeNull();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
