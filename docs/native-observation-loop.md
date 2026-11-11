@@ -8,10 +8,12 @@ or emotion-to-color table is used.
 
 ## Run and boundaries
 
-Codex may separately ask for persistent **Folder access** before opening a
+MAIN Codex may separately ask for persistent **Folder access** before opening a
 working thread. Review that Native prompt yourself; Fisch does not accept it or
-change trust settings for you. Being signed in does not grant folder trust. A
-launch stopped at this prompt has not verified a proactive model reaction.
+change trust settings for you. Being signed in does not grant folder trust. The
+data-only observer runs in its own read-only temporary directory; its readiness
+does not require or grant MAIN's folder trust. A test that withholds observation
+events while waiting for MAIN has not tested the observer's independence.
 
 Use the normal Live entry point from an interactive terminal:
 
@@ -107,6 +109,16 @@ dumping prior text into diagnostics. This mechanism does not supply private main
 coding conversation or prove the resulting dialogue feels natural.
 
 ## Reproducible acceptance
+
+The independent PR #166 observer-only validation used the unchanged production
+default with no reactive environment variables, checkbox interaction or provider
+replacement. One actual Native turn completed, chose greeting/retain, and
+published a browser-confirmed caption. Managed usage advanced from 0 to 1 while
+old explicit ledgers stayed unchanged. MAIN trust remained unanswered and MAIN
+turns were 0. This establishes the scoped observer-default path, not full MAIN
+launch, expressive geometry, dictation, real-camera accuracy or natural UX. The
+earlier stdin harness failure and a separate MAIN-readiness-gated attempt remain
+distinct evidence; neither sent an arrival event or dispatched a model turn.
 
 The existing `tests/live-conversation-host.test.mjs` contains both scripted
 lifecycle checks and opt-in actual-model checks. Build the gateway and install
