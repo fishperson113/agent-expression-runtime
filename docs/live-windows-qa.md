@@ -141,18 +141,23 @@ kiểm tra phiên sở hữu trước; không xóa lock của tiến trình còn
 ## Camera và observer là hai lựa chọn riêng
 
 Camera khởi đầu tắt. Chuẩn bị/tải model không cấp consent; chỉ bật camera và tay
-khi muốn bằng điều khiển browser. Native Codex có login không đồng nghĩa observer
-có provider. Observer tự động mặc định off, dùng Responses data-only tách khỏi
-coding thread; typed observation có thể rời máy khi đã cấu hình và bật phản ứng.
+khi muốn bằng điều khiển browser và cấp quyền browser/OS. `fisch live` và
+`fisch desktop` chuẩn bị observer Native Codex mặc định từ đăng nhập hiện có;
+không cần endpoint, API key riêng, tự tạo ledger hay bật checkbox phản ứng.
+Observer dùng thread data-only riêng, không đưa sự kiện vào coding thread.
+Configuration-ready chưa chứng minh đăng nhập hay inference thành công; xem
+status và lỗi đã lọc. Desktop cần kết nối MCP một lần theo [hướng dẫn host](desktop-host.md).
 
-Cấu hình observer cần endpoint/model đã chọn, credential riêng nếu provider yêu
-cầu, và `FISCH_REACTIVE_BUDGET` là **đường dẫn tuyệt đối tới ledger được duyệt đang
-có**. Không lấy key từ Codex login, tạo key ví dụ, ghi đè ledger, đặt lại used=0,
-tăng limit hoặc gia hạn deadline chỉ để làm nút sáng. Ledger thiếu/hết hạn/hết
-lượt phải để provider unavailable. Xem [hợp đồng provider](reactive-provider.md).
+Lịch sử reservation tích lũy được quản lý trong thư mục dữ liệu người dùng;
+không reset hoặc ghi đè lịch sử để thử lại. Cấu hình off/backend/budget tường minh
+vẫn được tôn trọng. Nếu chỉ định `FISCH_REACTIVE_BUDGET`, đó phải là đường dẫn
+ledger hiện có, hợp lệ; thiếu/hỏng/hết hạn/hết lượt không tự chuyển sang ledger
+khác. Responses là adapter tùy chọn cần cấu hình endpoint/model/credential và
+budget riêng, không phải prerequisite của Native mặc định. Xem
+[Native observer](native-observation-loop.md) và [Responses adapter](reactive-provider.md).
 Không in toàn bộ environment, auth file hoặc ledger vào log/screenshot hỗ trợ.
-Chỉ báo tên capability và reason code đã lọc. Native child loại bỏ các biến
-`FISCH_REACTIVE_*`; cấu hình observer phải có trong environment của **launcher**.
+Native child loại bỏ `FISCH_REACTIVE_*`; override nếu cần thuộc environment launcher.
+Camera/Windows/Dictate thực tế vẫn cần nghiệm thu riêng; không có STT/TTS mới.
 
 ## Ma trận QA và giới hạn bằng chứng
 
@@ -166,7 +171,7 @@ Chỉ báo tên capability và reason code đã lọc. Native child loại bỏ 
 | Agent cũ đang chạy | Live tạo host riêng; không đóng agent không sở hữu | Source/contract; hai phiên Windows tương tác thật pending |
 | Camera deny/off, restart | Không tự bật lại; input chữ vẫn hoạt động | Browser synthetic/permission contracts; thiết bị Windows thật pending |
 | Ctrl+C/đóng browser/Stop rồi chạy lại | Đóng tài nguyên sở hữu, không còn gateway cũ, token mới | Linux route/cleanup; Windows process-tree/end-to-end pending |
-| Observer chưa cấu hình/ledger hết hạn | Off/unavailable, không gọi provider hoặc tự tạo ledger | Provider/budget pure tests; Windows cấu hình thực pending |
+| Native mặc định; off hoặc explicit ledger lỗi | Native được chuẩn bị không cần cấu hình thủ công; off được giữ, explicit ledger lỗi fail closed và không thay thế lịch sử | Provider/host contracts và control Native Cloud; Windows thực pending |
 
 Workflow Windows CI chạy npm build cùng Cargo test/check và smoke npm-link
 trong prefix tạm: gọi shim fisch.cmd help/version từ workspace có khoảng trắng,

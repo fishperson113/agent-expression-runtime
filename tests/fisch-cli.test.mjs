@@ -19,6 +19,8 @@ it('prints branded help and version without starting the runtime', async () => {
   const help = await exec(process.execPath, ['bin/fisch.mjs', '--help']);
   expect(help.stdout).toContain('fisch <command>');
   expect(help.stdout).toContain('evaluate');
+  expect(help.stdout).toContain('Native MCP body with the default Codex observer');
+  expect(help.stdout).not.toContain('model-free body');
   expect(help.stdout).toContain('live [--hands] [--no-assets]');
   expect(help.stdout).not.toMatch(/^  (run|express|cancel)\s/m);
   const version = await exec(process.execPath, ['bin/fisch.mjs', '--version']);

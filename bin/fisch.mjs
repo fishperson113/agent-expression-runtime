@@ -9,7 +9,7 @@ const usage = `Fisch ${version} — a particle body for your agent
 Usage: fisch <command>
 
   live [--hands] [--no-assets]  Prepare and open the local body and Codex in this terminal (Herdr optional)
-  desktop [--hands] [--no-assets]  Open a model-free body controlled by Codex Desktop MCP
+  desktop [--hands] [--no-assets]  Open the Native MCP body with the default Codex observer
   desktop --mcp-config  Print a token-free Codex MCP configuration; write nothing
   mcp        Serve stdio MCP through the running Desktop body (no bootstrap)
   status     Inspect Live from its dedicated --agent Herdr pane
