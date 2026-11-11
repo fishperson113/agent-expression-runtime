@@ -27,6 +27,18 @@ async function open() {
   })()`);
   return { page, panel: page.locator('#conversation-test .fisch-conversation'), input: page.locator('#conversation-test').getByLabel('Nhắn trong phiên hiện tại', { exact: true }) };
 }
+async function settledReaderScroll(list) {
+  await list.evaluate(node => new Promise((resolve, reject) => {
+    let last = node.scrollTop, stable = 0, frames = 0;
+    const tick = () => {
+      stable = node.scrollTop === last ? stable + 1 : 0; last = node.scrollTop;
+      if (stable === 5) resolve();
+      else if (++frames === 120) reject(Error('reader_scroll_never_settled'));
+      else requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }));
+}
 it('shows only real projected plaintext, counts UTF8 bytes and sends explicitly without side effects', async () => {
   const { page, panel, input } = await open();
   try {
@@ -246,8 +258,18 @@ it.each(['following', 'reading-earlier', 'resumed-following'])('preserves %s int
       window.conversation.project(value);
     }, { ...ready, messages });
     const list = panel.locator('ol');
-    await list.evaluate((node, mode) => { node.scrollTop = mode === 'following' ? node.scrollHeight : 100; }, intent);
-    if (intent === 'resumed-following') { await list.focus(); await page.keyboard.press('End'); await expect.poll(() => list.evaluate(node => node.scrollHeight - node.clientHeight - node.scrollTop)).toBeLessThanOrEqual(1); }
+    await list.focus(); await page.keyboard.press('End');
+    await expect.poll(() => list.evaluate(node => node.scrollHeight - node.clientHeight - node.scrollTop)).toBeLessThanOrEqual(1);
+    await settledReaderScroll(list);
+    if (intent !== 'following') {
+      await list.hover(); await page.mouse.wheel(0, -450);
+      await expect.poll(() => list.evaluate(node => node.scrollHeight - node.clientHeight - node.scrollTop)).toBeGreaterThan(40);
+      await settledReaderScroll(list);
+    }
+    if (intent === 'resumed-following') {
+      await list.focus(); await page.keyboard.press('End'); await settledReaderScroll(list);
+      expect(await list.evaluate(node => node.scrollHeight - node.clientHeight - node.scrollTop)).toBeLessThanOrEqual(1);
+    }
     const before = await list.evaluate(node => ({ top: node.scrollTop, height: node.clientHeight, total: node.scrollHeight }));
     await input.fill('Bản nháp không được mất khi viewport đổi.');
     await page.evaluate(() => {
@@ -275,6 +297,35 @@ it.each(['following', 'reading-earlier', 'resumed-following'])('preserves %s int
     await page.evaluate(() => { window.conversation.clear(); });
     await page.evaluate(value => window.conversation.project(value), { ...ready, generation: 2, revision: 3, messages });
     expect(await list.evaluate(node => node.scrollHeight - node.clientHeight - node.scrollTop)).toBeLessThanOrEqual(1);
+  } finally { await page.close(); }
+}, 45000);
+
+it.each(['wheel', 'keyboard'])('keeps real %s reading intent when public layout changes during that input', async kind => {
+  const { page, panel } = await open();
+  try {
+    const messages = Array.from({ length: 20 }, (_, i) => ({ id: 'input-resize' + i, turn: 't', role: 'assistant', text: 'Nội dung phiên '.repeat(20), status: 'completed', truncated: false }));
+    await page.evaluate(value => {
+      const shell = document.querySelector('#conversation-test'); shell.style.flexDirection = 'column';
+      shell.querySelector('.fisch-conversation').style.flex = '1';
+      const brief = document.createElement('p'); brief.id = 'input-resize-brief'; brief.hidden = true;
+      brief.style.cssText = 'height:100px;flex:none;margin:0'; shell.prepend(brief);
+      window.conversation.project(value);
+    }, { ...ready, messages });
+    const list = panel.locator('ol'); await list.focus(); await page.keyboard.press('End'); await settledReaderScroll(list);
+    expect(await list.evaluate(node => node.scrollHeight - node.clientHeight - node.scrollTop)).toBeLessThanOrEqual(1);
+    await list.evaluate((node, type) => node.addEventListener(type, () => {
+      document.querySelector('#input-resize-brief').hidden = false;
+      window.conversation.reaction({ requestId: 'during-input', text: 'Lời Fisch công khai. '.repeat(15) });
+    }, { once: true }), kind === 'wheel' ? 'wheel' : 'keydown');
+    if (kind === 'wheel') { await list.hover(); await page.mouse.wheel(0, -450); }
+    else await page.keyboard.press('PageUp');
+    await expect.poll(() => page.locator('#input-resize-brief').isVisible()).toBe(true);
+    await settledReaderScroll(list);
+    expect(await list.evaluate(node => node.scrollHeight - node.clientHeight - node.scrollTop)).toBeGreaterThan(40);
+    const before = await list.evaluate(node => node.scrollTop);
+    await page.evaluate(value => window.conversation.project(value), { ...ready, revision: 2, messages: [...messages, { ...messages[0], id: 'input-resize-new', text: 'Câu đến sau thao tác đọc.' }] });
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    expect(await list.evaluate(node => node.scrollTop)).toBe(before);
   } finally { await page.close(); }
 }, 45000);
 
