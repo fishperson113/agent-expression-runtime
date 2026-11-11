@@ -50,8 +50,9 @@ function compositionInputError(input) {
   for (const [index, value] of values.entries()) {
     const validate = partValidators.get(value?.kind);
     if (!validate) {
-      details.push({ path: `/parts/${index}${value && typeof value === 'object' ? '/kind' : ''}`,
-        rule: value && typeof value === 'object' ? (Object.hasOwn(value, 'kind') ? 'enum' : 'required') : 'type' });
+      const object = value && typeof value === 'object' && !Array.isArray(value);
+      details.push({ path: `/parts/${index}${object ? '/kind' : ''}`,
+        rule: object ? (Object.hasOwn(value, 'kind') ? 'enum' : 'required') : 'type' });
       if (details.length === 3) break;
       continue;
     }

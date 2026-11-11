@@ -116,7 +116,7 @@ it('redacts unknown property names and submitted values through MCP before gatew
 
 it('locates missing and unsupported kinds without echoing authored values', () => {
   const cases = [[{ ...part(), kind: 'PRIVATE_KIND' }, '/parts/0/kind', 'enum'],
-    [{ id: 'PRIVATE_ID' }, '/parts/0/kind', 'required'], [null, '/parts/0', 'type']];
+    [{ id: 'PRIVATE_ID' }, '/parts/0/kind', 'required'], [null, '/parts/0', 'type'], [[], '/parts/0', 'type']];
   for (const [value, path, rule] of cases) {
     let failure;
     try { composeExpression({ parts: [value] }); } catch (error) { failure = error; }
