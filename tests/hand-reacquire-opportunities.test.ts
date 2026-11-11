@@ -119,3 +119,30 @@ it.each([[false, true], [true, false]])('preserves legacy or missing-provenance 
   const candidate = f.session.takeRequest(); expect(candidate).toBeTruthy();
   expect(f.session.status().handOpportunities.suppressed).toBe(0); await f.finish(candidate!.request);
 });
+
+it.each([false, true])('keeps an unserved genuine return eligible across a technical gap before coalescing (drift=%s)', async drift => {
+  const f = fixture(); await f.ready();
+  f.steady(42, null); const lost = f.session.takeRequest()!; expect(lost).toBeTruthy(); await f.finish(lost.request); f.steady(300, null);
+  for (let i = 0; i < 3; i++) f.sample(0.2, 150); const old = f.source.handState()!; expect(f.session.takeRequest()).toBeNull();
+  if (drift) for (const x of [0.215, 0.23, 0.245]) f.sample(x, 150);
+  const x = drift ? 0.245 : 0.2; f.sample(x, 550); f.steady(60, x);
+  const returned = f.session.takeRequest(); expect(returned).toBeTruthy();
+  expect(returned!.request.handReadSet!.sourceGeneration).toBeGreaterThan(old.sourceGeneration);
+  expect(returned!.request.handReadSet!.primaryTrackId).not.toBe(old.primaryTrackId);
+  expect(returned!.observationWindow.events.some(event => event.type === 'hand_appeared')).toBe(true);
+  await f.finish(returned!.request); f.steady(300, x); f.sample(x, 550); f.steady(60, x);
+  expect(f.session.takeRequest()).toBeNull();
+});
+
+it('clears an unserved appearance on user intent without making later technical gaps new opportunities', async () => {
+  const f = fixture(); f.steady(6); expect(f.session.takeRequest()).toBeNull();
+  f.session.userIntent(); f.steady(280); f.sample(0.2, 550); f.steady(60);
+  expect(f.session.takeRequest()).toBeNull();
+  expect(f.session.status().handOpportunities.suppressed).toBe(1);
+});
+
+
+it('does not resurrect an undispatched appearance after its original five-second event lifetime', () => {
+  const f = fixture(); f.steady(6); f.steady(120); f.sample(0.2, 550); f.steady(60);
+  expect(f.session.takeRequest()).toBeNull(); expect(f.session.status().handOpportunities.suppressed).toBe(1);
+});
