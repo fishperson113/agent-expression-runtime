@@ -121,6 +121,7 @@ it('bounds lifecycle history and keeps the page/composer reachable in narrow and
    await page.setViewportSize({width,height});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth&&document.documentElement.scrollHeight<=innerHeight)).toBe(true);
    const composer=page.locator('.fisch-conversation textarea');expect(await composer.evaluate(n=>n.getBoundingClientRect().bottom<=innerHeight)).toBe(true);
    await panel.locator('summary').click();await panel.locator('summary').click();expect(await panel.evaluate(n=>n.getBoundingClientRect().width<=innerWidth)).toBe(true);
+   expect(await panel.evaluate(n=>n.getBoundingClientRect().height)).toBeLessThanOrEqual(Math.min(160,height*.18)+1);
   }
   expect(await page.evaluate(()=>window.__mediaCalls)).toBe(0);
  }finally{await page.close();}
