@@ -44,6 +44,7 @@ export async function runPanelCodex({ live, cwd, signal, host: suppliedHost, rea
   try {
     if (signal.aborted) return liveShutdownCode(signal.reason) ?? 130;
     unbind = await bindLiveConversation(live.page, { send: value => state.conversation.send(value), cancel: value => state.conversation.cancel(value),
+      authorizeObserverContext: id => state.broker.authorizeObserverContext(id),
       navigation: () => { state.channel.stale = true; state.channel.token = undefined; state.conversation.navigation(); try { client?.close(); } catch { state.fail(1); } } });
     await bindControls(live, state, value => client?.respond(value) ?? Promise.reject(Error('panel_not_ready')));
     await state.publishSetup('waiting', state.channel.token); await panelPublication(state, { type: 'mode' });

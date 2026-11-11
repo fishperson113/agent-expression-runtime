@@ -216,14 +216,27 @@ export class LiveReactiveBroker {
     })
       .then(value => this.finish(owned, value)).catch(error => this.failed(owned, error));
   }
-  async deliver(id, data, contextDeadline = null) {
-    return this.evaluate(({ id, data, native, contextDeadline }) => {
+  authorizeObserverContext(id) {
+    const owned = this.active;
+    return !!owned && owned.id === id && owned.deliveryPending === true && !!owned.hostCapabilities?.currentTurnContext &&
+      !this.closed && !this.browserUnavailable && !owned.controller.signal.aborted && this.sharedContextCurrent(owned) &&
+      !this.reactionBusy() && !conversationBusy(this.conversationSource?.()?.snapshot);
+  }
+  async deliver(id, data, contextDeadline = null, requireContext = false) {
+    return this.evaluate(async ({ id, data, native, contextDeadline, requireContext }) => {
       if (!native) return window.fischLive.deliverReactiveDecision(id, data);
+      if (requireContext) {
+        let timer, allowed = false;
+        try { allowed = await Promise.race([window.fischLiveConversation?.({ action: 'authorize_observer_context', requestId: id }),
+          new Promise(resolve => { timer = setTimeout(() => resolve(false), 1000); })]); } catch {}
+        finally { clearTimeout(timer); }
+        if (allowed !== true) return window.fischLive.deliverNativeReaction(id, null);
+      }
       if (contextDeadline !== null && performance.now() >= contextDeadline) return window.fischLive.deliverNativeReaction(id, null);
       const bounded = contextDeadline !== null && Number.isFinite(data?.decision?.validUntil)
         ? { ...data, decision: { ...data.decision, validUntil: Math.min(data.decision.validUntil, contextDeadline) } } : data;
       return window.fischLive.deliverNativeReaction(id, bounded);
-    }, { id, data, native: this.provider?.conversationLane === true, contextDeadline }, 'deliver');
+    }, { id, data, native: this.provider?.conversationLane === true, contextDeadline, requireContext }, 'deliver');
   }
   async fail(id) {
     try { await this.evaluate(id => window.fischLive.failReactiveDecision(id), id, 'fail'); }
@@ -234,11 +247,13 @@ export class LiveReactiveBroker {
     clearTimeout(owned.timer); owned.terminal = true;
     if (this.provider?.conversationLane && (!this.sharedContextCurrent(owned) || owned.controller.signal.aborted || this.reactionBusy() || conversationBusy(this.conversationSource?.()?.snapshot))) { await this.finishFailure(owned); return; }
     try {
-      const receipt = await this.deliver(owned.id, value, owned.contextDeadline);
+      owned.deliveryPending = true;
+      const receipt = await this.deliver(owned.id, value, owned.contextDeadline, !!owned.hostCapabilities?.currentTurnContext);
+      owned.deliveryPending = false;
       try { await this.confirmPublication(owned, receipt); } catch { this.provider?.discardPublication?.(owned.id); }
       if (this.active === owned) this.active = undefined;
     }
-    catch { this.provider?.discardPublication?.(owned.id); this.uncertain = true; this.log('reactive_delivery_unknown'); }
+    catch { owned.deliveryPending = false; this.provider?.discardPublication?.(owned.id); this.uncertain = true; this.log('reactive_delivery_unknown'); }
   }
   async confirmPublication(owned, receipt) {
     if (!this.provider?.conversationLane || typeof this.provider.confirmPublication !== 'function') return;

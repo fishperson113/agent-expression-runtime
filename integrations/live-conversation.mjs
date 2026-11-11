@@ -281,8 +281,12 @@ export async function bindLiveConversation(page, conversation) {
     let current;
     try { current = new URL(source.frame.url()); } catch { throw failure('conversation_source_rejected'); }
     if (source.page !== page || source.frame !== frame || page.isClosed() || current.origin !== expected.origin ||
-      current.pathname !== expected.pathname || current.search !== expected.search || !value || !['send', 'cancel'].includes(value.action))
+      current.pathname !== expected.pathname || current.search !== expected.search || !value || !['send', 'cancel', 'authorize_observer_context'].includes(value.action))
       throw failure('conversation_source_rejected');
+    if (value.action === 'authorize_observer_context') {
+      if (Object.keys(value).sort().join() !== 'action,requestId' || !id(value.requestId)) throw failure('conversation_source_rejected');
+      return conversation.authorizeObserverContext?.(value.requestId) === true;
+    }
     return value.action === 'send' ? conversation.send(value) : conversation.cancel(value);
   });
   const navigate = current => {
