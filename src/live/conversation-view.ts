@@ -59,8 +59,8 @@ function elements() {
   host.innerHTML = `<style>.fisch-conversation{display:flex;flex-direction:column;min-height:0;min-width:0;gap:8px}.fisch-conversation ol{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;list-style:none;padding:0;margin:0;overflow-wrap:anywhere}.fisch-conversation li{white-space:pre-wrap;padding:8px 0}.fisch-conversation form{flex-shrink:0;display:grid;gap:6px}.fisch-conversation textarea{box-sizing:border-box;width:100%;min-width:0;resize:none;background:var(--bg,#080e14);color:inherit;font:inherit;border:1px solid var(--line,#344650);border-radius:6px;padding:8px}.fisch-conversation p{font-size:12px;margin:0;overflow-wrap:anywhere}.fisch-conversation .conversation-actions{display:flex;gap:8px;flex-wrap:wrap}.fisch-conversation button{min-height:40px}.fisch-conversation :focus-visible{outline:2px solid var(--focus,#fff);outline-offset:2px}</style>
     <h2>Trò chuyện với Codex</h2><ol tabindex="0" aria-label="Nội dung phiên Codex hiện tại"></ol>
     <div class="observation-messages" tabindex="0" role="log" aria-label="Fisch chủ động từ quan sát" style="max-height:var(--reaction-log-max-height,160px);overflow:auto;flex:none;white-space:pre-wrap"></div><p class="conversation-status" role="status" aria-live="polite" aria-atomic="true"></p>
-    <form><label>Nhắn trong phiên hiện tại<textarea rows="2" maxlength="16000" aria-describedby="${limitId}"></textarea></label>
-    <p id="${limitId}" class="conversation-count"></p><div class="conversation-actions"><button type="submit">Gửi</button><button type="button">Dừng trả lời</button></div></form>`;
+    <form class="conversation-composer"><label><span class="composer-label">Nhắn trong phiên hiện tại</span><textarea rows="2" maxlength="16000" placeholder="Nhắn với Codex…" aria-describedby="${limitId}" enterkeyhint="send"></textarea></label>
+    <div class="conversation-actions"><p id="${limitId}" class="conversation-count"></p><button type="submit">Gửi</button><button type="button">Dừng trả lời</button></div></form>`;
   return { host, list: host.querySelector('ol')!, status: host.querySelector<HTMLElement>('.conversation-status')!, count: host.querySelector<HTMLElement>('.conversation-count')!,
     input: host.querySelector('textarea')!, form: host.querySelector('form')!, send: host.querySelector<HTMLButtonElement>('button[type=submit]')!, cancel: host.querySelector<HTMLButtonElement>('button[type=button]')! };
 }
@@ -128,7 +128,8 @@ function reactionView(host: HTMLElement, disposed: () => boolean) {
 function paintConversation(ui: ReturnType<typeof elements>, state: Snapshot | undefined, flags: { disposed: boolean; busy: boolean; cancelling: boolean; localError: string; lock: boolean; acknowledged: number; panel: boolean }) {
     const { disposed, busy, cancelling, localError, lock, acknowledged } = flags;
     const length = bytes(ui.input.value), invalid = !ui.input.value.trim() || length > 16000;
-    ui.count.textContent = `${length} / 16000 byte UTF-8 · chỉ gửi khi bạn bấm Gửi.`;
+    ui.count.textContent = length > 12000 ? `${length} / 16000 byte UTF-8` : 'Enter gửi · Shift+Enter xuống dòng';
+    ui.input.setAttribute('aria-invalid', String(length > 16000));
     ui.input.disabled = disposed || !state?.available;
     ui.send.disabled = !state?.canSend || busy || lock || state?.error === 'conversation_unknown' || state?.revision === acknowledged || invalid;
     ui.cancel.disabled = !state?.canCancel || cancelling;
@@ -177,6 +178,9 @@ export function mountConversation(container: HTMLElement, request: Request) {
       if (action === 'send' && !['conversation_rejected', 'conversation_invalid_text', 'conversation_changed', 'conversation_unavailable'].includes(code)) lock = true;
     } finally { if (!disposed && current === attempt) { if (action === 'send') busy = false; else if (cancelScope === scope) cancelling = false; paint(); } }
   }
-  ui.input.oninput = paint; ui.form.onsubmit = event => { event.preventDefault(); void act('send'); }; ui.cancel.onclick = () => { void act('cancel'); }; paint();
-  return { project, clear, panelOwner: () => { panel = true; paint(); }, reaction: reactions.publish, reactionHistory: reactions.snapshot, dispose: () => { if (disposed) return; clear(); disposed = true; messages.dispose(); ui.input.oninput = null; ui.form.onsubmit = null; ui.cancel.onclick = null; ui.host.remove(); } };
+  ui.input.oninput = paint; ui.input.onkeydown = event => {
+    if (event.key !== 'Enter' || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey || event.isComposing || event.keyCode === 229) return;
+    event.preventDefault(); if (!event.repeat && !ui.send.disabled) ui.form.requestSubmit();
+  }; ui.form.onsubmit = event => { event.preventDefault(); void act('send'); }; ui.cancel.onclick = () => { void act('cancel'); }; paint();
+  return { project, clear, panelOwner: () => { panel = true; paint(); }, reaction: reactions.publish, reactionHistory: reactions.snapshot, dispose: () => { if (disposed) return; clear(); disposed = true; messages.dispose(); ui.input.oninput = null; ui.input.onkeydown = null; ui.form.onsubmit = null; ui.cancel.onclick = null; ui.host.remove(); } };
 }
