@@ -5,6 +5,23 @@ external agent can choose standalone geometry, change the whole body, or combine
 components from its conversation/task context. No runtime phrase/gesture-to-shape
 mapping is added. RGB, arrangement and bounded motion remain agent choices.
 
+Part `weight` (default 1) divides the current fixed particle budget proportionally,
+with integer rounding. It does not change geometry scale or represent mass or
+emotional intensity. Increasing one part's share leaves fewer particles for the
+others; a small share does not guarantee a visible detail. Coordinates are world
+x/y/z, not pixels. The current perspective camera looks toward the origin from
++Y/+Z, and the renderer may uniformly fit the scene. Depth separation alone can
+still project to overlapping silhouettes. Spatial separation and visual hierarchy
+can help when distinct components are intended; intentional overlap remains valid,
+with no mandatory style or context-to-shape mapping.
+
+This compact guidance is delivered in `compositionSchema.parts.description`:
+MAIN receives it through MCP `compose_expression` discovery, and the Native
+observer's `expressionResponseSchema` retains it in the compose output payload.
+It documents rendering mechanics, not a demonstrated improvement in recognition
+or contextual expression quality. Existing hosts must refresh discovery to receive
+changed tool metadata.
+
 Live MCP exposes `aer://live/v1.restingFace.parts` through resources/read when
 FISCH_LIVE=1. To retain that optional avatar and add a component, copy the full
 parts array and add uniquely identified parts within the 24-part limit.

@@ -14,7 +14,12 @@ export const compositionContract = Object.freeze({ schemaVersion: 1, defaultBase
 export const compositionSchema = {
   type: 'object', additionalProperties: false, required: ['parts'], $defs: { part, motion },
   properties: {
-    parts: { type: 'array', minItems: 1, maxItems: limits.assembly.parts, items: { $ref: '#/$defs/part' }, description: 'Your complete authored parts, or additions to an explicitly selected resting_face base. curve/ellipsoid/patch; stable unique IDs; bounded per-part motion is optional.' },
+    parts: { type: 'array', minItems: 1, maxItems: limits.assembly.parts, items: { $ref: '#/$defs/part' }, description: [
+      'Complete curve/ellipsoid/patch parts; stable IDs; optional bounded motion.',
+      'weight (default 1) shares a fixed particle budget proportionally, rounded; not scale/mass/emotion.',
+      'World xyz, not pixels: perspective from +Y/+Z toward origin, uniform scene fitting; depth gaps can project to overlap.',
+      'Use separation/hierarchy when useful; intentional overlap/no fixed style allowed.',
+    ].join(' ') },
     base: { enum: ['none', 'resting_face'], default: 'none', description: `none replaces the whole body. resting_face explicitly includes ${face.parts.length} canonical parts counting toward the ${limits.assembly.parts}-part total, plus your parts with noncolliding IDs. Never means the current scene.` },
     durationMs: { ...node('assemble').properties.durationMs, default: 600 },
     easing: node('assemble').properties.easing,

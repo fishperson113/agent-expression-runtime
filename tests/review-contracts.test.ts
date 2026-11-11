@@ -16,6 +16,15 @@ it('every advertised shape has a finite deterministic particle buffer', () => {
   );
   expect(capability.shapes).not.toContain('ring');
 });
+it.each([16 / 9, 9 / 16])('world separation along the view ray can project to overlap at aspect %s', aspect => {
+  const camera = new PerspectiveCamera(42, aspect, 0.1, 100);
+  fitCamera(camera, aspect); camera.updateMatrixWorld();
+  const origin = new Vector3().project(camera);
+  const offset = new Vector3(0, 0.15, 0.38).project(camera);
+  expect(offset.x).toBeCloseTo(origin.x, 10);
+  expect(offset.y).toBeCloseTo(origin.y, 10);
+  expect(Math.abs(offset.z - origin.z)).toBeGreaterThan(0.0001);
+});
 const program = (target: string) => ({
   v: 1,
   epoch: 'e',
