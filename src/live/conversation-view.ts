@@ -7,6 +7,7 @@ const cancelSettled = (state: Snapshot, scope: CancelScope) => state.generation 
 let mounts = 0;
 const bytes = (value: string) => new TextEncoder().encode(value).length;
 const errors: Record<string, string> = {
+  conversation_startup_failed: 'Codex chưa thể khởi tạo phiên. Mã lỗi nằm trong mục Yêu cầu và công cụ. Hãy dừng Live và kiểm tra môi trường Codex trước khi khởi chạy lại.',
   conversation_unknown: 'Chưa rõ yêu cầu đã được nhận. Không gửi lại; kiểm tra kết nối Codex hoặc khởi chạy lại Live.',
   conversation_expression_failed: 'Một yêu cầu biểu đạt báo lỗi. Lượt trả lời hoàn tất không xác nhận tạo hình thành công; kiểm tra kết nối Codex.',
   conversation_completion_unknown: 'Chưa xác nhận kết quả lượt trả lời. Kiểm tra kết nối Codex.',
