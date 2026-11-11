@@ -137,6 +137,7 @@ export class LiveReactiveBroker {
       const inference = this.active && !this.active.terminal ? this.active : undefined;
       const polled = await this.evaluate(({ activity, entries, busy, available, take, receipts, contractVersion, projection, native, activeId, policy }) => {
         const api = window.fischLive;
+        if (api.conversationOffline === true) return null;
         const publish = projection && (projection.token ? api.conversationDocument === projection.token : !projection.snapshot.available);
         if (publish) api.conversationStatus?.(projection.snapshot);
         for (const item of receipts) { try {

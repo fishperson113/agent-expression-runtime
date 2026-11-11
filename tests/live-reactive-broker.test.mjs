@@ -370,3 +370,11 @@ it('caps Native decision validity for the existing final admission and lease che
  const deadline=performance.now()+1000,result=await f.broker.deliver('r',original,deadline);
  expect(result.decision.validUntil).toBe(Math.min(10000,deadline));expect(original.decision.validUntil).toBe(10000);f.broker.close();
 });
+it('does not repaint a disconnected document from a poll callback queued before closure',async()=>{
+ const f=fixture(),queued=Promise.withResolvers();let execute,view;
+ f.api.conversationDocument='doc';f.api.conversationStatus=value=>{view=value;};
+ f.page.evaluate=(fn,arg)=>new Promise(resolve=>{execute=async()=>{const old=globalThis.window;globalThis.window={fischLive:f.api};try{resolve(await fn(arg));}finally{globalThis.window=old;}};queued.resolve();});
+ const polling=f.broker.poll({},[],()=>({token:'doc',snapshot:{available:true,canSend:true,messages:[]}}));await queued.promise;
+ f.broker.close();view={available:false,canSend:false,messages:[{text:'Public partial',status:'unknown'}]};f.api.conversationOffline=true;f.api.conversationDocument=null;f.state.available=false;
+ await execute();await polling;expect(view.messages[0].text).toBe('Public partial');expect(view.available).toBe(false);expect(f.state.available).toBe(false);expect(f.candidates).toEqual([]);
+});
