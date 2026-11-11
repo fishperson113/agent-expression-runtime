@@ -431,3 +431,95 @@ it.each(['matching','document','session','revision','missing'])('fences observat
   if(change!=='matching'){f.conversation.fenceObservation(call.message.id,scope);expect(call.guard(call.message)).toBe(true);expect(call.message.params.input[1].text).toContain('unavailable');}
   expect(captureObservation).toHaveBeenCalledTimes(1);f.reply(0,{result:{turn:{id:'fenced-turn',status:'completed'}}});await pending;
 });
+
+it('shares only confirmed original panel text, bounded Unicode, controls normalized and expiring', async () => {
+  let now=100;const f=fixture({now:()=>now,captureObservation:()=> 'MACHINE_CONTEXT_CANARY'});
+  const text='a\n\t'+ '😀'.repeat(300), pending=f.send(text);
+  expect(f.conversation.observerContext()).toBeNull();await vi.waitFor(()=>expect(f.calls).toHaveLength(1));
+  f.event({method:'turn/started',params:{threadId:'thread-a',turn:{id:'observer-turn'}}});
+  expect(f.conversation.observerContext()).toBeNull();f.reply(0,{result:{turn:{id:'observer-turn',status:'inProgress'}}});await pending;
+  const context=f.conversation.observerContext();expect(context).toMatchObject({threadId:'thread-a',turnId:'observer-turn',ageMs:0});
+  expect(Array.from(context.text)).toHaveLength(240);expect(context.text.startsWith('a  ')).toBe(true);expect(Object.isFrozen(context)).toBe(true);
+  expect(JSON.stringify(context)).not.toContain('MACHINE_CONTEXT_CANARY');
+  f.event({method:'turn/completed',params:{threadId:'thread-a',turn:{id:'observer-turn',status:'completed'}}});
+  now+=59999;expect(f.conversation.observerContext().ageMs).toBe(59999);now++;expect(f.conversation.observerContext()).toBeNull();
+});
+
+it.each(['selection','thread','navigation','close','cancel','failed','interrupted','unknown'])('revokes confirmed observer context on %s', async reason => {
+  const f=fixture(), pending=f.send('confirmed panel text');f.reply(0,{result:{turn:{id:'observer-turn',status:'inProgress'}}});await pending;
+  expect(f.conversation.observerContext()).not.toBeNull();
+  if(reason==='selection')f.conversation.selectionAttempt();if(reason==='thread')f.select('thread-b');if(reason==='navigation')f.conversation.navigation();if(reason==='close')f.conversation.close();
+  if(reason==='cancel'){const cancel=f.conversation.cancel({generation:f.conversation.snapshot().generation});expect(f.conversation.observerContext()).toBeNull();f.reply(1,{result:{}});await cancel;}
+  if(['failed','interrupted','unknown'].includes(reason))f.event({method:'turn/completed',params:{threadId:'thread-a',turn:{id:'observer-turn',status:reason}}});
+  expect(f.conversation.observerContext()).toBeNull();
+});
+
+it.each([false,true])('clears previous context before a new send even if it fails (unknown=%s)', async uncertain => {
+  const f=fixture(), first=f.send('previous');f.reply(0,{result:{turn:{id:'first-turn',status:'inProgress'}}});await first;
+  f.event({method:'turn/completed',params:{threadId:'thread-a',turn:{id:'first-turn',status:'completed'}}});
+  const next=f.send('new text');expect(f.conversation.observerContext()).toBeNull();f.fail(1,uncertain);await expect(next).rejects.toThrow();expect(f.conversation.observerContext()).toBeNull();
+});
+
+it('does not restore context from a late ACK after selection or from external user items', async () => {
+  const f=fixture(), pending=f.send('stale original');f.conversation.selectionAttempt();
+  f.reply(0,{result:{turn:{id:'late-turn',status:'inProgress'}}});await pending;expect(f.conversation.observerContext()).toBeNull();
+  f.event({method:'turn/started',params:{threadId:'thread-a',turn:{id:'external-turn'}}});
+  f.event({method:'item/completed',params:{threadId:'thread-a',turnId:'external-turn',item:{id:'external',type:'userMessage',content:[{type:'text',text:'not a panel submission'}]}}});
+  expect(f.conversation.observerContext()).toBeNull();
+});
+
+it('increments observer revisions across confirmed turns and prevents bad terminal before ACK from restoring context', async () => {
+  const f=fixture(),first=f.send('first original');f.reply(0,{result:{turn:{id:'first-turn',status:'inProgress'}}});await first;
+  const revision=f.conversation.observerContext().revision;
+  f.event({method:'turn/completed',params:{threadId:'thread-a',turn:{id:'first-turn',status:'completed'}}});
+  const second=f.send('second original');f.reply(1,{result:{turn:{id:'second-turn',status:'inProgress'}}});await second;
+  expect(f.conversation.observerContext().revision).toBeGreaterThan(revision);
+  f.event({method:'turn/completed',params:{threadId:'thread-a',turn:{id:'second-turn',status:'completed'}}});
+  const third=f.send('do not revive');f.event({method:'turn/started',params:{threadId:'thread-a',turn:{id:'third-turn'}}});
+  f.event({method:'turn/completed',params:{threadId:'thread-a',turn:{id:'third-turn',status:'failed'}}});
+  f.reply(2,{result:{turn:{id:'third-turn',status:'inProgress'}}});await third;expect(f.conversation.observerContext()).toBeNull();
+});
+
+
+it('keeps an owned panel input eligible for context after its guarded RPC is observed', async () => {
+  const f=fixture(),pending=f.send('owned panel text');
+  f.conversation.inputAttempt(f.calls[0].message);f.reply(0,{result:{turn:{id:'owned-input-turn',status:'inProgress'}}});await pending;
+  expect(f.conversation.observerContext()).toMatchObject({text:'owned panel text',turnId:'owned-input-turn'});
+});
+
+it.each(['turn/start','turn/steer','turn/interrupt'])('clears confirmed context immediately on external %s input', async method => {
+  const f=fixture(),pending=f.send('old confirmed text');f.reply(0,{result:{turn:{id:'old-turn',status:'inProgress'}}});await pending;
+  expect(f.conversation.observerContext()).not.toBeNull();
+  f.conversation.inputAttempt({id:'external-rpc',method,params:{threadId:'thread-a'}});expect(f.conversation.observerContext()).toBeNull();
+});
+
+
+it.each(['\u0000','\u0000'.repeat(240)+'useful later text'])('does not publish a blank normalized observer brief', async text => {
+  const f=fixture(),pending=f.send(text);f.reply(0,{result:{turn:{id:'empty-brief-turn',status:'inProgress'}}});await pending;
+  expect(f.conversation.observerContext()).toBeNull();
+});
+
+
+it('does not let a late old failed terminal erase a newer confirmed context', async () => {
+  const f=fixture(),old=f.send('old turn');f.reply(0,{result:{turn:{id:'old-completed-ack',status:'completed'}}});await old;
+  const next=f.send('new turn');f.reply(1,{result:{turn:{id:'new-confirmed-turn',status:'inProgress'}}});await next;
+  const context=f.conversation.observerContext();
+  f.event({method:'turn/completed',params:{threadId:'thread-a',turn:{id:'old-completed-ack',status:'failed'}}});
+  expect(f.conversation.observerContext()).toMatchObject({revision:context.revision,turnId:'new-confirmed-turn',text:'new turn'});
+});
+it('uses a strict same-frame read-only observer authorization action without a new Native turn',async()=>{
+ let binding;const frame={url:()=> 'http://127.0.0.1:123/live.html'},page={url:frame.url,mainFrame:()=>frame,isClosed:()=>false,on(){},off(){},exposeBinding:async(_name,fn)=>{binding=fn;}};
+ const calls=[],dispose=await bindLiveConversation(page,{authorizeObserverContext:id=>{calls.push(id);return id==='r';},navigation(){}});
+ expect(binding({page,frame},{action:'authorize_observer_context',requestId:'r'})).toBe(true);
+ expect(binding({page,frame},{action:'authorize_observer_context',requestId:'other'})).toBe(false);
+ expect(()=>binding({page,frame},{action:'authorize_observer_context',requestId:'r',text:'PRIVATE'})).toThrow('source_rejected');
+ expect(()=>binding({page,frame:{url:frame.url}},{action:'authorize_observer_context',requestId:'r'})).toThrow('source_rejected');
+ expect(calls).toEqual(['r','other']);dispose();
+});
+it('revokes confirmed observer context on transport loss and preserves its error after delayed send rejection',async()=>{
+ const f=fixture(),sent=f.send('Public current question');f.reply(0,{result:{turn:{id:'turn-a',status:'inProgress'}}});await sent;
+ expect(f.conversation.observerContext().text).toBe('Public current question');delta(f,'Public partial');f.conversation.transportLost();
+ expect(f.conversation.observerContext()).toBeNull();expect(f.conversation.snapshot()).toMatchObject({available:false,canSend:false,error:'conversation_transport_lost',messages:[{text:'Public partial',status:'unknown'}]});
+ const g=fixture(),pending=g.send('Do not resend');g.event({method:'turn/started',params:{threadId:'thread-a',turn:{id:'turn-a'}}});delta(g,'Pending partial');g.conversation.transportLost();g.fail(0,true);
+ await expect(pending).rejects.toThrow('conversation_unknown');expect(g.conversation.snapshot()).toMatchObject({error:'conversation_transport_lost',messages:[{text:'Pending partial',status:'unknown'}]});expect(g.calls).toHaveLength(1);
+});
