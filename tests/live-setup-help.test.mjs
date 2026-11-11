@@ -9,6 +9,23 @@ beforeAll(async () => {
   browser = await chromium.launch({ headless: true, ...(process.platform === 'win32' ? { channel: 'msedge' } : {}),
     args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 }, 45000);
+it('shows external observer readiness separately from unknown Native conversation and opt-out', async () => {
+  const { page, panel } = await open();
+  try {
+    await page.evaluate(presentDesktopHost); await panel.locator('summary').click();
+    await page.evaluate(() => { window.fischLive.externalObserverStatus('ready'); window.fischLive.configureReactive(true, 1, 1, true); });
+    expect(await panel.innerText()).toContain('Observer đã cấu hình');
+    expect(await panel.innerText()).toContain('Fisch không biết phiên Native');
+    await page.evaluate(() => window.fischLive.configureReactive(false, 1, 1, true));
+    expect(await panel.innerText()).toContain('Observer đang tạm dừng');
+    await page.evaluate(() => window.fischLive.externalObserverStatus('disabled_by_config'));
+    expect(await panel.innerText()).toContain('đang tắt trong cấu hình');
+    await page.evaluate(() => window.fischLive.externalObserverStatus('budget_unavailable'));
+    expect(await panel.innerText()).toContain('Ngân sách hiện chưa khả dụng');
+    expect(await panel.innerText()).not.toContain('Chờ Codex');
+    expect(await page.locator('video').evaluate(node => node.srcObject)).toBeNull();
+  } finally { await page.close(); }
+}, 45000);
 afterAll(async () => { await browser?.close(); await server?.close(); });
 async function open() {
   const page = await browser.newPage({ viewport: { width: 375, height: 812 } });

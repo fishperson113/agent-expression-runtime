@@ -41,7 +41,8 @@ function elements() {
     <p>Dừng hoặc khởi chạy lại từ terminal. Tạo hình riêng trong phiên không tự được khôi phục sau khi khởi chạy lại.</p></div>
     <div class="setup-external-guide" hidden><p>Gửi tin nhắn trong cuộc trò chuyện Codex Desktop đã kết nối Fisch MCP. Trang này chỉ hiển thị engine; không nhận hay sao chép hội thoại của ứng dụng.</p>
     <p>Dùng Dictate trong Codex Desktop nếu phiên bản của bạn hỗ trợ, rồi kiểm tra và gửi văn bản tại đó. Fisch không cung cấp STT/TTS và không xác nhận microphone hoặc dictation đang hoạt động.</p>
-    <p>Camera mặc định tắt; chỉ bật và cấp quyền khi muốn theo dõi cục bộ. Host Desktop này không chạy observer chủ động hoặc terminal Native Codex riêng.</p>
+    <p>Camera mặc định tắt; chỉ bật và cấp quyền khi muốn quan sát. Observer Codex được chuẩn bị mặc định, chỉ nhận hình học được hỗ trợ; không nhận ảnh camera hoặc tự suy ra cảm xúc/đồ vật. Có thể tắt phản ứng trong Thiết lập.</p>
+    <p>Caption chủ động nằm riêng trên trang Fisch, không gửi lại thành tin nhắn Native. Hội thoại/Dictate do Native sở hữu; host chỉ biết ý định mới khi có MCP operation, không theo dõi lúc bắt đầu nói hay gửi text trước tool call.</p>
     <p>Dừng toàn bộ, đóng hoặc tải lại trang sẽ dừng host. Chạy lại fisch desktop và kết nối lại MCP để bắt đầu một body mới; không tự khôi phục hình cũ.</p></div></details>`;
   const style = document.createElement('style'); style.textContent = css; host.prepend(style);
   return { host, state: host.querySelector<HTMLElement>('.setup-state')!, native: host.querySelector<HTMLElement>('.setup-native')!, observer: host.querySelector<HTMLElement>('.setup-observer')!,
@@ -49,13 +50,14 @@ function elements() {
 }
 
 export function mountLiveSetup(container: HTMLElement) {
-  const ui = elements(); container.append(ui.host); let disposed = false, external = false, active: boolean | undefined, dto = projection(undefined);
+  const ui = elements(); container.append(ui.host); let disposed = false, external = false, externalObserver: Observer = 'unavailable', active: boolean | undefined, dto = projection(undefined);
   const paint = () => {
     if (disposed) return;
     if (external) {
       ui.local.hidden = true; ui.external.hidden = false;
+      const paused = externalObserver === 'ready' && active === false;
       const values = [[ui.state, 'MCP bên ngoài'], [ui.native, 'Hội thoại thuộc Codex Desktop bên ngoài; Fisch không biết phiên Native đã chọn hay trạng thái trả lời.'],
-        [ui.observer, 'Chế độ capability MCP; không có observer trong host này.'] ] as const;
+        [ui.observer, paused ? 'Observer đang tạm dừng; kiểm tra lỗi trong terminal rồi khởi chạy lại host. Hội thoại Native vẫn độc lập.' : observerMessages[externalObserver]] ] as const;
       for (const [element, text] of values) if (element.textContent !== text) element.textContent = text;
       const title = ui.host.querySelector('.dialog-heading h2'), close = ui.host.querySelector('.dialog-heading button[aria-label]');
       if (title && title.textContent !== 'Kết nối · MCP bên ngoài') title.textContent = 'Kết nối · MCP bên ngoài';
@@ -74,5 +76,7 @@ export function mountLiveSetup(container: HTMLElement) {
   };
   const project = (value: unknown) => { if (!disposed) { dto = projection(value); paint(); } };
   project(undefined);
-  return { project, externalHost: () => { external = true; paint(); }, observerState: (value: boolean | undefined) => { active = value; paint(); }, dispose: () => { if (!disposed) { disposed = true; ui.host.remove(); } } };
+  return { project, externalHost: () => { external = true; paint(); }, externalObserver: (value: unknown) => {
+    externalObserver = typeof value === 'string' && Object.hasOwn(observerMessages, value) ? value as Observer : 'unavailable'; paint();
+  }, observerState: (value: boolean | undefined) => { active = value; paint(); }, dispose: () => { if (!disposed) { disposed = true; ui.host.remove(); } } };
 }

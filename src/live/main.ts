@@ -113,6 +113,7 @@ Object.assign(window, { fischLive: { pair: (base: string, token: string) => brid
   } } });
 Object.assign((window as any).fischLive, { setupStatus: (value: unknown) => liveSetup.project(value),
   externalHostPresentation: () => { if (!stopped) liveSetup.externalHost(); },
+  externalObserverStatus: (reason: unknown) => { if (!stopped) liveSetup.externalObserver(reason); },
   conversationStatus: (value: unknown) => { if (!stopped) conversation.project(value); }, conversationClear: () => conversation.clear() });
 const recent: LiveSourceEvent[] = [];
 let sampleCount = 0, sampleAt = performance.now(), inferenceMs = 0, stopped = false;

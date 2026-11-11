@@ -1,3 +1,6 @@
+import { startDesktopObserver } from '../integrations/desktop-observer.mjs';
+import { startDesktopIntentServer } from '../integrations/desktop-intent.mjs';
+import { composeExpression } from '../integrations/compose-expression.mjs';
 import { expect, it, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { spawn, execFileSync } from 'node:child_process';
@@ -600,3 +603,154 @@ it.skipIf(!nativeGateway)('returns public Fisch history with strict inspect and 
     expect((await f.live.page.evaluate(()=>window.fischLive.metrics())).cameraActive).toBe(false);
   }finally{await client.close();await f.close();}
 },60000);
+
+
+function desktopObserverFixture() {
+  let options, scheduled;
+  const provider = { conversationLane: true, discardPublication: vi.fn() };
+  const broker = { provider, active: { id: 'pending', controller: { abort: vi.fn() } },
+    evaluate: vi.fn(async (fn, value) => fn(value)), poll: vi.fn(async () => {}), close: vi.fn() };
+  const control = { base: 'http://127.0.0.1:2345', busy: vi.fn(() => false), close: vi.fn(async () => {}) };
+  const api = { reactiveUserIntent: vi.fn(), externalObserverStatus: vi.fn() };
+  const configure = vi.fn(() => ({ provider, reason: 'ready_native_conversation' }));
+  vi.stubGlobal('window', { fischLive: api });
+  return { provider, broker, control, api, configure, getOptions: () => options, scheduled: () => scheduled,
+    input: { live: { page: { isClosed: () => false }, token: 'synthetic' }, env: {}, configure,
+      intentServer: vi.fn(async value => { options = value; return control; }),
+      brokerFactory: vi.fn(() => broker), schedule: vi.fn(fn => { scheduled = fn; return 123; }), unschedule: vi.fn(), log: vi.fn() } };
+}
+it('prepares one default Native provider and polls without inventing main activity or a conversation', async () => {
+  const f = desktopObserverFixture();
+  try {
+    const observer = await startDesktopObserver(f.input);
+    expect(f.configure).toHaveBeenCalledExactlyOnceWith(f.input.env, { defaultNative: true });
+    expect(f.api.externalObserverStatus).toHaveBeenCalledWith('ready');
+    expect(f.broker.poll).toHaveBeenCalledExactlyOnceWith(undefined);
+    expect(observer.controlBase).toBe(f.control.base);
+    expect(f.input.brokerFactory.mock.calls[0][0].output).toBeUndefined();
+    await observer.close(); await observer.close();
+    expect(f.broker.close).toHaveBeenCalledOnce(); expect(f.control.close).toHaveBeenCalledOnce();
+    expect(f.input.unschedule).toHaveBeenCalledWith(123);
+  } finally { vi.unstubAllGlobals(); }
+});
+it('fences pending output at the known MCP boundary and pauses observer on uncertainty', async () => {
+  const f = desktopObserverFixture();
+  try {
+    const observer = await startDesktopObserver(f.input);
+    await f.getOptions().onBegin();
+    expect(f.broker.active.controller.abort).toHaveBeenCalledOnce();
+    expect(f.provider.discardPublication).toHaveBeenCalledWith('pending');
+    expect(f.api.reactiveUserIntent).toHaveBeenCalledOnce();
+    f.getOptions().onUncertain(); expect(f.broker.paused).toBe(true);
+    await observer.close();
+  } finally { vi.unstubAllGlobals(); }
+});
+it('retains explicit off/failure reasons and cleans resources on startup failure', async () => {
+  const f = desktopObserverFixture(); f.configure.mockReturnValue({ provider: null, reason: 'disabled_by_config' });
+  try {
+    const observer = await startDesktopObserver(f.input);
+    expect(f.api.externalObserverStatus).toHaveBeenCalledWith('disabled_by_config'); await observer.close();
+    f.broker.evaluate.mockRejectedValue(Error('browser_failed'));
+    await expect(startDesktopObserver(f.input)).rejects.toThrow('browser_failed');
+    expect(f.control.close).toHaveBeenCalledTimes(2);
+  } finally { vi.unstubAllGlobals(); }
+});
+it('broker external polling does not publish fake Native activity and respects an outstanding MCP lease', async () => {
+  const api = { activity: vi.fn(() => { throw Error('no Native activity source'); }), configureReactive: vi.fn(),
+    setReactiveUserBusy: vi.fn(), takeReactiveRequest: vi.fn(() => null) };
+  vi.stubGlobal('window', { fischLive: api });
+  const broker = new LiveReactiveBroker({ page: { evaluate: async (fn, arg) => fn(arg) },
+    provider: { conversationLane: true, close: vi.fn() }, externalBusy: () => true });
+  try {
+    await broker.poll(undefined);
+    expect(broker.browserUnavailable).toBe(false); expect(api.activity).not.toHaveBeenCalled();
+    expect(api.setReactiveUserBusy).toHaveBeenCalledWith(true); expect(api.takeReactiveRequest).not.toHaveBeenCalled();
+  } finally { broker.close(); vi.unstubAllGlobals(); }
+});
+
+async function externalMcpObserver() {
+  const live = await openLive({ headless: true, assets: false, synthetic: true, inspect: async page => page.addInitScript(() => {
+    window.fixtureMediaRequests = 0;
+    navigator.mediaDevices.getUserMedia = async () => { window.fixtureMediaRequests++; throw Error('real_media_forbidden'); };
+  }) });
+  const state = { response: Promise.withResolvers(), ack: Promise.withResolvers(), entered: false, autoReleased: false };
+  const provider = { conversationLane: true, contractVersion: 1, policy: { deadlineMs: 60000, cooldownMs: 1000, maxPerMinute: 4 },
+    decide: vi.fn((window, signal) => { state.request = window.request; state.signal = signal; return state.response.promise; }), close: vi.fn() };
+  const observer = await startDesktopObserver({ live, configured: { provider, reason: 'ready_native_conversation' }, intentServer: options =>
+    startDesktopIntentServer({ ...options, onBegin: async value => {
+      await options.onBegin(value); state.entered = true;
+      const timer = setTimeout(() => { state.autoReleased = true; state.ack.resolve(); }, 500);
+      try { await state.ack.promise; } finally { clearTimeout(timer); }
+    } }) });
+  const client = liveTestClient(live.base, live.token, { env: { FISCH_MCP_REQUIRE_THREAD: '1', FISCH_DESKTOP_INTENT_BASE: observer.controlBase } });
+  const tool = async (name, args = {}) => toolValue(await client.call('tools/call', { name, arguments: args, _meta: { threadId: 'fixture-external-owner' } }));
+  const close = async () => {
+    state.ack.resolve(); state.response.resolve(null);
+    await live.page.evaluate(() => clearInterval(window.fixtureSource)).catch(() => {});
+    await observer.close(); await client.close(); await live.close();
+  };
+  try {
+    await client.call('initialize'); await tool('bind_controller'); await tool('observe');
+    await live.page.waitForFunction(() => window.fischLive.metrics().diagnostics.events.some(event => event.epoch && !['local', 'idle'].includes(event.epoch)));
+    return { live, state, provider, observer, tool, close };
+  } catch (error) { await close(); throw error; }
+}
+function scriptedObserverExpression(request, reply) {
+  return { reply, decision: { schemaVersion: 1, requestId: request.requestId, decisionId: 'fixture_old_decision',
+    mode: 'express', validUntil: request.deadline, action: { actionId: 'fixture_old_action', body: composeExpression({ durationMs: 300,
+      parts: [{ id: 'fixture_old_form', kind: 'ellipsoid', center: [0, 0, 0], scale: [0.3, 0.3, 0.3] }], style: { color: '#00ff00' } }).body } } };
+}
+const requireGateway = process.env.FISCH_CAPABILITY_REQUIRE_GATEWAY === '1';
+it.skipIf(!existsSync(gatewayExecutable()) && !requireGateway)('publishes one scripted external-host observation with actual renderer admission and duplicate fencing', async () => {
+  expect(existsSync(gatewayExecutable()), 'Build the standalone gateway for required E2E').toBe(true);
+  const f = await externalMcpObserver();
+  try {
+    const before = await f.live.page.evaluate(() => window.fischLive.metrics());
+    await f.live.page.evaluate(() => { window.fixtureSource = setInterval(() => window.fischLive.fixture('present-neutral'), 150); });
+    await expect.poll(() => f.state.request, { timeout: 10000 }).toBeTruthy();
+    const value = scriptedObserverExpression(f.state.request, 'FIXTURE proactive caption'); f.state.response.resolve(value);
+    await expect.poll(() => f.live.page.locator('.observation-messages').textContent(), { timeout: 10000 }).toContain(value.reply);
+    const events = () => f.live.page.evaluate(id => window.fischLive.metrics().diagnostics.events.filter(event => event.requestId === id), f.state.request.requestId);
+    await expect.poll(async () => (await events()).map(event => event.phase), { timeout: 5000 }).toContain('completed');
+    for (const phase of ['admitted', 'applied', 'frame_submitted', 'completed']) expect((await events()).some(event => event.phase === phase)).toBe(true);
+    expect((await events()).filter(event => event.phase === 'applied')).toHaveLength(1);
+    await f.live.page.evaluate(({ id, value }) => window.fischLive.deliverNativeReaction(id, value), { id: f.state.request.requestId, value });
+    const captions = await f.live.page.locator('.observation-messages').textContent();
+    expect(captions.split(value.reply)).toHaveLength(2); expect((await events()).filter(event => event.phase === 'applied')).toHaveLength(1);
+    const inspection = await f.tool('inspect_expression');
+    expect(inspection.epoch).toBe(f.state.request.epoch); expect(inspection.summary.color).toBe('#00ff00');
+    const final = await f.live.page.evaluate(() => ({ metrics: window.fischLive.metrics(), media: window.fixtureMediaRequests }));
+    expect(final.media).toBe(0); expect(final.metrics.cameraActive).toBe(false);
+    expect(final.metrics.cameraSeq).toBeGreaterThan(before.cameraSeq); expect(final.metrics.render.frame).toBeGreaterThan(before.render.frame);
+    expect(f.provider.decide).toHaveBeenCalledOnce();
+  } finally { await f.close(); }
+  expect(f.provider.close).toHaveBeenCalledOnce();
+}, 60000);
+it.skipIf(!existsSync(gatewayExecutable()) && !requireGateway)('fences a held observer before the real MCP begin ACK in the same renderer epoch', async () => {
+  expect(existsSync(gatewayExecutable()), 'Build the standalone gateway for required E2E').toBe(true);
+  const f = await externalMcpObserver();
+  try {
+    await f.live.page.evaluate(() => { window.fixtureSource = setInterval(() => window.fischLive.fixture('present-neutral'), 150); });
+    await expect.poll(() => f.state.request, { timeout: 10000 }).toBeTruthy();
+    const before = await f.live.page.evaluate(() => window.fischLive.metrics());
+    const mutation = f.tool('compose_expression', { requestId: 'fixture_external_mutation', durationMs: 300,
+      parts: [{ id: 'fixture_user_form', kind: 'ellipsoid', center: [0, 0, 0], scale: [0.5, 0.4, 0.3] }], style: { color: '#ff36bf', pointSize: 3 } });
+    void mutation.catch(() => {});
+    await expect.poll(() => f.state.entered, { timeout: 1500 }).toBe(true);
+    expect(f.state.signal.aborted).toBe(true); f.state.response.resolve(scriptedObserverExpression(f.state.request, 'FIXTURE STALE REPLY'));
+    await expect.poll(() => f.observer.broker.active, { timeout: 1000 }).toBeUndefined();
+    const blocked = await f.live.page.evaluate(() => ({ events: window.fischLive.metrics().diagnostics.events,
+      captions: document.querySelector('.observation-messages').textContent, media: window.fixtureMediaRequests }));
+    expect(blocked.captions).not.toContain('FIXTURE STALE'); expect(blocked.media).toBe(0);
+    expect(blocked.events.some(event => event.origin === 'native' && event.phase === 'received')).toBe(false);
+    expect(blocked.events.some(event => event.requestId === f.state.request.requestId && ['admitted', 'applied', 'frame_submitted'].includes(event.phase))).toBe(false);
+    expect(f.state.autoReleased).toBe(false); f.state.ack.resolve();
+    const receipt = await mutation; expect(receipt.status).toBe('accepted'); expect(receipt.epoch).toBe(f.state.request.epoch);
+    await expect.poll(async () => (await f.tool('expression_status', { requestId: receipt.requestId })).status, { timeout: 12000 }).toBe('completed');
+    const final = await f.live.page.evaluate(() => window.fischLive.metrics());
+    expect(final.userGeometryLocked).toBe(true); expect(final.parts).toContain('fixture_user_form');
+    expect(final.cameraSeq).toBeGreaterThan(before.cameraSeq); expect(final.render.frame).toBeGreaterThan(before.render.frame);
+    expect(f.provider.decide).toHaveBeenCalledOnce();
+  } finally { await f.close(); }
+  expect(f.provider.close).toHaveBeenCalledOnce();
+}, 60000);

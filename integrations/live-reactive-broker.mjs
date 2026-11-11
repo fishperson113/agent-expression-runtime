@@ -25,9 +25,9 @@ export class LiveReactiveBroker {
   }
   closed = false; browserUnavailable = false; waiters = new Set(); polling = false; draining = false; active; uncertain = false; paused = false;
   providerReceipts = []; queue = []; pending = new Map(); turns = new Set(); completed = new Set(); receipts = new Set(); requests = new Set();
-  constructor({ page, provider = null, output, forward, reject, log = () => {}, evaluateTimeoutMs = 10000 }) {
+  constructor({ page, provider = null, output, forward, reject, log = () => {}, externalBusy = () => false, evaluateTimeoutMs = 10000 }) {
     if (!Number.isInteger(evaluateTimeoutMs) || evaluateTimeoutMs < 1 || evaluateTimeoutMs > 10000) throw Error('reactive_timeout_invalid');
-    Object.assign(this, { page, provider, output, forward, reject, log, evaluateTimeoutMs });
+    Object.assign(this, { page, provider, output, forward, reject, log, externalBusy, evaluateTimeoutMs });
   }
   evaluate(fn, arg, operation = 'other') {
     if (this.closed || this.browserUnavailable) {
@@ -57,8 +57,8 @@ export class LiveReactiveBroker {
     clearTimeout(this.active?.timer); if (this.active) this.active.terminal = true;
     this.rejectEvaluations('reactive_browser_unavailable'); this.log('reactive_browser_unavailable');
   }
-  busy() { return !!(this.draining || this.queue.length || this.pending.size || this.turns.size || this.output.turn || this.output.selection !== undefined); }
-  reactionBusy() { return this.provider?.conversationLane ? !!(this.draining || this.queue.length || this.pending.size || this.output.selection !== undefined) : this.busy(); }
+  busy() { return !!(this.externalBusy() || this.draining || this.queue.length || this.pending.size || this.turns.size || this.output?.turn || this.output?.selection !== undefined); }
+  reactionBusy() { return this.provider?.conversationLane ? !!(this.externalBusy() || this.draining || this.queue.length || this.pending.size || this.output?.selection !== undefined) : this.busy(); }
   client(message) {
     if (!controlled.has(message.method)) return true;
     if (this.closed || this.browserUnavailable || this.queue.length + Number(this.draining) >= 8 || this.pending.size >= 64 || message.id === undefined || this.receipts.has(message.id)) {
@@ -130,7 +130,7 @@ export class LiveReactiveBroker {
           const pending = api.recordProviderReceipt?.(item.token, item.receipt);
           if (pending !== undefined) void Promise.resolve(pending).catch(() => {});
         } catch {} }
-        api.activity(activity);
+        if (activity !== undefined) api.activity(activity);
         for (const text of entries) api.logActivity?.(text);
         if (native) api.configureReactive(available, 1, contractVersion, true, policy); else api.configureReactive(available, 1, contractVersion); api.setReactiveUserBusy(busy);
         let token = null; try { token = api.recordingCaptureToken?.() ?? null; } catch {}
