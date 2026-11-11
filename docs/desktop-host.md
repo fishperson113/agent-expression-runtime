@@ -8,6 +8,8 @@ This mode gives an existing Codex Desktop agent access to Fisch's expression eng
 
 The MCP launcher requires host-provided thread binding before mutation (`FISCH_MCP_REQUIRE_THREAD=1`). The binding contract must be installed alongside this host. A shared session identifier is not a conversation identifier. Desktop dictation must submit into the actual connected conversation; this increment does not establish that workflow or claim Windows microphone acceptance.
 
+The printed `env_vars` allowlist preserves the non-secret user-data location through Codex's restricted STDIO child environment. The host and Native application must receive the same `XDG_DATA_HOME` on Linux (or `LOCALAPPDATA` on Windows); forwarding a name cannot supply a value missing from the Native process. A terminal-only custom override is not automatically inherited by an already-running Desktop app. No credential variables are forwarded by this configuration.
+
 ## Runtime capability and lifecycle
 
 The host keeps an ephemeral loopback pairing capability in `fisch/desktop-live` under the OS user-data directory (Linux XDG data/home fallback, macOS Application Support, Windows LocalAppData). This is an engine-local token, not Codex authentication. Unlike the memory-only Tauri pairing path, this CLI handoff uses a private runtime file so separately started MCP children can connect. It is passed to the server only in its child environment, never printed or included in configuration.

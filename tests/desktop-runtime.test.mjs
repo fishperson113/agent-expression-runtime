@@ -43,3 +43,15 @@ it('uses standard Windows/macOS locations and prints static token-free executabl
   const text = desktopMcpConfig({ node: 'C:\\Program Files\\node.exe', entry: 'C:\\My Project\\bin\\fisch.mjs' });
   expect(text).toContain(JSON.stringify(['C:\\My Project\\bin\\fisch.mjs', 'mcp'])); expect(text).not.toMatch(/token|AER_|FISCH_|https?:/i);
 });
+it.skipIf(process.platform === 'win32')('preserves a custom data location through Native stdio environment filtering', () => {
+  const f = fixture(), options = { ...f.options, platform: 'linux' }, owner = claimDesktopRuntime(options);
+  owner.publish({ base, token });
+  try {
+    expect(() => readDesktopRuntime({ ...options, env: {} })).toThrow('desktop_host_not_running');
+    const line = desktopMcpConfig().split('\n').find(value => value.startsWith('env_vars = '));
+    const allowlist = JSON.parse(line.slice('env_vars = '.length));
+    expect(allowlist).toEqual(['XDG_DATA_HOME', 'LOCALAPPDATA']);
+    const filtered = Object.fromEntries(Object.entries(options.env).filter(([name]) => allowlist.includes(name)));
+    expect(readDesktopRuntime({ ...options, env: filtered })).toEqual({ base, token });
+  } finally { expect(owner.close()).toBe(true); }
+});

@@ -71,5 +71,5 @@ export function readDesktopRuntime(options = {}) {
   } catch (error) { throw Error(error.message === 'desktop_host_not_running' ? error.message : 'desktop_runtime_unavailable'); }
 }
 export function desktopMcpConfig({ node = process.execPath, entry = fileURLToPath(new URL('../bin/fisch.mjs', import.meta.url)) } = {}) {
-  return `[mcp_servers.fisch]\ncommand = ${JSON.stringify(node)}\nargs = ${JSON.stringify([entry, 'mcp'])}\n`;
+  return `[mcp_servers.fisch]\ncommand = ${JSON.stringify(node)}\nargs = ${JSON.stringify([entry, 'mcp'])}\nenv_vars = ["XDG_DATA_HOME", "LOCALAPPDATA"]\n`;
 }

@@ -6,7 +6,7 @@
   "setup": [
     "Freeze the exact PR head after all seven CI checks succeed. Keep the existing authenticated CODEX_HOME local; never copy credentials.",
     "Start the actual runDesktopHost/openLive production browser and Rust gateway with assets false and headless true, using an isolated owner-private XDG_DATA_HOME shared only with this test client. Do not inject a fake gateway, MCP server or model.",
-    "Configure only the fisch stdio MCP server using the token-free desktopMcpConfig command/args. The spawned child must be the actual bin/fisch.mjs mcp entry. Do not put pairing credentials into static configuration or model input.",
+    "Configure only the fisch stdio MCP server using the token-free desktopMcpConfig command/args and its env_vars allowlist. Give the actual Native app-server process the same isolated XDG_DATA_HOME before spawn; its restricted STDIO environment must forward that value without a fake child override. The spawned child must be the actual bin/fisch.mjs mcp entry. Do not put pairing credentials into static configuration or model input.",
     "Use the actual signed-in Codex app-server with one ephemeral read-only thread in an empty temporary working directory, project_doc_max_bytes=0, shell/apps/plugins/hooks/web/image/multi-agent disabled, and all unrelated MCP servers disabled. This is a limited expression-tool client, not the user's repository coding MAIN. Do not weaken sandbox or change folder trust.",
     "Verify the effective tool catalog and policy from the actual process before inference; require the actual Native host to provide _meta.threadId. Record host metadata in an instrumented transparent MCP relay if necessary; never fabricate it or place it in tool arguments."
   ],
