@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 const id = value => typeof value === 'string' && /^[A-Za-z0-9._:-]{1,128}$/.test(value);
 const freeze = value => {
   if (value && typeof value === 'object') { Object.values(value).forEach(freeze); Object.freeze(value); }
@@ -5,19 +7,31 @@ const freeze = value => {
 };
 const failure = code => Error(code);
 const bytes = value => Buffer.byteLength(value, 'utf8');
+const contextUnavailable = 'Fisch observation context: unavailable (capture failed, missing, invalid, or timed out).';
+function sourceScope(value) {
+  if (!value || typeof value !== 'object' || Object.getPrototypeOf(value) !== Object.prototype) return null;
+  const fields = Object.getOwnPropertyDescriptors(value);
+  if (Reflect.ownKeys(fields).length !== 3 || !['documentToken', 'sessionId', 'revision'].every(key => fields[key] && 'value' in fields[key])) return null;
+  const { documentToken, sessionId, revision } = Object.fromEntries(Object.entries(fields).map(([key, descriptor]) => [key, descriptor.value]));
+  if (typeof documentToken !== 'string' || !documentToken.length || documentToken.length > 128 ||
+    typeof sessionId !== 'string' || !sessionId.length || sessionId.length > 128 || !Number.isSafeInteger(revision) || revision < 0) return null;
+  return { documentToken, sessionId, revision };
+}
 const clip = (value, limit) => new TextDecoder().decode(Buffer.from(value.slice(0, limit)).subarray(0, limit), { stream: true });
 
 export class LiveConversation {
-  #output; #transport; #broker; #thread; #selection; #generation = 0; #revision = 0;
-  #terminal = new Set(); #intent = 0; #messages = []; #unknown = new Set(); #pending; #stopping; #stopErrorTurn; #expressionFailureTurn; #error = ''; #closed = false; #navigated = false;
-  constructor({ output, transport, broker }) {
+  #output; #transport; #broker; #captureObservation; #thread; #selection; #generation = 0; #revision = 0;
+  #ownedContexts = new Map(); #terminal = new Set(); #intent = 0; #messages = []; #unknown = new Set(); #pending; #stopping; #stopErrorTurn; #expressionFailureTurn; #error = ''; #closed = false; #navigated = false;
+  constructor({ output, transport, broker, captureObservation }) {
     if (!output || typeof broker?.busy !== 'function' || typeof transport?.submitUser !== 'function' || typeof transport?.interruptUser !== 'function')
       throw failure('conversation_configuration');
+    if (captureObservation !== undefined && typeof captureObservation !== 'function') throw failure('conversation_configuration');
+    this.#captureObservation = captureObservation;
     this.#output = output; this.#transport = transport; this.#broker = broker;
     this.#thread = output.thread; this.#selection = output.selection;
   }
   #clear() {
-    this.#expressionFailureTurn = undefined; this.#terminal.clear(); this.#messages = []; this.#stopping = this.#stopErrorTurn = undefined; this.#error = '';
+    this.#ownedContexts.clear(); this.#expressionFailureTurn = undefined; this.#terminal.clear(); this.#messages = []; this.#stopping = this.#stopErrorTurn = undefined; this.#error = '';
     this.#generation++; this.#revision++;
   }
   #sync() {
@@ -58,6 +72,9 @@ export class LiveConversation {
       this.#output.selection !== undefined || (!cancelling && this.#unknown.has(job.thread))) return false;
     if (!id(message?.id) || (job.rpcId !== undefined && job.rpcId !== message.id)) return false;
     job.rpcId = message.id;
+    if (!cancelling && job.contextCapturedAt !== undefined && (job.contextRevoked || performance.now() - job.contextCapturedAt > job.contextValidForMs) && message.params?.input?.[1]) {
+      job.contextText = contextUnavailable; message.params.input[1] = { type: 'text', text: contextUnavailable, text_elements: [] };
+    }
     if (cancelling) return this.#owner() === job.turn;
     if (this.#pending !== job) return false;
     return !this.#output.turn && !this.#broker.turns?.size &&
@@ -68,18 +85,51 @@ export class LiveConversation {
     return this.#available() && this.#output.selection === undefined && !this.#pending &&
       !this.#unknown.has(this.#thread) && this.#unknown.size < 64 && !this.#output.turn && !this.#broker.busy();
   }
+  async #captureContext(job, userText) {
+    let timer;
+    const captured = Promise.resolve().then(() => this.#captureObservation(freeze({ submissionId: job.submissionId,
+      thread: job.thread, generation: job.generation, intent: job.intent }))).catch(() => null);
+    let context;
+    try { context = await Promise.race([captured, new Promise(resolve => { timer = setTimeout(() => resolve(null), 250); })]); }
+    finally { clearTimeout(timer); }
+    this.#sync();
+    if (!this.#available() || job.generation !== this.#generation || job.intent !== this.#intent || job.thread !== this.#thread ||
+      this.#pending !== job || this.#output.selection !== undefined)
+      throw Object.assign(failure('conversation_changed'), { uncertain: false });
+    job.contextCapturedAt = performance.now();
+    let text = context, validForMs = 1000;
+    try { if (context && typeof context === 'object' && Object.getPrototypeOf(context) === Object.prototype) {
+      const fields = Object.getOwnPropertyDescriptors(context);
+      const scope = fields.sourceFence;
+      const parsedScope = scope && 'value' in scope ? sourceScope(scope.value) : null;
+      const validScope = !scope || parsedScope;
+      if (Reflect.ownKeys(fields).length === (scope ? 3 : 2) && validScope && fields.text && fields.validForMs &&
+        'value' in fields.text && 'value' in fields.validForMs && Number.isFinite(fields.validForMs.value) &&
+        fields.validForMs.value >= 0 && fields.validForMs.value <= 1000) {
+        text = fields.text.value; validForMs = fields.validForMs.value;
+        if (scope) job.sourceFence = freeze(parsedScope);
+      }
+    }
+    } catch { text = null; validForMs = 0; }
+    job.contextValidForMs = validForMs;
+    job.userText = userText; job.contextText = validForMs > 0 && typeof text === 'string' && text.length > 0 && bytes(text) <= 8192 ? text : contextUnavailable;
+    return { type: 'text', text: job.contextText, text_elements: [] };
+  }
   async send(value) {
     this.#sync();
     if (!this.#canSend() || value?.generation !== this.#generation) throw failure('conversation_unavailable');
     if (typeof value.text !== 'string' || !value.text.trim() || bytes(value.text) > 16000) throw failure('conversation_invalid_text');
-    const job = { generation: this.#generation, intent: this.#intent, thread: this.#thread };
+    const job = { generation: this.#generation, intent: this.#intent, thread: this.#thread, submissionId: randomUUID() };
     this.#pending = job; this.#error = ''; this.#revision++;
     try {
+      const input = [{ type: 'text', text: value.text, text_elements: [] }];
+      if (this.#captureObservation) input.push(await this.#captureContext(job, value.text));
       const reply = await this.#transport.submitUser({ threadId: job.thread,
-        input: [{ type: 'text', text: value.text, text_elements: [] }] }, message => this.#guard(job, message), key => { if (key === job.rpcId) this.#discard(key); });
+        input }, message => this.#guard(job, message), key => { if (key === job.rpcId) this.#discard(key); });
       if (reply?.error) throw Object.assign(failure('conversation_rejected'), { uncertain: false });
       if (!id(reply?.result?.turn?.id) || !['inProgress', 'completed', 'interrupted', 'failed'].includes(reply.result.turn.status))
         throw Object.assign(failure('conversation_unknown'), { uncertain: true });
+      if (job.contextText !== undefined) this.#rememberContext(reply.result.turn.id, job);
       return Object.freeze({ status: 'accepted' });
     } catch (error) {
       const unknown = error?.uncertain !== false;
@@ -88,6 +138,16 @@ export class LiveConversation {
       if (job.thread === this.#output.thread && this.#error !== 'conversation_transport_lost') this.#error = code;
       throw failure(code);
     } finally { if (this.#pending === job) this.#pending = undefined; this.#revision++; }
+  }
+  fenceObservation(rpcId, currentScope) {
+    const job = this.#pending;
+    if (!job || job.rpcId !== rpcId || !job.sourceFence) return;
+    let compatible = false;
+    try {
+      const current = sourceScope(currentScope);
+      compatible = !!current && ['documentToken', 'sessionId', 'revision'].every(key => current[key] === job.sourceFence[key]);
+    } catch { /* Unreadable scope cannot authorize old observation data. */ }
+    if (!compatible) job.contextRevoked = true;
   }
   #discard(key) {
     this.#broker.pending?.delete(key); this.#output.turnRequests?.delete(key);
@@ -119,11 +179,20 @@ export class LiveConversation {
       throw failure('conversation_stop_unconfirmed');
     }
   }
+  #rememberContext(turn, job) {
+    if (!id(turn) || job.thread !== this.#thread || job.generation !== this.#generation || job.intent !== this.#intent) return;
+    this.#ownedContexts.set(turn, job);
+    if (this.#ownedContexts.size > 64) this.#ownedContexts.delete(this.#ownedContexts.keys().next().value);
+  }
   accept(message) {
     this.#sync();
     if (!this.#available() || this.#output.selection !== undefined) return;
     const { method, params = {} } = message;
+    if (message.id === this.#pending?.rpcId && this.#pending?.contextText !== undefined && !message.error)
+      this.#rememberContext(message.result?.turn?.id, this.#pending);
     if (params.threadId !== this.#thread) return;
+    if (method === 'turn/started' && this.#pending?.rpcId && this.#pending.contextText !== undefined)
+      this.#rememberContext(params.turn?.id, this.#pending);
     if (method === 'turn/completed' && id(params.turn?.id) && this.#output.completed?.has(params.turn.id)) {
       if (this.#terminal.has(params.turn.id)) return;
       this.#terminal.add(params.turn.id);
@@ -147,7 +216,10 @@ export class LiveConversation {
     }
     if (item?.type === 'agentMessage' && typeof item.text === 'string') this.#update(item.id, turn, 'assistant', item.text);
     if (item?.type === 'userMessage' && Array.isArray(item.content)) {
-      const text = item.content.slice(0, 32).filter(value => value?.type === 'text' && typeof value.text === 'string')
+      const owned = this.#ownedContexts.get(turn);
+      const text = item.content.slice(0, 32).filter((value, index) => !(index === 1 && owned &&
+        item.content[0]?.type === 'text' && item.content[0].text === owned.userText && value?.type === 'text' && value.text === owned.contextText))
+        .filter(value => value?.type === 'text' && typeof value.text === 'string')
         .map(value => value.text.slice(0, 16000)).join('\n');
       this.#update(item.id, turn, 'user', text);
     }

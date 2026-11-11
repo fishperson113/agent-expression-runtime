@@ -1,5 +1,6 @@
 import type { ReactiveRequest } from '../core/live/decision-types';
 import './style.css';
+import { chatObservation } from './chat-observation';
 import { mountLive, element, mountDisclosures } from './view';
 import { mountPlayground } from './playground-view';
 import { mountPanelControls } from './panel-controls';
@@ -66,7 +67,8 @@ function logActivity(text: string) {
     return item;
   }));
 }
-Object.assign(window, { fischLive: { pair: (base: string, token: string) => bridge.connect(base, token),
+Object.assign(window, { fischLive: { chatObservation: () => chatObservation(observations.snapshot, body.scheduler.epoch, Date.now(), stopped || document.hidden, observations.sourceRevision),
+  chatObservationScope: () => ({ sessionId: observations.snapshot.sessionId, revision: observations.sourceRevision }), pair: (base: string, token: string) => bridge.connect(base, token),
   selectThread: () => { hands.reset(); resetReactive(); logActivity('Đã chọn phiên Codex.'); return bridge.cancel(); },
   panelControlStatus: (value: any) => { if (stopped) return; panelControls ??= mountPanelControls(element('conversation-tools'), value => (window as any).fischPanelRespond(value)); if (['mode', 'ready'].includes(value?.type)) { conversation.panelOwner(); liveSetup.panelOwner(); } else panelControls.project(value); },
   logActivity, playgroundStatus: (value: unknown) => playground.project(value), playgroundClear: () => playground.clear(),
