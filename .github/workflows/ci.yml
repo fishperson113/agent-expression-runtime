@@ -4,7 +4,7 @@ permissions:
   contents: read
 jobs:
   core:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -12,7 +12,10 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - name: Install pinned Chromium using runner system libraries
+        run: npx playwright install chromium
+      - name: Verify pinned Chromium launches
+        run: node --input-type=module -e "import {chromium} from '@playwright/test'; const browser=await chromium.launch({headless:true}); console.log(browser.version()); await browser.close();"
       - run: npm run check:architecture
       - run: npm test
       - run: npm run build
@@ -63,7 +66,7 @@ jobs:
       - run: cargo test --locked --manifest-path src-tauri/Cargo.toml
       - run: cargo check --locked --manifest-path src-tauri/Cargo.toml
   gateway:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -74,7 +77,10 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - name: Install pinned Chromium using runner system libraries
+        run: npx playwright install chromium
+      - name: Verify pinned Chromium launches
+        run: node --input-type=module -e "import {chromium} from '@playwright/test'; const browser=await chromium.launch({headless:true}); console.log(browser.version()); await browser.close();"
       - run: cargo build --locked --no-default-features --bin fisch-gateway --manifest-path src-tauri/Cargo.toml
       - run: node --input-type=module -e "const {openLive}=await import('./integrations/live-launch.mjs'); const live=await openLive({headless:true,assets:false,production:false,synthetic:true}); await live.close();"
       - run: npx vitest run --maxWorkers=1 tests/playground-mcp.test.mjs tests/playground-route.test.mjs tests/live-restart-route.test.mjs tests/expression-capability-e2e.test.mjs tests/expression-composition-e2e.test.mjs tests/expression-channel-e2e.test.mjs tests/live-conversation-host.test.mjs
