@@ -36,8 +36,8 @@ const observations = new FaceObservations(crypto.randomUUID());
 const handEvents = new HandEventSource(() => performance.now());
 let handEventVersion = 0, reactiveAvailable = false, nativeConversation = false;
 let reactiveChoice: boolean | undefined;
-const nativeReplies = new Map<string, { text: string; published: boolean; contextRevision: number | null }>();
-const nativeRequests = new Map<string, { request: ReactiveRequest; read: ReturnType<ReactiveSession['nativeReadSet']>; contextRevision: number | null }>();
+const nativeReplies = new Map<string, { text: string; published: boolean; contextRevision: number | string | null }>();
+const nativeRequests = new Map<string, { request: ReactiveRequest; read: ReturnType<ReactiveSession['nativeReadSet']>; contextRevision: number | string | null }>();
 const cameraTransitions: { status: string; source: string; at: number }[] = [];
 const bridge = new LiveBridge(body, observations, () => resetReactive(), () => observeReactive(), () => {
   const remainingMs = body.observerContextRemainingMs();
@@ -76,7 +76,7 @@ Object.assign(window, { fischLive: { chatObservation: () => chatObservation(obse
   setReactiveUserBusy: (busy: boolean) => reactive.setUserBusy(busy),
   reactiveUserIntent: () => { semanticEvents.length = 0; body.prepareUserMutation(); },
   takeReactiveRequest: () => { const candidate = reactive.takeRequest();
-    if (candidate && nativeConversation) { nativeRequests.set(candidate.request.requestId, { request: candidate.request, read: reactive.nativeReadSet(candidate.observationWindow.events), contextRevision: body.observerContext()?.revision ?? null }); if (nativeRequests.size > 8) nativeRequests.delete(nativeRequests.keys().next().value!); }
+    if (candidate && nativeConversation) { nativeRequests.set(candidate.request.requestId, { request: candidate.request, read: reactive.nativeReadSet(candidate.observationWindow.events), contextRevision: body.observerContextReadKey() }); if (nativeRequests.size > 8) nativeRequests.delete(nativeRequests.keys().next().value!); }
     return candidate; },
   canRememberNativeReaction: (request: ReactiveRequest) => nativeConversation && !stopped && reactive.canPublish(request),
   canContinueNativeReaction: (id: string) => { const held = nativeRequests.get(id); return !!held && body.matchesObserverContext(held.contextRevision) && reactive.canPublish(held.request, held.read); },
@@ -91,7 +91,7 @@ Object.assign(window, { fischLive: { chatObservation: () => chatObservation(obse
     return { ...result, chatPublished, source: 'native-observation' };
   }, authorizeReactiveRequest: (id: string) => reactive.authorize(id),
   deliverReactiveDecision: (id: string, data: unknown) => reactive.deliver(id, data), failReactiveDecision: (id: string) => reactive.fail(id),
-  nativeReactionCapabilities: () => { const context = body.observerContext(); return { schemaVersion: 1, expressionAllowed: !stopped && !document.hidden && body.canReactive(), ...(context ? { interactionContext: context } : {}) }; },
+  nativeReactionCapabilities: () => { const context = body.observerContext(), recent = body.recentObserverContext(); return { schemaVersion: 1, expressionAllowed: !stopped && !document.hidden && body.canReactive(), ...(context ? { interactionContext: context } : {}), ...(recent ? { recentInteractionContext: recent } : {}) }; },
   reactiveStatus: () => reactive.status(),
   startRecording: () => recording.start(), stopRecording: () => recording.stop(), clearRecording: () => recording.clear(),
   recordingSnapshot: () => recording.snapshot(), recordingCaptureToken: () => recording.captureToken(),
@@ -222,11 +222,11 @@ const sharedContextLabel = document.createTextNode(''), sharedContextText = docu
 sharedContext.append(sharedContextLabel, sharedContextText); element('conversation-tools').prepend(sharedContext);
 element('reactivity-privacy').textContent += ' MAIN có thể chia sẻ brief công khai riêng, hiển thị cạnh hội thoại; không tự sao chép chat/code.';
 const timer = setInterval(() => {
-  const context = body.observerContext();
-  sharedContext.hidden = !context;
-  const label = context ? `Codex chia sẻ công khai (${context.mode === 'quiet' ? 'tạm yên lặng' : 'mở tương tác'}, còn ${Math.ceil(body.observerContextRemainingMs() / 1000)} giây): ` : '';
+  const context = body.observerContext(), recentContext = body.recentObserverContext();
+  sharedContext.hidden = !context && !recentContext;
+  const label = context ? `Codex chia sẻ công khai (${context.mode === 'quiet' ? 'tạm yên lặng' : 'mở tương tác'}, còn ${Math.ceil(body.observerContextRemainingMs() / 1000)} giây): ` : recentContext ? 'Brief công khai vừa hết hạn (chỉ ngữ cảnh, không gia hạn quyền): ' : '';
   if (sharedContextLabel.data !== label) sharedContextLabel.data = label;
-  if (sharedContextText.data !== (context?.text ?? '')) sharedContextText.data = context?.text ?? '';
+  if (sharedContextText.data !== (context?.text ?? recentContext?.text ?? '')) sharedContextText.data = context?.text ?? recentContext?.text ?? '';
   recording.tick();
   element('world-state').textContent = JSON.stringify(observations.snapshot, null, 2);
   const metrics = body.metrics;

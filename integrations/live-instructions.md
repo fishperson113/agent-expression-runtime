@@ -151,3 +151,5 @@ vẫn raster hạt do giới hạn tối thiểu. Không suy ra hình cuối rõ
 tiếp bị ngắt.
 
 Observe làm mới coordination qua cùng kênh renderer, dùng chung giới hạn một lần/giây với inspect_expression. Nếu unavailable thì không tự retry hay coi cache là active; dữ liệu camera vẫn độc lập.
+
+Sau khi brief công khai hết hạn, Fisch có thể giữ chính brief đó thêm tối đa 120 giây, đánh dấu đã hết hạn và hiển thị cạnh hội thoại. Đây chỉ là ngữ cảnh lịch sử, không gia hạn quiet, handoff hay quyền đổi hình. Intent mới, brief mới, đổi thread, Stop hoặc thu hồi nguồn xóa cả lịch sử này. Không chia sẻ transcript riêng.

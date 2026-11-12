@@ -761,3 +761,36 @@ it.skipIf(!existsSync(gatewayExecutable()) && !requireGateway)('fences a held ob
   } finally { await f.close(); }
   expect(f.provider.close).toHaveBeenCalledOnce();
 }, 60000);
+
+
+it('retains only bounded expired public brief without renewing authority or read deadlines',async()=>{
+  const {LiveBody}=await import('../src/live/body.ts');
+  const body=Object.create(LiveBody.prototype);body.scheduler={epoch:'a',busy:false};body.controls={mode:'normal'};body.userLeaseUntil=0;
+  let now=9000;const clock=vi.spyOn(performance,'now').mockImplementation(()=>now);
+  try{
+    body.publicContext={epoch:'a',seq:7,until:10000,text:'Quiet shared moment',mode:'quiet'};
+    expect(body.observerContextReadKey()).toBe(7);expect(body.canConverse()).toBe(false);
+    now=10000;const key=body.observerContextReadKey();
+    expect(body.observerContext()).toBeNull();expect(body.canConverse()).toBe(true);
+    expect(body.recentObserverContext()).toEqual({revision:7,text:'Quiet shared moment',previousMode:'quiet',expired:true});
+    expect(body.matchesObserverContext(7)).toBe(false);expect(body.matchesObserverContext(key)).toBe(true);
+    now=129999;expect(body.observerContextReadKey()).toBe(key);
+    now=130000;expect(body.recentObserverContext()).toBeNull();expect(body.matchesObserverContext(key)).toBe(false);
+    body.publicContext={epoch:'a',seq:8,until:10000,text:'Old brief',mode:'open'};now=11000;
+    body.revokeObserverHandoff();expect(body.recentObserverContext()).toBeNull();
+    body.publicContext={epoch:'old',seq:9,until:10000,text:'Wrong epoch',mode:'open'};
+    expect(body.recentObserverContext()).toBeNull();
+  }finally{clock.mockRestore();}
+});
+it('validates historical brief as expired data, never active quiet authority',async()=>{
+  const {freezeNativeHostCapabilities}=await import('../integrations/native-reaction-provider.mjs');
+  const recent={revision:2,text:'Public quiet moment',previousMode:'quiet',expired:true};
+  const input={schemaVersion:1,expressionAllowed:false,recentInteractionContext:recent};
+  const frozen=freezeNativeHostCapabilities(input);recent.text='changed';
+  expect(frozen.recentInteractionContext.text).toBe('Public quiet moment');expect(Object.isFrozen(frozen.recentInteractionContext)).toBe(true);
+  expect(frozen.interactionContext).toBeUndefined();expect(frozen.expressionAllowed).toBe(false);
+  for(const bad of [{...recent,expired:false},{...recent,text:'x'.repeat(241)},{...recent,mode:'quiet'},{...recent,previousMode:'unknown'},
+    {...recent,get text(){throw Error('getter should not execute');}}])
+    expect(()=>freezeNativeHostCapabilities({...input,recentInteractionContext:bad})).toThrow('native_host_capabilities_invalid');
+  expect(()=>freezeNativeHostCapabilities({...input,interactionContext:{revision:2,text:'active',mode:'open'}})).toThrow('native_host_capabilities_invalid');
+});
