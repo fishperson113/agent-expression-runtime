@@ -9,12 +9,17 @@ const node = type => protocol.$defs.node.oneOf.map(item => item.$ref ? protocol.
 const pick = (source, keys) => Object.fromEntries(keys.map(key => [key, source.properties[key]]));
 const part = structuredClone(protocol.$defs.assemblyPart), motion = part.anyOf[0].properties.motion;
 const weight = part.anyOf[0].properties.weight;
-for (const kind of part.anyOf) { kind.properties.motion = { $ref: '#/$defs/motion' }; kind.properties.weight = { $ref: '#/$defs/weight' }; }
+for (const kind of part.anyOf) {
+  kind.properties.motion = { $ref: '#/$defs/motion' }; kind.properties.weight = { $ref: '#/$defs/weight' };
+  kind.properties.trajectory = { $ref: '#/$defs/track' };
+  kind.properties.trackRef = structuredClone(protocol.$defs.assemblyTrajectory.properties.group);
+}
 export const compositionContract = Object.freeze({ schemaVersion: 1, defaultBase: 'none',
   baseFingerprint: createHash('sha256').update(JSON.stringify(face.parts)).digest('hex') });
 export const compositionSchema = {
-  type: 'object', additionalProperties: false, required: ['parts'], $defs: { part, motion, weight, assemblyTrajectory: protocol.$defs.assemblyTrajectory },
+  type: 'object', additionalProperties: false, required: ['parts'], $defs: { part, motion, weight, track: protocol.$defs.assemblyTrajectory },
   properties: {
+    tracks: { type: 'array', minItems: 1, maxItems: limits.assembly.parts, items: { $ref: '#/$defs/track' } },
     parts: { type: 'array', minItems: 1, maxItems: limits.assembly.parts, items: { $ref: '#/$defs/part' }, description: [
       'Stable IDs. trajectory: identical per group; atMs starts at 0, strictly increases; excludes motion.',
       'weight: particle share, default 1.',
@@ -41,12 +46,25 @@ function sharePosition(value) {
   if (JSON.stringify(value) === JSON.stringify(vector)) return { $ref: '#/$defs/position' };
   return Array.isArray(value) ? value.map(sharePosition) : Object.fromEntries(Object.entries(value).map(([k, v]) => [k, sharePosition(v)]));
 }
-for (const key of ['part', 'motion', 'assemblyTrajectory']) compositionSchema.$defs[key] = sharePosition(compositionSchema.$defs[key]);
-compositionSchema.$defs.part.anyOf[0].properties.points.items = vector;
+for (const key of ['part', 'motion', 'track']) compositionSchema.$defs[key] = sharePosition(compositionSchema.$defs[key]);
 const rotation = part.anyOf[1].properties.rotation;
 compositionSchema.$defs.rotation = rotation;
 compositionSchema.$defs.part.anyOf[1].properties.rotation = { $ref: '#/$defs/rotation' };
-compositionSchema.$defs.assemblyTrajectory.properties.keyframes.items.properties.rotate = { $ref: '#/$defs/rotation' };
+compositionSchema.$defs.track.properties.keyframes.items.properties.rotate = { $ref: '#/$defs/rotation' };
+function shareDefinition(name, target) {
+  const exact = JSON.stringify(target);
+  const replace = value => {
+    if (!value || typeof value !== 'object') return value;
+    if (JSON.stringify(value) === exact) return { $ref: `#/$defs/${name}` };
+    return Array.isArray(value) ? value.map(replace) : Object.fromEntries(Object.entries(value).map(([k, v]) => [k, replace(v)]));
+  };
+  for (const key of Object.keys(compositionSchema.$defs)) compositionSchema.$defs[key] = replace(compositionSchema.$defs[key]);
+  compositionSchema.properties = replace(compositionSchema.properties);
+  compositionSchema.$defs[name] = target;
+}
+shareDefinition('id', structuredClone(protocol.$defs.assemblyTrajectory.properties.group));
+shareDefinition('color', structuredClone(part.anyOf[0].properties.color));
+shareDefinition('unit', structuredClone(compositionSchema.properties.flow.properties.strength));
 const ajv = new Ajv({ strict: false, strictNumbers: true });
 const validateInput = ajv.compile(compositionSchema);
 const partValidators = new Map(part.anyOf.map(schema => [schema.properties.kind.const,
@@ -86,7 +104,7 @@ function compositionInputError(input) {
 }
 const validateProgram = ajv.compile({ $defs: protocol.$defs, $ref: '#/$defs/node' });
 export const compositionTool = { name: 'compose_expression',
-  description: `Author a new particle silhouette or spatial composition from your own geometry (v1, base ${compositionContract.baseFingerprint.slice(0, 12)}). Omitted base means standalone. Explicit resting_face adds your parts to that optional avatar without copying it. Freely choose RGB and bounded part motion. No semantic presets. Use express for existing-part gestures or advanced choreography; retaining the current form/no new call can be appropriate. Same admission/status/cancel contract as express; ACK is not completion or recognition.`,
+  description: `Author a new particle silhouette or spatial composition from your own geometry (v1, base ${compositionContract.baseFingerprint.slice(0, 12)}). Omitted base means standalone. Explicit resting_face adds your parts to that optional avatar without copying it. Freely choose RGB and bounded motion. Share rigid tracks via tracks[{group,pivot,keyframes}] and part.trackRef=group; or inline trajectory. No motion with either. Track groups must be unique. No semantic presets. Use express for existing-part gestures or advanced choreography; retaining the current form/no new call can be appropriate. Same admission/status/cancel contract as express; ACK is not completion or recognition.`,
   annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false }, inputSchema: compositionSchema };
 function expansionError(code, details) { return Object.assign(Error(code), { details }); }
 function validateExpandedParts(base, authored) {
@@ -100,11 +118,26 @@ function validateExpandedParts(base, authored) {
   }
   if (details.length) throw expansionError('composition_part_collision', details);
 }
+function expandTracks(args) {
+  const tracks = new Map();
+  for (const [index, track] of (args.tracks ?? []).entries()) {
+    if (tracks.has(track.group)) throw expansionError('composition_track_duplicate', [{ path: `/tracks/${index}/group`, rule: 'unique' }]);
+    tracks.set(track.group, track);
+  }
+  return args.parts.map((part, index) => {
+    const { trackRef, ...body } = part;
+    if (trackRef === undefined) return body;
+    if (body.trajectory || body.motion) throw expansionError('composition_track_conflict', [{ path: `/parts/${index}/trackRef`, rule: 'exclusive' }]);
+    const track = tracks.get(trackRef);
+    if (!track) throw expansionError('composition_track_missing', [{ path: `/parts/${index}/trackRef`, rule: 'reference' }]);
+    return { ...body, trajectory: structuredClone(track) };
+  });
+}
 export function composeExpression(input) {
   if (!validateInput(input)) throw compositionInputError(input);
   const args = structuredClone(input), base = args.base === 'resting_face' ? structuredClone(face.parts) : [];
   validateExpandedParts(base, args.parts);
-  const parts = [...base, ...args.parts];
+  const parts = [...base, ...expandTracks(args)];
   const durationMs = args.durationMs ?? 600, easing = args.easing ?? 'smoothstep';
   const children = [{ type: 'assemble', parts, durationMs, easing }];
   if (args.style) children.push({ type: 'style', ...args.style, durationMs, easing });

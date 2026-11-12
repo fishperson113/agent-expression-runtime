@@ -90,8 +90,8 @@ it('never mutates the parent environment and rejects malformed typed data before
 it('converts unrestricted authored geometry and existing live animation without a preset mapping', async () => {
   const responses = [
     { reply: '', decision: { mode: 'compose', reasonCode: 'presence_form', payload: {
-      parts: [{ id: 'new_form', kind: 'ellipsoid', center: [0, 0, 0], scale: [0.2, 0.3, 0.1], rotation: null, weight: null, color: null, trajectory: null, motion: null }],
-      base: 'none', durationMs: 300, easing: 'smoothstep', style: null, flow: null } } },
+      parts: [{ id: 'new_form', kind: 'ellipsoid', center: [0, 0, 0], scale: [0.2, 0.3, 0.1], rotation: null, weight: null, color: null, trackRef: null, trajectory: null, motion: null }],
+      tracks: null, base: 'none', durationMs: 300, easing: 'smoothstep', style: null, flow: null } } },
     { reply: '', decision: { mode: 'animate', reasonCode: 'subtle_motion', payload: { controls: [], poses: [], lifetimeMs: 1000 } } },
   ];
   for (const response of responses) {
@@ -341,10 +341,10 @@ it('drops pending publication context if staging time becomes nonfinite or rewin
 it('carries observer-authored curves, patches, free RGB and bounded motion through the existing compose contract', async () => {
   const motion = { pivot: [0,0,0], translate: [0,0.1,0], rotate: [0,0,0.1], periodMs: 2000, phase: 0 };
   const parts = [
-    { id: 'authored_stroke', kind: 'curve', points: [[-0.3,0,0],[0,0.4,0],[0.3,0,0]], radius: 0.025, weight: null, color: null, trajectory: null, motion },
-    { id: 'authored_plane', kind: 'patch', points: [[-0.3,-0.2,0],[0.3,-0.2,0],[0.2,0.1,0],[-0.2,0.1,0]], weight: null, color: null, trajectory: null, motion: null },
+    { id: 'authored_stroke', kind: 'curve', points: [[-0.3,0,0],[0,0.4,0],[0.3,0,0]], radius: 0.025, weight: null, color: null, trackRef: null, trajectory: null, motion },
+    { id: 'authored_plane', kind: 'patch', points: [[-0.3,-0.2,0],[0.3,-0.2,0],[0.2,0.1,0],[-0.2,0.1,0]], weight: null, color: null, trackRef: null, trajectory: null, motion: null },
   ];
-  const response = { reply: '', decision: { mode: 'compose', reasonCode: 'authored_response', payload: { parts, base: 'none', durationMs: 500,
+  const response = { reply: '', decision: { mode: 'compose', reasonCode: 'authored_response', payload: { parts, tracks: null, base: 'none', durationMs: 500,
     easing: 'smoothstep', style: { color: '#71D3A9', brightness: 0.8, pointSize: 4, dispersion: 0.1 }, flow: null } } };
   const f = fixture({ response });
   try {

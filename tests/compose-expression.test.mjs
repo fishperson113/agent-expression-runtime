@@ -174,3 +174,35 @@ it('preserves authored rigid group trajectories through compose and compilation'
     expect(() => composeExpression({ parts: [{ ...part(), trajectory: { ...trajectory, keyframes } }] })).toThrow('composition_arguments');
   }
 });
+
+const sharedTrack = () => ({ group: 'actor', pivot: [0, 0, 0], keyframes: [
+  { atMs: 0, translate: [0, 0, 0], rotate: [0, 0, 0] },
+  { atMs: 1200, translate: [1, 0.5, 0], rotate: [0, 0, 0.3], easing: 'smoothstep' },
+] });
+it('expands shared tracks to independent inline copies with identical compiled behavior', () => {
+  const track = sharedTrack(), parts = [part(), { ...part(), id: 'second' }];
+  const input = { tracks: [track], parts: parts.map(p => ({ ...p, trackRef: 'actor' })), durationMs: 300 };
+  const before = structuredClone(input), shared = composeExpression(input);
+  const inline = composeExpression({ parts: parts.map(p => ({ ...p, trajectory: track })), durationMs: 300 });
+  expect(shared).toEqual(inline); expect(compile(shared.body)).toEqual(compile(inline.body)); expect(input).toEqual(before);
+  shared.body.children[0].parts[0].trajectory.keyframes[0].translate[0] = 2;
+  expect(shared.body.children[0].parts[1].trajectory.keyframes[0].translate[0]).toBe(0); expect(input).toEqual(before);
+});
+it('rejects duplicate, missing and conflicting track references without silently choosing a motion', () => {
+  const track = sharedTrack(), referenced = { ...part(), trackRef: 'actor' };
+  expect(() => composeExpression({ tracks: [track, track], parts: [referenced] })).toThrow('composition_track_duplicate');
+  expect(() => composeExpression({ parts: [referenced] })).toThrow('composition_track_missing');
+  expect(() => composeExpression({ tracks: [track], parts: [{ ...referenced, trackRef: 'unknown' }] })).toThrow('composition_track_missing');
+  expect(() => composeExpression({ tracks: [track], parts: [{ ...referenced, trajectory: track }] })).toThrow('composition_track_conflict');
+  const motion = { pivot: [0, 0, 0], translate: [0, 0, 0], rotate: [0, 0, 0], periodMs: 1000, phase: 0 };
+  expect(() => composeExpression({ tracks: [track], parts: [{ ...referenced, motion }] })).toThrow('composition_track_conflict');
+});
+it('retains track array bounds and applies record size limits after shared expansion', () => {
+  const track = sharedTrack();
+  expect(() => composeExpression({ tracks: [], parts: [part()] })).toThrow('composition_arguments');
+  expect(() => composeExpression({ tracks: Array.from({ length: 25 }, (_, i) => ({ ...track, group: `g${i}` })), parts: [part()] })).toThrow('composition_arguments');
+  track.keyframes = Array.from({ length: 32 }, (_, i) => ({ atMs: i * 500, translate: [0, 0, 0], rotate: [0, 0, 0] }));
+  const input = { tracks: [track], parts: Array.from({ length: 24 }, (_, i) => ({ ...part(), id: `p${i}`, trackRef: 'actor' })) };
+  expect(Buffer.byteLength(JSON.stringify(input))).toBeLessThan(32768);
+  expect(() => composeExpression(input)).toThrow('composition_bytes');
+});
