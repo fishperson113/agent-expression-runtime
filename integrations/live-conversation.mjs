@@ -19,7 +19,25 @@ function sourceScope(value) {
 }
 const clip = (value, limit) => new TextDecoder().decode(Buffer.from(value.slice(0, limit)).subarray(0, limit), { stream: true });
 
+const recoveringTools = new Set(['compose_expression', 'express', 'return_to_face', 'playground_edit']);
+function acceptedExpression(item) {
+  if (item.status !== 'completed' || item.error || item.result?.isError === true) return false;
+  const content = item.result?.content;
+  if (!Array.isArray(content) || content.length !== 1 || content[0]?.type !== 'text' ||
+      typeof content[0].text !== 'string' || bytes(content[0].text) > 16000) return false;
+  try {
+    const receipt = JSON.parse(content[0].text);
+    if (item.tool === 'playground_edit') return receipt?.status === 'committed' && !receipt.code &&
+      Number.isSafeInteger(receipt.revision) && receipt.revision > 0 && Number.isInteger(receipt.scenes) &&
+      receipt.scenes > 0 && receipt.scenes <= 12 && Number.isSafeInteger(receipt.bytes) && receipt.bytes >= 0 &&
+      receipt.closed === false && receipt.pending === null && receipt.recoveryRequired === false;
+    return receipt?.status === 'accepted' && !receipt.code && id(receipt.session) && id(receipt.epoch) &&
+      id(receipt.requestId) && Number.isSafeInteger(receipt.seq) && receipt.seq >= 1;
+  } catch { return false; }
+}
+
 export class LiveConversation {
+  #expressionRetries = new Set();
   #observer; #observerRevision = 0; #replyCandidate; #now;
   #output; #transport; #broker; #captureObservation; #thread; #selection; #generation = 0; #revision = 0;
   #ownedContexts = new Map(); #terminal = new Set(); #intent = 0; #messages = []; #unknown = new Set(); #pending; #stopping; #stopErrorTurn; #expressionFailureTurn; #error = ''; #closed = false; #navigated = false;
@@ -62,7 +80,7 @@ export class LiveConversation {
   }
   #clear() {
     this.#clearObserver();
-    this.#ownedContexts.clear(); this.#expressionFailureTurn = undefined; this.#terminal.clear(); this.#messages = []; this.#stopping = this.#stopErrorTurn = undefined; this.#error = '';
+    this.#ownedContexts.clear(); this.#expressionRetries.clear(); this.#expressionFailureTurn = undefined; this.#terminal.clear(); this.#messages = []; this.#stopping = this.#stopErrorTurn = undefined; this.#error = '';
     this.#generation++; this.#revision++;
   }
   #sync() {
@@ -74,7 +92,7 @@ export class LiveConversation {
     const owner = this.#owner();
     if (owner && this.#expressionFailureTurn && owner !== this.#expressionFailureTurn) {
       if (this.#error === 'conversation_expression_failed') this.#error = '';
-      this.#expressionFailureTurn = undefined; this.#revision++;
+      this.#expressionFailureTurn = undefined; this.#expressionRetries.clear(); this.#revision++;
     }
     if (owner && this.#stopping && owner !== this.#stopping.turn) { this.#stopping = undefined; this.#revision++; }
     if (this.#stopErrorTurn && (this.#output.completed?.has(this.#stopErrorTurn) || owner && owner !== this.#stopErrorTurn)) {
@@ -255,10 +273,17 @@ export class LiveConversation {
     if (['item/started', 'item/completed'].includes(method)) this.#item(params.item, turn, method === 'item/completed');
   }
   #item(item, turn, completed) {
+    if (item?.type === 'mcpToolCall' && item.server === 'fisch_live' && recoveringTools.has(item.tool) &&
+        id(item.id) && this.#expressionFailureTurn === turn && this.#error === 'conversation_expression_failed') {
+      if (!completed && item.status === 'inProgress' && this.#expressionRetries.size < 32) this.#expressionRetries.add(item.id);
+      if (completed && this.#expressionRetries.delete(item.id) && acceptedExpression(item)) {
+        this.#error = ''; this.#expressionRetries.clear(); this.#revision++;
+      }
+    }
     if (completed && item?.type === 'mcpToolCall' && item.server === 'fisch_live' && item.status === 'failed' &&
         ['compose_expression', 'express', 'playground_edit', 'return_to_face', 'cancel_expression'].includes(item.tool) &&
         (!this.#error || this.#error === 'conversation_expression_failed')) {
-      this.#error = 'conversation_expression_failed'; this.#expressionFailureTurn = turn; this.#revision++;
+      this.#error = 'conversation_expression_failed'; this.#expressionFailureTurn = turn; this.#expressionRetries.clear(); this.#revision++;
     }
     if (item?.type === 'agentMessage' && typeof item.text === 'string') {
       this.#update(item.id, turn, 'assistant', item.text);
