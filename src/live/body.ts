@@ -1,3 +1,4 @@
+import { presentationDuration } from '../core/live/presentation-duration';
 import { ThreeRenderer } from '../adapters/three-renderer';
 import { Scheduler } from '../core/runtime/scheduler';
 import { ExpressionLifecycle } from '../core/live/expression-lifecycle';
@@ -157,7 +158,7 @@ export class LiveBody {
       this.userLeaseUntil = at + compiled.program.duration;
   }
   private leaseUntil(compiled: LiveCompiled, at: number) {
-    const program = compiled.program, duration = program.kind === 'define' ? 0 : program.duration;
+    const program = compiled.program, duration = presentationDuration(program);
     const start = program.kind === 'program' && program.policy === 'append' ? Math.max(at, this.userLeaseUntil) : at;
     return Math.max(start + duration, at + (compiled.configuration?.lifetimeMs ?? 0));
   }
