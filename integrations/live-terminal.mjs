@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { captureChatObservation } from './chat-observation.mjs';
-import { readFileSync } from 'node:fs';
+import { nativeLiveInstructions } from './live-instruction-bundle.mjs';
 import { randomUUID } from 'node:crypto';
 import { liveCodexArguments } from '../scripts/live-codex.mjs';
 import { codexCommand, stopChild } from '../scripts/start-session.mjs';
@@ -65,7 +65,7 @@ export async function runTerminalCodex({ live, cwd, signal, spawnClient = spawn,
   const host = suppliedHost ?? await codexCommand();
   const env = { ...nativeLiveEnvironment(process.env), AER_BASE_URL: live.base, AER_PAIRING_TOKEN: live.token, FISCH_LIVE: '1', FISCH_PLANNER_BACKEND: 'off' };
   const configured = reactiveProvider === undefined ? createLiveReactiveProvider(process.env, { defaultNative: true }) : { provider: reactiveProvider, reason: reactiveProvider ? 'ready' : 'disabled_by_config' };
-  const instructions = readFileSync(new URL('./live-instructions.md', import.meta.url), 'utf8');
+  const instructions = nativeLiveInstructions();
   const state = await createBridge({ live, host, cwd, env, configured, instructions });
   let child, stopping = false, stoppedCode = 1, closing, failed = false;
   const cleanupFailure = Promise.withResolvers(); void cleanupFailure.promise.catch(() => {});
