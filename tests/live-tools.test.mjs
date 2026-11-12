@@ -107,3 +107,20 @@ it('reports missing epoch, absent host feedback and malformed response without c
     expect(result.coordination).toMatchObject({ available: false, reasonCode }); expect(result.coordination.state).toBeUndefined(); expect(result.snapshot.summary).toBe('camera');
   }
 });
+
+
+it('returns only bounded actual renderer preview image and rejects stale or arbitrary input', async()=>{
+  const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jO2kAAAAASUVORK5CYII=','base64');
+  const result={schemaVersion:1,source:'fisch-renderer',format:'image',session:'s',epoch:'e',summary:{frame:4},
+    coordination:{private:'MUST_NOT_SHARE'},image:{mimeType:'image/png',data:png.toString('base64'),width:1,height:1,bytes:png.length}};
+  let seen,epoch='e';const call=createLiveTools(async(path,args)=>{seen={path,args};return result;},async()=>({id:'s',epoch}));
+  const response=await call('preview_expression');expect(response.isError).toBeUndefined();expect(response.content[1]).toEqual({type:'image',mimeType:'image/png',data:result.image.data});
+  expect(response.content[0].text).not.toContain('MUST_NOT_SHARE');expect(seen.args).toEqual({preview:true});
+  expect((await call('preview_expression',{selector:'video'})).isError).toBe(true);
+  for(const mutation of [{width:481},{bytes:163841},{mimeType:'image/jpeg'},{data:'not base64'},{width:2}]){
+    const bad=createLiveTools(async()=>({...result,image:{...result.image,...mutation}}),async()=>({id:'s',epoch:'e'}));
+    expect((await bad('preview_expression')).isError).toBe(true);
+  }
+  let reads=0;const stale=createLiveTools(async()=>result,async()=>({id:'s',epoch:++reads===1?'e':'new'}));
+  expect((await stale('preview_expression')).isError).toBe(true);
+});

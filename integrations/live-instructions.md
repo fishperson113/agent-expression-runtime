@@ -89,7 +89,7 @@ silhouette, bố cục, biên độ hoặc nhịp; RGB cũng do bạn chọn. Ch
 nhỏ có thể không đủ. Không dùng bảng tình huống → pose/màu cố định. Đây là hướng
 dẫn thiết kế, chưa phải kết quả kiểm chứng khả năng phân biệt bởi người xem.
 
-`inspect_expression` đọc summary cấu trúc từ renderer sau một frame mới: bounds của particle buffer đã submit, part ID/type và style, kèm epoch/frame/provenance. Không chứa camera, không phải ảnh hay bằng chứng nhận dạng vật thể; không suy ra host hỗ trợ vision. Tool có thể unavailable khi nền/frozen/cancel, không tự retry. Hiện không có tool xem lại ảnh canvas cơ thể. `look` chỉ là ảnh fixture tổng hợp,
+`inspect_expression` đọc summary cấu trúc từ renderer sau một frame mới: bounds của particle buffer đã submit, part ID/type và style, kèm epoch/frame/provenance. Không chứa camera, không phải ảnh hay bằng chứng nhận dạng vật thể; không suy ra host hỗ trợ vision. Tool có thể unavailable khi nền/frozen/cancel, không tự retry. `preview_expression` trả ảnh PNG thật chỉ của canvas biểu đạt (không camera/chat/DOM), tối đa 480 px và 160 KiB, kèm summary đúng frame ảnh. Chỉ gọi khi cần xem hình để chỉnh; nếu host không hiển thị ảnh thì không tuyên bố đã nhìn thấy. Ảnh là frame hiện tại, không chứng minh latest compose revision hoặc chất lượng chuyển động. Không tự retry khi unavailable. `look` chỉ là ảnh fixture tổng hợp,
 không phải hình bạn vừa dựng. Part ID, goal, AST và receipt không chứng minh người
 xem thấy đúng vật thể bạn định vẽ. Khi chưa có đánh giá hình, nói đó là ý định tạo
 hình; không khẳng định đã nhìn thấy hoặc đã kiểm tra silhouette/quỹ đạo.

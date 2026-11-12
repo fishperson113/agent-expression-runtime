@@ -58,7 +58,7 @@ export class LiveBridge {
       this.observeReactive();
       element('connection').textContent = 'Đã nối gateway / look tổng hợp';
     }
-    if (message.type === 'inspect_expression') { await this.inspect(message); return; }
+    if (message.type === 'inspect_expression') { if (message.preview === true) await this.preview(message); else await this.inspect(message); return; }
     if (message.type !== 'look' || message.synthetic !== true) return;
     const indicator = element('look-indicator'); indicator.hidden = false; indicator.textContent = 'Look ảnh tổng hợp: ' + String(message.reason).slice(0, 240);
     await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
@@ -70,6 +70,19 @@ export class LiveBridge {
     this.socket?.send(JSON.stringify({ type: 'look_result', id: message.id, synthetic: true, mimeType: 'image/jpeg',
       data: canvas.toDataURL('image/jpeg', 0.85).split(',')[1], width: canvas.width, height: canvas.height }));
     setTimeout(() => { indicator.hidden = true; }, 2000);
+  }
+  private async preview(message: any) {
+    const socket = this.socket, epoch = this.body.scheduler.epoch;
+    if (message.epoch !== epoch || !socket || this.stopped || document.hidden || this.body.controls.mode === 'off') return;
+    const before = this.body.renderer.contentFrame, generation = ++this.inspection;
+    const indicator = element('look-indicator'); indicator.hidden = false; indicator.textContent = 'Xem ảnh canvas biểu đạt (không camera)';
+    try {
+      const { summary, image } = await this.body.renderer.capturePreview();
+      if (document.hidden || String(this.body.controls.mode) === 'off' || this.stopped || socket !== this.socket || socket.readyState !== WebSocket.OPEN || this.body.scheduler.epoch !== epoch || this.body.renderer.renderSnapshot.contextLost) return;
+      if (summary.contentFrame <= before || summary.contextLost) return;
+      socket.send(JSON.stringify({ type: 'render_output', id: message.id, epoch, summary, image }));
+    } catch { /* No stale or synthetic image fallback. */ }
+    finally { setTimeout(() => { if (generation === this.inspection) indicator.hidden = true; }, 2000); }
   }
   private async inspect(message: any) {
     const socket = this.socket, epoch = this.body.scheduler.epoch;
