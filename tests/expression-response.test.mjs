@@ -2,7 +2,7 @@ import { expect, it, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { ExpressionResponseChannel, expressionResponseSchema, parseExpressionResponse, runChannelTurn } from '../integrations/expression-response.mjs';
 const compose = () => ({ reply: 'A normal reply.', decision: { mode: 'compose', reasonCode: 'shared_progress', payload: {
-  parts: [{ id: 'authored', kind: 'ellipsoid', center: [0, 0, 0], scale: [0.2, 0.3, 0.1], rotation: null, weight: null, motion: null }],
+  parts: [{ id: 'authored', kind: 'ellipsoid', center: [0, 0, 0], scale: [0.2, 0.3, 0.1], rotation: null, weight: null, color: null, motion: null }],
   base: 'none', durationMs: 300, easing: 'smoothstep', style: null, flow: null } } });
 const retain = () => ({ reply: '', decision: { mode: 'retain', reasonCode: 'keep_current', payload: null } });
 const turn = value => ({ threadId: 'thread', turnId: 'turn', status: 'completed', truncated: false, toolRequests: [], messages: [{ id: 'final', text: JSON.stringify(value), phase: null }] });

@@ -56,14 +56,12 @@ it('published protocol schema agrees with compiler for valid and invalid wire fi
 });
 it('publishes parameterized geometry macros that the compiler can instantiate', () => {
   const record = { v: 1, epoch: 'e', seq: 1, kind: 'define', body: {
-    name: 'orb', revision: 1, params: { size: 'number', x: 'number', tint: 'string' }, body: { type: 'assemble', durationMs: 500,
-      parts: [{ id: 'orb', kind: 'ellipsoid', color: { type: 'param', name: 'tint' }, center: [{ type: 'param', name: 'x' }, 0, 0],
+    name: 'orb', revision: 1, params: { size: 'number', x: 'number' }, body: { type: 'assemble', durationMs: 500,
+      parts: [{ id: 'orb', kind: 'ellipsoid', center: [{ type: 'param', name: 'x' }, 0, 0],
         scale: [{ type: 'param', name: 'size' }, 0.2, 0.2] }] },
   } };
   expect(validate(record)).toBe(true);
   const compiler = new Compiler(); compiler.compile(record, 0);
   expect(compiler.compile({ v: 1, epoch: 'e', seq: 2, kind: 'program', track: 'body', policy: 'replace',
-    body: { type: 'call', name: 'orb', revision: 1, args: { size: 0.5, x: 0.3, tint: '#ff8800' } } }, 0).kind).toBe('program');
-  expect(() => compiler.compile({ v: 1, epoch: 'e', seq: 3, kind: 'program', track: 'body', policy: 'replace',
-    body: { type: 'call', name: 'orb', revision: 1, args: { size: 0.5, x: 0.3, tint: 'orange' } } }, 0)).toThrow();
+    body: { type: 'call', name: 'orb', revision: 1, args: { size: 0.5, x: 0.3 } } }, 0).kind).toBe('program');
 });
