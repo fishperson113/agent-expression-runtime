@@ -1,3 +1,4 @@
+import { trajectoryMatrix } from './trajectory';
 import type { Part, ParticleCloud, Sculpture, Vec3 } from './types';
 import { curveTable, curvePoint } from './curves';
 
@@ -37,8 +38,14 @@ export function sculptureCloud(form: Sculpture, count: number): ParticleCloud {
   const topology = JSON.stringify(parts.map(p => [p.id, p.kind, p.weight ?? 1, p.kind === 'ellipsoid' ? 0 : p.points.length]));
   return { positions, partIndices, parts, topology };
 }
-export function motionTransforms(cloud: ParticleCloud, elapsed: number) {
+export function motionTransforms(cloud: ParticleCloud, elapsed: number, trajectoryElapsed = elapsed) {
+  const groups = new Map<string, Float64Array>();
   return cloud.parts.map(part => {
+    if (part.trajectory) {
+      const track = part.trajectory;
+      if (!groups.has(track.group)) groups.set(track.group, trajectoryMatrix(track, trajectoryElapsed));
+      return groups.get(track.group)!;
+    }
     if (!part.motion) return null;
     const m = part.motion, wave = Math.sin(elapsed / m.periodMs * Math.PI * 2 + m.phase);
     const angles = m.rotate.map(x => x * wave) as Vec3;

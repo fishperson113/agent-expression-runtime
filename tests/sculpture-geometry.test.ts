@@ -109,3 +109,81 @@ it('publishes parameterized geometry macros that the compiler can instantiate', 
   expect(() => compiler.compile({ v: 1, epoch: 'e', seq: 3, kind: 'program', track: 'body', policy: 'replace',
     body: { type: 'call', name: 'orb', revision: 1, args: { size: 0.5, x: 0.3, tint: 'orange' } } }, 0)).toThrow();
 });
+
+const rigidTrack = () => ({ group: 'fish', pivot: [0, 0, 0], keyframes: [
+  { atMs: 0, translate: [0, 0, 0], rotate: [0, 0, 0] },
+  { atMs: 1000, translate: [1, 0.5, 0], rotate: [0, 0, 1] },
+] });
+it('validates finite rigid tracks and consistent shared group definitions', () => {
+  const make = () => ({ parts: scene().parts.map(p => ({ ...p, trajectory: rigidTrack() })) });
+  expect(validateSculpture(make(), '$').parts).toHaveLength(3);
+  const changed = make(); changed.parts[1].trajectory.keyframes[1].translate[0] = 2;
+  expect(() => validateSculpture(changed, '$')).toThrow();
+  for (const at of [-1, 0, 30001, Infinity]) {
+    const bad = make(); bad.parts[0].trajectory.keyframes[1].atMs = at;
+    expect(() => validateSculpture(bad, '$')).toThrow();
+  }
+  const both = { ...make().parts[0], motion: { pivot: [0, 0, 0], translate: [0, 0, 0], rotate: [0, 0, 0], periodMs: 1000, phase: 0 } };
+  expect(() => validateSculpture({ parts: [both] }, '$')).toThrow();
+});
+it('keeps cross-part distances rigid, deterministic, and holds the endpoint without orbit', () => {
+  const form = validateSculpture({ parts: scene().parts.map(p => ({ ...p, trajectory: rigidTrack() })) }, '$');
+  const f = new ParticleFormation(90), op = {}, weights = [1, 0, 0, 0, 0, 0, 0];
+  f.sample(op, form, 1, weights, 42, 0);
+  const initial = f.points!.slice(); f.tick(500);
+  const middle = f.points!.slice();
+  for (const [a, b] of [[0, 30], [3, 180], [60, 240]]) {
+    const distance = (p: Float32Array) => Math.hypot(p[a] - p[b], p[a + 1] - p[b + 1], p[a + 2] - p[b + 2]);
+    expect(distance(middle)).toBeCloseTo(distance(initial), 5);
+  }
+  const second = new ParticleFormation(90); second.sample({}, form, 1, weights, 42, 0);
+  for (let t = 100; t <= 500; t += 100) second.tick(t);
+  expect(second.points).toEqual(middle);
+  f.tick(1000); const end = f.points!.slice(); f.tick(9000); expect(f.points).toEqual(end);
+  expect(middle).not.toEqual(initial);
+});
+it('starts rigid time after assembly and pauses without idle slowdown or presence overwrite', () => {
+  const form = validateSculpture({ parts: scene().parts.map(p => ({ ...p, trajectory: rigidTrack() })) }, '$');
+  const f = new ParticleFormation(60), op = {}, weights = [1, 0, 0, 0, 0, 0, 0];
+  f.sample(op, form, 0, weights, 42, 0); f.sample(op, form, 1, weights, 42, 1000);
+  const start = f.points!.slice(); f.motionMode = 'off'; f.tick(3000); expect(f.points).toEqual(start);
+  f.motionMode = 'normal'; f.quiet = true; f.tick(3500);
+  const moved = f.points!.slice(); expect(moved).not.toEqual(start);
+  expect(f.perform([{ partId: 'palm', pivot: [0, 0, 0], translate: [4, 0, 0], rotate: [0, 0, 0], scale: [1, 1, 1] }])).toEqual(moved);
+});
+
+it('pins rigid boids through jumps and repeated timestamps without carrying stale velocity', async () => {
+  const { TargetBoids } = await import('../src/core/geometry/boids');
+  const boids = new TargetBoids(), groups = new Uint8Array([0, 1]), mask = new Uint8Array([1, 0]);
+  boids.apply(new Float32Array([0, 0, 0, 0, 0, 0]), 2, 0, groups, true, mask);
+  const moved = new Float32Array([3, 1, 0, 3, 1, 0]); boids.apply(moved, 2, 16, groups, true, mask);
+  expect([...moved.slice(0, 3)]).toEqual([3, 1, 0]); expect(moved[3]).toBeLessThan(3);
+  const repeated = new Float32Array([-2, 0, 0, 3, 1, 0]); boids.apply(repeated, 2, 16, groups, true, mask);
+  expect([...repeated.slice(0, 3)]).toEqual([-2, 0, 0]);
+  boids.apply(repeated, 2, 32, groups, true, new Uint8Array(2));
+  expect([...repeated.slice(0, 3)]).toEqual([-2, 0, 0]);
+});
+it('keeps trajectory points immune to ambient deformation and uses one full-path fit', async () => {
+  const { sampleBody, trajectorySceneBounds } = await import('../src/adapters/body-geometry');
+  const { ThreeRenderer, fitCamera } = await import('../src/adapters/three-renderer');
+  const { PerspectiveCamera } = await import('three');
+  const { initialState } = await import('../src/core/runtime/scheduler');
+  const form = validateSculpture({ parts: scene().parts.map(p => ({ ...p, trajectory: rigidTrack() })) }, '$');
+  const f = new ParticleFormation(90); f.sample({}, form, 1, [1, 0, 0, 0, 0, 0, 0], 42, 0);
+  const state = { ...initialState(), flowStrength: 1, flowWeights: [1, 1, 1], dispersion: 1, effortFlow: 1,
+    grow: 2, spread: 2, rise: 1, advance: 1, arcOffset: 1, particleParts: f.parts, particleGroups: f.groups,
+    particlePositions: f.points, presencePose: { x: 1, y: 1, roll: 1, yaw: 1, scale: 2, energy: 1, mode: 'normal', suppressed: false, updatedAt: 0, parts: [], clipCount: 0 } };
+  const sampled = new Float32Array(270); sampleBody([], sampled, 90, state, 100, 1);
+  expect(sampled).toEqual(f.points);
+  const camera = new PerspectiveCamera(42, 1, 0.1, 100); fitCamera(camera, 1);
+  const fixture = { camera, count: 90, positions: sampled, framedParts: undefined, trajectoryFit: undefined } as any;
+  (ThreeRenderer.prototype as any).frameScene.call(fixture, state); const fit = fixture.trajectoryFit;
+  const bounds = trajectorySceneBounds(form.parts);
+  for (const time of [250, 500, 750, 1000, 4000]) {
+    f.tick(time); fixture.positions = f.points!.slice();
+    (ThreeRenderer.prototype as any).frameScene.call(fixture, { ...state, grow: 0.5 });
+    expect(fixture.trajectoryFit).toBe(fit);
+    for (let i = 0; i < fixture.positions.length; i++) expect(fixture.positions[i]).toBeCloseTo(f.points![i] * fit, 5);
+  }
+  expect(bounds.length).toBe(form.parts.length * 24); expect(fit).toBeGreaterThan(0); expect(fit).toBeLessThanOrEqual(1);
+});

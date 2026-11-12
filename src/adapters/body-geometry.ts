@@ -1,3 +1,5 @@
+import type { Part } from '../core/geometry/types';
+import { curveTable } from '../core/geometry/curves';
 import type { PresenceState } from '../core/runtime/presence';
 import { capability } from '../primitives/registry';
 import { livePoint } from '../core/live/transforms';
@@ -25,6 +27,9 @@ export function sampleBody(shapes: Float32Array[], positions: Float32Array, coun
       if (state.particlePositions) {
         x = state.particlePositions[j]; y = state.particlePositions[j + 1]; z = state.particlePositions[j + 2];
       }
+      if (state.particleParts?.[state.particleGroups?.[i] ?? -1]?.trajectory) {
+        positions[j] = x; positions[j + 1] = y; positions[j + 2] = z; continue;
+      }
       if (state.liveMatrices) {
         [x, y, z] = livePoint(x, y, z, state.liveMatrices[(state.particleGroups?.[i] ?? -1) + 1], liveScratch);
         [x, y, z] = livePoint(x, y, z, state.liveMatrices[0], liveScratch);
@@ -47,4 +52,20 @@ export function sampleBody(shapes: Float32Array[], positions: Float32Array, coun
       positions[j + 1] = (y * scale + Math.cos(phase) * jitter) * grow + Number(state.rise) * amp;
       positions[j + 2] = (x * s + z * c) * scale * grow + Number(state.advance) * amp;
     }
+}
+
+export function trajectorySceneBounds(parts: Part[]) {
+  const corners: number[] = [];
+  for (const part of parts) {
+    const pivot = part.trajectory?.pivot ?? part.motion?.pivot ?? [0, 0, 0];
+    const points = part.kind === 'ellipsoid' ? [part.center] : part.kind === 'curve' ? curveTable(part.points) : part.points;
+    const padding = part.kind === 'ellipsoid' ? Math.max(...part.scale) : part.kind === 'curve' ? part.radius : 0;
+    const radius = Math.max(...points.map(p => Math.hypot(...p.map((v, k) => v - pivot[k])))) + padding;
+    const translations = part.trajectory?.keyframes.map(f => f.translate) ??
+      (part.motion ? [part.motion.translate, part.motion.translate.map(v => -v)] : [[0, 0, 0]]);
+    const min = pivot.map((v, k) => v + Math.min(...translations.map(p => p[k])) - radius);
+    const max = pivot.map((v, k) => v + Math.max(...translations.map(p => p[k])) + radius);
+    for (let i = 0; i < 8; i++) corners.push(...min.map((v, k) => i & (1 << k) ? max[k] : v));
+  }
+  return new Float32Array(corners);
 }
