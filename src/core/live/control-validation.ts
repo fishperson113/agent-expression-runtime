@@ -1,6 +1,6 @@
 import { finite, strictObject, eventKinds } from './observation';
 import { liveSignals } from './signals';
-import { channel, transformProperties, transformRange, type Pose, type LiveControl, type TransformTarget, type LiveConfiguration } from './control-types';
+import { channel, transformProperties, transformRange, type Pose, type LiveControl, type TransformTarget, type TransformProperty, type LiveConfiguration } from './control-types';
 
 const identifier = (value: unknown) => typeof value === 'string' && /^[a-zA-Z0-9_-]{1,32}$/.test(value);
 export function target(value: unknown): TransformTarget {
@@ -8,11 +8,19 @@ export function target(value: unknown): TransformTarget {
   if (!identifier(object.part) || !transformProperties.includes(object.prop)) throw Error('live_target');
   return object as TransformTarget;
 }
+function transformValue(value: unknown, prop: TransformProperty) {
+  const [min, max] = transformRange(prop);
+  try { finite(value, min, max); }
+  catch {
+    const family = prop.startsWith('scale') ? 'scale' : prop.startsWith('rotate') ? 'rotation' : 'translation';
+    throw Error(`live_${family}_range`);
+  }
+}
 export function pose(value: unknown): Pose {
   const optional = ['delayMs', 'attackMs', 'releaseMs'].filter(key => value && typeof value === 'object' && key in value);
   const object = strictObject(value, ['type', 'target', 'value', 'durationMs', ...optional]);
   if (object.type !== 'pose') throw Error('live_pose');
-  const aim = target(object.target); finite(object.value, ...transformRange(aim.prop));
+  const aim = target(object.target); transformValue(object.value, aim.prop);
   finite(object.durationMs, 100, 10000);
   if (!Number.isInteger(object.durationMs)) throw Error('live_duration');
   for (const key of optional) { finite(object[key], key === 'delayMs' ? 0 : 20, 10000); if (!Number.isInteger(object[key])) throw Error('live_duration'); }
@@ -23,10 +31,10 @@ export function pose(value: unknown): Pose {
 function control(value: any): LiveControl {
   if (value?.type === 'bind') {
     strictObject(value, ['type', 'id', 'signal', 'target', 'gain', 'offset', 'clamp', 'smoothMs']);
-    const aim = target(value.target), [min, max] = transformRange(aim.prop);
+    const aim = target(value.target);
     if (!Object.hasOwn(liveSignals, value.signal) || !Array.isArray(value.clamp) || value.clamp.length !== 2) throw Error('live_signal');
-    finite(value.gain, -4, 4); finite(value.offset, min, max);
-    finite(value.clamp[0], min, max); finite(value.clamp[1], min, max);
+    finite(value.gain, -4, 4); transformValue(value.offset, aim.prop);
+    transformValue(value.clamp[0], aim.prop); transformValue(value.clamp[1], aim.prop);
     if (value.clamp[0] > value.clamp[1]) throw Error('live_clamp');
     finite(value.smoothMs, 40, 2000);
   } else if (value?.type === 'orient') {

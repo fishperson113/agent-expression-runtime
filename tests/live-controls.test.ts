@@ -41,3 +41,17 @@ it('adds bounded anatomical movement without text, randomness or inference', () 
   const reduced = faceWrites('idle', 0, 'reduced', 5040);
   expect(reduced.find(w => w.target.part === 'eye_left' && w.target.prop === 'scaleY')!.value).toBeGreaterThan(0.9);
 });
+
+it('reports actionable property-specific transform bounds without changing runtime limits', () => {
+  for (const [prop, low, high, family] of [['x', -0.4, 0.4, 'translation'], ['rotateX', -0.6, 0.6, 'rotation'], ['scaleX', 0.25, 2, 'scale']] as const) {
+    const target = { part: 'body', prop }, pose = { type: 'pose', target, value: low, durationMs: 600 };
+    const make = (value: number) => ({ controls: [], poses: [{ ...pose, value }], lifetimeMs: 1000 });
+    for (const value of [low, high]) expect(() => validateConfiguration(make(value))).not.toThrow();
+    const code = `live_${family}_range`;
+    for (const value of [low - 0.01, high + 0.01, NaN]) expect(() => validateConfiguration(make(value))).toThrow(code);
+    const control = { ...bind, target, offset: low, clamp: [low, high] };
+    expect(() => validateConfiguration({ ...config(), controls: [control] })).not.toThrow();
+    for (const patch of [{ offset: high + 0.01 }, { clamp: [low - 0.01, high] }])
+      expect(() => validateConfiguration({ ...config(), controls: [{ ...control, ...patch }] })).toThrow(code);
+  }
+});

@@ -12,7 +12,7 @@
       "part": { "type": "string", "pattern": "^[a-zA-Z0-9_-]{1,32}$" },
       "prop": { "enum": ["x", "y", "z", "rotateX", "rotateY", "rotateZ", "scaleX", "scaleY", "scaleZ"] } } },
     "pose": { "type": "object", "additionalProperties": false, "required": ["type", "target", "value", "durationMs"], "properties": {
-      "type": { "const": "pose" }, "target": { "$ref": "#/$defs/target" }, "value": { "type": "number", "minimum": -0.6, "maximum": 2 },
+      "type": { "const": "pose" }, "target": { "$ref": "#/$defs/target" }, "value": { "type": "number", "minimum": -0.6, "maximum": 2, "description": "Range depends on target.prop: x/y/z [-0.4,0.4], rotateX/Y/Z [-0.6,0.6] radians, scaleX/Y/Z [0.25,2] (neutral 1). The shared numeric envelope is not valid for every property." },
       "durationMs": { "type": "integer", "minimum": 100, "maximum": 10000 },
       "delayMs": { "type": "integer", "minimum": 0, "maximum": 9900 },
       "attackMs": { "type": "integer", "minimum": 20, "maximum": 10000 },
@@ -20,8 +20,8 @@
     "bind": { "type": "object", "additionalProperties": false, "required": ["type", "id", "signal", "target", "gain", "offset", "clamp", "smoothMs"], "properties": {
       "type": { "const": "bind" }, "id": { "type": "string", "pattern": "^[a-zA-Z0-9_-]{1,32}$" },
       "signal": { "enum": ["agent.output", "user.head.yaw", "user.head.pitch", "user.position.x", "user.position.y", "hand.primary.position.x", "hand.primary.position.y", "user.expression.smile", "user.expression.browRaise", "user.expression.eyesClosed", "user.expression.mouthOpen", "user.mouthMoving"] },
-      "target": { "$ref": "#/$defs/target" }, "gain": { "type": "number", "minimum": -4, "maximum": 4 }, "offset": { "type": "number", "minimum": -0.6, "maximum": 2 },
-      "clamp": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "number", "minimum": -0.6, "maximum": 2 } },
+      "target": { "$ref": "#/$defs/target" }, "gain": { "type": "number", "minimum": -4, "maximum": 4 }, "offset": { "type": "number", "minimum": -0.6, "maximum": 2, "description": "Target-dependent offset: x/y/z [-0.4,0.4], rotateX/Y/Z [-0.6,0.6], scaleX/Y/Z [0.25,2]." },
+      "clamp": { "type": "array", "description": "Ordered [min,max], both within target.prop range: translation [-0.4,0.4], rotation [-0.6,0.6], scale [0.25,2].", "minItems": 2, "maxItems": 2, "items": { "type": "number", "minimum": -0.6, "maximum": 2 } },
       "smoothMs": { "type": "number", "minimum": 40, "maximum": 2000 } } },
     "orient": { "type": "object", "additionalProperties": false, "required": ["type", "id", "part", "toward", "maxDeg", "smoothMs"], "properties": {
       "type": { "const": "orient" }, "id": { "type": "string", "pattern": "^[a-zA-Z0-9_-]{1,32}$" }, "part": { "type": "string", "pattern": "^[a-zA-Z0-9_-]{1,32}$" },
