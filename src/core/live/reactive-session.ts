@@ -1,3 +1,4 @@
+import { presentationDuration } from './presentation-duration';
 import type { CausalKind, CausalPayloads } from './causal-recorder-types';
 import { matchesCriticalState } from './decision-contract';
 import { SemanticAxes } from './semantic-axes';
@@ -255,7 +256,7 @@ export class ReactiveSession {
     const generation = this.guard.generation;
     const done = this.host.run(request, { decide: () => promise }, (compiled, owner) => {
       if (nativeReadSet && !this.canPublish(request, nativeReadSet)) throw Error('semantic_admission_revoked');
-      const until = this.options.now() + Math.max(5000, compiled.program.kind === 'program' ? compiled.program.duration : 0, compiled.configuration?.lifetimeMs ?? 0) + 100;
+      const until = this.options.now() + Math.max(5000, presentationDuration(compiled.program), compiled.configuration?.lifetimeMs ?? 0) + 100;
       const lease = nativeReadSet ? { ...owner, validUntil: until } : owner;
       const executionRequest = nativeReadSet ? { ...request, deadline: Math.max(request.deadline, until) } : request;
       if (!this.enabled || !this.available || !this.healthy() || this.userBusy || !this.options.canAdmit() || !this.guard.acquire(executionRequest, lease, generation)) throw Error('admission_revoked');
