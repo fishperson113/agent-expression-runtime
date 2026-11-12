@@ -26,13 +26,14 @@ function validateMotion(value: unknown, path: string) {
   scalar(motion.phase, 0, Math.PI * 2, path + '.phase');
 }
 function validatePart(value: unknown, path: string): Part {
-  const p = object(value, ['id', 'kind', 'weight', 'motion', 'points', 'radius', 'center', 'scale', 'rotation'], path);
+  const p = object(value, ['id', 'kind', 'weight', 'color', 'motion', 'points', 'radius', 'center', 'scale', 'rotation'], path);
   if (typeof p.id !== 'string' || !/^[A-Za-z][\w-]{0,31}$/.test(p.id)) fail(path + '.id');
   scalar(p.weight === undefined ? 1 : p.weight, 0.1, 10, path + '.weight');
+  if (p.color !== undefined && (typeof p.color !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(p.color))) fail(path + '.color');
   validateMotion(p.motion, path + '.motion');
   const fields = p.kind === 'curve' ? ['points', 'radius'] : p.kind === 'ellipsoid' ? ['center', 'scale', 'rotation']
     : p.kind === 'patch' ? ['points'] : fail(path + '.kind');
-  object(p, ['id', 'kind', 'weight', 'motion', ...fields], path);
+  object(p, ['id', 'kind', 'weight', 'color', 'motion', ...fields], path);
   if (p.kind === 'ellipsoid') {
     vector(p.center, -2, 2, path + '.center'); vector(p.scale, 0.02, 1.5, path + '.scale');
     if (p.rotation !== undefined) vector(p.rotation, -Math.PI, Math.PI, path + '.rotation');

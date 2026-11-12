@@ -1,3 +1,6 @@
+import Ajv from 'ajv';
+import schema from '../src/contracts/protocol.schema.json';
+import { Compiler } from '../src/core/compiler/compiler';
 import { expect, it } from 'vitest';
 import { validateSculpture } from '../src/core/geometry/validate';
 import { sculptureCloud } from '../src/core/geometry/sampling';
@@ -12,6 +15,9 @@ const scene = () => ({ parts: [
 ] });
 it('validates arbitrary bounded compositions and retains paths on malformed geometry', () => {
   const valid = validateSculpture(scene(), '$.body');
+  expect(validateSculpture({ parts: [{ ...scene().parts[0], color: '#fF8800' }] }, '$').parts[0].color).toBe('#fF8800');
+  for (const color of ['red', '#fff', '#ff880000', null, 4])
+    expect(() => validateSculpture({ parts: [{ ...scene().parts[0], color }] }, '$')).toThrow();
   expect(valid.parts.map(p => p.id)).toEqual(['index', 'middle', 'palm']);
   const bad = scene(); bad.parts[1].points![0][0] = Infinity;
   expect(() => validateSculpture(bad, '$.body')).toThrow(expect.objectContaining({ path: '$.body.parts[1].points[0][0]' }));
@@ -87,4 +93,19 @@ it('interpolates part color overrides with stable particles, interruption and gl
   const frozen = f.colors!.slice(); f.freeze(50); expect(f.colors).toEqual(frozen);
   const returning = {}; f.sample(returning, 'sphere', 0, weights, 42, 60); expect(f.colors).toEqual(frozen);
   f.sample(returning, 'sphere', 1, weights, 42, 70); expect([...f.colors!].every(v => v === 0)).toBe(true);
+});
+
+it('publishes parameterized geometry macros that the compiler can instantiate', () => {
+  const validate = new Ajv({ strict: false }).compile(schema);
+  const record = { v: 1, epoch: 'e', seq: 1, kind: 'define', body: {
+    name: 'orb', revision: 1, params: { size: 'number', x: 'number', tint: 'string' }, body: { type: 'assemble', durationMs: 500,
+      parts: [{ id: 'orb', kind: 'ellipsoid', color: { type: 'param', name: 'tint' }, center: [{ type: 'param', name: 'x' }, 0, 0],
+        scale: [{ type: 'param', name: 'size' }, 0.2, 0.2] }] },
+  } };
+  expect(validate(record)).toBe(true);
+  const compiler = new Compiler(); compiler.compile(record, 0);
+  expect(compiler.compile({ v: 1, epoch: 'e', seq: 2, kind: 'program', track: 'body', policy: 'replace',
+    body: { type: 'call', name: 'orb', revision: 1, args: { size: 0.5, x: 0.3, tint: '#ff8800' } } }, 0).kind).toBe('program');
+  expect(() => compiler.compile({ v: 1, epoch: 'e', seq: 3, kind: 'program', track: 'body', policy: 'replace',
+    body: { type: 'call', name: 'orb', revision: 1, args: { size: 0.5, x: 0.3, tint: 'orange' } } }, 0)).toThrow();
 });

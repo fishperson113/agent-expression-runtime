@@ -16,7 +16,8 @@ fn valid(summary: &Value) -> bool {
     if !summary["color"].as_str().is_some_and(|s| s.len() == 7 && s.starts_with('#') && s[1..].bytes().all(|b| b.is_ascii_hexdigit())) { return false; }
     if !bounds(&summary["bounds"]) { return false; }
     summary["parts"].as_array().is_some_and(|parts| parts.len() <= 24 && parts.iter().all(|p|
-        observation::keys(p, &["id", "kind", "particles", "bounds"]) && p["particles"].as_u64().is_some_and(|n| n <= 10000 && (if n == 0 { p["bounds"].is_null() } else { bounds(&p["bounds"]) })) && p["id"].as_str().is_some_and(|s| !s.is_empty() && s.len() <= 32 && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-'))
+        observation::keys(p, if p.get("color").is_some() { &["id", "kind", "particles", "bounds", "color"] } else { &["id", "kind", "particles", "bounds"] }) &&
+        p.get("color").is_none_or(|v| v.as_str().is_some_and(|s| s.len() == 7 && s.starts_with('#') && s[1..].bytes().all(|b| b.is_ascii_hexdigit()))) && p["particles"].as_u64().is_some_and(|n| n <= 10000 && (if n == 0 { p["bounds"].is_null() } else { bounds(&p["bounds"]) })) && p["id"].as_str().is_some_and(|s| !s.is_empty() && s.len() <= 32 && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-'))
         && p["kind"].as_str().is_some_and(|s| ["curve", "ellipsoid", "patch"].contains(&s))))
 }
 fn preview_image(value: &Value) -> bool {

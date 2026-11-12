@@ -144,6 +144,11 @@ fn renderer_reply(id: &str, epoch: &str) -> Value {
 fn renderer_summary_rejects_camera_fields_unknown_fields_and_stale_render_time() {
     let state = LiveState::default(); let epoch = uuid::Uuid::new_v4().to_string();
     assert!(receive(&state, renderer_reply("unmatched", &epoch)));
+    let mut colored = renderer_reply("colored", &epoch); colored["summary"]["parts"][0]["color"] = json!("#fF8800");
+    assert!(receive(&state, colored.clone()));
+    for color in [json!("red"), json!("#fff"), json!("#ff880000"), json!(null), json!(4)] {
+        colored["summary"]["parts"][0]["color"] = color; assert!(!receive(&state, colored.clone()));
+    }
     let mut value = renderer_reply("x", &epoch); value["summary"]["camera"] = json!("private");
     assert!(!receive(&state, value));
     let mut value = renderer_reply("x", &epoch); value["summary"]["capturedAt"] = json!(0);
