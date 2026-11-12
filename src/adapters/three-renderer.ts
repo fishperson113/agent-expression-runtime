@@ -44,6 +44,8 @@ export class ThreeRenderer implements RendererSink {
   private material: THREE.ShaderMaterial;
   private points: THREE.Points;
   private positions = new Float32Array(30000);
+  private partColors = new Float32Array(40000);
+  private colorSignature = 0;
   private shapes: Float32Array[];
   private color = new THREE.Color();
   private lost = false;
@@ -76,6 +78,7 @@ export class ThreeRenderer implements RendererSink {
       'position',
       new THREE.BufferAttribute(this.positions, 3).setUsage(THREE.DynamicDrawUsage),
     );
+    this.geometry.setAttribute('partColor', new THREE.BufferAttribute(this.partColors, 4).setUsage(THREE.DynamicDrawUsage));
     this.material = new THREE.ShaderMaterial({
       transparent: true,
       depthWrite: false,
@@ -86,9 +89,9 @@ export class ThreeRenderer implements RendererSink {
         dpr: { value: 1 },
       },
       vertexShader:
-        'uniform float size; uniform float dpr; void main(){ vec4 p=modelViewMatrix*vec4(position,1.0); gl_PointSize=size*dpr*clamp(3.8/-p.z,0.75,1.25); gl_Position=projectionMatrix*p; }',
+        'attribute vec4 partColor; uniform vec3 color; varying vec3 renderedColor; uniform float size; uniform float dpr; void main(){ renderedColor=partColor.xyz+color*(1.0-partColor.w); vec4 p=modelViewMatrix*vec4(position,1.0); gl_PointSize=size*dpr*clamp(3.8/-p.z,0.75,1.25); gl_Position=projectionMatrix*p; }',
       fragmentShader:
-        'uniform vec3 color; uniform float brightness; void main(){float d=length(gl_PointCoord-0.5)*2.0; if(d>1.0) discard; gl_FragColor=vec4(color,brightness*(1.0-d*d));\n#include <colorspace_fragment>\n}',
+        'varying vec3 renderedColor; uniform float brightness; void main(){float d=length(gl_PointCoord-0.5)*2.0; if(d>1.0) discard; gl_FragColor=vec4(renderedColor,brightness*(1.0-d*d));\n#include <colorspace_fragment>\n}',
     });
     this.points = new THREE.Points(this.geometry, this.material);
     this.scene.add(this.points);
@@ -122,7 +125,7 @@ export class ThreeRenderer implements RendererSink {
     this.count = count;
     this.geometry.setDrawRange(0, count);
   }
-  private outputParts: { id: string; kind: string }[] = [];
+  private outputParts: { id: string; kind: string; color?: string }[] = [];
   private outputGroups = new Uint8Array();
   private outputAt = 0;
   private outputFrame = 0;
@@ -135,6 +138,7 @@ export class ThreeRenderer implements RendererSink {
     this.swarm.apply(this.positions, this.count, now, state.particleGroups, !this.reducedMotion);
     frameBody(this.positions, this.count, this.camera, Number(state.grow));
     this.geometry.attributes.position.needsUpdate = true;
+    this.updatePartColors(state.particleColors);
     this.material.uniforms.color.value = this.color.set(String(state.color));
     this.material.uniforms.size.value = Number(state.pointSize);
     this.material.uniforms.brightness.value = Number(state.brightness);
@@ -142,9 +146,17 @@ export class ThreeRenderer implements RendererSink {
     this.submittedFrames++;
     this.outputGroups = new Uint8Array(state.particleGroups ?? []);
     this.outputFrame = this.submittedFrames;
-    this.outputParts = (state.particleParts ?? []).map(part => ({ id: part.id, kind: part.kind }));
+    this.outputParts = (state.particleParts ?? []).map(part => ({ id: part.id, kind: part.kind, ...(part.color ? { color: part.color } : {}) }));
     this.outputAt = Date.now();
     void this.capturePreviewFrame();
+  }
+  private updatePartColors(colors?: Float32Array) {
+    this.partColors.fill(0);
+    if (colors) this.partColors.set(colors.subarray(0, this.count * 4));
+    let signature = 2166136261;
+    for (let i = 0; i < this.count * 4; i++) signature = Math.imul(signature ^ Math.round(this.partColors[i] * 10000), 16777619);
+    this.colorSignature = signature >>> 0;
+    this.geometry.attributes.partColor.needsUpdate = true;
   }
   private outputBounds(group?: number) {
     let particles = 0;
@@ -202,7 +214,7 @@ export class ThreeRenderer implements RendererSink {
   }
   get renderSnapshot() {
     const signature = particleSignature(this.positions, this.count, [this.material.uniforms.size.value,
-      this.material.uniforms.brightness.value, this.color.r, this.color.g, this.color.b]);
+      this.material.uniforms.brightness.value, this.color.r, this.color.g, this.color.b, this.colorSignature]);
     return { frame: this.submittedFrames, signature, contextLost: this.lost };
   }
   dispose() {

@@ -32,6 +32,9 @@ export class ParticleFormation {
   private sampledAt = NaN;
   private primitives?: Float32Array[];
   readonly groups: Uint8Array;
+  colors?: Float32Array;
+  private fromColors?: Float32Array;
+  private targetColors?: Float32Array;
   private performed?: Float32Array;
   private displayed?: Float32Array;
   constructor(readonly count = capability.assembly.particles) { this.groups = new Uint8Array(count); }
@@ -55,11 +58,25 @@ export class ParticleFormation {
         : sculptureCloud(target, this.count);
       if (cloud.topology !== this.topology) this.mapping = spatialAssignment(this.from, cloud.positions);
       for (let i = 0; i < this.count; i++) this.groups[i] = cloud.partIndices[this.mapping![i]] ?? 0;
+      this.prepareColors(cloud);
       this.cloud = cloud; this.topology = cloud.topology; this.operation = operation;
       this.motionAt = now; this.motionElapsed = 0; this.motionSpeed = 1;
     }
     this.progress = t;
+    if (this.colors && this.fromColors && this.targetColors) for (let i = 0; i < this.colors.length; i++)
+      this.colors[i] = this.fromColors[i] + (this.targetColors[i] - this.fromColors[i]) * t;
     this.sampledAt = NaN; this.tick(now);
+  }
+  private prepareColors(cloud: ParticleCloud) {
+    if (!this.colors && !cloud.parts.some(part => part.color !== undefined)) return;
+    this.colors ??= new Float32Array(this.count * 4);
+    this.fromColors = this.colors.slice(); this.targetColors = new Float32Array(this.count * 4);
+    const palette = cloud.parts.map(part => {
+      if (!part.color) return [0, 0, 0, 0];
+      const rgb = [1, 3, 5].map(offset => parseInt(part.color!.slice(offset, offset + 2), 16) / 255);
+      return [...rgb.map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4), 1];
+    });
+    for (let i = 0; i < this.count; i++) this.targetColors.set(palette[this.groups[i]] ?? [0, 0, 0, 0], i * 4);
   }
   tick(now: number) {
     if (!this.points || !this.cloud || !this.from || !this.mapping) return;

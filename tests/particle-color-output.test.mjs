@@ -73,3 +73,51 @@ it('captures only the actual canvas at one submitted frame with bounded image an
     expect(output.busy).toBe('preview_busy');expect(output.timeout).toBe('preview_timeout');expect(output.disposed).toBe('preview_disposed');
   }finally{await browser?.close();await server.close();}
 },30000);
+
+async function readPartColors(page) {
+  return page.evaluate(`(async () => {
+    const { ThreeRenderer } = await import('/src/adapters/three-renderer.ts');
+    const { initialState } = await import('/src/core/runtime/scheduler.ts');
+    const { Color } = await import('/node_modules/three/build/three.module.js');
+    const canvas = document.createElement('canvas'), r = new ThreeRenderer(canvas, () => {}, 42), records = [];
+    try {
+      r.resize(501, 501, 1); r.quality(2); r.reducedMotion = true;
+      r.camera.position.set(0, 0, 4); r.camera.lookAt(0, 0, 0); r.camera.updateMatrixWorld();
+      const x = 200 / 501 * 4 / r.camera.projectionMatrix.elements[0];
+      const positions = new Float32Array([-x, 0, 0, x, 0, 0]);
+      const colors = ['#79e6d3', '#ffd49a'].map(hex => new Color(hex)), global = new Color('#3040c0');
+      for (const weight of [1, 0.5, 0, undefined]) for (const brightness of [1, 0.5, 0]) {
+        const overrides = weight === undefined ? undefined : new Float32Array(colors.flatMap(c => [c.r * weight, c.g * weight, c.b * weight, weight]));
+        r.apply({ ...initialState(), color: '#3040c0', brightness, pointSize: 51, dispersion: 0, flowStrength: 0, effortFlow: 0,
+          particlePositions: positions, particleGroups: new Uint8Array([0, 1]), particleColors: overrides,
+          particleParts: [{ id: 'left', kind: 'ellipsoid', color: '#79e6d3' }, { id: 'right', kind: 'ellipsoid', color: '#ffd49a' }] }, 4500);
+        const gl = r.renderer.getContext(), background = new Uint8Array(4), pixels = [];
+        gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, background);
+        for (const px of [150, 350]) { const pixel = new Uint8Array(4); gl.readPixels(px, 250, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel); pixels.push([...pixel]); }
+        const expected = colors.map(c => c.clone().multiplyScalar(weight ?? 0).add(global.clone().multiplyScalar(1 - (weight ?? 0))).convertLinearToSRGB())
+          .map(c => [c.r, c.g, c.b].map((v, i) => Math.round(v * 255 * brightness + background[i] * (1 - brightness))));
+        records.push({ weight: weight ?? 'absent', brightness, pixels, expected, background: [...background], error: gl.getError(), summary: r.inspectOutput() });
+      }
+      return records;
+    } finally { r.dispose(); }
+  })()`);
+}
+
+it('renders contrasting per-part overrides, fades to global color and preserves brightness alpha', async () => {
+  const server = await createServer({ server: { host: '127.0.0.1', port: 0 } }); await server.listen(); let browser;
+  try {
+    browser = await chromium.launch({ headless: true, ...(process.platform === 'win32' ? { channel: 'msedge' } : {}),
+      args: ['--enable-webgl', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+    const page = await browser.newPage();
+    await page.route('**/part-color-probe', route => route.fulfill({ contentType: 'text/html', body: '<!doctype html>' }));
+    await page.goto(server.resolvedUrls.local[0] + 'part-color-probe');
+    const records = await readPartColors(page);
+    for (const row of records) {
+      expect(row.error).toBe(0); expect(row.summary.parts.map(p => p.color)).toEqual(['#79e6d3', '#ffd49a']);
+      row.pixels.forEach((pixel, p) => row.expected[p].forEach((value, c) => expect(Math.abs(pixel[c] - value)).toBeLessThanOrEqual(2)));
+      if (row.brightness === 0) row.pixels.forEach(pixel => expect(pixel).toEqual(row.background));
+    }
+    expect(new Set(records.filter(r => r.brightness === 1 && r.weight !== 'absent').map(r => r.summary.signature)).size).toBe(3);
+    expect(records.find(r => r.weight === 0 && r.brightness === 1).pixels).toEqual(records.find(r => r.weight === 'absent' && r.brightness === 1).pixels);
+  } finally { await browser?.close(); await server.close(); }
+}, 30000);
