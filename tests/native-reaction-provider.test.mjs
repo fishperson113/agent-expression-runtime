@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { PlannerRpc } from '../integrations/planner-rpc.mjs';
 import { tmpdir } from 'node:os';
+import { emptyObserverCapabilities, observerServerArgs, verifyObserverServers } from '../integrations/native-observer-isolation.mjs';
 import { nativeVisualAuthoringGuide } from '../integrations/native-visual-authoring.mjs';
 import { ReactiveProviderError } from '../integrations/reactive-provider.mjs';
 import { LiveReactiveBroker } from '../integrations/live-reactive-broker.mjs';
@@ -11,7 +12,7 @@ const window = () => ({ schemaVersion: 1, request: { schemaVersion: 1, sessionId
   observations: [{ v: 1, sessionId: 's', seq: 1, capturedAt: 100, camera: 'absent', turn: 'working', summary: 'PRIVATE_INSTRUCTION_CANARY',
     user: { present: false, quality: { score: 0, basis: 'unavailable' }, position: null, head: null, facingScreen: null, expression: null, mouthMoving: null } }] });
 const retain = { reply: 'Mình thấy bạn vừa quay lại.', decision: { mode: 'retain', reasonCode: 'presence', payload: null } };
-function fixture({ catalog = [], response = retain, pending = false, pendingAck = false, reserve = async () => {}, confirmedClose = true, nativeError = null, nativeStatus = 'completed', missingConfig = false, featurePatch = {}, requestedModel, effectiveModel, now } = {}) {
+function fixture({ catalog = [], response = retain, pending = false, pendingAck = false, reserve = async () => {}, confirmedClose = true, nativeError = null, nativeStatus = 'completed', missingConfig = false, featurePatch = {}, requestedModel, effectiveModel, now, inheritedMcp = false } = {}) {
   const calls = [], processes = []; let notify;
   const provider = new NativeReactionProvider({ command: 'codex', reserve, model: requestedModel }, { env: { HOME: '/native-auth', AER_PAIRING_TOKEN: 'SECRET', OPENAI_API_KEY: 'SECRET', PATH: 'native' },
     settleTimeoutMs: 10, now, rpcFactory: (command, args, cwd, event, failed, env) => {
@@ -20,7 +21,7 @@ function fixture({ catalog = [], response = retain, pending = false, pendingAck 
       const rpc = { settled, closed: false, command, args, env, send: () => {}, close: () => { rpc.closed = true; if (confirmedClose) confirm(); rejectAck?.(Error('planner_process_closed')); failed('closed'); },
         request: async (method, params) => {
           calls.push({ method, params });
-          if (method === 'config/read') return missingConfig ? {} : { config: { mcp_servers: { fisch_live: {} }, features: { ...Object.fromEntries(['shell_tool', 'apps', 'plugins', 'hooks', 'multi_agent', 'computer_use', 'browser_use', 'image_generation', 'view_image'].map(key => [key, false])), ...featurePatch } } };
+          if (method === 'config/read') return missingConfig ? {} : { config: { mcp_servers: { fisch_live: { enabled: inheritedMcp && !args.includes('mcp_servers.fisch_live.enabled=false') } }, features: { ...Object.fromEntries(['shell_tool', 'apps', 'plugins', 'hooks', 'multi_agent', 'computer_use', 'browser_use', 'image_generation', 'view_image'].map(key => [key, false])), ...featurePatch } } };
           if (method === 'thread/start') return { thread: { id: 'reaction-thread' }, ...(effectiveModel ? { model: effectiveModel } : {}) };
           if (method === 'mcpServerStatus/list') return { data: catalog, nextCursor: null };
           if (method === 'turn/start') {
@@ -422,4 +423,41 @@ it('allows only one bounded confirmed-turn excerpt without granting geometry per
  for(const invalid of [{...context,text:'x'.repeat(241)},{...context,ageMs:60000},{...context,transcript:['PRIVATE']},{...context,get text(){throw Error('do not read');}}]){
   expect(()=>freezeNativeHostCapabilities({schemaVersion:1,expressionAllowed:false,currentTurnContext:invalid})).toThrow('native_host_capabilities_invalid');
  }
+});
+
+it('isolates inherited MCP servers at process startup and accepts only disabled empty registry rows', async () => {
+  const empty = { name: 'fisch_live', tools: {}, resources: [], resourceTemplates: [] };
+  const f = fixture({ inheritedMcp: true, catalog: [empty] });
+  try {
+    const result = await f.provider.decide(window(), new AbortController().signal);
+    expect(result.nativeProvenance.mcpCatalogVerifiedEmpty).toBe(true);
+    expect(f.processes).toHaveLength(2); expect(f.processes[0].closed).toBe(true);
+    expect(f.processes[1].args).toContain('mcp_servers.fisch_live.enabled=false');
+    expect(f.calls.filter(c => c.method === 'turn/start')).toHaveLength(1);
+    const next = window(); next.request.requestId = 'second';
+    await f.provider.decide(next, new AbortController().signal);
+    expect(f.processes).toHaveLength(2);
+  } finally { f.provider.close(); }
+});
+
+it('rejects unknown, enabled, paginated or capability-bearing observer catalogs', () => {
+  const row = { name: 'known', tools: {}, resources: [], resourceTemplates: [] };
+  expect(emptyObserverCapabilities({ data: [row], nextCursor: null }, ['known'])).toBe(true);
+  for (const patch of [{ name: 'unknown' }, { tools: [] }, { tools: { command: {} } }, { resources: [{}] }, { resourceTemplates: [{}] }, { resources: undefined }])
+    expect(emptyObserverCapabilities({ data: [{ ...row, ...patch }] }, ['known'])).toBe(false);
+  expect(emptyObserverCapabilities({ data: [row, row] }, ['known'])).toBe(false);
+  expect(emptyObserverCapabilities({ data: [], nextCursor: 'more' }, ['known'])).toBe(false);
+  for (const enabled of [true, undefined, 0]) expect(() => verifyObserverServers({ mcp_servers: { known: { enabled } } }, ['known'])).toThrow();
+  expect(() => verifyObserverServers({ mcp_servers: { unknown: { enabled: false } } }, ['known'])).toThrow();
+  expect(() => observerServerArgs(['nested.name'])).toThrow();
+});
+
+it('does not respawn after unconfirmed discovery process settlement', async () => {
+  const f = fixture({ inheritedMcp: true, confirmedClose: false });
+  try {
+    await expect(f.provider.decide(window(), new AbortController().signal)).rejects.toThrow('native_reaction_isolation_unsettled');
+    await expect(f.provider.decide(window(), new AbortController().signal)).rejects.toThrow('native_reaction_unavailable');
+    expect(f.processes).toHaveLength(1);
+    expect(f.calls.some(call => call.method === 'turn/start')).toBe(false);
+  } finally { f.provider.close(); }
 });

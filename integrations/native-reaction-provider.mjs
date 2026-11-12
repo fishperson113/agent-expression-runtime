@@ -9,6 +9,7 @@ import { freezeReactiveWindow } from './reactive-window.mjs';
 import { expressionResponseSchema, parseExpressionResponse, boundedNativeError } from './expression-response.mjs';
 import { composeExpression } from './compose-expression.mjs';
 import { nativeVisualAuthoringGuide } from './native-visual-authoring.mjs';
+import { observerServers, observerServerArgs, verifyObserverServers, emptyObserverCapabilities } from './native-observer-isolation.mjs';
 
 const canonical = value => JSON.stringify(value, (_key, item) => item && typeof item === 'object' && !Array.isArray(item)
   ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item);
@@ -137,21 +138,33 @@ export class NativeReactionProvider {
     while (this.#history.length > 8 || this.#history.reduce((sum, item) => sum + item.record.reply.length, 0) > 2400) this.#history.shift();
     return true;
   }
-  async prepare() {
+  async prepare(signal) {
     if (this.closed) throw Error('native_reaction_closed');
     this.directory ??= mkdtempSync(join(tmpdir(), 'fisch-reaction-'));
     const resolved = plannerCommand({ backend: 'codex', command: this.config.command }, '', this.directory);
     const args = [...resolved.args.slice(0, resolved.args.indexOf('exec')), 'app-server', '--stdio', '-c', 'approval_policy="never"',
       '-c', 'sandbox_mode="read-only"', '-c', 'developer_instructions=""', '-c', 'project_doc_max_bytes=0', '-c', 'web_search="disabled"',
       '-c', 'features.skip_host_skill_discovery=true', ...disabledFeatures.flatMap(key => ['--disable', key])];
-    this.rpc = this.rpcFactory(resolved.command, args, this.directory, (method, params) => this.event(method, params), () => this.active?.reject(Error('native_reaction_transport_unknown')), this.environment);
+    let config = await this.openObserverProcess(resolved.command, args);
+    const names = observerServers(config);
+    if (names.some(name => config.mcp_servers[name].enabled !== false)) {
+      if (!await this.settle(this.rpc, false)) { this.close(); throw Error('native_reaction_isolation_unsettled'); }
+      if (this.closed || signal?.aborted) throw Error('native_reaction_aborted');
+      config = await this.openObserverProcess(resolved.command, [...args, ...observerServerArgs(names)]);
+    }
+    verifyObserverServers(config, names); this.isolatedServers = names;
+    this.threadConfig = { mcp_servers: Object.fromEntries(names.map(name => [name, { enabled: false }])) };
+  }
+  async openObserverProcess(command, args) {
+    this.rpc = this.rpcFactory(command, args, this.directory, (method, params) => this.event(method, params), () => this.active?.reject(Error('native_reaction_transport_unknown')), this.environment);
     await this.rpc.request('initialize', { clientInfo: { name: 'fisch_presence_reaction', version: '0.1.0' }, capabilities: { experimentalApi: true } });
     this.rpc.send({ method: 'initialized' });
     const { config } = await this.rpc.request('config/read', { includeLayers: false });
     if (!config || typeof config !== 'object') throw Error('native_reaction_config_unverified');
     if (!config.features || disabledFeatures.some(key => config.features[key] !== false)) throw Error('native_reaction_features_unverified');
-    this.threadConfig = { mcp_servers: Object.fromEntries(Object.keys(config.mcp_servers ?? {}).map(name => [name, { enabled: false }])) };
+    return config;
   }
+
   event(method, params) {
     const job = this.active;
     if (!job || params.threadId !== job.threadId) return;
@@ -171,8 +184,8 @@ export class NativeReactionProvider {
       params.turn?.status === 'completed' ? job.resolve(job.text) : job.reject(Error('native_reaction_turn_failed'));
     }
   }
-  async settle(rpc) {
-    rpc?.close(); this.starting = undefined;
+  async settle(rpc, reset = true) {
+    rpc?.close(); if (reset) this.starting = undefined;
     if (!rpc?.settled || typeof rpc.settled.then !== 'function') return false;
     let timer;
     try { return await Promise.race([rpc.settled.then(() => true, () => false),
@@ -201,14 +214,14 @@ export class NativeReactionProvider {
     const projected = reactionObservationData(window);
     if (window.request.schemaVersion !== 1 || this.active || this.closed || signal.aborted) throw Error('native_reaction_unavailable');
     const context = this.contextFor(window.request), data = { ...projected, hostCapabilities, recentPublishedReactions: context.recentPublishedReactions };
-    await (this.starting ??= this.prepare().catch(error => { this.rpc?.close(); this.starting = undefined; throw error; }));
+    await (this.starting ??= this.prepare(signal).catch(error => { this.rpc?.close(); this.starting = undefined; throw error; }));
     if (this.closed || this.rpc?.closed || signal.aborted) throw Error('native_reaction_aborted');
     const started = await this.rpc.request('thread/start', { ephemeral: true, cwd: this.directory, sandbox: 'read-only', approvalPolicy: 'never',
       baseInstructions: instructions, developerInstructions: '', config: this.threadConfig, dynamicTools: [], environments: [], ...(this.config.model ? { model: this.config.model } : {}) });
     const { thread } = started;
     this.#flight.threadId = thread.id;
     const catalog = await this.rpc.request('mcpServerStatus/list', { threadId: thread.id, limit: 100 });
-    if (!Array.isArray(catalog?.data) || catalog.data.length || catalog.nextCursor != null) { this.close(); throw Error('native_reaction_tools_unverified'); }
+    if (!emptyObserverCapabilities(catalog, this.isolatedServers)) { this.close(); throw Error('native_reaction_tools_unverified'); }
     if (this.closed || this.rpc?.closed || signal.aborted) throw Error('native_reaction_aborted');
     let resolve, reject;
     const done = new Promise((yes, no) => { resolve = yes; reject = no; }); done.catch(() => {});
