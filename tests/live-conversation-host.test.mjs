@@ -564,9 +564,10 @@ it.skipIf(!nativeGateway)('keeps a long public brief above usable chat with publ
     expect(await input.inputValue()).toBe('Bản nháp phải còn nguyên khi brief đếm ngược.');expect(calls).toBe(2);
     const replace=async durationMs=>toolValue(await client.tool('compose_expression',{durationMs:100,observerContext:{text,mode:'open',durationMs},
       parts:[{id:'layout_form',kind:'ellipsoid',center:[0,0,0],scale:[0.3,0.3,0.1]}]}));
-    expect((await replace(1000)).status).toBe('accepted');await expect.poll(()=>brief.isVisible(),{timeout:6000}).toBe(false);
-    expect(await brief.textContent()).toBe('');expect(await input.inputValue()).toBe('Bản nháp phải còn nguyên khi brief đếm ngược.');
+    expect((await replace(1000)).status).toBe('accepted');await expect.poll(()=>brief.textContent(),{timeout:6000}).toContain('vừa hết hạn');
+    expect(await brief.isVisible()).toBe(true);expect(await brief.textContent()).toContain(text);expect(await input.inputValue()).toBe('Bản nháp phải còn nguyên khi brief đếm ngược.');
     await page.locator('.fisch-conversation button[type=submit]').click();
+    await expect.poll(()=>brief.isVisible()).toBe(false);expect(await brief.textContent()).toBe('');
     await expect.poll(async()=>(await f.call('test/snapshot')).result.seen.filter(row=>row.method==='turn/start').length).toBe(2);
     expect((await f.call('test/snapshot')).result.seen.filter(row=>row.method==='turn/start').at(-1).text).toBe('Bản nháp phải còn nguyên khi brief đếm ngược.');
     expect((await replace(60000)).status).toBe('accepted');await expect.poll(()=>brief.isVisible()).toBe(true);
