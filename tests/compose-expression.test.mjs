@@ -1,3 +1,4 @@
+import { nativeVisualAuthoringGuide } from '../integrations/native-visual-authoring.mjs';
 import { expect, it } from 'vitest';
 import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
@@ -205,4 +206,37 @@ it('retains track array bounds and applies record size limits after shared expan
   const input = { tracks: [track], parts: Array.from({ length: 24 }, (_, i) => ({ ...part(), id: `p${i}`, trackRef: 'actor' })) };
   expect(Buffer.byteLength(JSON.stringify(input))).toBeLessThan(32768);
   expect(() => composeExpression(input)).toThrow('composition_bytes');
+});
+
+it('advertises the actual minimum ellipsoid depth without weakening geometry validation', () => {
+  const minimum = compositionSchema.$defs.part.anyOf.find(p => p.properties.kind.const === 'ellipsoid').properties.scale.items.minimum;
+  expect(compositionTool.description).toContain(`at least ${minimum} on every axis`);
+  expect(() => composeExpression({ parts: [{ ...part(), scale: [0.2, 0.2, minimum / 2] }] })).toThrow('composition_arguments');
+  expect(() => composeExpression({ parts: [{ ...part(), scale: [0.2, 0.2, minimum] }] })).not.toThrow();
+});
+
+
+it('reports bounded precise shared-track validation paths without echoing invalid values', () => {
+  const cases = [
+    [track => { track.pivot[1] = 3; }, '/tracks/0/pivot/1', 'maximum', 2],
+    [track => { track.keyframes[1].translate[0] = 5; }, '/tracks/0/keyframes/1/translate/0', 'maximum', 4],
+    [track => { track.keyframes[1].easing = 'PRIVATE_INVALID'; }, '/tracks/0/keyframes/1/easing', 'enum', undefined],
+  ];
+  for (const [mutate, path, rule, limit] of cases) {
+    const track = sharedTrack(); mutate(track); let failure;
+    try { composeExpression({ tracks: [track], parts: [{ ...part(), trackRef: 'actor' }] }); }
+    catch (error) { failure = error; }
+    expect(failure?.message).toBe('composition_arguments');
+    expect(failure?.details).toEqual([{ path, rule, ...(limit === undefined ? {} : { limit }) }]);
+    expect(failure.details.length).toBeLessThanOrEqual(3);
+    expect(JSON.stringify(failure.details)).not.toContain('PRIVATE_INVALID');
+    expect(failure.details.every(detail => detail.path.length <= 160)).toBe(true);
+  }
+});
+
+it('gives native authors the same trajectory units and timeline semantics as Live', () => {
+  for (const phrase of ['shared rest-scene coordinates', 'absolute offset from rest', 'XYZ radians',
+    'shortest path per axis', 'starts at 0 and strictly increases', 'assembly transition time',
+    'playback starts after assembly', 'runs once and holds its endpoint', 'Motion-off pauses'])
+    expect(nativeVisualAuthoringGuide).toContain(phrase);
 });
