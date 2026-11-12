@@ -562,3 +562,74 @@ it('omits a final answer whose bounded excerpt contains only whitespace',async()
  f.event({method:'turn/completed',params:{threadId:'thread-a',turn:{id:'space-turn',status:'completed'}}});
  expect(f.conversation.observerContext().text).toBe('Public user');expect(f.conversation.observerContext().assistantReply).toBeUndefined();
 });
+
+const expressionItem = (status, receipt = { status: 'accepted', session: 's', epoch: 'e', seq: 1, requestId: 'r' }) => ({
+  type: 'mcpToolCall', id: 'retry', server: 'fisch_live', tool: 'compose_expression', status,
+  error: null, result: { content: [{ type: 'text', text: JSON.stringify(receipt) }] },
+});
+async function failedExpression(tool = 'compose_expression') {
+  const f = fixture(), pending = f.send(); f.reply(0, { result: { turn: { id: 'turn-a', status: 'inProgress' } } }); await pending;
+  const item = { ...expressionItem('failed'), tool, id: 'failure', error: { message: 'PRIVATE_FAILURE' } };
+  const original = structuredClone(item);
+  f.event({ method: 'item/completed', params: { threadId: 'thread-a', turnId: 'turn-a', item } });
+  return { ...f, failureItem: item, original, tool: (item, completed = true, threadId = 'thread-a', turnId = 'turn-a') =>
+    f.event({ method: completed ? 'item/completed' : 'item/started', params: { threadId, turnId, item } }) };
+}
+it('clears only the current warning after a later accepted expression retry, preserving canonical failure evidence', async () => {
+  for (const tool of ['compose_expression', 'express', 'return_to_face']) {
+    const f = await failedExpression(); f.tool({ ...expressionItem('inProgress'), tool }, false);
+    f.tool({ ...expressionItem('completed'), tool });
+    expect(f.conversation.snapshot().error).toBe(''); expect(f.failureItem).toEqual(f.original);
+    expect(JSON.stringify(f.conversation.snapshot())).not.toContain('PRIVATE_FAILURE');
+    f.event({ method: 'turn/completed', params: { threadId: 'thread-a', turn: { id: 'turn-a', status: 'completed' } } });
+    expect(f.conversation.snapshot()).toMatchObject({ canSend: true, error: '' });
+  }
+});
+it('keeps unrecovered failure visible for pending, rejected, malformed and errored retry receipts', async () => {
+  for (const item of [expressionItem('failed'), expressionItem('completed', { status: 'pending' }),
+    expressionItem('completed', { status: 'rejected' }), expressionItem('completed', { status: 'accepted' }),
+    { ...expressionItem('completed'), error: { message: 'failed' } },
+    { ...expressionItem('completed'), result: { isError: true, content: expressionItem('completed').result.content } },
+    { ...expressionItem('completed'), result: { content: [{ type: 'text', text: '{bad' }] } }]) {
+    const f = await failedExpression(); f.tool(expressionItem('inProgress'), false); f.tool(item);
+    expect(f.conversation.snapshot().error).toBe('conversation_expression_failed');
+  }
+});
+it('does not treat older, unrelated or foreign successful tool events as recovery', async () => {
+  const f = await failedExpression(); f.tool(expressionItem('completed'));
+  expect(f.conversation.snapshot().error).toBe('conversation_expression_failed');
+  for (const tool of ['preview_expression', 'observe', 'cancel_expression']) {
+    f.tool({ ...expressionItem('inProgress'), tool }, false); f.tool({ ...expressionItem('completed'), tool });
+  }
+  f.tool(expressionItem('inProgress'), false, 'foreign'); f.tool(expressionItem('completed'));
+  f.tool(expressionItem('inProgress'), false, 'thread-a', 'foreign'); f.tool(expressionItem('completed'));
+  expect(f.conversation.snapshot().error).toBe('conversation_expression_failed');
+});
+it('shows a new failure again after successful retry rather than hiding all subsequent errors', async () => {
+  const f = await failedExpression(); f.tool(expressionItem('inProgress'), false); f.tool(expressionItem('completed'));
+  expect(f.conversation.snapshot().error).toBe('');
+  f.tool({ ...expressionItem('failed'), id: 'second-failure' });
+  expect(f.conversation.snapshot().error).toBe('conversation_expression_failed');
+});
+
+const committedPlayground = { status: 'committed', revision: 1, scenes: 1, closed: false, bytes: 3494, pending: null, recoveryRequired: false };
+it('clears warning after a later same-turn committed playground edit and keeps failure evidence', async () => {
+  const f = await failedExpression('playground_edit'), item = { ...expressionItem('completed', committedPlayground), tool: 'playground_edit' };
+  f.tool(item); expect(f.conversation.snapshot().error).toBe('conversation_expression_failed');
+  f.tool({ ...item, status: 'inProgress' }, false); f.tool(item);
+  expect(f.conversation.snapshot().error).toBe(''); expect(f.failureItem).toEqual(f.original);
+});
+it('does not clear warnings for failed or unresolved playground edits', async () => {
+  for (const patch of [{status:'rejected'}, {status:'pending'}, {pending:{stage:'pending'}}, {recoveryRequired:true},
+    {closed:true}, {revision:0}, {scenes:0}, {scenes:13}, {bytes:-1}, {code:'playground_scene'}]) {
+    const f = await failedExpression('playground_edit');
+    const item = { ...expressionItem('completed', {...committedPlayground,...patch}), tool:'playground_edit' };
+    f.tool({...item,status:'inProgress'},false); f.tool(item);
+    expect(f.conversation.snapshot().error).toBe('conversation_expression_failed');
+  }
+  for (const status of ['failed','completed']) {
+    const f = await failedExpression('playground_edit'), item = {...expressionItem(status,committedPlayground),tool:'playground_edit'};
+    if(status==='completed')item.result.isError=true;
+    f.tool({...item,status:'inProgress'},false);f.tool(item);expect(f.conversation.snapshot().error).toBe('conversation_expression_failed');
+  }
+});
