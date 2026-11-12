@@ -219,3 +219,25 @@ alone does not establish a browser RPC timeout. The existing evaluate deadline,
 capacity limit, revocation and late-result rejection are unchanged. A bounded
 trace can help investigate the next failure; it does not reconstruct earlier
 stalls or prove that their cause is fixed.
+
+## Native observer MCP isolation
+
+The observer must expose no MCP tools, resources or resource templates. A configured
+but disabled server can still appear as an empty registry row in Codex's status
+catalog. Fisch therefore verifies every configured server is explicitly disabled in
+the observer process's effective configuration, then accepts only known, unique
+rows with an empty tools map and empty resource/template arrays. Unknown names,
+malformed entries, exposed capabilities and pagination still fail closed.
+
+When inherited servers are enabled, startup closes and waits for the discovery
+process before one isolated restart with process-local disable overrides. It does
+not edit the user's global Codex configuration or other sessions. Unsupported
+server names fail closed rather than being interpolated into CLI configuration.
+The legacy provenance field `mcpCatalogVerifiedEmpty` means no exposed capabilities,
+not necessarily zero registry rows.
+
+A laptop diagnostic with synthetic typed arrival observations previously stopped
+before model dispatch on eight disabled registry rows. With process isolation, a
+real Codex turn produced a greeting and expression decision that the core admitted.
+This is startup/admission evidence only: no camera, renderer, visual-quality or
+natural-interaction result is implied.
