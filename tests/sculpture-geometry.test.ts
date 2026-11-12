@@ -67,3 +67,24 @@ it('keeps the same particles on their parts when a pose changes', () => {
   for (let i = 0; i < 512; i++) for (let k = 0; k < 3; k++)
     expect(f.points![i * 3 + k]).toBeCloseTo(target[map[i] * 3 + k], 6);
 });
+
+it('interpolates part color overrides with stable particles, interruption and global fallback', () => {
+  const f = new ParticleFormation(32), form = validateSculpture(scene(), '$'), weights = [1, 0, 0, 0, 0, 0, 0];
+  f.sample({}, form, 1, weights, 42, 0); expect(f.colors).toBeUndefined();
+  form.parts[0].color = '#ff0000'; form.parts[1].color = '#0000ff';
+  const op = {}; f.sample(op, form, 0, weights, 42, 10);
+  expect([...f.colors!].every(v => v === 0)).toBe(true);
+  f.sample(op, form, 0.5, weights, 42, 20);
+  for (let i = 0; i < 32; i++) {
+    const expected = f.groups[i] === 0 ? [0.5, 0, 0, 0.5] : f.groups[i] === 1 ? [0, 0, 0.5, 0.5] : [0, 0, 0, 0];
+    expect([...f.colors!.slice(i * 4, i * 4 + 4)]).toEqual(expected);
+  }
+  const before = f.colors!.slice(), next = structuredClone(form), replacement = {};
+  next.parts[0].color = '#00ff00';
+  f.sample(replacement, next, 0, weights, 42, 30); expect(f.colors).toEqual(before);
+  f.sample(replacement, next, 1, weights, 42, 40);
+  for (let i = 0; i < 32; i++) if (f.groups[i] === 0) expect([...f.colors!.slice(i * 4, i * 4 + 4)]).toEqual([0, 1, 0, 1]);
+  const frozen = f.colors!.slice(); f.freeze(50); expect(f.colors).toEqual(frozen);
+  const returning = {}; f.sample(returning, 'sphere', 0, weights, 42, 60); expect(f.colors).toEqual(frozen);
+  f.sample(returning, 'sphere', 1, weights, 42, 70); expect([...f.colors!].every(v => v === 0)).toBe(true);
+});

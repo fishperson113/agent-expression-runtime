@@ -10,6 +10,7 @@ export type BodyState = Record<Property, Value> & {
   flowWeights: number[];
   particlePositions?: Float32Array;
   particleGroups?: Uint8Array;
+  particleColors?: Float32Array;
   particleParts?: Part[];
   liveMatrices?: (LiveMatrix | undefined)[];
   ownedProperties?: Property[];
