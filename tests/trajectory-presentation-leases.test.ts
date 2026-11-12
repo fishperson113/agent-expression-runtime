@@ -79,3 +79,54 @@ it.each(['off','rollback','intent'])('still revokes observer trajectory on %s',a
  if(reason==='off')f.body.motion('off');else if(reason==='intent')f.body.prepareUserMutation();else {f.advance(-1);f.session.tick();}
  expect(f.body.metrics.reactiveOwner).toBeNull();f.body.dispose();
 });
+
+function transientScene(f: ReturnType<typeof setup>, transient?: boolean) {
+ return f.body.admit({v:1,epoch:f.body.scheduler.epoch,seq:1,kind:'program',track:'body',policy:'replace',body:{type:'live',program:longScene(),configuration:{controls:[],poses:[],lifetimeMs:1000,...(transient===undefined?{}:{transient})}}});
+}
+function finishPresentation(f: ReturnType<typeof setup>) {
+ f.frame();for(let i=0;i<84;i++){f.advance(100);f.observe();f.frame();}
+}
+it.each([undefined,false])('preserves persistent default when transient=%s', transient=>{
+ const f=setup();expect(transientScene(f,transient).status).toBe('accepted');finishPresentation(f);
+ expect(f.body.canReactive()).toBe(false);expect(f.body.metrics.userGeometryLocked).toBe(true);f.body.dispose();
+});
+it('allows successful fresh observer replacement after full transient presentation without time expiry',async()=>{
+ const f=setup();expect(transientScene(f,true).status).toBe('accepted');f.frame();f.advance(1200);f.observe();f.frame();expect(f.body.canReactive()).toBe(false);
+ for(let i=0;i<700;i++){f.advance(100);f.observe();f.frame();}
+ expect(f.body.canReactive()).toBe(true);expect(f.body.scheduler.state.particleParts?.some(p=>p.id==='traveler')).toBe(true);
+ const request=f.launch();expect((await f.session.deliver(request.requestId,decision(request)))?.reason).toBe('accepted');
+ expect(f.body.metrics.transientScene).toBeNull();f.body.dispose();
+});
+it('preserves scene intent across source loss but rejects old decision and accepts fresh reconnect',async()=>{
+ const f=setup();transientScene(f,true);finishPresentation(f);const old=f.launch();
+ f.source.status('stopped',Date.now());f.body.observe(f.source.snapshot);f.session.observe(f.source.snapshot,[]);
+ expect(f.body.metrics.transientScene).not.toBeNull();expect((await f.session.deliver(old.requestId,decision(old)))?.reason).toBe('revoked');
+ f.advance(16000);const fresh=f.launch();expect((await f.session.deliver(fresh.requestId,decision(fresh)))?.reason).toBe('accepted');f.body.dispose();
+});
+it('keeps transient permission after failed observer validation',()=>{
+ const f=setup();transientScene(f,true);finishPresentation(f);
+ expect(()=>f.body.admitReactive({program:{kind:'program',epoch:f.body.scheduler.epoch},configuration:{transient:true}} as any,{} as any)).toThrow('reactive_delegation_forbidden');
+ expect(f.body.canReactive()).toBe(true);expect(f.body.metrics.transientScene).not.toBeNull();f.body.dispose();
+});
+it.each(['intent','invalid-main','off','reset'])('revokes transient scene permission on %s', reason=>{
+ const f=setup();transientScene(f,true);finishPresentation(f);
+ if(reason==='intent')f.body.prepareUserMutation();else if(reason==='invalid-main')f.body.admit({bad:true});else if(reason==='off'){f.body.motion('off');f.body.motion('normal');}else f.body.epoch('next',true);
+ expect(f.body.metrics.transientScene).toBeNull();f.body.dispose();
+});
+it('keeps MAIN transient opt-in compact and out of all observer response schemas',async()=>{
+ const {composeExpression,compositionSchema}=await import(new URL('../integrations/compose-expression.mjs',import.meta.url).href);
+ const {expressionResponseSchema}=await import(new URL('../integrations/expression-response.mjs',import.meta.url).href);
+ const input={parts:longScene().parts};expect(Buffer.byteLength(JSON.stringify(compositionSchema))).toBeLessThan(5000);
+ expect(composeExpression(input).body.type).toBe('parallel');expect(composeExpression({...input,transient:false}).body.type).toBe('parallel');
+ expect(composeExpression({...input,transient:true}).body.configuration.transient).toBe(true);
+ expect(JSON.stringify(expressionResponseSchema)).not.toContain('"transient"');
+});
+it.each([true,false])('rejects observer configuration transient=%s at runtime',transient=>{
+ const f=setup();expect(()=>f.body.admitReactive({configuration:{transient}} as any,{} as any)).toThrow('reactive_delegation_forbidden');f.body.dispose();
+});
+
+it('retains scene intent when an actual observer response is invalid',async()=>{
+ const f=setup();transientScene(f,true);finishPresentation(f);const request=f.launch();
+ const result=await f.session.deliver(request.requestId,{bad:true});expect(result?.reason).not.toBe('accepted');
+ expect(f.body.metrics.transientScene).not.toBeNull();expect(f.body.metrics.userGeometryLocked).toBe(true);f.body.dispose();
+});

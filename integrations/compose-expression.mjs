@@ -19,6 +19,7 @@ export const compositionContract = Object.freeze({ schemaVersion: 1, defaultBase
 export const compositionSchema = {
   type: 'object', additionalProperties: false, required: ['parts'], $defs: { part, motion, weight, track: protocol.$defs.assemblyTrajectory },
   properties: {
+    transient: { type: 'boolean' },
     tracks: { type: 'array', minItems: 1, maxItems: limits.assembly.parts, items: { $ref: '#/$defs/track' } },
     parts: { type: 'array', minItems: 1, maxItems: limits.assembly.parts, items: { $ref: '#/$defs/part' }, description: [
       'Stable IDs. trajectory: identical per group; atMs starts at 0, strictly increases; excludes motion.',
@@ -104,7 +105,7 @@ function compositionInputError(input) {
 }
 const validateProgram = ajv.compile({ $defs: protocol.$defs, $ref: '#/$defs/node' });
 export const compositionTool = { name: 'compose_expression',
-  description: `Author a new particle silhouette or spatial composition from your own geometry (v1, base ${compositionContract.baseFingerprint.slice(0, 12)}). Omitted base means standalone. Explicit resting_face adds your parts to that optional avatar without copying it. Freely choose RGB and bounded motion. Ellipsoid scale is at least 0.02 on every axis, including thin depth; use curves or patches for thinner features. Share rigid tracks via tracks[{group,pivot,keyframes}] and part.trackRef=group; or inline trajectory. No motion with either. Track groups must be unique. No semantic presets. Use express for existing-part gestures or advanced choreography; retaining the current form/no new call can be appropriate. Same admission/status/cancel contract as express; ACK is not completion or recognition.`,
+  description: `Author a new particle silhouette or spatial composition from your own geometry (v1, base ${compositionContract.baseFingerprint.slice(0, 12)}). Omitted base means standalone. Explicit resting_face adds your parts to that optional avatar without copying it. Freely choose RGB and bounded motion. Ellipsoid scale is at least 0.02 on every axis, including thin depth; use curves or patches for thinner features. Share rigid tracks via tracks[{group,pivot,keyframes}] and part.trackRef=group; or inline trajectory. No motion with either. Track groups must be unique. For ordinary conversational illustrations choose transient:true, even when asked for a new picture; omit/false when the user explicitly asks to keep or edit the scene. No semantic presets. Use express for existing-part gestures or advanced choreography; retaining the current form/no new call can be appropriate. Same admission/status/cancel contract as express; ACK is not completion or recognition.`,
   annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false }, inputSchema: compositionSchema };
 function expansionError(code, details) { return Object.assign(Error(code), { details }); }
 function validateExpandedParts(base, authored) {
@@ -144,7 +145,7 @@ export function composeExpression(input) {
   if (args.flow) children.push({ type: 'flow', ...args.flow, durationMs, easing });
   const body = { type: 'parallel', children };
   if (!validateProgram(body)) throw Error('composition_program');
-  const output = args.observerHandoffMs === undefined && args.observerContext === undefined ? body : { type: 'live', program: body, configuration: { controls: [], poses: [], lifetimeMs: Math.max(1000, durationMs), ...(args.observerHandoffMs === undefined ? {} : { observerHandoffMs: args.observerHandoffMs }), ...(args.observerContext === undefined ? {} : { observerContext: args.observerContext }) } };
+  const output = args.observerHandoffMs === undefined && args.observerContext === undefined && args.transient !== true ? body : { type: 'live', program: body, configuration: { controls: [], poses: [], ...(args.transient === true ? { transient: true } : {}), lifetimeMs: Math.max(1000, durationMs), ...(args.observerHandoffMs === undefined ? {} : { observerHandoffMs: args.observerHandoffMs }), ...(args.observerContext === undefined ? {} : { observerContext: args.observerContext }) } };
   const result = { body: output, policy: 'replace', ...(args.requestId ? { requestId: args.requestId } : {}), ...(args.expectedEpoch ? { expectedEpoch: args.expectedEpoch } : {}) };
   if (Buffer.byteLength(JSON.stringify(result), 'utf8') > limits.limits.recordBytes - 512) throw Error('composition_bytes');
   return result;

@@ -43,6 +43,7 @@ export class LiveBody {
   private reactiveOwner?: ReactiveOwnership;
   private userLeaseUntil = 0;
   private userGeometryLocked = false;
+  private transientScene?: { epoch: string; seq: number };
   private publicContext?: { epoch: string; seq: number; until: number; text: string; mode: 'open' | 'quiet' };
   private observerHandoff?: { epoch: string; seq: number; from: number; until: number };
   private origins = new WeakMap<Compiled, TraceAttribution>();
@@ -114,6 +115,8 @@ export class LiveBody {
       const compiled = record.kind === 'define' ? { program: this.compiler.compiler.prepareDefinition(record, at) } : this.compiler.compile(record, at);
       const result = this.admitCompiled(compiled, at), accepted = ['accepted', 'state', 'defined'].includes(result);
       if (accepted) { this.userLeaseUntil = Math.max(this.userLeaseUntil, this.leaseUntil(compiled, at)); this.userGeometry(compiled, at);
+        if (compiled.configuration?.transient === true && this.userGeometryLocked && compiled.program.kind === 'program')
+          this.transientScene = { epoch: this.scheduler.epoch, seq: compiled.program.seq };
         const context = compiled.configuration?.observerContext;
         if (context && compiled.program.kind === 'program') this.publicContext = { epoch: this.scheduler.epoch, seq: compiled.program.seq,
           until: this.userLeaseUntil + context.durationMs, text: context.text, mode: context.mode };
@@ -131,7 +134,7 @@ export class LiveBody {
     }
   }
   attachReactive(session: ReactiveSession) { this.reactive = session; }
-  revokeObserverHandoff() { this.observerHandoff = undefined; this.publicContext = undefined; }
+  revokeObserverHandoff(preserveScene = false) { this.observerHandoff = undefined; this.publicContext = undefined; if (!preserveScene) this.transientScene = undefined; }
   observerContext() {
     const value = this.publicContext;
     if (value && (value.epoch !== this.scheduler.epoch || performance.now() >= value.until)) this.publicContext = undefined;
@@ -142,7 +145,7 @@ export class LiveBody {
   prepareUserMutation() { this.revokeObserverHandoff(); this.attention.revoke(); this.reactive?.userIntent(); }
   get userSceneOwned() { return this.userGeometryLocked; }
   canConverse() { return this.controls.mode !== 'off' && this.observerContext()?.mode !== 'quiet' && performance.now() >= this.userLeaseUntil && !this.scheduler.busy; }
-  canReactive() { return (!this.userGeometryLocked || this.handoffAvailable()) && this.canConverse(); }
+  canReactive() { return (!this.userGeometryLocked || this.transientScene?.epoch === this.scheduler.epoch || this.handoffAvailable()) && this.canConverse(); }
   private handoffAvailable() {
     const grant = this.observerHandoff, now = performance.now();
     if (grant && (grant.epoch !== this.scheduler.epoch || now >= grant.until)) this.observerHandoff = undefined;
@@ -187,7 +190,7 @@ export class LiveBody {
     return result;
   }
   admitReactive(compiled: LiveCompiled, owner: ReactiveOwnership) {
-    if (compiled.configuration?.observerHandoffMs !== undefined || compiled.configuration?.observerContext !== undefined) throw Error('reactive_delegation_forbidden');
+    if (compiled.configuration?.observerHandoffMs !== undefined || compiled.configuration?.observerContext !== undefined || compiled.configuration?.transient !== undefined) throw Error('reactive_delegation_forbidden');
     if (!this.canReactive() || compiled.program.kind !== 'program' || compiled.program.epoch !== this.scheduler.epoch) throw Error('reactive_admission_rejected');
     this.validateParts(compiled);
     this.reactiveOwner = owner;
@@ -195,7 +198,7 @@ export class LiveBody {
     const source: TraceAttribution = { origin: 'reactive', requestId: owner.requestId, decisionId: owner.decisionId, actionId: owner.actionId };
     const result = this.admitCompiled(compiled, performance.now(), source);
     if (result !== 'accepted') throw Error('reactive_admission_rejected');
-    if (this.userGeometryLocked) { this.userGeometryLocked = false; this.observerHandoff = undefined; }
+    if (this.userGeometryLocked) { this.userGeometryLocked = false; this.observerHandoff = undefined; this.transientScene = undefined; }
     this.trace.record(compiled.program.seq, 'admitted', performance.now(), undefined, compiled.program.epoch, source);
   }
   cancelReactive(owner: ReactiveLease, _reason: LeaseRevokeReason) {
@@ -225,10 +228,10 @@ export class LiveBody {
   observe(snapshot: Observation) {
     try {
       const next = validateObservation(snapshot), previous = this.observation;
-      if (!['tracking', 'absent'].includes(next.camera) || previous && (next.sessionId !== previous.sessionId || next.capturedAt < previous.capturedAt)) this.revokeObserverHandoff();
+      if (!['tracking', 'absent'].includes(next.camera) || previous && (next.sessionId !== previous.sessionId || next.capturedAt < previous.capturedAt)) this.revokeObserverHandoff(true);
       this.observation = next; this.attention.observe(next);
     }
-    catch { this.revokeObserverHandoff(); this.observation = null; this.attention.unavailable('invalid_observation'); }
+    catch { this.revokeObserverHandoff(true); this.observation = null; this.attention.unavailable('invalid_observation'); }
   }
   activity(activity: string) {
     this.trace.activity(activity);
@@ -247,7 +250,7 @@ export class LiveBody {
     this.scheduler.state.presenceIntent = { activity: 'idle', mode };
   }
   get metrics() { const sorted = [...this.samples].sort((a, b) => a - b); const p95 = sorted[Math.floor(sorted.length * 0.95)] ?? 0;
-    return { visualAttention: this.attention.snapshot(), reactiveOwner: this.reactiveOwner?.actionId ?? null, userGeometryLocked: this.userGeometryLocked, observerHandoff: this.observerHandoff ? { ...this.observerHandoff } : null, userLeaseUntil: this.userLeaseUntil, schedulerBusy: this.scheduler.busy, queueDepth: this.scheduler.queueDepth, activity: this.faceActivity(performance.now()), diagnostics: this.trace.snapshot(), render: this.renderer.renderSnapshot,
+    return { visualAttention: this.attention.snapshot(), reactiveOwner: this.reactiveOwner?.actionId ?? null, userGeometryLocked: this.userGeometryLocked, transientScene: this.transientScene ? { ...this.transientScene } : null, observerHandoff: this.observerHandoff ? { ...this.observerHandoff } : null, userLeaseUntil: this.userLeaseUntil, schedulerBusy: this.scheduler.busy, queueDepth: this.scheduler.queueDepth, activity: this.faceActivity(performance.now()), diagnostics: this.trace.snapshot(), render: this.renderer.renderSnapshot,
       scene: isFace(this.scheduler.state.particleParts ?? []) ? 'face' : this.scheduler.state.shape,
       parts: this.scheduler.state.particleParts?.map(part => part.id) ?? [],
       frameP95: p95, meanFps: 1000 / (this.samples.reduce((sum, value) => sum + value, 0) / Math.max(1, this.samples.length)), particles: this.renderer.count }; }
