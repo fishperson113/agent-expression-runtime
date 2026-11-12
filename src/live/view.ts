@@ -53,13 +53,14 @@ export function mountDisclosures(root: HTMLElement) {
       if (active) details.dispatchEvent(new Event('fisch:tool-dismiss'));
       if (dialog.open) dialog.close(); restore(); summary.focus({ preventScroll: true });
     };
+    const show = () => { header.append(stop); dialog.showModal(); close.focus({ preventScroll: true }); };
     close.onclick = shut;
     dialog.addEventListener('cancel', event => { event.preventDefault(); shut(); });
-    summary.onclick = event => { event.preventDefault(); details.open = true; header.append(stop); dialog.showModal(); };
+    summary.onclick = event => { event.preventDefault(); details.open = true; show(); };
     stop.addEventListener('click', () => { if (dialog.open) shut(); }, { capture: true });
     details.addEventListener('toggle', event => {
       if (event.target !== details) return;
-      if (details.open && !dialog.open) { header.append(stop); dialog.showModal(); }
+      if (details.open && !dialog.open) show();
       else if (!details.open && dialog.open) shut();
     });
     dialog.addEventListener('close', () => { if (!dialog.open && details.open) shut(); });
