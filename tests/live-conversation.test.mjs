@@ -1,3 +1,4 @@
+import { LiveReactiveBroker } from '../integrations/live-reactive-broker.mjs';
 import { expect, it, vi } from 'vitest';
 import { LiveOutput } from '../integrations/live-output.mjs';
 import { LiveConversation, bindLiveConversation } from '../integrations/live-conversation.mjs';
@@ -525,7 +526,7 @@ it('revokes confirmed observer context on transport loss and preserves its error
 });
 
 
-it('shares only a canonical completed final answer, bounded and revision-fenced without extending TTL', async () => {
+it('shares only a canonical completed final answer, bounded and revision-fenced with a fresh completion TTL', async () => {
   let now=100; const f=fixture({now:()=>now}), pending=f.send('Snack or a quiet break?');
   f.reply(0,{result:{turn:{id:'reply-turn',status:'inProgress'}}});await pending;
   const before=f.conversation.observerContext();
@@ -533,10 +534,10 @@ it('shares only a canonical completed final answer, bounded and revision-fenced 
   item('commentary','PRIVATE_PARTIAL');expect(f.conversation.observerContext().assistantReply).toBeUndefined();
   item('final_answer','Public answer\n'+'a'.repeat(500));expect(f.conversation.observerContext().assistantReply).toBeUndefined();
   now=200;f.event({method:'turn/completed',params:{threadId:'thread-a',turn:{id:'reply-turn',status:'completed'}}});
-  const context=f.conversation.observerContext();expect(context.revision).toBeGreaterThan(before.revision);expect(context.ageMs).toBe(100);
+  const context=f.conversation.observerContext();expect(context.revision).toBeGreaterThan(before.revision);expect(context.ageMs).toBe(0);
   expect(context.assistantReply).toMatchObject({messageId:'answer',truncated:true});expect(Array.from(context.assistantReply.text)).toHaveLength(480);
   expect(context.assistantReply.text).not.toContain('\n');expect(Object.isFrozen(context.assistantReply)).toBe(true);
-  now=60100;expect(f.conversation.observerContext()).toBeNull();item('final_answer','late');expect(f.conversation.observerContext()).toBeNull();
+  now=60200;expect(f.conversation.observerContext()).toBeNull();item('final_answer','late');expect(f.conversation.observerContext()).toBeNull();
 });
 it.each(['failed','interrupted','delta-only','other-thread'])('does not share %s as a completed MAIN answer',async kind=>{
   const f=fixture(),pending=f.send('Public user');f.reply(0,{result:{turn:{id:'reply-turn',status:'inProgress'}}});await pending;
@@ -632,4 +633,40 @@ it('does not clear warnings for failed or unresolved playground edits', async ()
     if(status==='completed')item.result.isError=true;
     f.tool({...item,status:'inProgress'},false);f.tool(item);expect(f.conversation.snapshot().error).toBe('conversation_expression_failed');
   }
+});
+
+function completeReply(f, turn='reply-turn') {
+ f.event({method:'item/completed',params:{threadId:'thread-a',turnId:turn,item:{type:'agentMessage',id:'final',phase:'final_answer',text:'Public completed answer'}}});
+ f.event({method:'turn/completed',params:{threadId:'thread-a',turn:{id:turn,status:'completed'}}});
+}
+it.each([39000,75000])('refreshes context once at final completion after %sms, not from reads',async elapsed=>{
+ let now=0;const f=fixture({now:()=>now}),pending=f.send('Public user');f.reply(0,{result:{turn:{id:'reply-turn',status:'inProgress'}}});await pending;
+ const original=f.conversation.observerContext();now=elapsed;
+ if(elapsed>=60000)expect(f.conversation.observerContext()).toBeNull();
+ completeReply(f);const final=f.conversation.observerContext();expect(final.ageMs).toBe(0);expect(final.revision).toBeGreaterThan(original.revision);
+ expect(final.text).toBe(original.text);expect(final).not.toHaveProperty('at');expect(final).not.toHaveProperty('replyAt');
+ now+=35000;expect(f.conversation.observerContext().ageMs).toBe(35000);completeReply(f);
+ expect(f.conversation.observerContext().ageMs).toBe(35000);expect(f.conversation.observerContext().revision).toBe(final.revision);
+ now+=25000;expect(f.conversation.observerContext()).toBeNull();completeReply(f);expect(f.conversation.observerContext()).toBeNull();
+});
+it.each(['next-input','next-turn','thread','transport','close','failed','rollback'])('does not revive expired context after %s invalidation',async reason=>{
+ let now=0;const f=fixture({now:()=>now}),pending=f.send('Public user');f.reply(0,{result:{turn:{id:'reply-turn',status:'inProgress'}}});await pending;
+ now=65000;expect(f.conversation.observerContext()).toBeNull();
+ if(reason==='next-input')f.conversation.inputAttempt({id:'other',method:'turn/start'});
+ else if(reason==='next-turn')f.event({method:'turn/started',params:{threadId:'thread-a',turn:{id:'new-turn'}}});
+ else if(reason==='thread')f.select('other');else if(reason==='transport')f.conversation.transportLost();else if(reason==='close')f.conversation.close();
+ else if(reason==='failed')f.event({method:'turn/completed',params:{threadId:'thread-a',turn:{id:'reply-turn',status:'failed'}}});
+ else {now=-1;expect(f.conversation.observerContext()).toBeNull();now=65000;}
+ completeReply(f);expect(f.conversation.observerContext()).toBeNull();
+});
+
+it('fences old in-flight observer context when the completed reply renews freshness',async()=>{
+ let now=0;const f=fixture({now:()=>now}),pending=f.send('Public user');f.reply(0,{result:{turn:{id:'reply-turn',status:'inProgress'}}});await pending;
+ const old={hostCapabilities:{currentTurnContext:f.conversation.observerContext()}};
+ const broker=new LiveReactiveBroker({page:{},provider:{conversationLane:true},output:{},forward(){},reject(){},contextSource:()=>f.conversation.observerContext()});
+ expect(broker.sharedContextCurrent(old)).toBe(true);now=39000;completeReply(f);
+ expect(broker.sharedContextCurrent(old)).toBe(false);
+ const fresh={hostCapabilities:{currentTurnContext:f.conversation.observerContext()}};now=78000;
+ expect(broker.sharedContextCurrent(fresh)).toBe(true);f.conversation.inputAttempt({method:'turn/start',id:'next'});
+ expect(broker.sharedContextCurrent(fresh)).toBe(false);broker.close();
 });
