@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { WebSocketServer } from 'ws';
 import { once } from 'node:events';
 import { PanelProtocol, openPanelClient } from '../integrations/panel-client.mjs';
@@ -182,4 +182,17 @@ it('authenticates a real loopback WS and completes handshake/thread selection wi
   await new Promise(resolve => setTimeout(resolve, 25)); expect(events[0].type).toBe('request');
   client.respond({ id: 5, decision: 'decline' }); client.close();
   await new Promise(resolve => server.close(resolve)); expect(failures).toEqual([]);
+});
+
+it.each([undefined, 'existing'])('annotates thread startup timeout and never retries (%s)', async resume => {
+  vi.useFakeTimers(); const writes = [], client = new PanelProtocol({ write: value => writes.push(value) });
+  try {
+    const promise = client.initialize('/public', resume);
+    client.receive({ id: writes[0].id, result: {} });
+    await Promise.resolve();
+    const rejection = expect(promise).rejects.toMatchObject({ message: 'panel_rpc_timeout', startupPhase: resume ? 'thread/resume' : 'thread/start' });
+    await vi.advanceTimersByTimeAsync(10000); await rejection;
+    expect(writes.filter(value => value.method.startsWith('thread/'))).toHaveLength(1);
+    expect(client.pending.size).toBe(0);
+  } finally { client.close(); vi.useRealTimers(); }
 });

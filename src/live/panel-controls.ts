@@ -33,6 +33,7 @@ export function parsePanelControl(value: unknown): Data | undefined {
     const dto = copy(value); if (!dto || bytes(dto) > 32768) return;
     if (dto.type === 'offline') return Object.keys(dto).length === 1 ? dto : undefined;
     if (dto.type === 'startup_failed') return Object.keys(dto).length === 2 && Number.isSafeInteger(dto.code) ? dto : undefined;
+    if (dto.type === 'startup_unavailable') return Object.keys(dto).length === 3 && ['connect', 'initialize', 'thread/start', 'thread/resume'].includes(dto.phase) && ['timeout', 'connection'].includes(dto.reason) ? dto : undefined;
     if (dto.type === 'unsupported') return id(dto.id) && label(dto.method) && dto.reason === 'unsupported_or_unavailable' ? dto : undefined;
     if (![dto.threadId, dto.turnId].every(label)) return;
     if (dto.type === 'resolved') return id(dto.id) && Object.hasOwn(reasons, dto.reason) ? dto : undefined;
@@ -166,6 +167,10 @@ class PanelControls {
     if (this.disposed) return; const dto = parsePanelControl(value);
     if (!dto) { this.status.textContent = 'Dữ liệu điều khiển không hợp lệ; chưa gửi phản hồi.'; this.host.open = true; return; }
     if (dto.type === 'offline') { this.clear(); this.status.textContent = 'Mất kết nối Codex; yêu cầu phê duyệt cũ đã hết hiệu lực.'; this.host.open = true; }
+    if (dto.type === 'startup_unavailable') {
+      this.clear(); this.status.textContent = `Codex: ${dto.reason} (${dto.phase}). Chưa xác minh được phiên đã tạo hay chưa. Hãy dừng Live, kiểm tra Codex rồi khởi chạy lại; không tự gửi lại yêu cầu.`;
+      this.host.open = true;
+    }
     if (dto.type === 'startup_failed') { this.clear(); this.status.textContent = 'Codex chưa thể khởi tạo phiên (RPC ' + dto.code + '). Hãy dừng Live, kiểm tra môi trường Codex rồi khởi chạy lại; chưa có yêu cầu nào được gửi lại.'; this.host.open = true; }
     if (dto.type === 'request') this.request(dto as Control);
     if (dto.type === 'tool') this.tool(dto);
