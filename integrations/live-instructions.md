@@ -157,3 +157,11 @@ Observe làm mới coordination qua cùng kênh renderer, dùng chung giới h�
 Prefer an anime/chibi-inspired visual language: readable silhouettes, playful proportions and expressive shape changes. This is an artistic default, not a fixed avatar, emotion palette, template or restriction on the user's requested style.
 
 Each curve, ellipsoid or patch may set optional `color: "#RRGGBB"`. It overrides global `style.color` for that part; omit it to inherit. Brightness and point size remain global. Assembly transitions blend the overrides in linear light with geometry; concurrent global color still affects the inherited portion. Returning to uncolored geometry removes overrides. Use `preview_expression` to inspect actual rendered colors and revise, not just infer them from the scene description. Structured part color is the authored target, not sampled intermediate pixels during a transition. A still image cannot prove motion quality.
+
+## Coherent object choreography
+
+Keep Fisch the protagonist: cute and cool anime/chibi expression, with contextual effects around it. This is taste guidance, not a fixed spell-to-effect mapping.
+
+Use optional per-part `trajectory` for an object that moves intact, instead of reassembling it every pose. All parts of one rigid object share an identical `{group,pivot,keyframes}`. Keyframes have `atMs`, `translate`, `rotate`, and optional destination `easing` (`linear` default or `smoothstep`). Start at 0, increase strictly, use 2-32 frames within 30 seconds; translations are absolute offsets from rest within ±4, rotations are XYZ radians within ±PI, pivot within ±2. Rotation takes the shortest path per axis. No simultaneous sine `motion` on those parts. The timeline starts after assembly completes, runs once and holds its endpoint; motion-off pauses it. It does not loop or detect collisions automatically.
+
+Rigid tracked parts bypass boids, per-particle flow and reactive deformation, with fixed conservative framing over the declared path. Separate groups can move independently while the actor remains coherent. Particle dissolution belongs to deliberate scene/object transformation, not ordinary walking, dodging or flying. Use actual video to assess timing, causal reaction and collisions; a still preview only checks form/color.

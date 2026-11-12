@@ -13,25 +13,39 @@ for (const kind of part.anyOf) { kind.properties.motion = { $ref: '#/$defs/motio
 export const compositionContract = Object.freeze({ schemaVersion: 1, defaultBase: 'none',
   baseFingerprint: createHash('sha256').update(JSON.stringify(face.parts)).digest('hex') });
 export const compositionSchema = {
-  type: 'object', additionalProperties: false, required: ['parts'], $defs: { part, motion, weight },
+  type: 'object', additionalProperties: false, required: ['parts'], $defs: { part, motion, weight, assemblyTrajectory: protocol.$defs.assemblyTrajectory },
   properties: {
     parts: { type: 'array', minItems: 1, maxItems: limits.assembly.parts, items: { $ref: '#/$defs/part' }, description: [
-      'curve/ellipsoid/patch parts; stable IDs; bounded motion.',
-      'weight shares rounded particle budget (default 1); not scale/mass/emotion.',
-      'World xyz; +Y/+Z perspective; uniform fit. Depth gaps can overlap.',
-      'Optional part.color #RRGGBB overrides global style.color; omission inherits. No fixed emotion colors.',
+      'Stable IDs. Optional rigid trajectory: identical track per group, atMs starts at 0 and increases; no motion together.',
+      'weight shares particle budget (default 1).',
+      'World xyz.',
+      'color overrides global; omit to inherit.',
     ].join(' ') },
-    base: { enum: ['none', 'resting_face'], default: 'none', description: `none replaces body; resting_face includes ${face.parts.length} canonical parts counting toward the ${limits.assembly.parts}-part total, plus your parts with noncolliding IDs. Never means the current scene.` },
+    base: { enum: ['none', 'resting_face'], default: 'none', description: `none replaces body; resting_face adds ${face.parts.length} canonical parts within ${limits.assembly.parts} total. IDs must not collide; not current scene.` },
     durationMs: { ...node('assemble').properties.durationMs, default: 600 },
     easing: node('assemble').properties.easing,
-    observerContext: { ...contextSchema, description: 'Public MAIN brief shown to user; no transcript/camera evidence. quiet pauses observer temporarily, without geometry permission.' },
-    observerHandoffMs: { type: 'integer', minimum: 1000, maximum: 60000, description: 'MAIN only: explicitly disposable body, one-shot observer replacement after this program lease; bounded window, no overlay/restoration. Omit to protect your scene.' },
+    observerContext: { ...contextSchema, description: 'Public MAIN brief; quiet pauses observer, no geometry authority.' },
+    observerHandoffMs: { type: 'integer', minimum: 1000, maximum: 60000, description: 'MAIN: one-shot observer replacement after lease; no restoration. Omit to protect scene.' },
     style: { type: 'object', additionalProperties: false, minProperties: 1, properties: pick(node('style'), ['color', 'brightness', 'pointSize', 'dispersion']) },
     flow: { type: 'object', additionalProperties: false, required: ['field', 'strength'], properties: pick(node('flow'), ['field', 'strength']) },
     requestId: { type: 'string', minLength: 1, maxLength: 128 },
     expectedEpoch: { type: 'string', minLength: 1, maxLength: 128 },
   },
 };
+compositionSchema.properties.style.properties.pointSize = { ...compositionSchema.properties.style.properties.pointSize,
+  description: 'Sprite pixels, not world radius. Start at 2-4; brightness fades.' };
+const vector = part.anyOf[0].properties.points.items;
+compositionSchema.$defs.position = vector;
+function sharePosition(value) {
+  if (!value || typeof value !== 'object') return value;
+  if (JSON.stringify(value) === JSON.stringify(vector)) return { $ref: '#/$defs/position' };
+  return Array.isArray(value) ? value.map(sharePosition) : Object.fromEntries(Object.entries(value).map(([k, v]) => [k, sharePosition(v)]));
+}
+for (const key of ['part', 'motion', 'assemblyTrajectory']) compositionSchema.$defs[key] = sharePosition(compositionSchema.$defs[key]);
+const rotation = part.anyOf[1].properties.rotation;
+compositionSchema.$defs.rotation = rotation;
+compositionSchema.$defs.part.anyOf[1].properties.rotation = { $ref: '#/$defs/rotation' };
+compositionSchema.$defs.assemblyTrajectory.properties.keyframes.items.properties.rotate = { $ref: '#/$defs/rotation' };
 const ajv = new Ajv({ strict: false, strictNumbers: true });
 const validateInput = ajv.compile(compositionSchema);
 const partValidators = new Map(part.anyOf.map(schema => [schema.properties.kind.const,
