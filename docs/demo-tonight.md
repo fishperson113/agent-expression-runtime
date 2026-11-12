@@ -32,8 +32,7 @@ Windows cần Rust/MSVC/SDK và browser như [hướng dẫn Windows](live-windo
 
 ## 2. Thử hội thoại, biểu đạt và ngắt trong một phiên
 
-Trong terminal Native vừa mở, chọn hoặc bắt đầu thread. Live không hot-attach một
-Codex cũ; panel text chỉ sẵn sàng sau khi thread thật được chọn. Giữ camera tắt.
+`fisch live` tự mở thread Native mới trong panel; khi báo đã kết nối, nhập trực tiếp tại đó. Dùng `--thread <id>` để tiếp tục thread đã biết hoặc `--terminal` nếu muốn giao diện terminal cũ. Live không hot-attach Codex đang chạy. Giữ camera tắt.
 
 - Nhập một ý tưởng của chính bạn rồi bấm **Gửi**. Thử thêm hai lượt nối tiếp, trong
   đó lượt sau nhắc lại ý tưởng trước; xem agent có giữ đúng ngữ cảnh không.

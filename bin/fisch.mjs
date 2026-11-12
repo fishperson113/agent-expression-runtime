@@ -8,8 +8,9 @@ const usage = `Fisch ${version} — a particle body for your agent
 
 Usage: fisch <command>
 
-  live [--hands] [--no-assets]  Prepare and open the local body and Codex in this terminal (Herdr optional)
-  live --panel [--thread id]  Chat with the owned Codex thread directly in the body panel
+  live [--hands] [--no-assets]  Open the local body and Codex chat together in the browser
+  live [--thread id]          Start or resume Codex directly in the browser panel
+  live --terminal             Use the legacy terminal-hosted Codex session
   desktop [--hands] [--no-assets]  Open the Native MCP body with the default Codex observer
   desktop --mcp-config  Print a token-free Codex MCP configuration; write nothing
   mcp        Serve stdio MCP through the running Desktop body (no bootstrap)
@@ -111,7 +112,7 @@ export async function dispatch(args, handlers = { live, build, test, evaluate, d
   if (args[0] === 'live') return handlers.live(parseLiveOptions(args.slice(1)));
   if (args[0] === 'desktop') {
     const options = args.length === 2 && args[1] === '--mcp-config' ? { config: true } : parseLiveOptions(args.slice(1));
-    if (options.agentPane || options.panel || options.resumeThreadId) throw Object.assign(Error('Desktop MCP mode does not own panel or terminal conversations.'), { public: true });
+    if (options.agentPane || options.panel !== undefined || options.resumeThreadId) throw Object.assign(Error('Desktop MCP mode does not own panel or terminal conversations.'), { public: true });
     return (handlers.desktop ?? desktop)(options);
   }
   if (args[0] === 'mcp' && args.length === 1) return (handlers.mcp ?? mcp)();
@@ -126,11 +127,12 @@ export function parseLiveOptions(args) {
     if (args[i] === '--hands' && options.hands === undefined) options.hands = true;
     else if (args[i] === '--no-assets' && options.assets === undefined) options.assets = false;
     else if (args[i] === '--panel' && options.panel === undefined) options.panel = true;
+    else if (args[i] === '--terminal' && options.panel === undefined) options.panel = false;
     else if (args[i] === '--thread' && !options.resumeThreadId && !args[i + 1]?.startsWith('--') && /^[A-Za-z0-9._:-]{1,128}$/.test(args[i + 1] ?? '')) options.resumeThreadId = args[++i];
     else if (args[i] === '--agent' && !options.agentPane && args[i + 1] && !args[i + 1].startsWith('--')) options.agentPane = args[++i];
-    else throw Object.assign(Error('Use fisch live [--hands] [--no-assets] [--agent pane].'), { public: true });
+    else throw Object.assign(Error('Use fisch live [--hands] [--no-assets] [--thread id] [--terminal | --agent pane].'), { public: true });
   }
-  if ((options.resumeThreadId && !options.panel) || (options.panel && options.agentPane)) throw Object.assign(Error('Use --thread only with --panel; --panel cannot use --agent.'), { public: true });
+  if ((options.resumeThreadId && (options.panel === false || options.agentPane)) || (options.panel !== undefined && options.agentPane)) throw Object.assign(Error('--thread requires browser panel mode; --panel/--terminal cannot use --agent.'), { public: true });
   if (options.hands && options.assets === false) throw Object.assign(Error('--hands needs assets; remove --no-assets.'), { public: true });
   return options;
 }

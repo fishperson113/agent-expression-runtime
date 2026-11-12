@@ -25,7 +25,7 @@ npm link
 fisch live
 ```
 
-The first launch installs dependencies, builds the app and downloads face-tracking models. Fisch opens in your browser, with Codex in the terminal. Start or select a Codex thread there, then use the browser's text panel or continue in the terminal.
+The first launch installs dependencies, builds the app and downloads face-tracking models. Fisch opens the particle body and a ready-to-chat Codex session together in your browser. Type in the conversation panel; no terminal thread selection is needed. Use `fisch live --thread <id>` to resume a known thread, or `fisch live --terminal` for the legacy terminal interface. `--panel` remains a compatible alias for the default.
 
 After installation, run `fisch live` from the project you want to work in. From the Fisch checkout, `npm start` also works.
 

@@ -2,7 +2,7 @@
 
 ## Normal use
 
-Run `fisch live` in a free shell pane, including inside Herdr, tmux or another multiplexer. Codex runs in that same terminal and the body opens in a browser. No Herdr API, neighboring agent, global hooks or pane ID is needed. Run from the project directory you want Codex to use.
+Run `fisch live` in a free shell pane, including inside Herdr, tmux or another multiplexer. The body and Codex conversation open together in the browser. Add `--terminal` only if you prefer Codex in that same terminal. No Herdr API, neighboring agent, global hooks or pane ID is needed. Run from the project directory you want Codex to use.
 
 The old `fisch run` terminal body has been removed. `npm start` now launches Live from the checkout. The old terminal-only `fisch express` and `fisch cancel` commands are also removed; they fail with migration guidance rather than silently launching another session. Codex still has the Live MCP `express` and `cancel_expression` tools. Use the browser controls to stop an expression or end a normal Live session.
 
