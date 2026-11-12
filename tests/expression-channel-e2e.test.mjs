@@ -8,7 +8,7 @@ const curveSchema = expressionResponseSchema.$defs.part.anyOf.find(part => part.
 const optionalColor = Object.hasOwn(curveSchema.properties, 'color') ? { color: null } : {};
 const response = mode => JSON.stringify({ reply: 'Synthetic response projection.', decision: mode === 'retain'
   ? { mode, reasonCode: 'preserve_current', payload: null }
-  : { mode, reasonCode: 'authored_context', payload: { parts: [{ id: 'channel_authored', kind: 'curve', points: [[-0.5, -0.3, 0], [0, 0.7, 0], [0.6, -0.4, 0]], radius: 0.06, weight: null, ...optionalColor, motion: null }], base: 'none', durationMs: 300, easing: 'smoothstep', style: { color: '#b34ea7', brightness: 0.95, pointSize: 2.2, dispersion: 0 }, flow: null } } });
+  : { mode, reasonCode: 'authored_context', payload: { parts: [{ id: 'channel_authored', kind: 'curve', points: [[-0.5, -0.3, 0], [0, 0.7, 0], [0.6, -0.4, 0]], radius: 0.06, weight: null, ...optionalColor, motion: null, trajectory: null }], base: 'none', durationMs: 300, easing: 'smoothstep', style: { color: '#b34ea7', brightness: 0.95, pointSize: 2.2, dispersion: 0 }, flow: null } } });
 const result = mode => ({ threadId: 'owned_thread', turnId: 'owned_turn', status: 'completed', truncated: false, toolRequests: [], messages: [{ id: 'final', text: response(mode) }] });
 it('keeps structured channel fixtures valid before gateway admission', () => {
   for (const mode of ['retain', 'compose']) expect(parseExpressionResponse(response(mode)).mode).toBe(mode);
@@ -44,3 +44,4 @@ it.skipIf(!existsSync(gatewayExecutable()) && !required)('projects a structured 
     }
   } finally { await client.close(); await live.close(); }
 }, 60000);
+

@@ -1402,6 +1402,9 @@
             "color": {
               "type": "string",
               "pattern": "^#[0-9a-fA-F]{6}$"
+            },
+            "trajectory": {
+              "$ref": "#/$defs/assemblyTrajectory"
             }
           },
           "required": [
@@ -1520,6 +1523,9 @@
             "color": {
               "type": "string",
               "pattern": "^#[0-9a-fA-F]{6}$"
+            },
+            "trajectory": {
+              "$ref": "#/$defs/assemblyTrajectory"
             }
           },
           "required": [
@@ -1623,6 +1629,9 @@
             "color": {
               "type": "string",
               "pattern": "^#[0-9a-fA-F]{6}$"
+            },
+            "trajectory": {
+              "$ref": "#/$defs/assemblyTrajectory"
             }
           },
           "required": [
@@ -1935,6 +1944,9 @@
                   "$ref": "#/$defs/param"
                 }
               ]
+            },
+            "trajectory": {
+              "$ref": "#/$defs/assemblyTrajectory"
             }
           },
           "required": [
@@ -2123,6 +2135,9 @@
                   "$ref": "#/$defs/param"
                 }
               ]
+            },
+            "trajectory": {
+              "$ref": "#/$defs/assemblyTrajectory"
             }
           },
           "required": [
@@ -2282,6 +2297,9 @@
                   "$ref": "#/$defs/param"
                 }
               ]
+            },
+            "trajectory": {
+              "$ref": "#/$defs/assemblyTrajectory"
             }
           },
           "required": [
@@ -2292,6 +2310,78 @@
           "additionalProperties": false
         }
       ]
+    },
+    "assemblyTrajectory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "group",
+        "pivot",
+        "keyframes"
+      ],
+      "properties": {
+        "group": {
+          "type": "string",
+          "pattern": "^[A-Za-z][\\w-]{0,31}$"
+        },
+        "pivot": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": -2,
+            "maximum": 2
+          },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "keyframes": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "atMs",
+              "translate",
+              "rotate"
+            ],
+            "properties": {
+              "atMs": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 30000
+              },
+              "translate": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": -4,
+                  "maximum": 4
+                },
+                "minItems": 3,
+                "maxItems": 3
+              },
+              "rotate": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": -3.141592653589793,
+                  "maximum": 3.141592653589793
+                },
+                "minItems": 3,
+                "maxItems": 3
+              },
+              "easing": {
+                "enum": [
+                  "linear",
+                  "smoothstep"
+                ]
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

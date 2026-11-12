@@ -159,3 +159,18 @@ it('bounds repair details through MCP and never sends rejected geometry to gatew
     }
   } finally { await client.close(); await new Promise(resolve => server.close(resolve)); }
 });
+
+it('preserves authored rigid group trajectories through compose and compilation', () => {
+  const trajectory = { group: 'actor', pivot: [0, 0, 0], keyframes: [
+    { atMs: 0, translate: [0, 0, 0], rotate: [0, 0, 0] },
+    { atMs: 1200, translate: [1, 0.5, 0], rotate: [0, 0, 0.3], easing: 'smoothstep' },
+  ] };
+  const input = { parts: [{ ...part(), trajectory }], durationMs: 300 };
+  const result = composeExpression(input);
+  expect(result.body.children[0].parts[0].trajectory).toEqual(trajectory);
+  expect(compile(result.body).kind).toBe('program');
+  for (const keyframes of [trajectory.keyframes.slice(0, 1), [trajectory.keyframes[0],
+    { ...trajectory.keyframes[1], translate: [4.1, 0, 0] }]]) {
+    expect(() => composeExpression({ parts: [{ ...part(), trajectory: { ...trajectory, keyframes } }] })).toThrow('composition_arguments');
+  }
+});

@@ -65,3 +65,17 @@ it('publishes parameterized geometry macros that the compiler can instantiate', 
   expect(compiler.compile({ v: 1, epoch: 'e', seq: 2, kind: 'program', track: 'body', policy: 'replace',
     body: { type: 'call', name: 'orb', revision: 1, args: { size: 0.5, x: 0.3 } } }, 0).kind).toBe('program');
 });
+
+it('publishes rigid group trajectories usable by direct and macro assemblies', () => {
+  const trajectory = { group: 'actor', pivot: [0, 0, 0], keyframes: [
+    { atMs: 0, translate: [0, 0, 0], rotate: [0, 0, 0] },
+    { atMs: 1000, translate: [1, 0, 0], rotate: [0, 0, 0.5], easing: 'smoothstep' },
+  ] };
+  const body = { type: 'assemble', durationMs: 300, parts: [{ id: 'actor', kind: 'ellipsoid',
+    center: [0, 0, 0], scale: [0.2, 0.2, 0.2], trajectory }] };
+  const compiler = new Compiler();
+  const direct = { v: 1, epoch: 'e', seq: 1, kind: 'program', track: 'body', policy: 'replace', body };
+  expect(validate(direct)).toBe(true); expect(compiler.compile(direct, 0).kind).toBe('program');
+  const macro = { v: 1, epoch: 'e', seq: 2, kind: 'define', body: { name: 'moving', revision: 1, params: {}, body } };
+  expect(validate(macro)).toBe(true); expect(compiler.compile(macro, 0).kind).toBe('define');
+});
