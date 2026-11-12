@@ -97,9 +97,10 @@ export class NativeReactionProvider {
     } catch { /* Diagnostics never change transport or admission behavior. */ }
   }
   contractVersion = 1; closed = false; active;
-  constructor(config, { rpcFactory = (...args) => new PlannerRpc(...args), env = process.env, settleTimeoutMs = 2000, now = () => performance.now() } = {}) {
+  constructor(config, { rpcFactory = (...args) => new PlannerRpc(...args), env = process.env, settleTimeoutMs = 2000, discoverySettleTimeoutMs = 5000, now = () => performance.now() } = {}) {
+    if (!Number.isInteger(discoverySettleTimeoutMs) || discoverySettleTimeoutMs < 1 || discoverySettleTimeoutMs > 5000) throw Error('native_reaction_configuration');
     if (typeof now !== 'function' || !Number.isInteger(settleTimeoutMs) || settleTimeoutMs < 1 || settleTimeoutMs > 2000 || typeof config?.reserve !== 'function' || !Number.isInteger(config.timeoutMs ?? 60000) || (config.timeoutMs ?? 60000) < 1 || (config.timeoutMs ?? 60000) > 120000) throw Error('native_reaction_configuration');
-    this.#now = now; this.settleTimeoutMs = settleTimeoutMs; this.config = config; this.rpcFactory = rpcFactory; this.environment = nativeReactionEnvironment(env);
+    this.#now = now; this.settleTimeoutMs = settleTimeoutMs; this.discoverySettleTimeoutMs = discoverySettleTimeoutMs; this.config = config; this.rpcFactory = rpcFactory; this.environment = nativeReactionEnvironment(env);
   }
   contextFor(request) {
     const scope = JSON.stringify([request.sessionId, request.epoch]), now = this.#now();
@@ -148,7 +149,7 @@ export class NativeReactionProvider {
     let config = await this.openObserverProcess(resolved.command, args);
     const names = observerServers(config);
     if (names.some(name => config.mcp_servers[name].enabled !== false)) {
-      if (!await this.settle(this.rpc, false)) { this.close(); throw Error('native_reaction_isolation_unsettled'); }
+      if (!await this.settle(this.rpc, false, this.discoverySettleTimeoutMs)) { this.close(); throw Error('native_reaction_isolation_unsettled'); }
       if (this.closed || signal?.aborted) throw Error('native_reaction_aborted');
       config = await this.openObserverProcess(resolved.command, [...args, ...observerServerArgs(names)]);
     }
@@ -184,12 +185,12 @@ export class NativeReactionProvider {
       params.turn?.status === 'completed' ? job.resolve(job.text) : job.reject(Error('native_reaction_turn_failed'));
     }
   }
-  async settle(rpc, reset = true) {
+  async settle(rpc, reset = true, timeoutMs = this.settleTimeoutMs) {
     rpc?.close(); if (reset) this.starting = undefined;
     if (!rpc?.settled || typeof rpc.settled.then !== 'function') return false;
     let timer;
     try { return await Promise.race([rpc.settled.then(() => true, () => false),
-      new Promise(resolve => { timer = setTimeout(() => resolve(false), this.settleTimeoutMs); })]); }
+      new Promise(resolve => { timer = setTimeout(() => resolve(false), timeoutMs); })]); }
     finally { clearTimeout(timer); }
   }
   async decide(window, signal, _receipt, hostCapabilities) {
