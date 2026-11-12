@@ -2,8 +2,8 @@ import { expect, it, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { ExpressionResponseChannel, expressionResponseSchema, parseExpressionResponse, runChannelTurn } from '../integrations/expression-response.mjs';
 const compose = () => ({ reply: 'A normal reply.', decision: { mode: 'compose', reasonCode: 'shared_progress', payload: {
-  parts: [{ id: 'authored', kind: 'ellipsoid', center: [0, 0, 0], scale: [0.2, 0.3, 0.1], rotation: null, weight: null, color: null, trajectory: null, motion: null }],
-  base: 'none', durationMs: 300, easing: 'smoothstep', style: null, flow: null } } });
+  parts: [{ id: 'authored', kind: 'ellipsoid', center: [0, 0, 0], scale: [0.2, 0.3, 0.1], rotation: null, weight: null, color: null, trackRef: null, trajectory: null, motion: null }],
+  tracks: null, base: 'none', durationMs: 300, easing: 'smoothstep', style: null, flow: null } } });
 const retain = () => ({ reply: '', decision: { mode: 'retain', reasonCode: 'keep_current', payload: null } });
 const turn = value => ({ threadId: 'thread', turnId: 'turn', status: 'completed', truncated: false, toolRequests: [], messages: [{ id: 'final', text: JSON.stringify(value), phase: null }] });
 function fixture() {
@@ -115,4 +115,18 @@ it('preserves Native terminal errors and retry notifications without projecting 
   const result = await runChannelTurn(client, 'thread', 'synthetic');
   expect(result).toMatchObject({ status: 'failed', error, errors: [{ error, willRetry: false }] });
   const f = fixture(); expect((await f.channel.complete(f.token, { ...result, turnId: 'turn' })).dispatch).toBe('dropped'); expect(f.call).not.toHaveBeenCalled();
+});
+
+it('normalizes nullable shared tracks and preserves shorthand for the existing compose tool', () => {
+  const response = compose();
+  response.decision.payload.tracks = [{ group: 'actor', pivot: [0, 0, 0], keyframes: [
+    { atMs: 0, translate: [0, 0, 0], rotate: [0, 0, 0], easing: null },
+    { atMs: 1000, translate: [0.5, 0, 0], rotate: [0, 0, 0], easing: 'smoothstep' },
+  ] }];
+  response.decision.payload.parts[0].trackRef = 'actor';
+  const parsed = parseExpressionResponse(JSON.stringify(response));
+  expect(parsed.args.parts[0].trackRef).toBe('actor'); expect(parsed.args.parts[0]).not.toHaveProperty('trajectory');
+  expect(parsed.args.tracks[0].keyframes[0]).not.toHaveProperty('easing');
+  response.decision.payload.parts[0].trackRef = 'missing';
+  expect(() => parseExpressionResponse(JSON.stringify(response))).toThrow('composition_track_missing');
 });
