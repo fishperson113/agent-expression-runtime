@@ -83,7 +83,7 @@ export class ThreeRenderer implements RendererSink {
       vertexShader:
         'uniform float size; uniform float dpr; void main(){ vec4 p=modelViewMatrix*vec4(position,1.0); gl_PointSize=size*dpr*clamp(3.8/-p.z,0.75,1.25); gl_Position=projectionMatrix*p; }',
       fragmentShader:
-        'uniform vec3 color; uniform float brightness; void main(){float d=length(gl_PointCoord-0.5)*2.0; if(d>1.0) discard; gl_FragColor=vec4(color,brightness*(1.0-d*d));}',
+        'uniform vec3 color; uniform float brightness; void main(){float d=length(gl_PointCoord-0.5)*2.0; if(d>1.0) discard; gl_FragColor=vec4(color,brightness*(1.0-d*d));\n#include <colorspace_fragment>\n}',
     });
     this.points = new THREE.Points(this.geometry, this.material);
     this.scene.add(this.points);
