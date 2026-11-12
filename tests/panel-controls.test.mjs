@@ -146,6 +146,11 @@ it('keeps sanitized startup failure visible with sending disabled in the product
   expect(await page.locator('.fisch-panel-controls').textContent()).toContain('RPC -32603');
   expect(await page.locator('.fisch-conversation button[type=submit]').isDisabled()).toBe(true);
   expect(parsePanelControl({type:'startup_failed',code:-32603,error:'PRIVATE'})).toBeUndefined();
+  await page.evaluate(()=>window.fischLive.panelControlStatus({type:'startup_unavailable',phase:'thread/start',reason:'timeout'}));
+  expect(await page.locator('.fisch-panel-controls').textContent()).toContain('timeout (thread/start)');
+  expect(await page.locator('.fisch-conversation button[type=submit]').isDisabled()).toBe(true);
+  expect(parsePanelControl({type:'startup_unavailable',phase:'PRIVATE',reason:'timeout'})).toBeUndefined();
+  expect(parsePanelControl({type:'startup_unavailable',phase:'initialize',reason:'timeout',secret:'PRIVATE'})).toBeUndefined();
  }finally{await page.close();}
 },45000);
 

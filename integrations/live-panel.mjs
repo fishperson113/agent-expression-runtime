@@ -6,6 +6,15 @@ import { bindLiveConversation } from './live-conversation.mjs';
 import { liveShutdownCode, closeLiveOwned } from './live-shutdown.mjs';
 import { openPanelClient } from './panel-client.mjs';
 
+export function startupFeedback(error) {
+  if (Number.isSafeInteger(error?.rpcError?.code)) return { type: 'startup_failed', code: error.rpcError.code };
+  const phase = error?.startupPhase;
+  if (!['connect', 'initialize', 'thread/start', 'thread/resume'].includes(phase)) return;
+  const reason = ['panel_rpc_timeout', 'panel_connect_timeout'].includes(error.message) ? 'timeout'
+    : ['panel_connect_failed', 'panel_connect_closed', 'panel_closed', 'panel_rpc_unavailable', 'panel_write_unknown'].includes(error.message) ? 'connection' : null;
+  if (reason) return { type: 'startup_unavailable', phase, reason };
+}
+
 async function bindControls(live, state, respond) {
   const expected = live.page.url(), frame = live.page.mainFrame();
   await live.page.exposeBinding('fischPanelRespond', (source, value) => {
@@ -84,17 +93,18 @@ export async function runPanelCodex({ live, cwd, signal, host: suppliedHost, rea
   } catch (error) {
     if (signal.aborted) return liveShutdownCode(signal.reason) ?? 130;
     failed = true;
-    if (state.output.thread || !Number.isSafeInteger(error?.rpcError?.code) || state.broker.browserUnavailable) throw error;
+    const feedback = startupFeedback(error);
+    if (state.output.thread || !feedback || state.broker.browserUnavailable) throw error;
     state.conversation.startupFailed();
-    const token = state.channel.token, code = error.rpcError.code, snapshot = state.conversation.snapshot();
+    const token = state.channel.token, snapshot = state.conversation.snapshot();
     try {
-      const published = await state.broker.evaluate(({ token, code, snapshot }) => {
+      const published = await state.broker.evaluate(({ token, feedback, snapshot }) => {
         const api = window.fischLive;
         if (api.conversationDocument !== token || typeof api.conversationStatus !== 'function' || typeof api.panelControlStatus !== 'function') return false;
-        api.conversationStatus(snapshot); api.panelControlStatus({ type: 'startup_failed', code });
+        api.conversationStatus(snapshot); api.panelControlStatus(feedback);
         api.setupStatus?.({ native: 'unavailable', observer: 'unavailable' });
         api.configureReactive?.(false); return true;
-      }, { token, code, snapshot });
+      }, { token, feedback, snapshot });
       if (!published) throw Error('panel_startup_publication_failed');
     } finally {
       state.channel.stale = true; state.broker.close();

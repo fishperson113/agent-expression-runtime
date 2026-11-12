@@ -69,13 +69,18 @@ export class PanelProtocol {
   }
   async initialize(cwd, resumeThreadId) {
     if (resumeThreadId !== undefined && !label(resumeThreadId)) throw fail('panel_resume_invalid');
-    await this.request('initialize', { clientInfo: { name: 'fisch_panel', version: '0.1.0' }, capabilities: { experimentalApi: true } });
-    this.write({ method: 'initialized', params: {} });
-    const reply = await this.request(resumeThreadId === undefined ? 'thread/start' : 'thread/resume', resumeThreadId === undefined ? { cwd } : { threadId: resumeThreadId, cwd });
-    if (!label(reply?.thread?.id) || resumeThreadId !== undefined && reply.thread.id !== resumeThreadId) throw fail('panel_thread_invalid');
-    this.threadId = reply.thread.id;
-    return this.threadId;
+    let phase = 'initialize';
+    try {
+      await this.request('initialize', { clientInfo: { name: 'fisch_panel', version: '0.1.0' }, capabilities: { experimentalApi: true } });
+      this.write({ method: 'initialized', params: {} });
+      phase = resumeThreadId === undefined ? 'thread/start' : 'thread/resume';
+      const reply = await this.request(phase, resumeThreadId === undefined ? { cwd } : { threadId: resumeThreadId, cwd });
+      if (!label(reply?.thread?.id) || resumeThreadId !== undefined && reply.thread.id !== resumeThreadId) throw fail('panel_thread_invalid');
+      this.threadId = reply.thread.id;
+      return this.threadId;
+    } catch (error) { error.startupPhase = phase; throw error; }
   }
+
   receive(message) {
     if (this.closed) return;
     if (message.method && message.id !== undefined) return this.serverRequest(message);
@@ -188,5 +193,5 @@ export async function openPanelClient({ url, token, cwd, resumeThreadId, onContr
     });
     const threadId = await protocol.initialize(cwd, resumeThreadId);
     return { threadId, respond: value => protocol.respond(value), close };
-  } catch (error) { try { close(); } catch {} throw error; }
+  } catch (error) { error.startupPhase ??= 'connect'; try { close(); } catch {} throw error; }
 }
