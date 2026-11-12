@@ -8,22 +8,23 @@ const contextSchema = read('../src/contracts/live-control.schema.json').$defs.ob
 const node = type => protocol.$defs.node.oneOf.map(item => item.$ref ? protocol.$defs[item.$ref.split('/').at(-1)] : item).find(item => item.properties?.type?.const === type);
 const pick = (source, keys) => Object.fromEntries(keys.map(key => [key, source.properties[key]]));
 const part = structuredClone(protocol.$defs.assemblyPart), motion = part.anyOf[0].properties.motion;
-for (const kind of part.anyOf) kind.properties.motion = { $ref: '#/$defs/motion' };
+const weight = part.anyOf[0].properties.weight;
+for (const kind of part.anyOf) { kind.properties.motion = { $ref: '#/$defs/motion' }; kind.properties.weight = { $ref: '#/$defs/weight' }; }
 export const compositionContract = Object.freeze({ schemaVersion: 1, defaultBase: 'none',
   baseFingerprint: createHash('sha256').update(JSON.stringify(face.parts)).digest('hex') });
 export const compositionSchema = {
-  type: 'object', additionalProperties: false, required: ['parts'], $defs: { part, motion },
+  type: 'object', additionalProperties: false, required: ['parts'], $defs: { part, motion, weight },
   properties: {
     parts: { type: 'array', minItems: 1, maxItems: limits.assembly.parts, items: { $ref: '#/$defs/part' }, description: [
-      'Complete curve/ellipsoid/patch parts; stable IDs; optional bounded motion.',
-      'weight (default 1) shares a fixed particle budget proportionally, rounded; not scale/mass/emotion.',
-      'World xyz, not pixels: perspective from +Y/+Z toward origin, uniform scene fitting; depth gaps can project to overlap.',
-      'Use separation/hierarchy when useful; intentional overlap/no fixed style allowed.',
+      'curve/ellipsoid/patch parts; stable IDs; bounded motion.',
+      'weight shares rounded particle budget (default 1); not scale/mass/emotion.',
+      'World xyz; +Y/+Z perspective; uniform fit. Depth gaps can overlap.',
+      'Optional part.color #RRGGBB overrides global style.color; omission inherits. No fixed emotion colors.',
     ].join(' ') },
-    base: { enum: ['none', 'resting_face'], default: 'none', description: `none replaces the whole body. resting_face explicitly includes ${face.parts.length} canonical parts counting toward the ${limits.assembly.parts}-part total, plus your parts with noncolliding IDs. Never means the current scene.` },
+    base: { enum: ['none', 'resting_face'], default: 'none', description: `none replaces body; resting_face includes ${face.parts.length} canonical parts counting toward the ${limits.assembly.parts}-part total, plus your parts with noncolliding IDs. Never means the current scene.` },
     durationMs: { ...node('assemble').properties.durationMs, default: 600 },
     easing: node('assemble').properties.easing,
-    observerContext: { ...contextSchema, description: 'MAIN-authored public interaction brief displayed to the user. Not automatic task/transcript sharing or camera evidence. quiet pauses observer inference for a finite window; does not grant geometry permission.' },
+    observerContext: { ...contextSchema, description: 'Public MAIN brief shown to user; no transcript/camera evidence. quiet pauses observer temporarily, without geometry permission.' },
     observerHandoffMs: { type: 'integer', minimum: 1000, maximum: 60000, description: 'MAIN only: explicitly disposable body, one-shot observer replacement after this program lease; bounded window, no overlay/restoration. Omit to protect your scene.' },
     style: { type: 'object', additionalProperties: false, minProperties: 1, properties: pick(node('style'), ['color', 'brightness', 'pointSize', 'dispersion']) },
     flow: { type: 'object', additionalProperties: false, required: ['field', 'strength'], properties: pick(node('flow'), ['field', 'strength']) },

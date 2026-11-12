@@ -12,6 +12,9 @@ const scene = () => ({ parts: [
 ] });
 it('validates arbitrary bounded compositions and retains paths on malformed geometry', () => {
   const valid = validateSculpture(scene(), '$.body');
+  expect(validateSculpture({ parts: [{ ...scene().parts[0], color: '#fF8800' }] }, '$').parts[0].color).toBe('#fF8800');
+  for (const color of ['red', '#fff', '#ff880000', null, 4])
+    expect(() => validateSculpture({ parts: [{ ...scene().parts[0], color }] }, '$')).toThrow();
   expect(valid.parts.map(p => p.id)).toEqual(['index', 'middle', 'palm']);
   const bad = scene(); bad.parts[1].points![0][0] = Infinity;
   expect(() => validateSculpture(bad, '$.body')).toThrow(expect.objectContaining({ path: '$.body.parts[1].points[0][0]' }));

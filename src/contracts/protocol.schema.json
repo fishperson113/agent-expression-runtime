@@ -1398,6 +1398,10 @@
               "type": "number",
               "minimum": 0,
               "maximum": 0.25
+            },
+            "color": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$"
             }
           },
           "required": [
@@ -1512,6 +1516,10 @@
               },
               "minItems": 3,
               "maxItems": 3
+            },
+            "color": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$"
             }
           },
           "required": [
@@ -1611,6 +1619,10 @@
                 "minItems": 3,
                 "maxItems": 3
               }
+            },
+            "color": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$"
             }
           },
           "required": [

@@ -151,3 +151,9 @@ vẫn raster hạt do giới hạn tối thiểu. Không suy ra hình cuối rõ
 tiếp bị ngắt.
 
 Observe làm mới coordination qua cùng kênh renderer, dùng chung giới hạn một lần/giây với inspect_expression. Nếu unavailable thì không tự retry hay coi cache là active; dữ liệu camera vẫn độc lập.
+
+## Part colors and artistic direction
+
+Prefer an anime/chibi-inspired visual language: readable silhouettes, playful proportions and expressive shape changes. This is an artistic default, not a fixed avatar, emotion palette, template or restriction on the user's requested style.
+
+Each curve, ellipsoid or patch may set optional `color: "#RRGGBB"`. It overrides global `style.color` for that part; omit it to inherit. Brightness and point size remain global. Assembly transitions blend the overrides in linear light with geometry; concurrent global color still affects the inherited portion. Returning to uncolored geometry removes overrides. Use `preview_expression` to inspect actual rendered colors and revise, not just infer them from the scene description. A still image cannot prove motion quality.
