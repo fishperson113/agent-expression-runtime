@@ -41,6 +41,16 @@ governs resting ownership; a compound scene remains agent/user-owned, so local
 hand follow, automatic gaze and reactive model work cannot reclaim it. Motion-off
 and stop remain authoritative. This adds no emotion preset or new tool/API.
 
+## Live transform ranges
+
+For existing-part poses and binding offsets/clamps, `target.prop` determines the
+range: translation x/y/z is [-0.4, 0.4], rotation is [-0.6, 0.6] radians, and scale
+is [0.25, 2] with neutral 1. The schema's shared numeric envelope is broader than
+any one property; field descriptions state the runtime limits. A rejected range
+returns `live_translation_range`, `live_rotation_range` or `live_scale_range`.
+These codes help correct a rejected authored motion without loosening bounds.
+This is contract guidance, not evidence of more spontaneous or readable motion.
+
 ## Reproduce the engineering checks
 
 After building the standalone gateway and installing the repository's locked
