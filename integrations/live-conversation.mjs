@@ -54,9 +54,10 @@ export class LiveConversation {
   observerContext() {
     this.#sync();
     if (!this.#observer) return null;
-    const ageMs = this.#now() - this.#observer.at;
-    if (!this.#available() || !Number.isFinite(ageMs) || ageMs < 0 || ageMs >= 60000) { this.#clearObserver(); return null; }
-    const { at, ...context } = this.#observer;
+    const ageMs = this.#now() - (this.#observer.replyAt ?? this.#observer.at);
+    if (!this.#available() || !Number.isFinite(ageMs) || ageMs < 0) { this.#clearObserver(); return null; }
+    if (ageMs >= 60000) return null;
+    const { at, replyAt, ...context } = this.#observer;
     return freeze({ ...context, ageMs });
   }
   #confirmObserver(job, turn, text) {
@@ -73,9 +74,10 @@ export class LiveConversation {
   }
   #attachCompletedReply() {
     const reply = this.#replyCandidate, context = this.#observer, age = context ? this.#now() - context.at : NaN;
-    if (!reply?.completed || !context || reply.turnId !== context.turnId || !Number.isFinite(age) || age < 0 || age >= 60000) return;
-    if (context.assistantReply?.messageId === reply.messageId) return;
-    this.#observer = freeze({ ...context, revision: ++this.#observerRevision,
+    if (!reply?.completed || !context || !this.#available() || reply.turnId !== context.turnId ||
+        !Number.isFinite(age) || age < 0 || !Number.isFinite(reply.completedAt) || reply.completedAt > this.#now()) return;
+    if (context.assistantReply) return;
+    this.#observer = freeze({ ...context, revision: ++this.#observerRevision, replyAt: reply.completedAt,
       assistantReply: { messageId: reply.messageId, text: reply.text, truncated: reply.truncated } });
   }
   #clear() {
@@ -261,7 +263,7 @@ export class LiveConversation {
       if (status !== 'completed' && (this.#observer?.turnId === params.turn.id || this.#pending?.observerTurnId === params.turn.id)) this.#clearObserver();
       for (const item of this.#messages) if (item.turn === params.turn.id && item.status === 'streaming') item.status = status;
       if (status === 'completed' && this.#replyCandidate?.turnId === params.turn.id) {
-        this.#replyCandidate.completed = true; this.#attachCompletedReply();
+        this.#replyCandidate.completed = true; this.#replyCandidate.completedAt = this.#now(); this.#attachCompletedReply();
       }
       if (status === 'unknown') this.#error = 'conversation_completion_unknown';
       if (this.#stopping?.turn === params.turn.id) this.#stopping = undefined;
