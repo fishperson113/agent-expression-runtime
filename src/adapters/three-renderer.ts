@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { BodyState, RendererSink } from '../core/ports';
 import { MotionPhase } from './motion-phase';
 import { capability } from '../primitives/registry';
-import { sampleBody } from './body-geometry';
+import { sampleBody, trajectorySceneBounds } from './body-geometry';
 import { TargetBoids } from '../core/geometry/boids';
 import { particleSignature } from './particle-signature';
 import { shapeBuffers } from '../core/geometry/primitives';
@@ -37,6 +37,9 @@ export function fitCamera(camera: THREE.PerspectiveCamera, aspect: number) {
 }
 export class ThreeRenderer implements RendererSink {
   private swarm = new TargetBoids();
+  private rigid = new Uint8Array(10000);
+  private framedParts?: BodyState['particleParts'];
+  private trajectoryFit?: number;
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
   private camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
@@ -115,6 +118,7 @@ export class ThreeRenderer implements RendererSink {
     this.renderer.setSize(width, height, false);
     fitCamera(this.camera, Math.max(1, width) / Math.max(1, height));
     this.material.uniforms.dpr.value = Math.min(2, dpr);
+    this.framedParts = undefined; this.trajectoryFit = undefined;
     if (!this.lost && this.submittedFrames > 0) {
       this.renderer.render(this.scene, this.camera);
       this.submittedFrames++;
@@ -135,8 +139,9 @@ export class ThreeRenderer implements RendererSink {
     const amp = this.reducedMotion ? 0.08 : 1;
     const angle = this.orbit.advance(now, state.flowStrength * amp * state.flowWeights[capability.fields.indexOf('orbit')]);
     sampleBody(this.shapes, this.positions, this.count, state, now, angle, this.reducedMotion);
-    this.swarm.apply(this.positions, this.count, now, state.particleGroups, !this.reducedMotion);
-    frameBody(this.positions, this.count, this.camera, Number(state.grow));
+    for (let i = 0; i < this.count; i++) this.rigid[i] = state.particleParts?.[state.particleGroups?.[i] ?? -1]?.trajectory ? 1 : 0;
+    this.swarm.apply(this.positions, this.count, now, state.particleGroups, !this.reducedMotion, this.rigid);
+    this.frameScene(state);
     this.geometry.attributes.position.needsUpdate = true;
     this.updatePartColors(state.particleColors);
     this.material.uniforms.color.value = this.color.set(String(state.color));
@@ -149,6 +154,17 @@ export class ThreeRenderer implements RendererSink {
     this.outputParts = (state.particleParts ?? []).map(part => ({ id: part.id, kind: part.kind, ...(part.color ? { color: part.color } : {}) }));
     this.outputAt = Date.now();
     void this.capturePreviewFrame();
+  }
+  private frameScene(state: BodyState) {
+    if (this.framedParts !== state.particleParts) {
+      this.framedParts = state.particleParts; this.trajectoryFit = undefined;
+      if (state.particleParts?.some(part => part.trajectory)) {
+        const bounds = trajectorySceneBounds(state.particleParts);
+        this.trajectoryFit = frameBody(bounds, bounds.length / 3, this.camera);
+      }
+    }
+    if (this.trajectoryFit === undefined) frameBody(this.positions, this.count, this.camera, Number(state.grow));
+    else for (let i = 0; i < this.count * 3; i++) this.positions[i] *= this.trajectoryFit;
   }
   private updatePartColors(colors?: Float32Array) {
     this.partColors.fill(0);

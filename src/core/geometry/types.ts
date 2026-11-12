@@ -1,6 +1,8 @@
 export type Vec3 = [number, number, number];
 export type PartMotion = { pivot: Vec3; translate: Vec3; rotate: Vec3; periodMs: number; phase: number };
-type PartBase = { id: string; weight?: number; color?: string; motion?: PartMotion | null };
+export type TrajectoryFrame = { atMs: number; translate: Vec3; rotate: Vec3; easing?: 'linear' | 'smoothstep' };
+export type PartTrajectory = { group: string; pivot: Vec3; keyframes: TrajectoryFrame[] };
+type PartBase = { id: string; weight?: number; color?: string; motion?: PartMotion | null; trajectory?: PartTrajectory };
 export type Part = PartBase & (
   | { kind: 'curve'; points: Vec3[]; radius: number }
   | { kind: 'ellipsoid'; center: Vec3; scale: Vec3; rotation?: Vec3 }

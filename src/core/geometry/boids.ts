@@ -74,7 +74,7 @@ export class TargetBoids {
     }
     this.error += error;
   }
-  apply(output: Float32Array, count: number, now: number, groups?: Uint8Array, enabled = true) {
+  apply(output: Float32Array, count: number, now: number, groups?: Uint8Array, enabled = true, rigid?: Uint8Array) {
     this.resize(output, count); this.enabled = enabled; this.checks = 0; this.error = 0;
     this.targets.set(output.subarray(0, count * 3));
     const first = this.lastTime === undefined;
@@ -83,6 +83,12 @@ export class TargetBoids {
     if (!enabled || first) {
       this.positions.set(this.targets); this.previous.set(this.targets); this.velocities.fill(0); return;
     }
+    for (let i = 0; i < count; i++) if (rigid?.[i]) {
+      for (let k = i * 3; k < i * 3 + 3; k++) {
+        this.positions[k] = this.targets[k]; this.previous[k] = this.targets[k];
+        this.velocities[k] = 0; this.targetVelocity[k] = 0; this.forces[k] = 0;
+      }
+    }
     if (elapsed === 0) { output.set(this.positions); return; }
     for (let i = 0; i < count; i++) {
       const j = i * 3;
@@ -90,9 +96,9 @@ export class TargetBoids {
       const speed = Math.hypot(this.targetVelocity[j], this.targetVelocity[j + 1], this.targetVelocity[j + 2]);
       if (speed > maxSpeed) for (let k = j; k < j + 3; k++) this.targetVelocity[k] *= maxSpeed / speed;
     }
-    this.grid(); for (let i = 0; i < count; i++) this.flock(i, groups);
+    this.grid(); for (let i = 0; i < count; i++) if (!rigid?.[i]) this.flock(i, groups);
     const duration = Math.min(0.1, elapsed), steps = Math.max(1, Math.ceil(duration * 60));
-    for (let i = 0; i < count; i++) this.integrate(i, duration / steps, steps);
+    for (let i = 0; i < count; i++) if (!rigid?.[i]) this.integrate(i, duration / steps, steps);
     output.set(this.positions); this.previous.set(this.targets);
   }
   get info() { return { mode: this.enabled ? 'target-boids' : 'off', particles: this.count,

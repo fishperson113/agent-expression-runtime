@@ -24,6 +24,8 @@ export class ParticleFormation {
   private topology = '';
   private motionAt = 0;
   private motionElapsed = 0;
+  private trajectoryElapsed = 0;
+  private trajectoryReady = false;
   private motionSpeed = 1;
   private quietAt?: number;
   motionMode = 'normal';
@@ -60,7 +62,7 @@ export class ParticleFormation {
       for (let i = 0; i < this.count; i++) this.groups[i] = cloud.partIndices[this.mapping![i]] ?? 0;
       this.prepareColors(cloud);
       this.cloud = cloud; this.topology = cloud.topology; this.operation = operation;
-      this.motionAt = now; this.motionElapsed = 0; this.motionSpeed = 1;
+      this.motionAt = now; this.motionElapsed = 0; this.motionSpeed = 1; this.trajectoryElapsed = 0; this.trajectoryReady = false;
     }
     this.progress = t;
     if (this.colors && this.fromColors && this.targetColors) for (let i = 0; i < this.colors.length; i++)
@@ -89,7 +91,9 @@ export class ParticleFormation {
     const targetSpeed = this.quietAt !== undefined && now - this.quietAt > 30000 ? 0 : speed;
     this.motionSpeed += (targetSpeed - this.motionSpeed) * (1 - Math.exp(-dt / 2000));
     this.motionElapsed += dt * (this.motionMode === 'off' ? 0 : this.motionSpeed);
-    const matrices = motionTransforms(this.cloud, this.motionElapsed), target: Vec3 = [0, 0, 0];
+    if (this.trajectoryReady && this.motionMode !== 'off') this.trajectoryElapsed += dt;
+    if (this.progress >= 1) this.trajectoryReady = true;
+    const matrices = motionTransforms(this.cloud, this.motionElapsed, this.trajectoryElapsed), target: Vec3 = [0, 0, 0];
     for (let i = 0; i < this.count; i++) {
       animatedPoint(this.cloud, this.mapping[i], matrices, target); const j = i * 3;
       for (let k = 0; k < 3; k++) this.points[j + k] = this.from[j + k] + (target[k] - this.from[j + k]) * this.progress;
@@ -111,7 +115,7 @@ export class ParticleFormation {
     const bindings = parts.map(part => ({ part, group: this.cloud!.parts.findIndex(p => p.id === part.partId),
       matrix: performanceMatrix(part) }));
     for (const { part, group, matrix } of bindings) {
-      if (group < 0 || !matrix) continue;
+      if (group < 0 || !matrix || this.cloud.parts[group].trajectory) continue;
       for (let i = 0; i < this.count; i++) if (this.groups[i] === group) {
         const j = i * 3, x = (this.points[j] - part.pivot[0]) * part.scale[0] + part.pivot[0];
         const y = (this.points[j + 1] - part.pivot[1]) * part.scale[1] + part.pivot[1];
