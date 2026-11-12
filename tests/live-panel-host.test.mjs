@@ -4,7 +4,7 @@ import { it, expect, vi } from 'vitest';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { parseLiveOptions } from '../bin/fisch.mjs';
+import { dispatch, parseLiveOptions } from '../bin/fisch.mjs';
 import { runPanelCodex } from '../integrations/live-panel.mjs';
 
 function panelPage() {
@@ -50,9 +50,14 @@ it('fences cancellation while a real app-server fixture holds thread initializat
   try { await vi.waitFor(async () => expect(await readFile(marker, 'utf8')).toBe('thread/start'), { timeout: 5000 }); }
   finally { abort.abort(); expect(await run).toBe(130); await rm(directory, { recursive: true, force: true }); }
 });
-it('routes panel options explicitly without changing terminal or Desktop ownership', () => {
+it('routes default panel and explicit terminal options without changing Desktop ownership', async () => {
   expect(parseLiveOptions(['--panel', '--thread', 'saved-thread'])).toEqual({ panel: true, resumeThreadId: 'saved-thread' });
-  for (const args of [['--thread', 'saved'], ['--panel', '--agent', 'pane'], ['--thread', '--panel'], ['--panel', '--panel']]) expect(() => parseLiveOptions(args)).toThrow();
+  const desktop=vi.fn();await dispatch(['desktop'],{desktop});expect(desktop).toHaveBeenCalledWith({});
+  for(const mode of ['--panel','--terminal'])await expect(dispatch(['desktop',mode],{desktop})).rejects.toThrow('Desktop MCP');
+  expect(parseLiveOptions([])).toEqual({});
+  expect(parseLiveOptions(['--thread', 'saved'])).toEqual({ resumeThreadId: 'saved' });
+  expect(parseLiveOptions(['--terminal'])).toEqual({ panel: false });
+  for (const args of [['--terminal', '--terminal'], ['--terminal', '--agent', 'pane'], ['--terminal', '--thread', 'saved'], ['--thread', 'saved', '--agent', 'pane'], ['--terminal', '--panel'], ['--panel', '--terminal'], ['--panel', '--agent', 'pane'], ['--thread', '--panel'], ['--panel', '--panel']]) expect(() => parseLiveOptions(args)).toThrow();
 });
 
 it('preloads exact static resources without claiming live state or changing standalone MCP discovery', async () => {

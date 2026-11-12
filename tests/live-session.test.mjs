@@ -1,3 +1,5 @@
+import * as panelHost from '../integrations/live-panel.mjs';
+import * as terminalHost from '../integrations/live-terminal.mjs';
 import { expect, it, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { runLiveSession } from '../scripts/live-session.mjs';
@@ -39,4 +41,12 @@ it('passes browser closure to the owned host and closes Live after host exit', a
       page.emit('close'); return closed;
     } });
   expect(result).toBe(0); expect(close).toHaveBeenCalledOnce();
+});
+
+it('selects the browser panel by default and terminal only when explicitly requested',async()=>{
+ const panel=vi.spyOn(panelHost,'runPanelCodex').mockResolvedValue(0),terminal=vi.spyOn(terminalHost,'runTerminalCodex').mockResolvedValue(0);
+ const page=new EventEmitter();page.exposeFunction=async()=>{};const open=async()=>({page,gateway:new EventEmitter(),close:async()=>{}});
+ try { await runLiveSession({open});expect(panel).toHaveBeenCalledOnce();expect(terminal).not.toHaveBeenCalled();
+   await runLiveSession({open,panel:false});expect(terminal).toHaveBeenCalledOnce();expect(panel).toHaveBeenCalledOnce();
+ } finally {panel.mockRestore();terminal.mockRestore();}
 });

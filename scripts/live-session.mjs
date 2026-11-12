@@ -57,7 +57,7 @@ async function activityLoop(live, pane, call, signal, proxy) {
     await delay(100, undefined, { signal }).catch(() => {});
   }
 }
-export async function runLiveSession({ hands, assets, agentPane, panel = false, resumeThreadId, call = herdrCall, headless = false, signal, launchCodex = true, runHost, open = openLive } = {}) {
+export async function runLiveSession({ hands, assets, agentPane, panel = true, resumeThreadId, call = herdrCall, headless = false, signal, launchCodex = true, runHost, open = openLive } = {}) {
   if (signal?.aborted) return 130;
   const host = await selectLiveHost({ call, agentPane });
   const abort = new AbortController(), stop = kind => abort.abort(liveShutdown(kind));
