@@ -155,7 +155,7 @@ fn renderer_summary_rejects_camera_fields_unknown_fields_and_stale_render_time()
 async fn renderer_capture_drops_a_reply_when_session_or_renderer_connection_changes() {
     use axum::{body::{to_bytes, Body}, http::Request};
     use tower::ServiceExt;
-    for disconnect in [false, true] {
+    for (disconnect, preview) in [(false, false), (true, false), (false, true), (true, true)] {
     let g = Gateway::new(); let owner = g.clone();
     g.subscribe(Arc::new(move |event| { owner.control_ack(event.epoch); Ok(()) }));
     let response = g.router().oneshot(Request::post("/v1/sessions").header("host","127.0.0.1:12345").header("Authorization", format!("Bearer {}",g.token))
@@ -164,10 +164,10 @@ async fn renderer_capture_drops_a_reply_when_session_or_renderer_connection_chan
     let id = session["id"].as_str().unwrap().to_owned(); let epoch = session["epoch"].as_str().unwrap().to_owned();
     let (sender, mut outgoing) = mpsc::channel(4); g.live.inner.lock().unwrap().sender = Some(sender);
     let worker = g.clone();
-    let pending = tokio::spawn(async move { render_output::inspect(State(worker), Path(id), Json(json!({}))).await });
+    let pending = tokio::spawn(async move { render_output::inspect(State(worker), Path(id), Json(if preview { json!({"preview":true}) } else { json!({}) })).await });
     let request = outgoing.recv().await.unwrap(); assert_eq!(request["epoch"], epoch);
     if disconnect { g.live.inner.lock().unwrap().generation = uuid::Uuid::new_v4().to_string(); } else { g.revoke(); }
-    assert!(receive(&g.live, renderer_reply(request["id"].as_str().unwrap(), &epoch)));
+    assert!(receive(&g.live, if preview { preview_reply(request["id"].as_str().unwrap(), &epoch) } else { renderer_reply(request["id"].as_str().unwrap(), &epoch) }));
     assert_eq!(pending.await.unwrap().status(), StatusCode::CONFLICT);
     }
 }
@@ -192,4 +192,51 @@ fn public_coordination_rejects_private_fields_and_unbounded_history() {
     unicode["coordination"]["publicBrief"]["text"] = json!("😀".repeat(240)); assert!(receive(&state, unicode.clone()));
     unicode["coordination"]["publicBrief"]["text"] = json!("😀".repeat(241)); assert!(!receive(&state, unicode));
     let mut invalid = value; invalid["coordination"]["publicBrief"] = json!({"revision":1,"text":"public","mode":"unknown"}); assert!(!receive(&state, invalid));
+}
+
+fn preview_reply(id: &str, epoch: &str) -> Value {
+    let mut value = renderer_reply(id, epoch);
+    let data = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=";
+    value["image"] = json!({"mimeType":"image/png", "data":data, "width":1, "height":1,
+        "bytes":base64::prelude::BASE64_STANDARD.decode(data).unwrap().len()});
+    value
+}
+#[test]
+fn renderer_preview_rejects_wrong_encoding_dimensions_sizes_and_private_fields() {
+    let state = LiveState::default(); let epoch = uuid::Uuid::new_v4().to_string();
+    let value = preview_reply("x", &epoch); assert!(receive(&state, value.clone()));
+    for (field, invalid) in [("mimeType", json!("image/jpeg")), ("data", json!("not base64")),
+        ("data", json!("A".repeat(218457))), ("width", json!(481)), ("height", json!(2)), ("bytes", json!(1)), ("camera", json!("private"))] {
+        let mut bad = value.clone(); bad["image"][field] = invalid; assert!(!receive(&state, bad));
+    }
+    let mut bad = value.clone(); bad["coordination"] = json!({}); assert!(!receive(&state, bad));
+    let mut bad = value.clone(); bad["summary"]["capturedAt"] = json!(0); assert!(!receive(&state, bad));
+    for mode in 0..3 {
+        let mut bytes = base64::prelude::BASE64_STANDARD.decode(value["image"]["data"].as_str().unwrap()).unwrap();
+        if mode == 0 { bytes[0] = 0; } else if mode == 1 { bytes[16..20].copy_from_slice(&481u32.to_be_bytes()); } else { bytes.resize(163841, 0); }
+        let mut bad = value.clone(); bad["image"]["data"] = json!(base64::prelude::BASE64_STANDARD.encode(&bytes));
+        bad["image"]["bytes"] = json!(bytes.len()); assert!(!receive(&state, bad));
+    }
+}
+#[tokio::test]
+async fn renderer_preview_returns_matching_frame_and_image_without_coordination() {
+    use axum::{body::{to_bytes, Body}, http::Request};
+    use tower::ServiceExt;
+    let g = Gateway::new(); let owner = g.clone();
+    g.subscribe(Arc::new(move |event| { owner.control_ack(event.epoch); Ok(()) }));
+    let response = g.router().oneshot(Request::post("/v1/sessions").header("host","127.0.0.1:12345").header("Authorization", format!("Bearer {}",g.token))
+        .header("Content-Type","application/json").body(Body::from("{}")).unwrap()).await.unwrap();
+    let session: Value = serde_json::from_slice(&to_bytes(response.into_body(), 4096).await.unwrap()).unwrap();
+    let id = session["id"].as_str().unwrap().to_owned(); let epoch = session["epoch"].as_str().unwrap().to_owned();
+    let (sender, mut outgoing) = mpsc::channel(4); g.live.inner.lock().unwrap().sender = Some(sender);
+    let worker = g.clone();
+    let pending = tokio::spawn(async move { render_output::inspect(State(worker), Path(id), Json(json!({"preview":true}))).await });
+    let request = outgoing.recv().await.unwrap(); assert_eq!(request["preview"], true);
+    let reply = preview_reply(request["id"].as_str().unwrap(), &epoch);
+    assert!(receive(&g.live, reply.clone()));
+    let response = pending.await.unwrap(); assert_eq!(response.status(), StatusCode::OK);
+    let body: Value = serde_json::from_slice(&to_bytes(response.into_body(), 4096).await.unwrap()).unwrap();
+    assert_eq!(body["format"], "image"); assert_eq!(body["summary"], reply["summary"]);
+    assert_eq!(body["image"], reply["image"]); assert_eq!(body["epoch"], epoch);
+    assert_eq!(body["requestId"], request["id"]); assert!(body.get("coordination").is_none());
 }

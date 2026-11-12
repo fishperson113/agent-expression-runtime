@@ -51,6 +51,11 @@ export class ThreeRenderer implements RendererSink {
   private orbit = new MotionPhase();
   count = 10000;
   private submittedFrames = 0;
+  private disposed = false;
+  private preview?: {
+    resolve: (value: RendererPreview) => void; reject: (error: Error) => void;
+    timer: ReturnType<typeof setTimeout>; copying: boolean;
+  };
   reducedMotion = false;
   constructor(
     private canvas: HTMLCanvasElement | OffscreenCanvas,
@@ -93,6 +98,7 @@ export class ThreeRenderer implements RendererSink {
   private onLost = (e: Event) => {
     e.preventDefault();
     this.lost = true;
+    this.rejectPreview('preview_context_lost');
     this.fault('context_lost');
   };
   private onRestore = () => {
@@ -138,6 +144,7 @@ export class ThreeRenderer implements RendererSink {
     this.outputFrame = this.submittedFrames;
     this.outputParts = (state.particleParts ?? []).map(part => ({ id: part.id, kind: part.kind }));
     this.outputAt = Date.now();
+    void this.capturePreviewFrame();
   }
   private outputBounds(group?: number) {
     let particles = 0;
@@ -154,12 +161,52 @@ export class ThreeRenderer implements RendererSink {
       color: '#' + this.material.uniforms.color.value.getHexString(), pointSize: Number(this.material.uniforms.size.value),
       brightness: Number(this.material.uniforms.brightness.value), parts: this.outputParts.map((part, i) => ({ ...part, ...this.outputBounds(i) })), bounds: this.outputBounds().bounds };
   }
+  capturePreview(): Promise<RendererPreview> {
+    if (this.disposed || this.lost) return Promise.reject(new Error('preview_unavailable'));
+    if (this.preview) return Promise.reject(new Error('preview_busy'));
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => this.rejectPreview('preview_timeout'), 1500);
+      this.preview = { resolve, reject, timer, copying: false };
+    });
+  }
+  private rejectPreview(reason: string) {
+    const pending = this.preview;
+    if (!pending) return;
+    this.preview = undefined; clearTimeout(pending.timer); pending.reject(new Error(reason));
+  }
+  private async capturePreviewFrame() {
+    const pending = this.preview;
+    if (!pending || pending.copying) return;
+    pending.copying = true;
+    try {
+      if (this.renderer.getContext().isContextLost()) throw new Error('preview_context_lost');
+      const sourceWidth = this.canvas.width, sourceHeight = this.canvas.height;
+      if (!sourceWidth || !sourceHeight) throw new Error('preview_empty_canvas');
+      const ratio = Math.min(1, 480 / Math.max(sourceWidth, sourceHeight));
+      const width = Math.max(1, Math.round(sourceWidth * ratio)), height = Math.max(1, Math.round(sourceHeight * ratio));
+      const copy = new OffscreenCanvas(width, height), context = copy.getContext('2d');
+      if (!context) throw new Error('preview_copy_unavailable');
+      context.drawImage(this.canvas, 0, 0, width, height);
+      const summary = this.inspectOutput();
+      const blob = await copy.convertToBlob({ type: 'image/png' });
+      if (blob.size > 160 * 1024) throw new Error('preview_image_too_large');
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      let binary = '';
+      for (let i = 0; i < bytes.length; i += 32768) binary += String.fromCharCode(...bytes.subarray(i, i + 32768));
+      if (this.preview !== pending) return;
+      this.preview = undefined; clearTimeout(pending.timer);
+      pending.resolve({ summary, image: { mimeType: 'image/png', data: btoa(binary), width, height, bytes: bytes.length } });
+    } catch (error) {
+      if (this.preview === pending) this.rejectPreview(error instanceof Error ? error.message : 'preview_capture_failed');
+    }
+  }
   get renderSnapshot() {
     const signature = particleSignature(this.positions, this.count, [this.material.uniforms.size.value,
       this.material.uniforms.brightness.value, this.color.r, this.color.g, this.color.b]);
     return { frame: this.submittedFrames, signature, contextLost: this.lost };
   }
   dispose() {
+    this.disposed = true; this.rejectPreview('preview_disposed');
     this.canvas.removeEventListener('webglcontextlost', this.onLost as EventListener);
     this.canvas.removeEventListener('webglcontextrestored', this.onRestore as EventListener);
     this.geometry.dispose();
@@ -167,3 +214,8 @@ export class ThreeRenderer implements RendererSink {
     this.renderer.dispose();
   }
 }
+
+export type RendererPreview = {
+  summary: ReturnType<ThreeRenderer['inspectOutput']>;
+  image: { mimeType: 'image/png'; data: string; width: number; height: number; bytes: number };
+};

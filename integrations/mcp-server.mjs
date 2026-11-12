@@ -347,7 +347,7 @@ async function handle(message) {
       try { return { content: [{ type: 'text', text: JSON.stringify(expressionStatus.read(params.arguments)) }] }; }
       catch { return { isError: true, content: [{ type: 'text', text: JSON.stringify({ status: 'rejected', code: 'invalid_arguments' }) }] }; }
     }
-    if (live && ['observe', 'look', 'inspect_expression'].includes(params?.name)) return liveCall(params.name, params.arguments);
+    if (live && ['observe', 'look', 'inspect_expression', 'preview_expression'].includes(params?.name)) return liveCall(params.name, params.arguments);
     if (live && params?.name === 'playground_state') return playgroundRead(params.arguments);
     if (desktopIntent && mutations.has(params?.name)) return fencedMutation(params);
     return mutation(params);

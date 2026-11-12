@@ -25,6 +25,8 @@ export function liveToolDefinitions() {
     inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'inspect_expression', description: 'Refresh a structured summary from the engine renderer only: last submitted particle-buffer bounds, part IDs/types and style, with frame/epoch provenance. No camera or image. This is not pixel/recognition/vision evidence. Unavailable while frozen, backgrounded or disconnected. One request per second.', annotations,
     inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
+  { name: 'preview_expression', description: 'View an actual PNG of the generated expression canvas only, with metadata from the same rendered frame. No camera, screen, chat or DOM. At most480 pixels/160KiB. Current rendered frame, not proof of latest compose revision or animation quality. Unavailable when frozen, hidden, cancelled or disconnected; shares one-request/second limit with inspect/observe. No automatic retries.', annotations,
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'look', description: 'Look at a SYNTHETIC visual fixture only. Camera pixels are never sent. Visible reason, five-second cooldown.', annotations,
     inputSchema: { type: 'object', properties: { reason: { type: 'string', minLength: 1, maxLength: 120 } }, required: ['reason'], additionalProperties: false } }];
 }
@@ -55,16 +57,31 @@ async function readCoordination(request, currentSession, resetSession, path, ses
   }
   return { ...value, elapsedMs: Math.min(60000, Math.max(0, Math.round(performance.now() - started))) };
 }
+async function previewExpression(request, currentSession, path, session) {
+  const result = await request(path + '/render-output', { preview: true }, 'POST', 3000);
+  const image = result?.image;
+  if (result?.source !== 'fisch-renderer' || result.format !== 'image' || result.session !== session.id || result.epoch !== session.epoch ||
+      image?.mimeType !== 'image/png' || !Number.isInteger(image.width) || !Number.isInteger(image.height) || image.width < 1 || image.height < 1 || image.width > 480 || image.height > 480 ||
+      typeof image.data !== 'string' || image.data.length > 218456 || !/^[A-Za-z0-9+/]+={0,2}$/.test(image.data)) throw Error('render_output_invalid');
+  const bytes = Buffer.from(image.data, 'base64');
+  if (bytes.length > 163840 || bytes.length !== image.bytes || bytes.length < 24 || bytes.subarray(0,8).toString('hex') !== '89504e470d0a1a0a' ||
+      bytes.toString('ascii',12,16) !== 'IHDR' || bytes.readUInt32BE(16) !== image.width || bytes.readUInt32BE(20) !== image.height) throw Error('render_output_invalid');
+  const current = await currentSession();
+  if (current.id !== session.id || current.epoch !== result.epoch) throw Error('render_epoch_changed');
+  const metadata = Object.fromEntries(['schemaVersion', 'source', 'format', 'session', 'epoch', 'requestId', 'receivedAt', 'summary', 'evidence'].map(key => [key, result[key]]));
+  return { content: [{ type: 'text', text: JSON.stringify(metadata) }, { type: 'image', mimeType: 'image/png', data: image.data }] };
+}
 export function createLiveTools(request, currentSession, resetSession = () => {}) {
   let cursor = 0, sessionId;
   return async (name, args = {}) => {
     try {
-      if (!['observe', 'look', 'inspect_expression'].includes(name)) throw Error('unknown_tool');
+      if (!['observe', 'look', 'inspect_expression', 'preview_expression'].includes(name)) throw Error('unknown_tool');
       if (!args || typeof args !== 'object' || Array.isArray(args) || Object.keys(args).some(key => name !== 'look' || key !== 'reason')) throw Error('invalid_arguments');
       if (name === 'look' && (typeof args.reason !== 'string' || !args.reason.length || args.reason.length > 120 || /[\x00-\x1f]/.test(args.reason))) throw Error('look_reason');
       const session = await currentSession();
       if (session.id !== sessionId) { sessionId = session.id; cursor = 0; }
       const path = `/v1/sessions/${session.id}`;
+      if (name === 'preview_expression') return await previewExpression(request, currentSession, path, session);
       if (name === 'inspect_expression') {
         const result = await request(path + '/render-output', {}, 'POST', 3000);
         if (result.source !== 'fisch-renderer' || result.format !== 'structured' || result.session !== session.id || result.epoch !== session.epoch) throw Error('render_output_invalid');

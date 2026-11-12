@@ -84,10 +84,19 @@ async function inspectEngine(client, live) {
   expect(second.summary.color).toBe('#1c73a9'); expect(second.summary.contentFrame).toBeGreaterThan(first.summary.contentFrame);
   expect(second.requestId).not.toBe(first.requestId); expect(second.epoch).toBe(first.epoch);
   await new Promise(resolve => setTimeout(resolve, 1100));
+  const preview = await client.tool('preview_expression', {}); expect(preview.isError).toBeUndefined();
+  const provenance = JSON.parse(preview.content[0].text), image = preview.content[1];
+  expect(provenance).toMatchObject({source:'fisch-renderer',format:'image',epoch:first.epoch});
+  expect(provenance.coordination).toBeUndefined();expect(provenance.summary.color).toBe('#1c73a9');
+  expect(image).toMatchObject({type:'image',mimeType:'image/png'});
+  const bytes=Buffer.from(image.data,'base64');expect(bytes.length).toBeLessThanOrEqual(163840);
+  expect(bytes.subarray(0,8).toString('hex')).toBe('89504e470d0a1a0a');expect(bytes.readUInt32BE(16)).toBeLessThanOrEqual(480);
+  await new Promise(resolve => setTimeout(resolve,1100));
   await live.page.locator('#motion').selectOption('off');
   await live.page.setViewportSize({ width: 1277, height: 901 });
   const frozen = await client.tool('inspect_expression', {});
   expect(frozen.isError).toBe(true); expect(frozen.content[0].text).toContain('render_refresh_unavailable');
+  const frozenPreview=await client.tool('preview_expression',{});expect(frozenPreview.isError).toBe(true);expect(frozenPreview.content.every(block=>block.type==='text')).toBe(true);
   await live.page.locator('#motion').selectOption('normal');
   return { first, second, frozen: 'unavailable despite resize', mode: 'structured output, no image/vision/recognition claim' };
 }
