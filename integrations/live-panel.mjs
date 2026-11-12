@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { nativeLiveInstructions } from './live-instruction-bundle.mjs';
 import { codexCommand } from '../scripts/start-session.mjs';
 import { createBridge, startLivePolling } from './live-terminal.mjs';
 import { createLiveReactiveProvider, nativeLiveEnvironment } from './live-reactive-provider.mjs';
@@ -54,7 +54,7 @@ export async function runPanelCodex({ live, cwd, signal, host: suppliedHost, rea
   const host = suppliedHost ?? await codexCommand();
   const env = { ...nativeLiveEnvironment(process.env), AER_BASE_URL: live.base, AER_PAIRING_TOKEN: live.token, FISCH_LIVE: '1', FISCH_PLANNER_BACKEND: 'off' };
   const configured = reactiveProvider === undefined ? createLiveReactiveProvider(process.env, { defaultNative: true }) : { provider: reactiveProvider, reason: reactiveProvider ? 'ready' : 'disabled_by_config' };
-  const instructions = readFileSync(new URL('./live-instructions.md', import.meta.url), 'utf8');
+  const instructions = nativeLiveInstructions();
   const state = await createBridge({ live, host, cwd, env, configured, instructions });
   const done = Promise.withResolvers(); let client, timer, unbind, failed = false;
   state.fail = code => done.resolve(code);

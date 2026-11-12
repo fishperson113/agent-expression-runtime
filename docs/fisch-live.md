@@ -395,3 +395,16 @@ khi chờ I/O; `LiveBody.admit()` luôn kiểm tra lại hàng rào này trướ
 ### Context hội thoại giới hạn cho observer
 
 Tin nhắn gửi từ panel chỉ trở thành context observer sau ACK Native hợp lệ. Host chia sẻ tối đa 240 ký tự của đúng câu người dùng vừa gửi, kèm thread/turn/submission/revision, trong tối đa 60 giây; không chia toàn transcript, câu trả lời MAIN, ảnh hay context máy. Lượt mới, đổi thread, hủy, lỗi hoặc kết quả chưa rõ thu hồi context. Kết quả observer dựa trên context hết hạn/đã đổi bị bỏ, không replay. Brief công khai do MAIN tự soạn vẫn độc lập và quiet có ưu tiên; đoạn trích không cấp quyền thay hình. Nguồn hội thoại ngoài panel không tự được suy thành context. Đây là wiring/protocol đã kiểm thử bằng fixture, chưa xác nhận chất lượng hội thoại qua Codex thật.
+
+
+### Static reference bootstrap
+
+New Native terminal and panel threads receive the installed host's exact
+`aer://capabilities/v1` and `aer://workflow/v1` contents with their instructions.
+This avoids requiring model-driven reads of the same static references before
+ordinary expression authoring. Other resource discovery remains available;
+`observe`, live ownership, scene and receipt checks are unchanged. A different
+connected contract must be read rather than inferred from this snapshot.
+External MCP-only clients retain their normal discovery flow. This does not
+promise a latency target or more spontaneous expression; real conversation
+quality and timing must be evaluated separately.

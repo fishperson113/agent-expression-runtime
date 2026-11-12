@@ -1,3 +1,5 @@
+import { nativeLiveInstructions } from '../integrations/live-instruction-bundle.mjs';
+import { capabilityResource } from '../integrations/capability-contract.mjs';
 import { it, expect, vi } from 'vitest';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -51,4 +53,16 @@ it('fences cancellation while a real app-server fixture holds thread initializat
 it('routes panel options explicitly without changing terminal or Desktop ownership', () => {
   expect(parseLiveOptions(['--panel', '--thread', 'saved-thread'])).toEqual({ panel: true, resumeThreadId: 'saved-thread' });
   for (const args of [['--thread', 'saved'], ['--panel', '--agent', 'pane'], ['--thread', '--panel'], ['--panel', '--panel']]) expect(() => parseLiveOptions(args)).toThrow();
+});
+
+it('preloads exact static resources without claiming live state or changing standalone MCP discovery', async () => {
+  const instructions = nativeLiveInstructions();
+  const authored = await readFile(new URL('../integrations/live-instructions.md', import.meta.url), 'utf8');
+  expect(instructions.startsWith(authored)).toBe(true);
+  for (const uri of ['aer://capabilities/v1', 'aer://workflow/v1']) {
+    expect(instructions).toContain(`${uri}\n${capabilityResource(uri).contents[0].text}`);
+  }
+  expect(instructions).toContain('NOT current scene, ownership, camera state or execution evidence');
+  expect(instructions).toContain('Continue observe and the usual state/feedback checks');
+  expect(instructions.length - authored.length).toBeLessThan(14000);
 });
