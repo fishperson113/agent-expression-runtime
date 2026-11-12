@@ -16,16 +16,16 @@ export const compositionSchema = {
   type: 'object', additionalProperties: false, required: ['parts'], $defs: { part, motion, weight, assemblyTrajectory: protocol.$defs.assemblyTrajectory },
   properties: {
     parts: { type: 'array', minItems: 1, maxItems: limits.assembly.parts, items: { $ref: '#/$defs/part' }, description: [
-      'Stable IDs. Optional rigid trajectory: identical track per group, atMs starts at 0 and increases; no motion together.',
-      'weight shares particle budget (default 1).',
-      'World xyz.',
+      'Stable IDs. trajectory: identical per group; atMs starts at 0, strictly increases; excludes motion.',
+      'weight: particle share, default 1.',
+      'xyz.',
       'color overrides global; omit to inherit.',
     ].join(' ') },
     base: { enum: ['none', 'resting_face'], default: 'none', description: `none replaces body; resting_face adds ${face.parts.length} canonical parts within ${limits.assembly.parts} total. IDs must not collide; not current scene.` },
     durationMs: { ...node('assemble').properties.durationMs, default: 600 },
     easing: node('assemble').properties.easing,
-    observerContext: { ...contextSchema, description: 'Public MAIN brief; quiet pauses observer, no geometry authority.' },
-    observerHandoffMs: { type: 'integer', minimum: 1000, maximum: 60000, description: 'MAIN: one-shot observer replacement after lease; no restoration. Omit to protect scene.' },
+    observerContext: { ...contextSchema, description: 'MAIN brief; quiet pauses observer, no geometry authority.' },
+    observerHandoffMs: { type: 'integer', minimum: 1000, maximum: 60000, description: 'MAIN: observer may replace after lease, once; no restore. Omit to protect scene.' },
     style: { type: 'object', additionalProperties: false, minProperties: 1, properties: pick(node('style'), ['color', 'brightness', 'pointSize', 'dispersion']) },
     flow: { type: 'object', additionalProperties: false, required: ['field', 'strength'], properties: pick(node('flow'), ['field', 'strength']) },
     requestId: { type: 'string', minLength: 1, maxLength: 128 },
@@ -33,7 +33,7 @@ export const compositionSchema = {
   },
 };
 compositionSchema.properties.style.properties.pointSize = { ...compositionSchema.properties.style.properties.pointSize,
-  description: 'Sprite pixels, not world radius. Start at 2-4; brightness fades.' };
+  description: 'Sprite pixels, not radius. Start at 2-4; brightness fades.' };
 const vector = part.anyOf[0].properties.points.items;
 compositionSchema.$defs.position = vector;
 function sharePosition(value) {
@@ -42,6 +42,7 @@ function sharePosition(value) {
   return Array.isArray(value) ? value.map(sharePosition) : Object.fromEntries(Object.entries(value).map(([k, v]) => [k, sharePosition(v)]));
 }
 for (const key of ['part', 'motion', 'assemblyTrajectory']) compositionSchema.$defs[key] = sharePosition(compositionSchema.$defs[key]);
+compositionSchema.$defs.part.anyOf[0].properties.points.items = vector;
 const rotation = part.anyOf[1].properties.rotation;
 compositionSchema.$defs.rotation = rotation;
 compositionSchema.$defs.part.anyOf[1].properties.rotation = { $ref: '#/$defs/rotation' };
@@ -115,3 +116,6 @@ export function composeExpression(input) {
   if (Buffer.byteLength(JSON.stringify(result), 'utf8') > limits.limits.recordBytes - 512) throw Error('composition_bytes');
   return result;
 }
+
+
+
