@@ -241,3 +241,11 @@ before model dispatch on eight disabled registry rows. With process isolation, a
 real Codex turn produced a greeting and expression decision that the core admitted.
 This is startup/admission evidence only: no camera, renderer, visual-quality or
 natural-interaction result is implied.
+
+Discovery-process shutdown has a separate bounded five-second confirmation window.
+A Windows rendered diagnostic exceeded the old shared two-second bound; a traced
+retry confirmed discovery exit after 2153 ms. This grace does not change the
+existing two-second in-flight settlement bound, treat a timeout as success, or
+permit a replacement process before confirmed exit. Timeout still closes the
+provider, and abort still prevents replacement. It tolerates startup shutdown
+latency; it does not make process termination itself faster or prove reliability.

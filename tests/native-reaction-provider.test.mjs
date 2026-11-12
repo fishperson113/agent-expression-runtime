@@ -12,13 +12,13 @@ const window = () => ({ schemaVersion: 1, request: { schemaVersion: 1, sessionId
   observations: [{ v: 1, sessionId: 's', seq: 1, capturedAt: 100, camera: 'absent', turn: 'working', summary: 'PRIVATE_INSTRUCTION_CANARY',
     user: { present: false, quality: { score: 0, basis: 'unavailable' }, position: null, head: null, facingScreen: null, expression: null, mouthMoving: null } }] });
 const retain = { reply: 'Mình thấy bạn vừa quay lại.', decision: { mode: 'retain', reasonCode: 'presence', payload: null } };
-function fixture({ catalog = [], response = retain, pending = false, pendingAck = false, reserve = async () => {}, confirmedClose = true, nativeError = null, nativeStatus = 'completed', missingConfig = false, featurePatch = {}, requestedModel, effectiveModel, now, inheritedMcp = false } = {}) {
+function fixture({ catalog = [], response = retain, pending = false, pendingAck = false, reserve = async () => {}, confirmedClose = true, nativeError = null, nativeStatus = 'completed', missingConfig = false, featurePatch = {}, requestedModel, effectiveModel, now, inheritedMcp = false, closeDelayMs = 0, discoverySettleTimeoutMs = 10 } = {}) {
   const calls = [], processes = []; let notify;
   const provider = new NativeReactionProvider({ command: 'codex', reserve, model: requestedModel }, { env: { HOME: '/native-auth', AER_PAIRING_TOKEN: 'SECRET', OPENAI_API_KEY: 'SECRET', PATH: 'native' },
-    settleTimeoutMs: 10, now, rpcFactory: (command, args, cwd, event, failed, env) => {
+    settleTimeoutMs: 10, discoverySettleTimeoutMs, now, rpcFactory: (command, args, cwd, event, failed, env) => {
       notify = event;
       let rejectAck; let confirm; const settled = new Promise(resolve => { confirm = resolve; });
-      const rpc = { settled, closed: false, command, args, env, send: () => {}, close: () => { rpc.closed = true; if (confirmedClose) confirm(); rejectAck?.(Error('planner_process_closed')); failed('closed'); },
+      const rpc = { settled, closed: false, command, args, env, send: () => {}, close: () => { rpc.closed = true; if (confirmedClose) { if (closeDelayMs) setTimeout(confirm, closeDelayMs); else confirm(); } rejectAck?.(Error('planner_process_closed')); failed('closed'); },
         request: async (method, params) => {
           calls.push({ method, params });
           if (method === 'config/read') return missingConfig ? {} : { config: { mcp_servers: { fisch_live: { enabled: inheritedMcp && !args.includes('mcp_servers.fisch_live.enabled=false') } }, features: { ...Object.fromEntries(['shell_tool', 'apps', 'plugins', 'hooks', 'multi_agent', 'computer_use', 'browser_use', 'image_generation', 'view_image'].map(key => [key, false])), ...featurePatch } } };
@@ -459,5 +459,14 @@ it('does not respawn after unconfirmed discovery process settlement', async () =
     await expect(f.provider.decide(window(), new AbortController().signal)).rejects.toThrow('native_reaction_unavailable');
     expect(f.processes).toHaveLength(1);
     expect(f.calls.some(call => call.method === 'turn/start')).toBe(false);
+  } finally { f.provider.close(); }
+});
+
+it('waits for verified discovery shutdown beyond the separate in-flight settlement bound', async () => {
+  const f = fixture({ inheritedMcp: true, closeDelayMs: 30, discoverySettleTimeoutMs: 100 });
+  try {
+    await f.provider.decide(window(), new AbortController().signal);
+    expect(f.processes).toHaveLength(2); expect(f.provider.settleTimeoutMs).toBe(10);
+    expect(f.calls.filter(call => call.method === 'turn/start')).toHaveLength(1);
   } finally { f.provider.close(); }
 });
