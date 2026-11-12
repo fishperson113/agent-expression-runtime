@@ -7,10 +7,10 @@ import { TargetBoids } from '../core/geometry/boids';
 import { particleSignature } from './particle-signature';
 import { shapeBuffers } from '../core/geometry/primitives';
 export { shapeBuffers } from '../core/geometry/primitives';
-export function frameBody(positions: Float32Array, count: number, camera: THREE.PerspectiveCamera, grow = 1) {
+export function frameBody(positions: Float32Array, count: number, camera: THREE.PerspectiveCamera, grow = 1, framingMargin = 0.44) {
   camera.updateMatrixWorld();
   const view = camera.matrixWorldInverse.elements, projection = camera.projectionMatrix.elements;
-  const distance = -view[14], margin = 0.44 * Math.max(0.25, Math.min(2, grow));
+  const distance = -view[14], margin = framingMargin * Math.max(0.25, Math.min(2, grow));
   let fit = 1;
   for (let i = 0; i < count * 3; i += 3) {
     const x = positions[i], y = positions[i + 1], z = positions[i + 2];
@@ -160,7 +160,7 @@ export class ThreeRenderer implements RendererSink {
       this.framedParts = state.particleParts; this.trajectoryFit = undefined;
       if (state.particleParts?.some(part => part.trajectory)) {
         const bounds = trajectorySceneBounds(state.particleParts);
-        this.trajectoryFit = frameBody(bounds, bounds.length / 3, this.camera);
+        this.trajectoryFit = frameBody(bounds, bounds.length / 3, this.camera, 1, 0.75);
       }
     }
     if (this.trajectoryFit === undefined) frameBody(this.positions, this.count, this.camera, Number(state.grow));
