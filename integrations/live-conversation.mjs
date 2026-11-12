@@ -265,8 +265,9 @@ export class LiveConversation {
       if (completed && item.phase === 'final_answer' && id(item.id) &&
           (this.#observer?.turnId === turn || this.#pending?.observerTurnId === turn)) {
         const chars = Array.from(item.text.replace(/[\u0000-\u001f\u007f-\u009f]/g, ' '));
-        if (chars.join('').trim()) this.#replyCandidate = { turnId: turn, messageId: item.id,
-          text: chars.slice(0, 480).join(''), truncated: chars.length > 480, completed: false };
+        const text = chars.slice(0, 480).join('');
+        if (text.trim()) this.#replyCandidate = { turnId: turn, messageId: item.id,
+          text, truncated: chars.length > 480, completed: false };
       }
     }
     if (item?.type === 'userMessage' && Array.isArray(item.content)) {

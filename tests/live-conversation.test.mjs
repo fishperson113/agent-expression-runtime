@@ -555,3 +555,10 @@ it('attaches a completed final answer when terminal notification precedes the su
  expect(f.conversation.observerContext().assistantReply).toEqual({messageId:'final',text:'Public final',truncated:false});
  f.select('other');expect(f.conversation.observerContext()).toBeNull();
 });
+
+it('omits a final answer whose bounded excerpt contains only whitespace',async()=>{
+ const f=fixture(),pending=f.send('Public user');f.reply(0,{result:{turn:{id:'space-turn',status:'inProgress'}}});await pending;
+ f.event({method:'item/completed',params:{threadId:'thread-a',turnId:'space-turn',item:{type:'agentMessage',id:'spaces',phase:'final_answer',text:' '.repeat(480)+'outside excerpt'}}});
+ f.event({method:'turn/completed',params:{threadId:'thread-a',turn:{id:'space-turn',status:'completed'}}});
+ expect(f.conversation.observerContext().text).toBe('Public user');expect(f.conversation.observerContext().assistantReply).toBeUndefined();
+});
