@@ -470,3 +470,15 @@ it('waits for verified discovery shutdown beyond the separate in-flight settleme
     expect(f.calls.filter(call => call.method === 'turn/start')).toHaveLength(1);
   } finally { f.provider.close(); }
 });
+
+
+it('validates an optional public completed MAIN reply without widening host permissions',()=>{
+  const context={revision:2,submissionId:'submission',threadId:'thread',turnId:'turn',text:'Public question',ageMs:10,
+    assistantReply:{messageId:'answer',text:'Which snack would you like?',truncated:false}};
+  const result=freezeNativeHostCapabilities({schemaVersion:1,expressionAllowed:false,currentTurnContext:context});
+  expect(result.expressionAllowed).toBe(false);expect(result.currentTurnContext.assistantReply).toEqual(context.assistantReply);
+  expect(Object.isFrozen(result.currentTurnContext.assistantReply)).toBe(true);
+  for(const assistantReply of [{...context.assistantReply,text:'x'.repeat(481)},{...context.assistantReply,text:'bad\ntext'},
+    {...context.assistantReply,truncated:'no'},{...context.assistantReply,transcript:[]},{get text(){throw Error('not read');},messageId:'answer',truncated:false}])
+    expect(()=>freezeNativeHostCapabilities({schemaVersion:1,expressionAllowed:true,currentTurnContext:{...context,assistantReply}})).toThrow('native_host_capabilities_invalid');
+});

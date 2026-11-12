@@ -20,7 +20,7 @@ function sourceScope(value) {
 const clip = (value, limit) => new TextDecoder().decode(Buffer.from(value.slice(0, limit)).subarray(0, limit), { stream: true });
 
 export class LiveConversation {
-  #observer; #observerRevision = 0; #now;
+  #observer; #observerRevision = 0; #replyCandidate; #now;
   #output; #transport; #broker; #captureObservation; #thread; #selection; #generation = 0; #revision = 0;
   #ownedContexts = new Map(); #terminal = new Set(); #intent = 0; #messages = []; #unknown = new Set(); #pending; #stopping; #stopErrorTurn; #expressionFailureTurn; #error = ''; #closed = false; #navigated = false;
   constructor({ output, transport, broker, captureObservation, now = () => performance.now() }) {
@@ -32,7 +32,7 @@ export class LiveConversation {
     this.#output = output; this.#transport = transport; this.#broker = broker;
     this.#thread = output.thread; this.#selection = output.selection;
   }
-  #clearObserver() { this.#observer = undefined; this.#observerRevision++; }
+  #clearObserver() { this.#observer = undefined; this.#replyCandidate = undefined; this.#observerRevision++; }
   observerContext() {
     this.#sync();
     if (!this.#observer) return null;
@@ -51,6 +51,14 @@ export class LiveConversation {
     this.#observerRevision++;
     this.#observer = freeze({ revision: this.#observerRevision, submissionId: job.submissionId, threadId: job.thread,
       turnId: turn.id, text: normalized, at: this.#now() });
+    this.#attachCompletedReply();
+  }
+  #attachCompletedReply() {
+    const reply = this.#replyCandidate, context = this.#observer, age = context ? this.#now() - context.at : NaN;
+    if (!reply?.completed || !context || reply.turnId !== context.turnId || !Number.isFinite(age) || age < 0 || age >= 60000) return;
+    if (context.assistantReply?.messageId === reply.messageId) return;
+    this.#observer = freeze({ ...context, revision: ++this.#observerRevision,
+      assistantReply: { messageId: reply.messageId, text: reply.text, truncated: reply.truncated } });
   }
   #clear() {
     this.#clearObserver();
@@ -234,6 +242,9 @@ export class LiveConversation {
       const status = ['completed', 'interrupted', 'failed'].includes(params.turn.status) ? params.turn.status : 'unknown';
       if (status !== 'completed' && (this.#observer?.turnId === params.turn.id || this.#pending?.observerTurnId === params.turn.id)) this.#clearObserver();
       for (const item of this.#messages) if (item.turn === params.turn.id && item.status === 'streaming') item.status = status;
+      if (status === 'completed' && this.#replyCandidate?.turnId === params.turn.id) {
+        this.#replyCandidate.completed = true; this.#attachCompletedReply();
+      }
       if (status === 'unknown') this.#error = 'conversation_completion_unknown';
       if (this.#stopping?.turn === params.turn.id) this.#stopping = undefined;
       this.#revision++; return;
@@ -249,7 +260,15 @@ export class LiveConversation {
         (!this.#error || this.#error === 'conversation_expression_failed')) {
       this.#error = 'conversation_expression_failed'; this.#expressionFailureTurn = turn; this.#revision++;
     }
-    if (item?.type === 'agentMessage' && typeof item.text === 'string') this.#update(item.id, turn, 'assistant', item.text);
+    if (item?.type === 'agentMessage' && typeof item.text === 'string') {
+      this.#update(item.id, turn, 'assistant', item.text);
+      if (completed && item.phase === 'final_answer' && id(item.id) &&
+          (this.#observer?.turnId === turn || this.#pending?.observerTurnId === turn)) {
+        const chars = Array.from(item.text.replace(/[\u0000-\u001f\u007f-\u009f]/g, ' '));
+        if (chars.join('').trim()) this.#replyCandidate = { turnId: turn, messageId: item.id,
+          text: chars.slice(0, 480).join(''), truncated: chars.length > 480, completed: false };
+      }
+    }
     if (item?.type === 'userMessage' && Array.isArray(item.content)) {
       const owned = this.#ownedContexts.get(turn);
       const text = item.content.slice(0, 32).filter((value, index) => !(index === 1 && owned &&

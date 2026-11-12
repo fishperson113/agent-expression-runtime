@@ -523,3 +523,35 @@ it('revokes confirmed observer context on transport loss and preserves its error
  const g=fixture(),pending=g.send('Do not resend');g.event({method:'turn/started',params:{threadId:'thread-a',turn:{id:'turn-a'}}});delta(g,'Pending partial');g.conversation.transportLost();g.fail(0,true);
  await expect(pending).rejects.toThrow('conversation_unknown');expect(g.conversation.snapshot()).toMatchObject({error:'conversation_transport_lost',messages:[{text:'Pending partial',status:'unknown'}]});expect(g.calls).toHaveLength(1);
 });
+
+
+it('shares only a canonical completed final answer, bounded and revision-fenced without extending TTL', async () => {
+  let now=100; const f=fixture({now:()=>now}), pending=f.send('Snack or a quiet break?');
+  f.reply(0,{result:{turn:{id:'reply-turn',status:'inProgress'}}});await pending;
+  const before=f.conversation.observerContext();
+  const item=(phase,text,id='answer')=>f.event({method:'item/completed',params:{threadId:'thread-a',turnId:'reply-turn',item:{type:'agentMessage',id,phase,text}}});
+  item('commentary','PRIVATE_PARTIAL');expect(f.conversation.observerContext().assistantReply).toBeUndefined();
+  item('final_answer','Public answer\n'+'a'.repeat(500));expect(f.conversation.observerContext().assistantReply).toBeUndefined();
+  now=200;f.event({method:'turn/completed',params:{threadId:'thread-a',turn:{id:'reply-turn',status:'completed'}}});
+  const context=f.conversation.observerContext();expect(context.revision).toBeGreaterThan(before.revision);expect(context.ageMs).toBe(100);
+  expect(context.assistantReply).toMatchObject({messageId:'answer',truncated:true});expect(Array.from(context.assistantReply.text)).toHaveLength(480);
+  expect(context.assistantReply.text).not.toContain('\n');expect(Object.isFrozen(context.assistantReply)).toBe(true);
+  now=60100;expect(f.conversation.observerContext()).toBeNull();item('final_answer','late');expect(f.conversation.observerContext()).toBeNull();
+});
+it.each(['failed','interrupted','delta-only','other-thread'])('does not share %s as a completed MAIN answer',async kind=>{
+  const f=fixture(),pending=f.send('Public user');f.reply(0,{result:{turn:{id:'reply-turn',status:'inProgress'}}});await pending;
+  if(kind==='delta-only')delta(f,'Partial','answer','reply-turn');
+  else f.event({method:'item/completed',params:{threadId:kind==='other-thread'?'other':'thread-a',turnId:'reply-turn',item:{type:'agentMessage',id:'answer',phase:'final_answer',text:'Not confirmed'}}});
+  f.event({method:'turn/completed',params:{threadId:'thread-a',turn:{id:'reply-turn',status:['failed','interrupted'].includes(kind)?kind:'completed'}}});
+  expect(f.conversation.observerContext()?.assistantReply).toBeUndefined();
+});
+
+it('attaches a completed final answer when terminal notification precedes the submit ACK',async()=>{
+ const f=fixture(),pending=f.send('Public user');
+ f.event({method:'turn/started',params:{threadId:'thread-a',turn:{id:'early-turn'}}});
+ f.event({method:'item/completed',params:{threadId:'thread-a',turnId:'early-turn',item:{type:'agentMessage',id:'final',phase:'final_answer',text:'Public final'}}});
+ f.event({method:'turn/completed',params:{threadId:'thread-a',turn:{id:'early-turn',status:'completed'}}});
+ expect(f.conversation.observerContext()).toBeNull();f.reply(0,{result:{turn:{id:'early-turn',status:'completed'}}});await pending;
+ expect(f.conversation.observerContext().assistantReply).toEqual({messageId:'final',text:'Public final',truncated:false});
+ f.select('other');expect(f.conversation.observerContext()).toBeNull();
+});
