@@ -1,3 +1,4 @@
+import { fischCodexServiceTier } from './fisch-codex-runtime.mjs';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
@@ -12,9 +13,10 @@ export function liveInstructions(message, instructions) {
   return { ...message, params };
 }
 
-export function scopedLiveRequest(message, cwd, instructions) {
+export function scopedLiveRequest(message, cwd, instructions, serviceTier = fischCodexServiceTier()) {
   if (!['thread/start', 'thread/resume', 'thread/fork', 'turn/start'].includes(message.method)) return message;
   const params = { ...message.params, cwd };
+  if (message.method !== 'turn/start' && params.serviceTier == null) params.serviceTier = serviceTier;
   delete params.config; delete params.path; delete params.environment;
   if (message.method !== 'turn/start') {
     delete params.developerInstructions; delete params.baseInstructions;
@@ -58,7 +60,7 @@ export async function openCodexTransport({ host, args, cwd, env, instructions, o
   let child, client, closed = false, closing;
   const rpc = new LiveRequests(message => {
     if (closed || !child?.stdin.writable || child.stdin.writableLength > 1048576) throw Error('relay_unavailable');
-    child.stdin.write(JSON.stringify(scopedLiveRequest(message, cwd, instructions)) + '\n');
+    child.stdin.write(JSON.stringify(scopedLiveRequest(message, cwd, instructions, fischCodexServiceTier(env))) + '\n');
   });
   server.on('upgrade', (request, socket, head) => {
     const given = Buffer.from(request.headers.authorization ?? '');

@@ -37,7 +37,7 @@ async function observeMessage(state, message) {
 export async function createBridge({ live, host, cwd, env, configured, instructions }) {
   const state = { logs: [], projection: new PlaygroundProjection(), channel: { token: randomUUID(), stale: false } };
   state.output = new LiveOutput((thread, previous) => selectThread(state, thread, previous));
-  const original = liveCodexArguments(liveRoot, cwd), config = original.slice(original.indexOf('-c'));
+  const original = liveCodexArguments(liveRoot, cwd, env), config = original.slice(original.indexOf('-c'));
   try {
     state.transport = await openCodexTransport({ host, args: config, cwd, env, instructions,
       onEvent: message => observeMessage(state, message), onFailure: () => state.fail?.(1),

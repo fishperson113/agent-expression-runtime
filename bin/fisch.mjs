@@ -33,7 +33,8 @@ async function live(options) {
   const abort = new AbortController(), stop = () => abort.abort();
   process.once('SIGINT', stop); process.once('SIGTERM', stop);
   try {
-    const { ensureFischCodexLogin, prepareFischCodexRuntime } = await import('../integrations/fisch-codex-runtime.mjs');
+    const { ensureFischCodexLogin, prepareFischCodexRuntime, fischCodexServiceTier } = await import('../integrations/fisch-codex-runtime.mjs');
+    console.log(`Fisch Codex requested tier: ${fischCodexServiceTier()}. Priority may consume more usage; set FISCH_CODEX_SERVICE_TIER=default before launch for standard speed. Provider availability applies; failed turns are not retried automatically.`);
     const { codexCommand } = await import('../scripts/start-session.mjs');
     const codexHost = await codexCommand();
     await prepareFischCodexRuntime(codexHost, await ensureFischCodexLogin(codexHost, { signal: abort.signal }), { signal: abort.signal });

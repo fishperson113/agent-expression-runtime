@@ -442,3 +442,32 @@ isolated Live-owned session. Old Fisch lifecycle hooks can be removed with
 
 Isolation is not proof of better model latency. Compare identical prompts,
 tools, model settings and cache conditions before attributing timings to an OS.
+
+
+### Scoped Codex speed tier
+
+Native Fisch Live requests **priority** service for its interactive Codex thread
+and lets new turns inherit that tier. Explicit provider tier choices remain
+respected. This is a provider scheduling preference, not a guarantee of a
+particular latency. Priority can consume more plan usage or credits; provider
+availability and account limits still apply. The launcher prints the requested
+tier. The native thread response can report the effective tier; the Live UI
+does not currently display that confirmation.
+Global Codex settings, the separate observer and Desktop-attached sessions are unchanged.
+
+For standard speed or if your account/model rejects priority, stop Live and restart
+with `FISCH_CODEX_SERVICE_TIER=default`. In PowerShell:
+
+```powershell
+$env:FISCH_CODEX_SERVICE_TIER = 'default'
+fisch live
+```
+
+This process-local option also reaches the optional Herdr launcher. Remove the
+variable to restore priority. Invalid values stop startup rather than silently
+selecting another tier. Fisch surfaces provider errors and does not automatically
+replay a submitted turn: a timeout could already have applied a scene or tool.
+If a provider silently downgrades the tier, requested priority is not evidence of
+priority execution. Neither tier changes DSL geometry, ownership checks or model
+reasoning settings. Tests without video recording are the speed reference; a
+recording can itself slow this laptop substantially.
