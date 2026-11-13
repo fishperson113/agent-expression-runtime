@@ -400,3 +400,43 @@ it.each(['send-last', 'cancel-last'])('keeps send uncertainty when an overlappin
     expect(await panel.getByRole('button', { name: 'Gửi', exact: true }).isDisabled()).toBe(true);
   } finally { await page.close(); }
 }, 45000);
+it('updates streaming text in place without replacing history, selection or interpreting partial JSON', async () => {
+  const { page, panel } = await open();
+  try {
+    const result = await page.evaluate(base => {
+      const item = { id: 'answer', turn: 't', role: 'assistant', text: 'Hello', status: 'streaming', truncated: false };
+      const history = { ...item, id: 'history', text: 'Readable history', status: 'completed' };
+      window.conversation.project({ ...base, messages: [history, item] });
+      const list = document.querySelector('#conversation-test ol'), first = list.firstChild, answer = list.lastChild, text = answer.firstChild;
+      const range = document.createRange(); range.setStart(first.firstChild, 0); range.setEnd(first.firstChild, 8);
+      const selection = getSelection(); selection.removeAllRanges(); selection.addRange(range);
+      let creates = 0; const observer = new MutationObserver(records => { creates += records.filter(r => r.type === 'childList').length; });
+      observer.observe(list, { childList: true, subtree: true });
+      for (let i = 0; i < 30; i++) window.conversation.project({ ...base, revision: i + 2, messages: [history, { ...item, text: item.text + 'x'.repeat(i) }] });
+      const final = '{"type":"assemble","parts":[<img src=x onerror=alert(1)>';
+      window.conversation.project({ ...base, revision: 32, messages: [history, { ...item, text: final, status: 'completed' }] });
+      creates += observer.takeRecords().filter(r => r.type === 'childList').length; observer.disconnect();
+      return { stable: first === list.firstChild && answer === list.lastChild && text === answer.firstChild,
+        selection: selection.toString(), creates, final: answer.textContent.includes(final), images: list.querySelectorAll('img').length };
+    }, ready);
+    expect(result).toEqual({ stable: true, selection: 'Codex: R', creates: 0, final: true, images: 0 });
+    expect(await panel.locator('li').count()).toBe(2);
+  } finally { await page.close(); }
+}, 45000);
+
+it('keys rows by turn and generation while pruning history and rejecting stale snapshots', async () => {
+  const { page } = await open();
+  try {
+    expect(await page.evaluate(base => {
+      const item = { id: 'same', turn: 'a', role: 'assistant', text: 'First', status: 'completed', truncated: false };
+      const project = (revision, messages, generation = 1) => window.conversation.project({ ...base, revision, generation, messages });
+      project(1, [item]); const list = document.querySelector('#conversation-test ol'), first = list.firstChild;
+      project(2, [item, { ...item, turn: 'b', text: 'Second' }]); const second = list.lastChild;
+      project(3, [{ ...item, turn: 'b', text: 'Second' }]); const pruned = !first.isConnected && second === list.firstChild;
+      project(2, [item]); const stale = second === list.firstChild;
+      project(4, [{ ...item, turn: 'b', text: 'New generation' }], 2); const reset = second !== list.firstChild && !second.isConnected;
+      const current = list.firstChild; project(100, [item], 1);
+      return { pruned, stale, reset, oldGenerationIgnored: current === list.firstChild, rows: list.children.length };
+    }, ready)).toEqual({ pruned: true, stale: true, reset: true, oldGenerationIgnored: true, rows: 1 });
+  } finally { await page.close(); }
+}, 45000);

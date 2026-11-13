@@ -18,6 +18,10 @@ and unprivileged; a bounded public conversation brief is not full coding history
 - [LiveReactiveBroker](../../../integrations/live-reactive-broker.mjs) coordinates
   browser-authorized observer requests with the bounded context source.
 - [conversation view](../../../src/live/conversation-view.ts) renders panel chat.
+  Its `messageRows` reconciler retains DOM rows by generation/turn/item/role and
+  edits plaintext in place; it does not execute streamed JSON or tool arguments.
+  See [projection scope](../../chat-stream-projection.md) and
+  [view tests](../../../tests/conversation-view.test.mjs) for reading/selection checks.
 
 ## Connected to
 MAIN can author an expression; observer decisions still pass [Live body](live-body.md)
