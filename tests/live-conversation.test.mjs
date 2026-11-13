@@ -13,7 +13,7 @@ function fixture(options = {}) {
     output.request(message); broker.pending.set(message.id, {});
     calls.push({ message, guard, discard, resolve, reject });
   });
-  const transport = { submitUser: (p, g, d) => request('turn/start', p, g, d), interruptUser: (p, g, d) => request('turn/interrupt', p, g, d) };
+  const transport = { submitUser: (p, g, d) => request('turn/start', p, g, d), interruptUser: (p, g, d) => request('turn/interrupt', p, g, d), request: options.controllerRequest };
   conversation = new LiveConversation({ output, broker, transport, ...options });
   const event = message => { output.accept(message); conversation.accept(message); };
   const reply = (index, response) => {
@@ -749,4 +749,60 @@ it.each(['valid','unpaired','other-thread','wrong-tool','failed','cancel','selec
  expect(text.includes('"controllerEpoch":"scene-a"')).toBe(mode==='valid');
  expect(text.includes('controller_unavailable')).toBe(mode!=='valid');
  f.reply(index,{result:{turn:{id:'next-turn',status:'completed'}}});await next;
+});
+
+
+it.each(['valid','error','invalid','selection','navigation','close','epoch-change'])('host controller bootstrap stays fenced: %s', async mode => {
+  let resolve; const controllerRequest = vi.fn(() => new Promise(r => { resolve = r; }));
+  const f = fixture({controllerRequest}); f.conversation.holdControllerBootstrap();
+  expect(f.conversation.snapshot().canSend).toBe(false);
+  await expect(f.send()).rejects.toThrow('conversation_unavailable');
+  const boot = f.conversation.bootstrapController('thread-a');
+  expect(controllerRequest).toHaveBeenCalledWith('mcpServer/tool/call', {threadId:'thread-a',server:'fisch_live',tool:'inspect_expression',arguments:{}});
+  if(mode==='selection') f.select('thread-a');
+  if(mode==='navigation') f.conversation.navigation();
+  if(mode==='close') f.conversation.close();
+  const proof={source:'fisch-renderer',format:'structured',session:'own-controller',epoch:'scene-a'};
+  resolve(mode==='error'?{error:{code:-1}}:{result:{content:[{type:'text',text:JSON.stringify(mode==='invalid'?{}:proof)}]}});
+  expect(await boot).toBe(['valid','epoch-change'].includes(mode));
+  expect(f.conversation.snapshot().messages).toHaveLength(0);
+  if(['navigation','close'].includes(mode)) return;
+  const next=f.send('cup'), call=f.calls[0], source=hostScene();
+  if(mode==='epoch-change')source.scene.epoch='new-epoch';
+  f.conversation.prepareSceneContext(call.message.id,source);expect(call.guard(call.message)).toBe(true);
+  expect(call.message.params.input[1].text.includes('controller_unavailable')).toBe(mode!=='valid');
+  f.reply(0,{result:{turn:{id:'next',status:'completed'}}}); await next;
+});
+
+it.each(['reject', 'timeout'])('optional bootstrap releases composer and ignores late proof: %s', async mode => {
+  vi.useFakeTimers();
+  try {
+    let resolve;
+    const controllerRequest = () => mode === 'reject' ? Promise.reject(Error('unsupported')) : new Promise(r => { resolve = r; });
+    const f = fixture({ controllerRequest }); f.conversation.holdControllerBootstrap();
+    const boot = f.conversation.bootstrapController('thread-a');
+    if (mode === 'timeout') await vi.advanceTimersByTimeAsync(1500);
+    expect(await boot).toBe(false); expect(f.conversation.snapshot().canSend).toBe(true);
+    resolve?.({ result: { content: [{ type: 'text', text: JSON.stringify({ source: 'fisch-renderer', format: 'structured', session: 'own', epoch: 'scene-a' }) }] } });
+    await Promise.resolve();
+    const next = f.send('cup'), call = f.calls[0];
+    f.conversation.prepareSceneContext(call.message.id, hostScene()); expect(call.guard(call.message)).toBe(true);
+    expect(call.message.params.input[1].text).toContain('controller_unavailable');
+    f.reply(0, { result: { turn: { id: 'next', status: 'completed' } } }); await next;
+  } finally { vi.useRealTimers(); }
+});
+it('rejects bootstrap authority if an external turn becomes active', async () => {
+  let resolve; const f = fixture({ controllerRequest: () => new Promise(r => { resolve = r; }) });
+  f.conversation.holdControllerBootstrap(); const boot = f.conversation.bootstrapController('thread-a');
+  f.event({ method: 'turn/started', params: { threadId: 'thread-a', turn: { id: 'external', status: 'inProgress' } } });
+  resolve({ result: { content: [{ type: 'text', text: JSON.stringify({ source: 'fisch-renderer', format: 'structured', session: 'own', epoch: 'scene-a' }) }] } });
+  expect(await boot).toBe(false); expect(f.conversation.snapshot().canSend).toBe(false);
+});
+
+it('does not inspect an already active resumed turn', async () => {
+  const controllerRequest = vi.fn(); const f = fixture({ controllerRequest });
+  f.event({ method: 'turn/started', params: { threadId: 'thread-a', turn: { id: 'active', status: 'inProgress' } } });
+  f.conversation.holdControllerBootstrap();
+  expect(await f.conversation.bootstrapController('thread-a')).toBe(false);
+  expect(controllerRequest).not.toHaveBeenCalled();
 });

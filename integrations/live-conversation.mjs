@@ -1,4 +1,4 @@
-import { sceneContextInput, sceneAuthorityReceipt } from './chat-scene-context.mjs';
+import { sceneContextInput, sceneAuthorityReceipt, controllerAuthorityReceipt } from './chat-scene-context.mjs';
 import { validCameraJpeg } from './chat-camera-image.mjs';
 import { randomUUID } from 'node:crypto';
 
@@ -39,8 +39,30 @@ function acceptedExpression(item) {
 }
 
 export class LiveConversation {
-  #sceneAuthority; #sceneCalls = new Map();
+  #sceneAuthority; #sceneCalls = new Map(); #controllerBootstrap = false;
   #clearSceneAuthority() { this.#sceneAuthority = undefined; this.#sceneCalls.clear(); }
+  holdControllerBootstrap() { this.#controllerBootstrap = true; }
+  async bootstrapController(threadId) {
+    this.#sync();
+    const scope = { thread: this.#thread, generation: this.#generation, intent: this.#intent }; let timer;
+    try {
+      if (!this.#controllerBootstrap || !this.#available() || scope.thread !== threadId || this.#output.selection !== undefined || this.#owner()) return false;
+      const reply = await Promise.race([
+        this.#transport.request('mcpServer/tool/call', { threadId, server: 'fisch_live', tool: 'inspect_expression', arguments: {} }),
+        new Promise(resolve => { timer = setTimeout(() => resolve(null), 1500); }),
+      ]);
+      if (!reply) return false;
+      this.#sync();
+      if (!this.#available() || this.#thread !== scope.thread || this.#generation !== scope.generation ||
+          this.#intent !== scope.intent || this.#output.selection !== undefined || this.#owner()) return false;
+      const proof = !reply.error && controllerAuthorityReceipt(reply.result);
+      if (!proof) return false;
+      this.#sceneAuthority = proof;
+      return true;
+    } catch { return false; }
+    finally { clearTimeout(timer); this.#controllerBootstrap = false; }
+  }
+
   #expressionRetries = new Set();
   #observer; #observerRevision = 0; #replyCandidate; #now;
   #output; #transport; #broker; #captureObservation; #thread; #selection; #generation = 0; #revision = 0;
@@ -148,7 +170,7 @@ export class LiveConversation {
     return ready;
   }
   #canSend() {
-    return this.#available() && this.#output.selection === undefined && !this.#pending &&
+    return this.#available() && !this.#controllerBootstrap && this.#output.selection === undefined && !this.#pending &&
       !this.#unknown.has(this.#thread) && this.#unknown.size < 64 && !this.#output.turn && !this.#broker.busy();
   }
   async #captureContext(job, userText) {

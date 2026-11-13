@@ -81,9 +81,11 @@ export async function runPanelCodex({ live, cwd, signal, host: suppliedHost, rea
       navigation: () => { state.channel.stale = true; state.channel.token = undefined; state.conversation.navigation(); try { client?.close(); } catch { state.fail(1); } } });
     await bindControls(live, state, value => client?.respond(value) ?? Promise.reject(Error('panel_not_ready')));
     await state.publishSetup('waiting', state.channel.token); await panelPublication(state, { type: 'mode' });
+    state.conversation.holdControllerBootstrap();
     client = await clientFactory({ url: state.transport.url, token: state.transport.token, cwd, resumeThreadId,
       onControl: value => { void panelPublication(state, value); }, onFailure: () => state.fail(1) });
     if (state.output.thread !== client.threadId) throw Error('panel_thread_not_selected');
+    await state.conversation.bootstrapController(client.threadId);
     await state.publishSetup('connected');
     await panelPublication(state, { type: 'ready', threadId: client.threadId });
     timer = startLivePolling(live, state, () => state.fail(1));

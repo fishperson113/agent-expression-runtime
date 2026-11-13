@@ -1,4 +1,7 @@
-import { nativeLiveInstructions } from '../integrations/live-instruction-bundle.mjs';
+import { compositionTool } from '../integrations/compose-expression.mjs';
+import { liveToolDefinitions } from '../integrations/live-tools.mjs';
+import { expressionStatusTool } from '../integrations/expression-status.mjs';
+import { nativeLiveInstructions, nativeToolManifest } from '../integrations/live-instruction-bundle.mjs';
 import { capabilityResource } from '../integrations/capability-contract.mjs';
 import { it, expect, vi } from 'vitest';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
@@ -20,7 +23,7 @@ function panelPage() {
   return { bindings, controls, snapshots, page, frame };
 }
 it('boots a selected panel thread and submits browser text through the same canonical transport without a terminal', async () => {
-  const script = `let buffer='';process.stdin.on('data',chunk=>{buffer+=chunk;let n;while((n=buffer.indexOf('\\n'))>=0){const m=JSON.parse(buffer.slice(0,n));buffer=buffer.slice(n+1);const send=v=>process.stdout.write(JSON.stringify(v)+'\\n');if(m.method==='initialize')send({id:m.id,result:{}});if(m.method==='thread/start')send({id:m.id,result:{thread:{id:'panel-thread'}}});if(m.method==='turn/start'){send({id:m.id,result:{turn:{id:'panel-turn',status:'inProgress'}}});send({method:'turn/started',params:{threadId:'panel-thread',turn:{id:'panel-turn'}}});for(let i=0;i<8;i++)send({method:'item/started',params:{threadId:'panel-thread',turnId:'panel-turn',item:{id:'tool-'+i,type:'mcpToolCall',server:'fisch_live',tool:'observe',status:'inProgress'}}});send({method:'item/agentMessage/delta',params:{threadId:'panel-thread',turnId:'panel-turn',itemId:'answer',delta:'Canonical fixture reply'}});send({method:'turn/completed',params:{threadId:'panel-thread',turn:{id:'panel-turn',status:'completed'}}});}}});`;
+  const script = `let buffer='';process.stdin.on('data',chunk=>{buffer+=chunk;let n;while((n=buffer.indexOf('\\n'))>=0){const m=JSON.parse(buffer.slice(0,n));buffer=buffer.slice(n+1);const send=v=>process.stdout.write(JSON.stringify(v)+'\\n');if(m.method==='initialize')send({id:m.id,result:{}});if(m.method==='thread/start')send({id:m.id,result:{thread:{id:'panel-thread'}}});if(m.method==='mcpServer/tool/call')send({id:m.id,error:{code:-32601,message:'fixture unsupported'}});if(m.method==='turn/start'){send({id:m.id,result:{turn:{id:'panel-turn',status:'inProgress'}}});send({method:'turn/started',params:{threadId:'panel-thread',turn:{id:'panel-turn'}}});for(let i=0;i<8;i++)send({method:'item/started',params:{threadId:'panel-thread',turnId:'panel-turn',item:{id:'tool-'+i,type:'mcpToolCall',server:'fisch_live',tool:'observe',status:'inProgress'}}});send({method:'item/agentMessage/delta',params:{threadId:'panel-thread',turnId:'panel-turn',itemId:'answer',delta:'Canonical fixture reply'}});send({method:'turn/completed',params:{threadId:'panel-thread',turn:{id:'panel-turn',status:'completed'}}});}}});`;
   const { bindings, controls, snapshots, page, frame } = panelPage(), abort = new AbortController();
   const run = runPanelCodex({ live: { page, base: 'http://127.0.0.1:1', token: 'fixture' }, cwd: process.cwd(),
     signal: abort.signal, reactiveProvider: null, host: { command: process.execPath, args: ['-e', script, '--'] } });
@@ -87,5 +90,15 @@ it('preloads exact static resources without claiming live state or changing stan
   }
   expect(instructions).toContain('NOT current scene, ownership, camera state or execution evidence');
   expect(instructions).toContain('without an observe prerequisite');
-  expect(instructions.length - authored.length).toBeLessThan(14000);
+  expect(instructions.length - authored.length - nativeToolManifest().length).toBeLessThan(14000);
+});
+
+it('supplies exact installed schemas once without granting scene authority', () => {
+  const manifest = nativeToolManifest();
+  const data = JSON.parse(manifest.slice(manifest.indexOf('[{')));
+  expect(data).toEqual([compositionTool, liveToolDefinitions().find(t => t.name === 'inspect_expression'), expressionStatusTool]
+    .map(t => ({ ...t, callable: 'tools.mcp__fisch_live__' + t.name })));
+  expect(nativeLiveInstructions().split('## Installed Fisch tool manifest')).toHaveLength(2);
+  expect(manifest).toContain('not current state or authority');
+  expect(manifest).toContain('If actual contract mismatches');
 });
