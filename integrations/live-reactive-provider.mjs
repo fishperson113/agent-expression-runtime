@@ -32,7 +32,8 @@ export function createLiveReactiveProvider(env = process.env, { fetch, now = Dat
   if (config.native) {
     const policy = { deadlineMs: Number(env.FISCH_REACTIVE_DEADLINE_MS ?? 60000), cooldownMs: Number(env.FISCH_REACTIVE_COOLDOWN_MS ?? 15000), maxPerMinute: Number(env.FISCH_REACTIVE_MAX_PER_MINUTE ?? 4) };
     if (!Number.isInteger(policy.deadlineMs) || policy.deadlineMs < 5000 || policy.deadlineMs > 90000 || !Number.isInteger(policy.cooldownMs) || policy.cooldownMs < 1000 || policy.cooldownMs > 60000 || !Number.isInteger(policy.maxPerMinute) || policy.maxPerMinute < 1 || policy.maxPerMinute > 4) return { provider: null, reason: 'invalid_provider_config' };
-    const provider = new NativeReactionProvider({ model: config.model, reserve: ({ requestId }) => { reserve(requestId); return true; } });
+    const provider = new NativeReactionProvider({ model: config.model, reserve: ({ requestId }) => { reserve(requestId); return true; } }, { env });
+    Object.defineProperty(provider, 'environment', { enumerable: false });
     provider.conversationLane = true; provider.contractVersion = 1; provider.policy = Object.freeze(policy);
     return { provider, reason: 'ready_native_conversation' };
   }

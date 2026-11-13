@@ -420,3 +420,25 @@ cold tool initialization. Connection, protocol initialization and ordinary reque
 retain their 10-second limits. A timeout does not retry or create another thread;
 stopping Live cancels the pending request. This startup allowance does not change
 model response latency or expression execution deadlines.
+
+## Dedicated Codex runtime
+
+Live stores its own Codex home in the OS user-data directory under `fisch/codex`.
+`FISCH_CODEX_HOME` can select another dedicated directory, not the global home.
+The first launch prints an official device login; subsequent launches reuse
+that scoped login without copying global credentials.
+
+Panel, terminal and Herdr sessions use a clean workspace inside that home,
+while the owned observation worker uses its own temporary workspace with the same
+scoped Codex home. Hooks, plugins, app connectors and host
+skill discovery are disabled; project instructions are not loaded. Only the
+Fisch MCP integration is supplied. Thread requests cannot override the runtime
+cwd or add configuration. Do not install custom skills or hooks in this home.
+Development harness rules still apply when editing the repository.
+
+Desktop-attached mode uses an external user-owned Codex session, not an
+isolated Live-owned session. Old Fisch lifecycle hooks can be removed with
+`fisch hooks uninstall codex`; unrelated provider and my-harness hooks remain.
+
+Isolation is not proof of better model latency. Compare identical prompts,
+tools, model settings and cache conditions before attributing timings to an OS.

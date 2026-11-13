@@ -6,9 +6,21 @@ import { stopChild } from '../scripts/start-session.mjs';
 import { closeLiveOwned } from './live-shutdown.mjs';
 
 export function liveInstructions(message, instructions) {
-  if (!['thread/start', 'thread/resume'].includes(message.method)) return message;
+  if (!['thread/start', 'thread/resume', 'thread/fork'].includes(message.method)) return message;
   const params = { ...message.params }, existing = params.developerInstructions ?? '';
   params.developerInstructions = existing.includes('FISCH_LIVE_BODY') ? existing : existing + '\nFISCH_LIVE_BODY\n' + instructions;
+  return { ...message, params };
+}
+
+export function scopedLiveRequest(message, cwd, instructions) {
+  if (!['thread/start', 'thread/resume', 'thread/fork', 'turn/start'].includes(message.method)) return message;
+  const params = { ...message.params, cwd };
+  delete params.config; delete params.path; delete params.environment;
+  if (message.method !== 'turn/start') {
+    delete params.developerInstructions; delete params.baseInstructions;
+    delete params.skillRoots; delete params.dynamicTools;
+    return liveInstructions({ ...message, params }, instructions);
+  }
   return { ...message, params };
 }
 
@@ -46,7 +58,7 @@ export async function openCodexTransport({ host, args, cwd, env, instructions, o
   let child, client, closed = false, closing;
   const rpc = new LiveRequests(message => {
     if (closed || !child?.stdin.writable || child.stdin.writableLength > 1048576) throw Error('relay_unavailable');
-    child.stdin.write(JSON.stringify(message) + '\n');
+    child.stdin.write(JSON.stringify(scopedLiveRequest(message, cwd, instructions)) + '\n');
   });
   server.on('upgrade', (request, socket, head) => {
     const given = Buffer.from(request.headers.authorization ?? '');
