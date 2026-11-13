@@ -1,3 +1,4 @@
+import { createLiveReactiveProvider } from '../integrations/live-reactive-provider.mjs';
 import { createLivePane } from '../integrations/live-launch.mjs';
 import { it, expect } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -76,4 +77,15 @@ it('forwards a custom dedicated Codex home to the Herdr child', async () => {
     }, { cwd: '/project', workspace_id: 'work' }, 'http://127.0.0.1', 'test');
     expect(calls[0].params.env.FISCH_CODEX_HOME).toBe('/custom/fisch');
   } finally { if (previous === undefined) delete process.env.FISCH_CODEX_HOME; else process.env.FISCH_CODEX_HOME = previous; }
+});
+
+it('does not serialize the observation worker environment into provider status', () => {
+  const home = mkdtempSync(join(tmpdir(), 'fisch-provider-'));
+  try {
+    const value = createLiveReactiveProvider({ XDG_DATA_HOME: home, LOCALAPPDATA: home }, { defaultNative: true });
+    expect(value.provider).toBeTruthy();
+    expect(Object.keys(value.provider)).not.toContain('environment');
+    expect(JSON.parse(JSON.stringify(value)).provider.environment).toBeUndefined();
+    value.provider.close();
+  } finally { rmSync(home, { recursive: true, force: true }); }
 });
