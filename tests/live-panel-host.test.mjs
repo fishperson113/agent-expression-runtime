@@ -53,6 +53,8 @@ it('delivers contextual restraint to app-server thread initialization and fences
       expect(request.developerInstructions).toContain(nativeLiveInstructions());
       expect(request.developerInstructions).toContain('For ordinary chat, default to subtle expression');
       expect(request.developerInstructions).toContain('not keywords, a fixed emotion table');
+      expect(request.developerInstructions).toContain('Adding a conversational prop normally keeps the current body');
+      expect(request.developerInstructions).toContain('ask one short clarifying question');
       expect(request.developerInstructions).not.toContain('rather than relying on the local mouth indicator');
     }, { timeout: 5000 });
   }

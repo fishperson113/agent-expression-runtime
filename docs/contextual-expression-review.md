@@ -26,6 +26,10 @@ actual body video; review contextual fit rather than counting successful calls.
 | Relevant non-avatar scene, then thanks | Do not force a face reset merely because the next response is ordinary chat. |
 | Explicit keep/edit request, then observer event | Preserve authored work and ownership; no unsolicited transient flag or replacement. |
 | Disposable illustration becomes misleading after a topic change | Choose continuity deliberately; restraint must not strand an irrelevant scene forever. |
+| Add a prop beside the canonical body | Keep the body, choose the canonical base intentionally; a standalone prop should not accidentally erase it. |
+| Add/edit a prop in a custom moving scene | Retain known complete parts, IDs and motion/track data; do not swap in the canonical face or invent unavailable geometry. |
+| Ambiguous location, then an explicit location | Ask briefly first when unresolved; then move only the intended object. A resolved reference needs no redundant question. |
+| Intentionally transform the whole body | Preserve freedom to become a non-avatar form; additive restraint is not a permanent face requirement. |
 | Stop/motion-off, then conversation | Never defeat the control to satisfy the expression preference. |
 
 Human review should record appropriateness, distraction, continuity and whether
@@ -41,3 +45,9 @@ initialization tests preserve the standalone instruction bundle. These assertion
 prove delivery and absence of the contradictory mouth-indicator instruction,
 not that Codex obeys the guidance or that the experience is good. Real-model
 conversation and owner review remain required for behavioral acceptance.
+
+Additive/spatial guidance follows a native QA observation: a prop-only composition
+with omitted base replaced the body, and an unresolved spatial reference was
+guessed. These motivate review cases, not a fixed phrase mapping. Delivery/schema
+tests do not establish that the model now preserves identity or asks appropriately;
+repeat real-model conversations and inspect actual video before claiming that.

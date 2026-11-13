@@ -49,7 +49,11 @@ it('rejects invalid composition and stale epoch through actual MCP before any ga
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const client = liveTestClient(`http://127.0.0.1:${server.address().port}`, 'synthetic-compose-test-only');
   try {
-    const list = await client.call('tools/list'); expect(list.tools.some(t => t.name === 'compose_expression')).toBe(true);
+    const list = await client.call('tools/list');
+    const tool = list.tools.find(t => t.name === 'compose_expression');
+    expect(tool.description).toContain('standalone replacement, not append');
+    expect(tool.description).toContain('stable IDs and motion/track data');
+    expect(tool.description).toContain('Clarify unresolved spatial references');
     const invalid = await client.tool('compose_expression', { base: 'resting_face', parts: [{ ...part(), id: 'mouth' }] });
     expect(invalid.isError).toBe(true); expect(invalid.content[0].text).toContain('composition_part_collision'); expect(requests).toBe(0);
     const stale = await client.tool('compose_expression', { parts: [part()], expectedEpoch: 'retired' });
