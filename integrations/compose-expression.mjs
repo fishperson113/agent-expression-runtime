@@ -27,7 +27,7 @@ export const compositionSchema = {
       'xyz.',
       'color overrides global; omit to inherit.',
     ].join(' ') },
-    base: { enum: ['none', 'resting_face'], default: 'none', description: `none replaces body; resting_face adds ${face.parts.length} canonical parts within ${limits.assembly.parts} total. IDs must not collide; not current scene.` },
+    base: { enum: ['none', 'resting_face', 'current_scene'], default: 'none', description: `none replaces; resting_face adds ${face.parts.length} canonical parts; current_scene adds (MAIN). Max ${limits.assembly.parts} parts, unique IDs.` },
     durationMs: { ...node('assemble').properties.durationMs, default: 600 },
     easing: node('assemble').properties.easing,
     observerContext: { ...contextSchema, description: 'MAIN brief; quiet pauses observer, no geometry authority.' },
@@ -105,7 +105,7 @@ function compositionInputError(input) {
 }
 const validateProgram = ajv.compile({ $defs: protocol.$defs, $ref: '#/$defs/node' });
 export const compositionTool = { name: 'compose_expression',
-  description: `Author a new particle silhouette or spatial composition from your own geometry (v1, base ${compositionContract.baseFingerprint.slice(0, 12)}). Omitted base means standalone replacement, not append. For additive props preserve the intended body: explicit resting_face includes only the canonical avatar, not a custom moving body; for authored scenes submit the known complete parts with stable IDs and motion/track data. Do not reconstruct unavailable geometry from summaries. Whole-body transformation remains valid when intentional. Clarify unresolved spatial references before choosing a side. Freely choose RGB and bounded motion. Ellipsoid scale is at least 0.02 on every axis, including thin depth; use curves or patches for thinner features. Share rigid tracks via tracks[{group,pivot,keyframes}] and part.trackRef=group; or inline trajectory. No motion with either. Track groups must be unique. For ordinary conversational illustrations choose transient:true, even when asked for a new picture; omit/false when the user explicitly asks to keep or edit the scene. No semantic presets. Use express for existing-part gestures or advanced choreography; retaining the current form/no new call can be appropriate. Same admission/status/cancel contract as express; ACK is not completion or recognition.`,
+  description: `For an ordinary conversational prop/illustration, prefer current_scene to retain the current body unless whole-body transformation is intended. Author a particle silhouette or spatial composition from your own geometry (v1, base ${compositionContract.baseFingerprint.slice(0, 12)}). Omitted base means standalone replacement, not append. For additive props prefer current_scene: send only new parts; the MAIN host retains its current authored body with stable IDs and motion/track data. The ${limits.assembly.parts}-part limit includes retained parts. Reuse known capacity; otherwise inspect_expression gives current part IDs (observe does not). On scene_append_part_limit_remaining_N, simplify only NEW parts to fit N, never replace the retained body as a fallback. Busy/unavailable scenes or collisions reject without replacement. resting_face includes only the canonical avatar, not a custom moving body. Do not reconstruct unavailable geometry from summaries. Whole-body transformation remains valid when intentional. Clarify unresolved spatial references before choosing a side. Freely choose RGB and bounded motion. Ellipsoid scale is at least 0.02 on every axis, including thin depth; use curves or patches for thinner features. Share rigid tracks via tracks[{group,pivot,keyframes}] and part.trackRef=group; or inline trajectory. No motion with either. Track groups must be unique. current_scene must omit transient:true and observerHandoffMs: additions do not grant observer ownership of the retained body. For replacement conversational illustrations choose transient:true, even when asked for a new picture; omit/false when the user explicitly asks to keep or edit the scene. No semantic presets. Use express for existing-part gestures or advanced choreography; retaining the current form/no new call can be appropriate. Same admission/status/cancel contract as express; ACK is not completion or recognition.`,
   annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false }, inputSchema: compositionSchema };
 function expansionError(code, details) { return Object.assign(Error(code), { details }); }
 function validateExpandedParts(base, authored) {
@@ -136,6 +136,7 @@ function expandTracks(args) {
 }
 export function composeExpression(input) {
   if (!validateInput(input)) throw compositionInputError(input);
+  if (input.base === 'current_scene' && (input.transient === true || input.observerHandoffMs !== undefined)) throw Error('scene_append_ownership');
   const args = structuredClone(input), base = args.base === 'resting_face' ? structuredClone(face.parts) : [];
   validateExpandedParts(base, args.parts);
   const parts = [...base, ...expandTracks(args)];
@@ -145,7 +146,7 @@ export function composeExpression(input) {
   if (args.flow) children.push({ type: 'flow', ...args.flow, durationMs, easing });
   const body = { type: 'parallel', children };
   if (!validateProgram(body)) throw Error('composition_program');
-  const output = args.observerHandoffMs === undefined && args.observerContext === undefined && args.transient !== true ? body : { type: 'live', program: body, configuration: { controls: [], poses: [], ...(args.transient === true ? { transient: true } : {}), lifetimeMs: Math.max(1000, durationMs), ...(args.observerHandoffMs === undefined ? {} : { observerHandoffMs: args.observerHandoffMs }), ...(args.observerContext === undefined ? {} : { observerContext: args.observerContext }) } };
+  const output = args.observerHandoffMs === undefined && args.observerContext === undefined && args.transient !== true && args.base !== 'current_scene' ? body : { type: 'live', program: body, configuration: { controls: [], poses: [], ...(args.base === 'current_scene' ? { sceneAppend: true } : {}), ...(args.transient === true ? { transient: true } : {}), lifetimeMs: Math.max(1000, durationMs), ...(args.observerHandoffMs === undefined ? {} : { observerHandoffMs: args.observerHandoffMs }), ...(args.observerContext === undefined ? {} : { observerContext: args.observerContext }) } };
   const result = { body: output, policy: 'replace', ...(args.requestId ? { requestId: args.requestId } : {}), ...(args.expectedEpoch ? { expectedEpoch: args.expectedEpoch } : {}) };
   if (Buffer.byteLength(JSON.stringify(result), 'utf8') > limits.limits.recordBytes - 512) throw Error('composition_bytes');
   return result;

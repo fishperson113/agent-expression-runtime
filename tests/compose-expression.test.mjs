@@ -54,6 +54,8 @@ it('rejects invalid composition and stale epoch through actual MCP before any ga
     expect(tool.description).toContain('standalone replacement, not append');
     expect(tool.description).toContain('stable IDs and motion/track data');
     expect(tool.description).toContain('Clarify unresolved spatial references');
+    expect(tool.description).toContain('24-part limit includes retained parts');
+    expect(tool.description).toContain('scene_append_part_limit_remaining_N');
     const invalid = await client.tool('compose_expression', { base: 'resting_face', parts: [{ ...part(), id: 'mouth' }] });
     expect(invalid.isError).toBe(true); expect(invalid.content[0].text).toContain('composition_part_collision'); expect(requests).toBe(0);
     const stale = await client.tool('compose_expression', { parts: [part()], expectedEpoch: 'retired' });
@@ -244,3 +246,35 @@ it('gives native authors the same trajectory units and timeline semantics as Liv
     'playback starts after assembly', 'runs once and holds its endpoint', 'Motion-off pauses'])
     expect(nativeVisualAuthoringGuide).toContain(phrase);
 });
+
+it('emits only the new parts with explicit host-side append intent and no inferred current scene', () => {
+  const input = { base: 'current_scene', parts: [part()], requestId: 'append-owned', expectedEpoch: 'test' };
+  const before = structuredClone(input), result = composeExpression(input);
+  expect(input).toEqual(before);
+  expect(result).toMatchObject({ policy: 'replace', requestId: 'append-owned', expectedEpoch: 'test',
+    body: { type: 'live', configuration: { sceneAppend: true, controls: [], poses: [] } } });
+  expect(result.body.program.children).toEqual([{ type: 'assemble', parts: [part()], durationMs: 600, easing: 'smoothstep' }]);
+  expect(composeExpression({ parts: [part()] })).toEqual(composeExpression({ base: 'none', parts: [part()] }));
+  const explicit = composeExpression({ ...input, style: { color: '#123456' }, flow: { field: 'pulse', strength: 0.1 } });
+  expect(explicit.body.configuration).toMatchObject({ sceneAppend: true });
+  for (const authority of [{ transient: true }, { observerHandoffMs: 1000 }])
+    expect(() => composeExpression({ ...input, ...authority })).toThrow('scene_append_ownership');
+  expect(explicit.body.program.children.map(child => child.type)).toEqual(['assemble', 'style', 'flow']);
+});
+
+it('forwards current_scene intent through actual MCP without expanding remembered geometry', async () => {
+  let forwarded;
+  const server = createServer((req, res) => {
+    if (req.url === '/v1/sessions') { res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ id: 's', epoch: 'e' })); return; }
+    if (req.method === 'DELETE') { res.writeHead(200).end('{}'); return; }
+    let body = ''; req.on('data', chunk => { body += chunk; });
+    req.on('end', () => { forwarded = JSON.parse(body); res.writeHead(500, { 'Content-Type': 'application/json' }).end('{}'); });
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const client = liveTestClient(`http://127.0.0.1:${server.address().port}`, 'synthetic-append-only');
+  try {
+    await client.tool('compose_expression', { base: 'current_scene', parts: [part()] });
+    expect(forwarded.body.configuration.sceneAppend).toBe(true);
+    expect(forwarded.body.program.children[0].parts).toEqual([part()]);
+  } finally { await client.close(); await new Promise(resolve => server.close(resolve)); }
+}, 15000);
