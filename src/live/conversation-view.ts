@@ -68,7 +68,39 @@ function messageText(item: Message) {
   const status: Record<string, string> = { streaming: 'Đang nhận', completed: 'Đã hoàn tất', interrupted: 'Đã ngắt', failed: 'Lượt lỗi', unknown: 'Chưa rõ kết quả' };
   return `${item.role === 'user' ? 'Bạn' : 'Codex'}: ${item.text}\n[${status[item.status]}${item.truncated ? ' · Đã rút gọn phần hiển thị' : ''}]`;
 }
+function updateMessageText(node: Text, text: string) {
+  const previous = node.data;
+  if (previous === text) return;
+  let start = 0, end = 0;
+  while (start < previous.length && start < text.length && previous[start] === text[start]) start++;
+  while (end < previous.length - start && end < text.length - start &&
+    previous[previous.length - end - 1] === text[text.length - end - 1]) end++;
+  node.replaceData(start, previous.length - start - end, text.slice(start, text.length - end));
+}
+function messageRows(list: HTMLOListElement) {
+  let rows = new Map<string, HTMLLIElement>();
+  return {
+    reconcile(next: Snapshot) {
+      const retained = new Map<string, HTMLLIElement>(), occurrences = new Map<string, number>();
+      let cursor = list.firstChild;
+      for (const item of next.messages) {
+        const identity = JSON.stringify([next.generation, item.turn, item.id, item.role]);
+        const occurrence = occurrences.get(identity) ?? 0; occurrences.set(identity, occurrence + 1);
+        const key = identity + ':' + occurrence;
+        let node = rows.get(key);
+        if (!node) { node = document.createElement('li'); node.append(document.createTextNode('')); }
+        updateMessageText(node.firstChild as Text, messageText(item));
+        if (node !== cursor) list.insertBefore(node, cursor);
+        cursor = node.nextSibling; retained.set(key, node);
+      }
+      for (const [key, node] of rows) if (!retained.has(key)) node.remove();
+      rows = retained;
+    },
+    clear() { rows.clear(); list.replaceChildren(); }
+  };
+}
 function messageProjection(list: HTMLOListElement) {
+  const rows = messageRows(list);
   const measure = () => ({ top: list.scrollTop, height: list.clientHeight, total: list.scrollHeight });
   let following = true, resizing = false, frame = 0, layout = measure();
   const settle = () => {
@@ -94,12 +126,11 @@ function messageProjection(list: HTMLOListElement) {
   list.addEventListener('scroll', capture); resize.observe(list);
   return {
     project(next: Snapshot) {
-      const before = capture(), texts = next.messages.map(messageText);
-      if (JSON.stringify([...list.children].map(node => node.textContent)) === JSON.stringify(texts)) return;
-      list.replaceChildren(...texts.map(text => { const node = document.createElement('li'); node.textContent = text; return node; }));
+      const before = capture();
+      rows.reconcile(next);
       list.scrollTop = following ? list.scrollHeight : before.top; layout = measure(); resizing = false;
     },
-    clear() { following = true; resizing = false; if (frame) cancelAnimationFrame(frame); frame = 0; list.replaceChildren(); layout = measure(); },
+    clear() { following = true; resizing = false; if (frame) cancelAnimationFrame(frame); frame = 0; rows.clear(); layout = measure(); },
     dispose() { resize.disconnect(); if (frame) cancelAnimationFrame(frame); list.removeEventListener('scroll', capture); for (const type of inputs) list.removeEventListener(type, readerScroll); }
   };
 }
