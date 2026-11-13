@@ -17,3 +17,5 @@ Validate relevant changes with `npm run check:architecture`, `npm test` and
 in README.md when native prerequisites are available. Report blocked checks.
 Keep generated smoke evidence out of tracked docs unless deliberately updating
 the validation record. Preserve existing provider hooks and status lines.
+
+For source ownership and change impact, start at [the ICM system map](docs/map/AGENTS.md).
