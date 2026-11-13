@@ -38,7 +38,8 @@ it('rejects collisions, invalid programs, unsupported context and expanded budge
   expect(()=>appendScene(record([part('prop')]),[])).toThrow('scene_append_unavailable');
   const nested=record([part('prop')]);nested.body.program.children.push({type:'wait',durationMs:1});
   expect(()=>appendScene(nested,base)).toThrow('scene_append_program');
-  expect(()=>appendScene(record([part('prop')]),Array.from({length:24},(_,i)=>part('p'+i)))).toThrow();
+  expect(()=>appendScene(record([part('prop')]),Array.from({length:24},(_,i)=>part('p'+i)))).toThrow('scene_append_part_limit_remaining_0');
+  expect(()=>appendScene(record(Array.from({length:8},(_,i)=>part('new'+i))),Array.from({length:18},(_,i)=>part('p'+i)))).toThrow('scene_append_part_limit_remaining_6');
   const track={group:'shared',pivot:[0,0,0],keyframes:[{atMs:0,translate:[0,0,0],rotate:[0,0,0]},{atMs:1000,translate:[1,0,0],rotate:[0,0,0]}]};
   const a={...part('a'),motion:undefined,trajectory:track} as Part, b={...a,id:'b'};
   expect(()=>appendScene(record([b]),[a])).toThrow('scene_append_track_collision');
@@ -106,4 +107,10 @@ it.each([{transient:true},{observerHandoffMs:1000}])('does not grant observer ow
   expect(f.send(input)).toMatchObject({status:'rejected',code:'scene_append_ownership'});
   f.advance(2000);expect(f.body.canReactive()).toBe(false);expect(f.body.userSceneOwned).toBe(true);
   expect(f.body.scheduler.sceneParts.map(p=>p.id)).toEqual(['custom']);f.body.dispose();
+});
+
+it('returns authoritative remaining capacity through host rejection without losing the scene',()=>{
+  const f=setup();expect(f.send(record(Array.from({length:18},(_,i)=>part('p'+i)),2,false)).status).toBe('accepted');f.advance(200);
+  expect(f.send(record(Array.from({length:8},(_,i)=>part('new'+i)),3))).toMatchObject({status:'rejected',code:'scene_append_part_limit_remaining_6'});
+  expect(f.body.scheduler.sceneParts).toHaveLength(18);f.body.dispose();
 });

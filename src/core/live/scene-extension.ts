@@ -1,3 +1,4 @@
+import { capability } from '../../primitives/registry';
 import type { Part } from '../geometry/types';
 import { validateSculpture } from '../geometry/validate';
 
@@ -10,6 +11,8 @@ export function appendScene(record: any, currentParts?: readonly Part[]) {
   if (shapes.length !== 1 || program.children.some((node: any) => !['assemble', 'style', 'flow'].includes(node?.type)))
     throw Error('scene_append_program');
   const authored = validateSculpture({ parts: shapes[0].parts }, '$.body.program.parts').parts;
+  const remaining = Math.max(0, capability.assembly.parts - currentParts.length);
+  if (authored.length > remaining) throw Error(`scene_append_part_limit_remaining_${remaining}`);
   const ids = new Set(currentParts.map(part => part.id));
   if (authored.some(part => ids.has(part.id))) throw Error('scene_append_collision');
   const groups = new Set(currentParts.flatMap(part => part.trajectory ? [part.trajectory.group] : []));
