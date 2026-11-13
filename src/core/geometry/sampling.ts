@@ -38,16 +38,16 @@ export function sculptureCloud(form: Sculpture, count: number): ParticleCloud {
   const topology = JSON.stringify(parts.map(p => [p.id, p.kind, p.weight ?? 1, p.kind === 'ellipsoid' ? 0 : p.points.length]));
   return { positions, partIndices, parts, topology };
 }
-export function motionTransforms(cloud: ParticleCloud, elapsed: number, trajectoryElapsed = elapsed) {
+export function motionTransforms(cloud: ParticleCloud, elapsed: number | number[], trajectoryElapsed: number | number[] = elapsed) {
   const groups = new Map<string, Float64Array>();
-  return cloud.parts.map(part => {
+  return cloud.parts.map((part, index) => {
     if (part.trajectory) {
       const track = part.trajectory;
-      if (!groups.has(track.group)) groups.set(track.group, trajectoryMatrix(track, trajectoryElapsed));
+      if (!groups.has(track.group)) groups.set(track.group, trajectoryMatrix(track, typeof trajectoryElapsed === 'number' ? trajectoryElapsed : trajectoryElapsed[index]));
       return groups.get(track.group)!;
     }
     if (!part.motion) return null;
-    const m = part.motion, wave = Math.sin(elapsed / m.periodMs * Math.PI * 2 + m.phase);
+    const m = part.motion, wave = Math.sin((typeof elapsed === 'number' ? elapsed : elapsed[index]) / m.periodMs * Math.PI * 2 + m.phase);
     const angles = m.rotate.map(x => x * wave) as Vec3;
     const [a, b, c] = [rotatePoint([1, 0, 0], angles), rotatePoint([0, 1, 0], angles), rotatePoint([0, 0, 1], angles)];
     const matrix = new Float64Array(12);

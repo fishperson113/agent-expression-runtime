@@ -3,6 +3,7 @@ import type { ParticleCloud, Sculpture, Vec3 } from './types';
 import { shapeBuffers } from './primitives';
 import { sculptureCloud, animatedPoint, motionTransforms, rotatePoint } from './sampling';
 import { spatialAssignment } from './assignment';
+import { canonical, incrementalAssignment, retainedParts } from './incremental';
 import type { PerformancePart } from '../runtime/presence';
 
 function performanceMatrix(part: PerformancePart) {
@@ -22,9 +23,11 @@ export class ParticleFormation {
   private cloud?: ParticleCloud;
   private mapping?: Uint32Array;
   private topology = '';
+  private retained = new Uint8Array(0);
+  private partMotion: number[] = [];
+  private partTrajectory: number[] = [];
+  private continuing: boolean[] = [];
   private motionAt = 0;
-  private motionElapsed = 0;
-  private trajectoryElapsed = 0;
   private trajectoryReady = false;
   private motionSpeed = 1;
   private quietAt?: number;
@@ -58,16 +61,30 @@ export class ParticleFormation {
       const cloud = typeof target === 'string'
         ? { positions: this.primitives[capability.shapes.indexOf(target)], parts: [], partIndices: new Uint8Array(this.count), topology: 'primitive:' + target }
         : sculptureCloud(target, this.count);
-      if (cloud.topology !== this.topology) this.mapping = spatialAssignment(this.from, cloud.positions);
+      this.prepareAssignment(cloud);
       for (let i = 0; i < this.count; i++) this.groups[i] = cloud.partIndices[this.mapping![i]] ?? 0;
       this.prepareColors(cloud);
       this.cloud = cloud; this.topology = cloud.topology; this.operation = operation;
-      this.motionAt = now; this.motionElapsed = 0; this.motionSpeed = 1; this.trajectoryElapsed = 0; this.trajectoryReady = false;
+      this.motionAt = now;
+      if (!this.continuing.some(Boolean)) this.motionSpeed = 1;
+      this.trajectoryReady = false;
     }
     this.progress = t;
     if (this.colors && this.fromColors && this.targetColors) for (let i = 0; i < this.colors.length; i++)
       this.colors[i] = this.fromColors[i] + (this.targetColors[i] - this.fromColors[i]) * t;
     this.sampledAt = NaN; this.tick(now);
+  }
+  private prepareAssignment(cloud: ParticleCloud) {
+    const previous = this.cloud;
+    const retained = previous && this.progress >= 1 && canonical(previous.parts) !== canonical(cloud.parts) ? retainedParts(previous, cloud) : cloud.parts.map(() => -1);
+    this.retained = new Uint8Array(this.count);
+    if (previous?.parts.length && cloud.parts.length && this.mapping) {
+      const result = incrementalAssignment(this.from!, previous, this.mapping, cloud, retained);
+      this.mapping = result.map; this.retained = result.fixed;
+    } else if (cloud.topology !== this.topology) this.mapping = spatialAssignment(this.from!, cloud.positions);
+    this.partMotion = retained.map(index => index < 0 ? 0 : this.partMotion[index]);
+    this.partTrajectory = retained.map(index => index < 0 ? 0 : this.partTrajectory[index]);
+    this.continuing = retained.map(index => index >= 0);
   }
   private prepareColors(cloud: ParticleCloud) {
     if (!this.colors && !cloud.parts.some(part => part.color !== undefined)) return;
@@ -90,13 +107,16 @@ export class ParticleFormation {
     else this.quietAt ??= now;
     const targetSpeed = this.quietAt !== undefined && now - this.quietAt > 30000 ? 0 : speed;
     this.motionSpeed += (targetSpeed - this.motionSpeed) * (1 - Math.exp(-dt / 2000));
-    this.motionElapsed += dt * (this.motionMode === 'off' ? 0 : this.motionSpeed);
-    if (this.trajectoryReady && this.motionMode !== 'off') this.trajectoryElapsed += dt;
+    const trajectoryReady = this.trajectoryReady;
     if (this.progress >= 1) this.trajectoryReady = true;
-    const matrices = motionTransforms(this.cloud, this.motionElapsed, this.trajectoryElapsed), target: Vec3 = [0, 0, 0];
+    for (let i = 0; i < this.partMotion.length; i++) {
+      this.partMotion[i] += dt * (this.motionMode === 'off' ? 0 : this.motionSpeed);
+      if ((this.continuing[i] || trajectoryReady) && this.motionMode !== 'off') this.partTrajectory[i] += dt;
+    }
+    const matrices = motionTransforms(this.cloud, this.partMotion, this.partTrajectory), target: Vec3 = [0, 0, 0];
     for (let i = 0; i < this.count; i++) {
       animatedPoint(this.cloud, this.mapping[i], matrices, target); const j = i * 3;
-      for (let k = 0; k < 3; k++) this.points[j + k] = this.from[j + k] + (target[k] - this.from[j + k]) * this.progress;
+      for (let k = 0; k < 3; k++) this.points[j + k] = this.from[j + k] + (target[k] - this.from[j + k]) * (this.retained[i] ? 1 : this.progress);
     }
   }
   freeze(now: number) {
@@ -106,7 +126,8 @@ export class ParticleFormation {
     this.cloud = { positions, parts: [], partIndices: new Uint8Array(this.count), topology: 'frozen' };
     this.from = positions; this.mapping = Uint32Array.from({ length: this.count }, (_, i) => i);
     this.operation = undefined; this.topology = 'frozen'; this.progress = 1;
-    this.groups.fill(0);
+    this.groups.fill(0); this.retained.fill(0);
+    this.partMotion = []; this.partTrajectory = []; this.continuing = [];
   }
   perform(parts: PerformancePart[]) {
     if (!this.points || !this.cloud || !parts.length) return this.displayed = this.points;
