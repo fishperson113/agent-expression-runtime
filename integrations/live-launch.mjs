@@ -63,6 +63,7 @@ export async function createLivePane(call, source, base, token) {
   const created = await call('tab.create', { workspace_id: source.workspace_id, cwd: workspace,
     label: 'Fisch Live', focus: true, env: { AER_BASE_URL: base, AER_PAIRING_TOKEN: token, FISCH_LIVE: '1',
       FISCH_PLANNER_BACKEND: 'off', FISCH_LIVE_WORKSPACE: workspace,
+      ...(process.env.FISCH_CODEX_SERVICE_TIER ? { FISCH_CODEX_SERVICE_TIER: process.env.FISCH_CODEX_SERVICE_TIER } : {}),
       ...(process.env.FISCH_CODEX_HOME ? { FISCH_CODEX_HOME: process.env.FISCH_CODEX_HOME } : {}) } });
   const { snapshot } = await call('session.snapshot');
   const pane = snapshot.panes.find(pane => pane.tab_id === created.tab.tab_id);

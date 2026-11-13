@@ -1,10 +1,11 @@
+import { liveCodexArguments } from '../scripts/live-codex.mjs';
 import { createLiveReactiveProvider } from '../integrations/live-reactive-provider.mjs';
 import { createLivePane } from '../integrations/live-launch.mjs';
 import { it, expect } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fischCodexRuntime, fischCodexArguments, ensureFischCodexLogin, prepareFischCodexRuntime } from '../integrations/fisch-codex-runtime.mjs';
+import { fischCodexRuntime, fischCodexArguments, fischCodexServiceTier, ensureFischCodexLogin, prepareFischCodexRuntime } from '../integrations/fisch-codex-runtime.mjs';
 import { scopedLiveRequest } from '../integrations/live-codex-transport.mjs';
 
 it('uses a dedicated workspace without inheriting global credentials or Codex overrides', () => {
@@ -88,4 +89,25 @@ it('does not serialize the observation worker environment into provider status',
     expect(JSON.parse(JSON.stringify(value)).provider.environment).toBeUndefined();
     value.provider.close();
   } finally { rmSync(home, { recursive: true, force: true }); }
+});
+
+it('uses priority only in Live configuration, with an explicit standard-speed opt-out', () => {
+  expect(fischCodexServiceTier({})).toBe('priority');
+  expect(fischCodexServiceTier({ FISCH_CODEX_SERVICE_TIER: 'default' })).toBe('default');
+  expect(() => fischCodexServiceTier({ FISCH_CODEX_SERVICE_TIER: 'invalid' })).toThrow('must be');
+  expect(liveCodexArguments('/root', '/work', {})).toContain('service_tier="priority"');
+  expect(liveCodexArguments('/root', '/work', { FISCH_CODEX_SERVICE_TIER: 'default' })).toContain('service_tier="default"');
+  expect(fischCodexArguments().some(value => value.includes('service_tier'))).toBe(false);
+});
+it.each(['thread/start', 'thread/resume', 'thread/fork'])('defaults %s tier but preserves an explicit provider choice', method => {
+  expect(scopedLiveRequest({ method, params: {} }, '/fisch', '', 'priority').params.serviceTier).toBe('priority');
+  expect(scopedLiveRequest({ method, params: {} }, '/fisch', '', 'default').params.serviceTier).toBe('default');
+  const input = { method, params: { serviceTier: 'default' } };
+  expect(scopedLiveRequest(input, '/fisch', '', 'priority').params.serviceTier).toBe('default');
+  expect(input.params).toEqual({ serviceTier: 'default' });
+});
+it('lets turns inherit the thread or explicitly override tier without automatic replay', () => {
+  const input = { method: 'turn/start', params: { threadId: 'same', serviceTier: 'default', serviceTierForTurn: 'priority' } };
+  expect(scopedLiveRequest(input, '/fisch', '', 'default').params).toEqual({ ...input.params, cwd: '/fisch' });
+  expect(scopedLiveRequest({ method: 'turn/start', params: {} }, '/fisch', '', 'priority').params).toEqual({ cwd: '/fisch' });
 });

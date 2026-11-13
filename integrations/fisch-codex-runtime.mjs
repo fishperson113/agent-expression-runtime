@@ -23,6 +23,12 @@ export function fischCodexRuntime(env = process.env, home = homedir()) {
   return { home: codexHome, cwd, env: { ...clean, CODEX_HOME: codexHome } };
 }
 
+export function fischCodexServiceTier(env = process.env) {
+  const tier = env.FISCH_CODEX_SERVICE_TIER ?? 'priority';
+  if (!['priority', 'default'].includes(tier)) throw Error('FISCH_CODEX_SERVICE_TIER must be priority or default.');
+  return tier;
+}
+
 export function fischCodexArguments() {
   return ['-c', 'mcp_servers={}', '-c', 'project_doc_max_bytes=0', '-c', 'developer_instructions=""', '-c', 'web_search="disabled"',
     '-c', 'features.skip_host_skill_discovery=true', '-c', 'features.omit_skill_descriptions=true',

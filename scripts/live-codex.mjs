@@ -1,11 +1,12 @@
-import { fischCodexRuntime, fischCodexArguments } from '../integrations/fisch-codex-runtime.mjs';
+import { fischCodexRuntime, fischCodexArguments, fischCodexServiceTier } from '../integrations/fisch-codex-runtime.mjs';
 import { spawn } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 import { codexCommand } from './start-session.mjs';
 
-export function liveCodexArguments(root, workspace = root) {
+export function liveCodexArguments(root, workspace = root, env = process.env) {
   return ['--no-daemon', '--no-alt-screen', '-C', workspace, ...fischCodexArguments(),
+    '-c', 'service_tier=' + JSON.stringify(fischCodexServiceTier(env)),
     '-c', 'mcp_servers.fisch_live.command=' + JSON.stringify(process.execPath.replaceAll('\\', '/')),
     '-c', 'mcp_servers.fisch_live.args=' + JSON.stringify([resolve(root, 'integrations/mcp-server.mjs').replaceAll('\\', '/')]),
     '-c', 'mcp_servers.fisch_live.env_vars=["AER_BASE_URL","AER_PAIRING_TOKEN","FISCH_LIVE"]',
