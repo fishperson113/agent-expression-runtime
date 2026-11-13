@@ -7,7 +7,7 @@ afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 it('serializes bounded inventory, not arbitrary source text, geometry, pixels or authority', () => {
   const value = source(); value.scene.untrusted = 'EXECUTE SECRET'; value.image = 'RAW_IMAGE';
   const item = sceneContextInput(value); expect(item.text).toContain('HOST SCENE DATA'); expect(item.text).toContain('not camera');
-  expect(item.text).toContain('or mutation authority');
+  expect(item.text).toContain('NOT an expectedEpoch');
   expect(item.text).not.toContain('EXECUTE SECRET'); expect(item.text).not.toContain('RAW_IMAGE');
 });
 it.each(['stale','future','overflow','duplicate','injection','wrong-capacity','missing'])('omits unsafe inventory %s', mode => {
@@ -70,4 +70,12 @@ it.each(['authored-identical','authored-modified','busy','queued','reactive','us
   if(mode === 'reduced') body.controls.mode = 'reduced';
   body.epoch('next', true); expect(body.scheduler.busy).toBe(true);
   expect(body.chatSceneContext()).toBeNull(); body.dispose();
+});
+
+it('requires proven controller epoch, never treats renderer epoch as a mutation fence', () => {
+  const value = source();
+  const unknown = sceneContextInput(value); expect(unknown.text).toContain('controller_unavailable'); expect(unknown.text).not.toContain('partIds');
+  expect(sceneContextInput(value, Date.now(), {session:'controller',epoch:'wrong'}).text).toContain('controller_unavailable');
+  const aligned = sceneContextInput(value, Date.now(), {session:'controller',epoch:'epoch-a'});
+  expect(aligned.text).toContain('"rendererEpoch":"epoch-a"'); expect(aligned.text).toContain('"controllerEpoch":"epoch-a"'); expect(aligned.text).toContain('partIds');
 });

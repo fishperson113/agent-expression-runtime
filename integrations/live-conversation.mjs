@@ -1,4 +1,4 @@
-import { sceneContextInput } from './chat-scene-context.mjs';
+import { sceneContextInput, sceneAuthorityReceipt } from './chat-scene-context.mjs';
 import { validCameraJpeg } from './chat-camera-image.mjs';
 import { randomUUID } from 'node:crypto';
 
@@ -39,6 +39,8 @@ function acceptedExpression(item) {
 }
 
 export class LiveConversation {
+  #sceneAuthority; #sceneCalls = new Map();
+  #clearSceneAuthority() { this.#sceneAuthority = undefined; this.#sceneCalls.clear(); }
   #expressionRetries = new Set();
   #observer; #observerRevision = 0; #replyCandidate; #now;
   #output; #transport; #broker; #captureObservation; #thread; #selection; #generation = 0; #revision = 0;
@@ -83,14 +85,14 @@ export class LiveConversation {
       assistantReply: { messageId: reply.messageId, text: reply.text, truncated: reply.truncated } });
   }
   #clear() {
-    this.#clearObserver();
+    this.#clearSceneAuthority(); this.#clearObserver();
     this.#ownedContexts.clear(); this.#expressionRetries.clear(); this.#expressionFailureTurn = undefined; this.#terminal.clear(); this.#messages = []; this.#stopping = this.#stopErrorTurn = undefined; this.#error = '';
     this.#generation++; this.#revision++;
   }
   #sync() {
     if (this.#output.selection !== this.#selection) {
       this.#selection = this.#output.selection;
-      if (this.#selection !== undefined) { this.#clearObserver(); this.#intent++; this.#revision++; }
+      if (this.#selection !== undefined) { this.#clearSceneAuthority(); this.#clearObserver(); this.#intent++; this.#revision++; }
     }
     if (this.#thread !== this.#output.thread) { this.#thread = this.#output.thread; this.#clear(); }
     const owner = this.#owner();
@@ -108,7 +110,7 @@ export class LiveConversation {
     if (['turn/start', 'turn/steer', 'turn/interrupt'].includes(message?.method) &&
       (this.#pending?.rpcId === undefined || message.id !== this.#pending.rpcId)) this.#clearObserver();
   }
-  selectionAttempt() { this.#clearObserver(); this.#intent++; this.#revision++; }
+  selectionAttempt() { this.#clearSceneAuthority(); this.#clearObserver(); this.#intent++; this.#revision++; }
   navigation() { this.#navigated = true; this.#clear(); this.#error = 'conversation_restart_required'; }
   transportLost() {
     const messages = this.#messages.map(value => ({ ...value, status: value.status === 'streaming' ? 'unknown' : value.status }));
@@ -140,7 +142,7 @@ export class LiveConversation {
       ![...(this.#broker.pending?.keys() ?? [])].some(key => key !== message?.id) &&
       !(this.#broker.queue ?? []).some(value => value.id !== message?.id);
     if (ready && job.sceneSource) {
-      job.sceneItem = sceneContextInput(job.sceneSource);
+      job.sceneItem = sceneContextInput(job.sceneSource, Date.now(), this.#sceneAuthority);
       if (job.sceneItem) message.params.input.push(job.sceneItem);
     }
     return ready;
@@ -214,6 +216,7 @@ export class LiveConversation {
   }
   prepareSceneContext(rpcId, source) {
     const job = this.#pending;
+    if (this.#sceneAuthority && source?.scene?.epoch !== this.#sceneAuthority.epoch) this.#clearSceneAuthority();
     if (job?.rpcId === rpcId) job.sceneSource = source;
   }
   fenceObservation(rpcId, currentScope) {
@@ -230,7 +233,7 @@ export class LiveConversation {
     this.#broker.pending?.delete(key); this.#output.turnRequests?.delete(key);
   }
   async cancel(value) {
-    this.#clearObserver(); this.#sync(); const turn = this.#owner();
+    this.#clearSceneAuthority(); this.#clearObserver(); this.#sync(); const turn = this.#owner();
     if (!turn || value?.generation !== this.#generation) throw failure('conversation_no_turn');
     if (this.#stopping?.turn === turn) return Object.freeze({ status: 'stopping' });
     if (this.#stopErrorTurn === turn && this.#error === 'conversation_stop_unconfirmed') {
@@ -278,8 +281,10 @@ export class LiveConversation {
     if (method === 'turn/completed' && id(params.turn?.id) && this.#output.completed?.has(params.turn.id)) {
       if (this.#terminal.has(params.turn.id)) return;
       this.#terminal.add(params.turn.id);
+      for (const [key, call] of this.#sceneCalls) if (call.turn === params.turn.id) this.#sceneCalls.delete(key);
       if (this.#terminal.size > 64) this.#terminal.delete(this.#terminal.values().next().value);
       const status = ['completed', 'interrupted', 'failed'].includes(params.turn.status) ? params.turn.status : 'unknown';
+      if (status !== 'completed') this.#clearSceneAuthority();
       if (status !== 'completed' && (this.#observer?.turnId === params.turn.id || this.#pending?.observerTurnId === params.turn.id)) this.#clearObserver();
       for (const item of this.#messages) if (item.turn === params.turn.id && item.status === 'streaming') item.status = status;
       if (status === 'completed' && this.#replyCandidate?.turnId === params.turn.id) {
@@ -295,6 +300,21 @@ export class LiveConversation {
     if (['item/started', 'item/completed'].includes(method)) this.#item(params.item, turn, method === 'item/completed');
   }
   #item(item, turn, completed) {
+    if (item?.type === 'mcpToolCall' && item.server === 'fisch_live' && id(item.id)) {
+      if (item.tool === 'cancel_expression') this.#clearSceneAuthority();
+      if (!this.#stopping && ['inspect_expression','compose_expression','express'].includes(item.tool)) {
+        if (!completed && item.status === 'inProgress' && this.#sceneCalls.size < 32)
+          this.#sceneCalls.set(item.id, {turn,tool:item.tool,generation:this.#generation,intent:this.#intent});
+        if (completed) {
+          const call = this.#sceneCalls.get(item.id); this.#sceneCalls.delete(item.id);
+          if (call?.turn === turn && call.tool === item.tool && call.generation === this.#generation && call.intent === this.#intent) {
+            const proof = sceneAuthorityReceipt(item);
+            if (proof) this.#sceneAuthority = proof;
+            else this.#clearSceneAuthority();
+          }
+        }
+      }
+    }
     if (item?.type === 'mcpToolCall' && item.server === 'fisch_live' && recoveringTools.has(item.tool) &&
         id(item.id) && this.#expressionFailureTurn === turn && this.#error === 'conversation_expression_failed') {
       if (!completed && item.status === 'inProgress' && this.#expressionRetries.size < 32) this.#expressionRetries.add(item.id);

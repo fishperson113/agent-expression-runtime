@@ -731,3 +731,22 @@ it.each(['navigation','close','selection'])('does not forward scene context afte
  if(mode==='navigation')f.conversation.navigation();if(mode==='close')f.conversation.close();if(mode==='selection')f.conversation.selectionAttempt();
  expect(call.guard(call.message)).toBe(false);f.fail(0,false);await expect(pending).rejects.toThrow();
 });
+
+const proofEvent = (f, completed, extra = {}) => f.event({method:completed?'item/completed':'item/started',params:{threadId:'thread-a',turnId:'proof-turn',...extra,
+ item:{type:'mcpToolCall',id:'inspect-one',server:'fisch_live',tool:'inspect_expression',status:completed?'completed':'inProgress',
+ result:completed?{content:[{type:'text',text:JSON.stringify({source:'fisch-renderer',format:'structured',session:'own-controller',epoch:'scene-a'})}]}:null,...extra.item}}});
+it.each(['valid','unpaired','other-thread','wrong-tool','failed','cancel','selection','epoch-change'])('scene controller proof is scoped: %s', async mode => {
+ const f=fixture(), pending=f.send('hello'); f.reply(0,{result:{turn:{id:'proof-turn',status:'inProgress'}}}); await pending;
+ if(mode!=='unpaired') proofEvent(f,false);
+ if(mode==='cancel') { const cancelled=f.conversation.cancel({generation:f.conversation.snapshot().generation});f.reply(1,{result:{}});await cancelled; }
+ if(mode==='selection') f.select('thread-a');
+ proofEvent(f,true, mode==='other-thread'?{threadId:'other'}:mode==='wrong-tool'?{item:{tool:'compose_expression'}}:mode==='failed'?{item:{status:'failed'}}:{});
+ f.event({method:'turn/completed',params:{threadId:'thread-a',turn:{id:'proof-turn',status:mode==='cancel'?'interrupted':'completed'}}});
+ const next=f.send('cup'), index=f.calls.length-1, call=f.calls[index], context=hostScene();
+ if(mode==='epoch-change') context.scene.epoch='revoked-epoch';
+ f.conversation.prepareSceneContext(call.message.id,context);expect(call.guard(call.message)).toBe(true);
+ const text=call.message.params.input[1].text;
+ expect(text.includes('"controllerEpoch":"scene-a"')).toBe(mode==='valid');
+ expect(text.includes('controller_unavailable')).toBe(mode!=='valid');
+ f.reply(index,{result:{turn:{id:'next-turn',status:'completed'}}});await next;
+});
