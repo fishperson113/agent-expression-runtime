@@ -18,7 +18,12 @@ not in cards. No source files are relocated by this integration.
 ## Check
 A cold reviewer follows root -> map -> card -> source, identifies a relevant
 test and impact, and records pass/fail plus commit in the PR evidence. Run the
-normal harness and architecture checks from the repository root.
+normal harness and architecture checks from the repository root, plus
+`node scripts/check-icm.mjs` (also exercised by `npm test`). Copy the
+[object](_templates/object.md) or [process](_templates/process.md) template for new cards.
+The validator checks links/contracts, not semantic correctness. Store the cold
+walk verdict as `.runtime/icm/check.md` beginning with `pass` or `fail: reason`;
+keep private run evidence out of Git.
 
 ## Schema and scope
 Cards use YAML `kind` (object/process), `universe` (live/leftover/ghost),

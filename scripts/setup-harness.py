@@ -12,7 +12,7 @@ HARNESS = ROOT / "tools/my-harness/harness.py"
 sys.dont_write_bytecode = True
 REPO_DOCS_DIRS = [
     ".", ".agents/skills/icm-architect", ".claude/skills/icm-architect",
-    "docs/map", "docs/map/objects", "docs/map/processes", "docs/map/effects",
+    "docs/map", "docs/map/objects", "docs/map/processes", "docs/map/effects", "docs/map/_templates",
 ]
 
 
