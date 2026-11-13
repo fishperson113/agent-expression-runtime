@@ -412,3 +412,11 @@ quality and timing must be evaluated separately.
 ### Brief công khai vừa hết hạn
 
 Một brief do MAIN chủ động chia sẻ có thể còn hiển thị tối đa 120 giây sau khi hết hạn, với nhãn lịch sử. Observer có thể dùng nó để nối tiếp tương tác, nhưng quiet và quyền đổi hình không được gia hạn. Intent mới, đổi thread, Stop hoặc thu hồi nguồn xóa brief. Không có lượt model chỉ vì hết hạn.
+
+### Native panel startup deadline
+
+The panel allows up to 30 seconds for Codex thread creation or resumption, including
+cold tool initialization. Connection, protocol initialization and ordinary requests
+retain their 10-second limits. A timeout does not retry or create another thread;
+stopping Live cancels the pending request. This startup allowance does not change
+model response latency or expression execution deadlines.
