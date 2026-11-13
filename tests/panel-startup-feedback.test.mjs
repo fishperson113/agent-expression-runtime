@@ -19,7 +19,7 @@ it.each(['rejected', 'timeout'])('keeps a pre-thread %s offline with sanitized f
     reactiveProvider: provider, host: { command: process.execPath, args: ['-e',script,'--'] } });
   void running.then(() => { settled = true; }, () => { settled = true; });
   try {
-    await vi.waitFor(() => expect(controls).toContainEqual(mode === 'rejected' ? { type: 'startup_failed', code: -32603 } : { type: 'startup_unavailable', phase: 'thread/start', reason: 'timeout' }), { timeout: 15000 });
+    await vi.waitFor(() => expect(controls).toContainEqual(mode === 'rejected' ? { type: 'startup_failed', code: -32603 } : { type: 'startup_unavailable', phase: 'thread/start', reason: 'timeout' }), { timeout: 35000 });
     expect(snapshots.at(-1)).toMatchObject({ available: false, canSend: false, canCancel: false, error: 'conversation_startup_failed' });
     expect(setup.at(-1)).toEqual({ native: 'unavailable', observer: 'unavailable' });
     expect(JSON.stringify({controls,snapshots,setup})).not.toContain('PRIVATE_STARTUP_CANARY');
@@ -30,7 +30,7 @@ it.each(['rejected', 'timeout'])('keeps a pre-thread %s offline with sanitized f
     await expect(bindings.get('fischLiveConversation')({page,frame},{action:'send',generation:0,text:'no dispatch'})).rejects.toThrow('conversation_unavailable');
     await new Promise(resolve => setTimeout(resolve,50)); expect(settled).toBe(false);
   } finally { abort.abort(liveShutdown('ui')); await expect(running).resolves.toBe(1); await rm(directory,{recursive:true,force:true}); }
-}, 20000);
+}, 40000);
 
 it.each(['connect', 'initialize', 'thread/start', 'thread/resume'])('sanitizes startup timeout at %s', phase => {
   const error = Object.assign(Error('panel_rpc_timeout'), { startupPhase: phase, privateData: 'SECRET' });

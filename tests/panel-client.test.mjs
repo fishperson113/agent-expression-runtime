@@ -191,8 +191,42 @@ it.each([undefined, 'existing'])('annotates thread startup timeout and never ret
     client.receive({ id: writes[0].id, result: {} });
     await Promise.resolve();
     const rejection = expect(promise).rejects.toMatchObject({ message: 'panel_rpc_timeout', startupPhase: resume ? 'thread/resume' : 'thread/start' });
-    await vi.advanceTimersByTimeAsync(10000); await rejection;
+    await vi.advanceTimersByTimeAsync(29999); expect(client.pending.size).toBe(1);
+    await vi.advanceTimersByTimeAsync(1); await rejection;
     expect(writes.filter(value => value.method.startsWith('thread/'))).toHaveLength(1);
     expect(client.pending.size).toBe(0);
+  } finally { client.close(); vi.useRealTimers(); }
+});
+
+it.each([undefined, 'existing'])('allows cold thread setup beyond ten seconds (%s)', async resume => {
+  vi.useFakeTimers(); const writes = [], client = new PanelProtocol({ write: value => writes.push(value) });
+  try {
+    const promise = client.initialize('/public', resume);
+    client.receive({ id: writes[0].id, result: {} }); await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(15000);
+    expect(client.pending.size).toBe(1);
+    client.receive({ id: writes.at(-1).id, result: { thread: { id: resume ?? 'new' } } });
+    expect(await promise).toBe(resume ?? 'new'); expect(client.pending.size).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
+  } finally { client.close(); vi.useRealTimers(); }
+});
+it('closing during extended startup rejects once and clears its timer', async () => {
+  vi.useFakeTimers(); const writes = [], client = new PanelProtocol({ write: value => writes.push(value) });
+  try {
+    const promise = client.initialize('/public');
+    client.receive({ id: writes[0].id, result: {} }); await Promise.resolve();
+    const rejected = expect(promise).rejects.toThrow('panel_closed');
+    await vi.advanceTimersByTimeAsync(15000); client.close(); await rejected;
+    expect(client.pending.size).toBe(0); expect(vi.getTimerCount()).toBe(0);
+    client.receive({ id: writes.at(-1).id, result: { thread: { id: 'late' } } });
+    expect(client.threadId).toBeUndefined();
+  } finally { client.close(); vi.useRealTimers(); }
+});
+it.each(['initialize', 'test'])('keeps the ordinary ten-second deadline for %s', async method => {
+  vi.useFakeTimers(); const client = new PanelProtocol({ write: () => {} });
+  try {
+    const rejected = expect(client.request(method, {})).rejects.toThrow('panel_rpc_timeout');
+    await vi.advanceTimersByTimeAsync(9999); expect(client.pending.size).toBe(1);
+    await vi.advanceTimersByTimeAsync(1); await rejected; expect(client.pending.size).toBe(0);
   } finally { client.close(); vi.useRealTimers(); }
 });

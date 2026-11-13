@@ -60,8 +60,9 @@ export class PanelProtocol {
   request(method, params) {
     if (this.closed || this.pending.size >= 8) return Promise.reject(fail('panel_rpc_unavailable'));
     const id = this.prefix + ++this.serial;
+    const timeoutMs = ['thread/start', 'thread/resume'].includes(method) ? 30000 : 10000;
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => { this.pending.delete(id); reject(fail('panel_rpc_timeout')); }, 10000);
+      const timer = setTimeout(() => { this.pending.delete(id); reject(fail('panel_rpc_timeout')); }, timeoutMs);
       this.pending.set(id, { resolve, reject, timer });
       try { this.write({ id, method, params }); }
       catch { clearTimeout(timer); this.pending.delete(id); reject(fail('panel_write_unknown')); }
