@@ -155,3 +155,8 @@ placement clarification, and explicit whole-body transformation. Contract tests
 prove envelope delivery and isolation, not model choice or visual quality.
 
 For `current_scene`, omit `transient:true` and `observerHandoffMs`; these reject with `scene_append_ownership`. An added prop does not delegate the retained body to the observer, and has no independent expiry.
+
+The 24-part budget includes retained parts. Reuse known capacity or count current
+IDs from `inspect_expression` when unknown; `observe` is not an inventory.
+`scene_append_part_limit_remaining_N` reports capacity at rejection. Simplify
+only new geometry to fit N; do not replace the retained body as a fallback.

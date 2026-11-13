@@ -54,6 +54,8 @@ it('rejects invalid composition and stale epoch through actual MCP before any ga
     expect(tool.description).toContain('standalone replacement, not append');
     expect(tool.description).toContain('stable IDs and motion/track data');
     expect(tool.description).toContain('Clarify unresolved spatial references');
+    expect(tool.description).toContain('24-part limit includes retained parts');
+    expect(tool.description).toContain('scene_append_part_limit_remaining_N');
     const invalid = await client.tool('compose_expression', { base: 'resting_face', parts: [{ ...part(), id: 'mouth' }] });
     expect(invalid.isError).toBe(true); expect(invalid.content[0].text).toContain('composition_part_collision'); expect(requests).toBe(0);
     const stale = await client.tool('compose_expression', { parts: [part()], expectedEpoch: 'retired' });
