@@ -51,9 +51,10 @@ function control(value: any): LiveControl {
   return value;
 }
 export function validateConfiguration(value: unknown): LiveConfiguration {
-  const object = strictObject(value, ['controls', 'poses', 'lifetimeMs', ...['observerHandoffMs', 'observerContext', 'transient'].filter(key => value && typeof value === 'object' && key in value)]);
+  const object = strictObject(value, ['controls', 'poses', 'lifetimeMs', ...['observerHandoffMs', 'observerContext', 'transient', 'sceneAppend'].filter(key => value && typeof value === 'object' && key in value)]);
   if (!Array.isArray(object.controls) || object.controls.length > 32 || !Array.isArray(object.poses) || object.poses.length > 16) throw Error('live_control_budget');
   finite(object.lifetimeMs, 1000, 300000);
+  if ('sceneAppend' in object && object.sceneAppend !== true) throw Error('live_scene_append');
   if ('transient' in object && typeof object.transient !== 'boolean') throw Error('live_transient');
   if ('observerHandoffMs' in object) {
     finite(object.observerHandoffMs, 1000, 60000);
@@ -82,5 +83,5 @@ export function validateConfiguration(value: unknown): LiveConfiguration {
     if (spans.some(([a, b]) => start < b && end > a)) throw Error('live_property_conflict');
     spans.push([start, end]); owned.set(key, spans);
   }
-  return structuredClone({ controls, poses, lifetimeMs: object.lifetimeMs, ...Object.fromEntries(['observerHandoffMs', 'observerContext', 'transient'].filter(key => key in object).map(key => [key, object[key]])) });
+  return structuredClone({ controls, poses, lifetimeMs: object.lifetimeMs, ...Object.fromEntries(['observerHandoffMs', 'observerContext', 'transient', 'sceneAppend'].filter(key => key in object).map(key => [key, object[key]])) });
 }

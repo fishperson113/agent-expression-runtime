@@ -7,6 +7,7 @@ const live = JSON.parse(readFileSync(new URL('../src/contracts/live-control.sche
 delete live.$defs.configuration.properties.observerHandoffMs;
 delete live.$defs.configuration.properties.observerContext;
 delete live.$defs.configuration.properties.transient;
+delete live.$defs.configuration.properties.sceneAppend;
 delete live.$defs.observerContext;
 const object = properties => ({ type: 'object', properties, required: Object.keys(properties), additionalProperties: false });
 function strictOptional(value) {

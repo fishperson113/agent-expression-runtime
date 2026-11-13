@@ -69,6 +69,7 @@ export class Scheduler {
   get queueDepth() {
     return this.queue.length;
   }
+  get sceneParts() { return this.formation.parts; }
   get busy() {
     return !!this.active;
   }

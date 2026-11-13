@@ -108,12 +108,16 @@ export class LiveBody {
     return new Set((state.ownedProperties ?? []).flatMap(property => (mapping[property] ?? []).map(prop => 'body:' + prop)));
   }
   admit(record: any) {
-    this.prepareUserMutation();
+    const append = record?.body?.configuration?.sceneAppend === true;
+    if (!append) this.prepareUserMutation();
     const at = performance.now();
     this.trace.record(record?.seq, 'received', at, undefined, record?.epoch, { origin: 'native' });
     try {
-      const compiled = record.kind === 'define' ? { program: this.compiler.compiler.prepareDefinition(record, at) } : this.compiler.compile(record, at);
+      if (append && (document.hidden || this.controls.mode === 'off' || this.scheduler.busy || this.scheduler.queueDepth || this.reactiveOwner)) throw Error('scene_append_unavailable');
+      if (append && record.epoch !== this.scheduler.epoch) throw Error('stale_epoch');
+      const compiled = record.kind === 'define' ? { program: this.compiler.compiler.prepareDefinition(record, at) } : this.compiler.compile(record, at, append ? this.scheduler.sceneParts : undefined);
       const result = this.admitCompiled(compiled, at), accepted = ['accepted', 'state', 'defined'].includes(result);
+      if (accepted && append) this.prepareUserMutation();
       if (accepted) { this.userLeaseUntil = Math.max(this.userLeaseUntil, this.leaseUntil(compiled, at)); this.userGeometry(compiled, at);
         if (compiled.configuration?.transient === true && this.userGeometryLocked && compiled.program.kind === 'program')
           this.transientScene = { epoch: this.scheduler.epoch, seq: compiled.program.seq };
@@ -178,7 +182,7 @@ export class LiveBody {
     this.origins.set(compiled.program, source);
     const result = this.scheduler.admit(compiled.program), accepted = ['accepted', 'state', 'defined'].includes(result);
     if (compiled.program.kind === 'define' && compiled.program.draft !== undefined) this.compiler.compiler.settleDefinition(compiled.program.draft, accepted);
-    if (accepted && compiled.configuration) {
+    if (accepted && compiled.configuration && !compiled.configuration.sceneAppend) {
       this.lifecycle.cancel();
       const config = compiled.configuration;
       const duration = config.controls.length ? config.lifetimeMs :
@@ -190,7 +194,7 @@ export class LiveBody {
     return result;
   }
   admitReactive(compiled: LiveCompiled, owner: ReactiveOwnership) {
-    if (compiled.configuration?.observerHandoffMs !== undefined || compiled.configuration?.observerContext !== undefined || compiled.configuration?.transient !== undefined) throw Error('reactive_delegation_forbidden');
+    if (compiled.configuration?.sceneAppend !== undefined || compiled.configuration?.observerHandoffMs !== undefined || compiled.configuration?.observerContext !== undefined || compiled.configuration?.transient !== undefined) throw Error('reactive_delegation_forbidden');
     if (!this.canReactive() || compiled.program.kind !== 'program' || compiled.program.epoch !== this.scheduler.epoch) throw Error('reactive_admission_rejected');
     this.validateParts(compiled);
     this.reactiveOwner = owner;
