@@ -55,6 +55,8 @@ it('uses a separate readonly native lane, proves empty MCP catalog before reserv
     const thread = f.calls.find(c => c.method === 'thread/start').params;
     expect(thread.config.mcp_servers.fisch_live.enabled).toBe(false); expect(thread.dynamicTools).toEqual([]);
     expect(thread.developerInstructions).toBe(''); expect(f.processes[0].args).toContain('developer_instructions=""');
+    expect(thread.baseInstructions).toContain('For ordinary conversational context, prefer retain or subtle animation');
+    expect(thread.baseInstructions).toContain('never by keyword mapping');
     expect(thread.baseInstructions).toContain(nativeVisualAuthoringGuide); expect(thread.baseInstructions).not.toContain('PRIVATE'); expect(f.processes[0].args).toContain('shell_tool');
     expect(JSON.stringify(f.calls.find(c => c.method === 'turn/start').params.input)).not.toContain('PRIVATE');
   } finally { f.provider.close(); }
