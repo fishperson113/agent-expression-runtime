@@ -10,6 +10,10 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 HARNESS = ROOT / "tools/my-harness/harness.py"
 sys.dont_write_bytecode = True
+REPO_DOCS_DIRS = [
+    ".", ".agents/skills/icm-architect", ".claude/skills/icm-architect",
+    "docs/map", "docs/map/objects", "docs/map/processes", "docs/map/effects",
+]
 
 
 def setup_repo():
@@ -19,12 +23,13 @@ def setup_repo():
     sys.path.insert(0, str(HARNESS.parent))
     from harness import parse_toml
     dirs = parse_toml(text).get("docs_extra_dirs", [])
-    if "." in dirs:
+    merged = dirs + [directory for directory in REPO_DOCS_DIRS if directory not in dirs]
+    if merged == dirs:
         return
-    line = "docs_extra_dirs = " + json.dumps(dirs + ["."])
+    line = "docs_extra_dirs = " + json.dumps(merged)
     text = re.sub(r"(?m)^docs_extra_dirs\s*=.*$", line, text) if "docs_extra_dirs" in parse_toml(text) else text + "\n" + line + "\n"
     config.write_text(text, encoding="utf-8")
-    print("Configured root instruction documents in " + str(config))
+    print("Configured repository instruction directories in " + str(config))
 
 
 def install_codex():

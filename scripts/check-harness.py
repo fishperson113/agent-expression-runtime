@@ -32,6 +32,14 @@ def check(root, commits=None):
     return int(bool(harness.blocking_reasons(results)))
 
 
+def configure_snapshot(directory):
+    spec = importlib.util.spec_from_file_location("setup_harness", ROOT / "scripts/setup-harness.py")
+    setup = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(setup)
+    setup.ROOT = Path(directory)
+    setup.setup_repo()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base", help="Check committed changes since this ref in an isolated clone")
@@ -43,7 +51,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix="fisch-harness-") as directory:
         subprocess.run(["git", "clone", "--shared", "--quiet", str(ROOT), directory], check=True)
         subprocess.run(["git", "reset", "--soft", base], cwd=directory, check=True)
-        (Path(directory) / ".git/my-harness.toml").write_text('docs_extra_dirs = ["."]\n', encoding="utf-8")
+        configure_snapshot(directory)
         return check(Path(directory), commits)
 
 
