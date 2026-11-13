@@ -408,3 +408,7 @@ connected contract must be read rather than inferred from this snapshot.
 External MCP-only clients retain their normal discovery flow. This does not
 promise a latency target or more spontaneous expression; real conversation
 quality and timing must be evaluated separately.
+
+### Brief công khai vừa hết hạn
+
+Một brief do MAIN chủ động chia sẻ có thể còn hiển thị tối đa 120 giây sau khi hết hạn, với nhãn lịch sử. Observer có thể dùng nó để nối tiếp tương tác, nhưng quiet và quyền đổi hình không được gia hạn. Intent mới, đổi thread, Stop hoặc thu hồi nguồn xóa brief. Không có lượt model chỉ vì hết hạn.
