@@ -1,3 +1,4 @@
+import { capability } from '../primitives/registry';
 import { presentationDuration } from '../core/live/presentation-duration';
 import { ThreeRenderer } from '../adapters/three-renderer';
 import { Scheduler } from '../core/runtime/scheduler';
@@ -52,6 +53,18 @@ export class LiveBody {
     this.trace.record(ir.seq, status, performance.now(), undefined, ir.epoch, source);
     if (source.origin === 'native') this.feedback?.({ status, epoch: ir.epoch, seq: ir.seq });
   });
+  private restingParts?: unknown;
+  private chatSceneParts?: unknown;
+  private chatSceneRevision = 0;
+  chatSceneContext() {
+    if (document.hidden || this.controls.mode === 'off' || this.scheduler.busy || this.scheduler.queueDepth || this.reactiveOwner) return null;
+    const parts = this.scheduler.sceneParts;
+    if (!parts || !parts.length || parts.length > capability.assembly.parts) return null;
+    if (parts !== this.chatSceneParts) { this.chatSceneParts = parts; this.chatSceneRevision++; }
+    return { schemaVersion: 1, epoch: this.scheduler.epoch, revision: this.chatSceneRevision,
+      capturedAt: Date.now(), partIds: parts.map(part => part.id), capacity: capability.assembly.parts,
+      remaining: capability.assembly.parts - parts.length };
+  }
   output = 0;
   feedback?: (event: { epoch: string; seq: number; status: string }) => void;
   constructor(private canvas: HTMLCanvasElement, private status: (text: string) => void) {
@@ -224,6 +237,9 @@ export class LiveBody {
     this.restFace(this.controls.mode === 'off' ? 0 : 600);
   }
   epoch(epoch: string, reset = false) {
+    const settledRest = this.controls.mode === 'normal' && !this.scheduler.busy && !this.scheduler.queueDepth &&
+      !this.reactiveOwner && !this.userGeometryLocked && performance.now() >= this.userLeaseUntil && this.scheduler.sceneParts.length > 0 &&
+      this.scheduler.sceneParts === this.restingParts;
     this.revokeObserverHandoff(); this.attention.reset(epoch, this.observation ?? undefined);
     this.reactive?.reset(); this.reactiveOwner = undefined; this.userLeaseUntil = 0; this.userGeometryLocked = false;
     this.trace.reset();
@@ -231,14 +247,15 @@ export class LiveBody {
     this.controls.reset(); this.scheduler.cancel(epoch, false);
     if (reset) { this.compiler.compiler.reset(); this.partIds = ''; }
     else this.compiler.compiler.discardDefinitions();
-    this.restFace(this.controls.mode === 'off' ? 0 : 600);
+    this.restFace(this.controls.mode === 'off' || settledRest ? 0 : 600);
   }
   private restFace(durationMs: number) {
     const record = { v: 1, epoch: this.scheduler.epoch, seq: 0, kind: 'program', track: 'body', policy: 'replace', body: faceProgram(durationMs) };
     const program = this.compiler.compile(record, performance.now()).program;
-    this.origins.set(program, { origin: 'ambient' }); this.scheduler.admit(program);
+    this.origins.set(program, { origin: 'ambient' }); const admitted = this.scheduler.admit(program);
     this.faceBlend.clear();
     this.scheduler.tick();
+    this.restingParts = admitted === 'accepted' ? this.scheduler.sceneParts : undefined;
   }
   observe(snapshot: Observation) {
     try {

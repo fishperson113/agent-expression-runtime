@@ -75,6 +75,7 @@ Object.assign(window, { fischLive: { chatObservation: () => chatObservation(obse
     if (!image || stopped || document.hidden || source.sessionId !== observations.snapshot.sessionId || source.revision !== observations.sourceRevision) return null;
     return { image, source };
   },
+  chatSceneContext: () => stopped ? null : body.chatSceneContext(),
   chatObservationScope: () => ({ sessionId: observations.snapshot.sessionId, revision: observations.sourceRevision }), pair: (base: string, token: string) => bridge.connect(base, token),
   selectThread: () => { hands.reset(); resetReactive(); logActivity('Đã chọn phiên Codex.'); return bridge.cancel(); },
   panelControlStatus: (value: any) => { if (stopped) return; panelControls ??= mountPanelControls(element('conversation-tools'), value => (window as any).fischPanelRespond(value)); if (['mode', 'ready'].includes(value?.type)) { conversation.panelOwner(); liveSetup.panelOwner(); } else panelControls.project(value); },

@@ -46,7 +46,7 @@ export async function createBridge({ live, host, cwd, env, configured, instructi
         state.output.request(message); return state.broker?.client(message);
       } });
     state.broker = new LiveReactiveBroker({ page: live.page, provider: configured.provider, output: state.output,
-      forward: state.transport.forward, contextSource: () => state.conversation?.observerContext() ?? null, beforeForward: (message, source) => state.conversation?.fenceObservation(message.id, source), reject: (message, error) => {
+      forward: state.transport.forward, contextSource: () => state.conversation?.observerContext() ?? null, beforeForward: (message, source) => { state.conversation?.fenceObservation(message.id, source); state.conversation?.prepareSceneContext(message.id, source?.documentToken === state.channel.token ? source : null); }, reject: (message, error) => {
         const rejected = { id: message.id, error }; state.output.accept(rejected); state.conversation?.accept(rejected); state.transport.reject(message, error);
       }, log: text => { state.logs.push(text); state.logs.splice(0, Math.max(0, state.logs.length - 20)); } });
     state.conversation = new LiveConversation({ output: state.output, transport: state.transport, broker: state.broker, captureObservation: scope => captureChatObservation(state.broker, state.channel, scope) });
