@@ -101,3 +101,18 @@ cargo test --locked --manifest-path src-tauri/Cargo.toml
 ```
 
 Windows browser tests use Edge; Linux CI installs Chromium before tests. Run graphical performance acceptance sequentially and keep real camera imagery out of artifacts. See [validation scope](validation.md) and [benchmark procedure](benchmark.md). Keep each PR within 10 files; use dependent small PRs for larger work without weakening the gate.
+
+## ICM context skill
+
+The repository-scoped [ICM skill](../.agents/skills/icm-architect/SKILL.md) is a
+Fisch-specific adaptation of RinDig/icm-architect, pinned in its
+[provenance](../.agents/skills/icm-architect/PROVENANCE.md), under the included MIT
+license. Codex discovers `.agents/skills/icm-architect`; Claude has a thin project
+skill adapter pointing at the same source. No global configuration or upstream
+scripts are installed. This adds context maps/contracts, not a runtime framework.
+
+Setup and the isolated CI checker permit Markdown in exactly the two skill
+directories and the populated map shelves (`docs/map`, `objects`, `processes`,
+`effects`), alongside the existing root allowance. They preserve unrelated
+local configuration. R4 still rejects new Markdown in arbitrary code or sibling
+skill directories; all other rule thresholds are unchanged.
