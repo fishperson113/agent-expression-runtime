@@ -65,10 +65,39 @@ it('shows expression failure separately from a completed reply without locking o
   try {
     await page.evaluate(value => window.fischLive.conversationStatus(value), { ...ready,
       error: 'conversation_expression_failed', messages: [{ id: 'm', turn: 't', role: 'assistant', text: 'Nội dung trả lời', status: 'completed', truncated: false }] });
-    expect(await panel.locator('ol').textContent()).toContain('Đã hoàn tất');
+    expect(await panel.locator('ol').textContent()).toBe('Codex: Nội dung trả lời');
     expect(await panel.locator('.conversation-status').textContent()).toContain('Một yêu cầu biểu đạt báo lỗi');
     await input.fill('Tiếp tục trò chuyện');
     expect(await panel.getByRole('button', { name: 'Gửi', exact: true }).isEnabled()).toBe(true);
     expect(await page.evaluate(() => window.qaMediaCalls)).toBe(0);
   } finally { await page.close(); }
 }, 45000);
+
+it('keeps camera-off help readable and hides the placeholder when active', async () => {
+  const { page } = await open(false);
+  try {
+    for (const [width, height] of [[1280,800],[1024,768],[768,720],[390,844]]) {
+      await page.setViewportSize({width,height});
+      const fits = await page.locator('#camera-placeholder').evaluate(node => {
+        const box=node.getBoundingClientRect();
+        return [...node.children].filter(child=>getComputedStyle(child).display!=='none').every(child=>{const r=child.getBoundingClientRect();return r.top>=box.top&&r.bottom<=box.bottom&&r.left>=box.left&&r.right<=box.right;});
+      });
+      expect(fits).toBe(true);
+      expect(await page.locator('.camera-stage .stage-label').count()).toBe(0);
+    }
+    await page.locator('#camera-placeholder').evaluate(node=>{node.hidden=true;});
+    expect(await page.locator('#camera-placeholder').isVisible()).toBe(false);
+    expect(await page.evaluate(()=>window.qaMediaCalls)).toBe(0);
+  } finally { await page.close(); }
+},45000);
+it('keeps meaningful message state and truncation without repeating successful completion', async () => {
+  const {page,panel}=await open();
+  try {
+    const statuses=['completed','streaming','interrupted','failed','unknown'];
+    const messages=statuses.map((status,i)=>({id:'m'+i,turn:'t',role:'assistant',text:'text'+i,status,truncated:i===0}));
+    await page.evaluate(value=>window.fischLive.conversationStatus(value),{...ready,messages});
+    const text=await panel.locator('ol').textContent();
+    expect(text).not.toContain('Đã hoàn tất');
+    for(const label of ['Đã rút gọn phần hiển thị','Đang nhận','Đã ngắt','Lượt lỗi','Chưa rõ kết quả'])expect(text).toContain(label);
+  } finally {await page.close();}
+},45000);

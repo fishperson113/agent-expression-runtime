@@ -66,7 +66,8 @@ function elements() {
 }
 function messageText(item: Message) {
   const status: Record<string, string> = { streaming: 'Đang nhận', completed: 'Đã hoàn tất', interrupted: 'Đã ngắt', failed: 'Lượt lỗi', unknown: 'Chưa rõ kết quả' };
-  return `${item.role === 'user' ? 'Bạn' : 'Codex'}: ${item.text}\n[${status[item.status]}${item.truncated ? ' · Đã rút gọn phần hiển thị' : ''}]`;
+  const notes = [item.status === 'completed' ? '' : status[item.status], item.truncated ? 'Đã rút gọn phần hiển thị' : ''].filter(Boolean);
+  return `${item.role === 'user' ? 'Bạn' : 'Codex'}: ${item.text}${notes.length ? `\n[${notes.join(' · ')}]` : ''}`;
 }
 function updateMessageText(node: Text, text: string) {
   const previous = node.data;
