@@ -22,16 +22,13 @@ export const compositionSchema = {
     transient: { type: 'boolean' },
     tracks: { type: 'array', minItems: 1, maxItems: limits.assembly.parts, items: { $ref: '#/$defs/track' } },
     parts: { type: 'array', minItems: 1, maxItems: limits.assembly.parts, items: { $ref: '#/$defs/part' }, description: [
-      'Stable IDs. trajectory: identical per group; atMs starts at 0, strictly increases; excludes motion.',
-      'weight: particle share, default 1.',
-      'xyz.',
-      'color overrides global; omit to inherit.',
+      'Stable IDs; xyz. Track groups match; atMs starts at 0 and increases; no motion. Weight default 1. Color inherits.',
     ].join(' ') },
-    base: { enum: ['none', 'resting_face', 'current_scene'], default: 'none', description: `none replaces; resting_face adds ${face.parts.length} canonical parts; current_scene adds (MAIN). Max ${limits.assembly.parts} parts, unique IDs.` },
+    base: { enum: ['none', 'resting_face', 'current_scene'], default: 'none', description: `none: replace; resting_face: add ${face.parts.length} face parts; current_scene: append (MAIN). ${limits.assembly.parts} unique IDs max.` },
     durationMs: { ...node('assemble').properties.durationMs, default: 600 },
     easing: node('assemble').properties.easing,
     observerContext: { ...contextSchema, description: 'MAIN brief; quiet pauses observer, no geometry authority.' },
-    observerHandoffMs: { type: 'integer', minimum: 1000, maximum: 60000, description: 'MAIN: observer may replace after lease, once; no restore. Omit to protect scene.' },
+    observerHandoffMs: { type: 'integer', minimum: 1000, maximum: 60000, description: 'MAIN: one replacement after lease; no restore. Omit to protect.' },
     style: { type: 'object', additionalProperties: false, minProperties: 1, properties: pick(node('style'), ['color', 'brightness', 'pointSize', 'dispersion']) },
     flow: { type: 'object', additionalProperties: false, required: ['field', 'strength'], properties: pick(node('flow'), ['field', 'strength']) },
     requestId: { type: 'string', minLength: 1, maxLength: 128 },
@@ -39,7 +36,7 @@ export const compositionSchema = {
   },
 };
 compositionSchema.properties.style.properties.pointSize = { ...compositionSchema.properties.style.properties.pointSize,
-  description: 'Sprite pixels, not radius. Start at 2-4; brightness fades.' };
+  description: 'Sprite pixels, not radius; start 2-4. Brightness fades.' };
 const vector = part.anyOf[0].properties.points.items;
 compositionSchema.$defs.position = vector;
 function sharePosition(value) {
@@ -50,7 +47,8 @@ function sharePosition(value) {
 for (const key of ['part', 'motion', 'track']) compositionSchema.$defs[key] = sharePosition(compositionSchema.$defs[key]);
 const rotation = part.anyOf[1].properties.rotation;
 compositionSchema.$defs.rotation = rotation;
-compositionSchema.$defs.part.anyOf[1].properties.rotation = { $ref: '#/$defs/rotation' };
+compositionSchema.$defs.part.anyOf[1].properties.rotation = { ...structuredClone(rotation),
+  items: { type: 'number', minimum: -4 * Math.PI, maximum: 4 * Math.PI } };
 compositionSchema.$defs.track.properties.keyframes.items.properties.rotate = { $ref: '#/$defs/rotation' };
 function shareDefinition(name, target) {
   const exact = JSON.stringify(target);
@@ -68,7 +66,7 @@ shareDefinition('color', structuredClone(part.anyOf[0].properties.color));
 shareDefinition('unit', structuredClone(compositionSchema.properties.flow.properties.strength));
 const ajv = new Ajv({ strict: false, strictNumbers: true });
 const validateInput = ajv.compile(compositionSchema);
-const partValidators = new Map(part.anyOf.map(schema => [schema.properties.kind.const,
+const partValidators = new Map(compositionSchema.$defs.part.anyOf.map(schema => [schema.properties.kind.const,
   ajv.compile({ ...schema, $defs: compositionSchema.$defs })]));
 const diagnosticPaths = new Set(['', ...Object.keys(compositionSchema.properties).map(key => `/${key}`),
   ...['style', 'flow'].flatMap(key => Object.keys(compositionSchema.properties[key].properties).map(field => `/${key}/${field}`))]);
@@ -105,7 +103,7 @@ function compositionInputError(input) {
 }
 const validateProgram = ajv.compile({ $defs: protocol.$defs, $ref: '#/$defs/node' });
 export const compositionTool = { name: 'compose_expression',
-  description: `For an ordinary conversational prop/illustration, prefer current_scene to retain the current body unless whole-body transformation is intended. Author a particle silhouette or spatial composition from your own geometry (v1, base ${compositionContract.baseFingerprint.slice(0, 12)}). Omitted base means standalone replacement, not append. For additive props prefer current_scene: send only new parts; the MAIN host retains its current authored body with stable IDs and motion/track data. The ${limits.assembly.parts}-part limit includes retained parts. Reuse known capacity; otherwise inspect_expression gives current part IDs (observe does not). On scene_append_part_limit_remaining_N, simplify only NEW parts to fit N, never replace the retained body as a fallback. Busy/unavailable scenes or collisions reject without replacement. resting_face includes only the canonical avatar, not a custom moving body. Do not reconstruct unavailable geometry from summaries. Whole-body transformation remains valid when intentional. Clarify unresolved spatial references before choosing a side. Freely choose RGB and bounded motion. Ellipsoid scale is at least 0.02 on every axis, including thin depth; use curves or patches for thinner features. Share rigid tracks via tracks[{group,pivot,keyframes}] and part.trackRef=group; or inline trajectory. No motion with either. Track groups must be unique. current_scene must omit transient:true and observerHandoffMs: additions do not grant observer ownership of the retained body. For replacement conversational illustrations choose transient:true, even when asked for a new picture; omit/false when the user explicitly asks to keep or edit the scene. No semantic presets. Use express for existing-part gestures or advanced choreography; retaining the current form/no new call can be appropriate. Same admission/status/cancel contract as express; ACK is not completion or recognition.`,
+  description: `For an ordinary conversational prop/illustration, prefer current_scene to retain the current body unless whole-body transformation is intended. Author a particle silhouette or spatial composition from your own geometry (v1, base ${compositionContract.baseFingerprint.slice(0, 12)}). Omitted base means standalone replacement, not append. For additive props prefer current_scene: send only new parts; the MAIN host retains its current authored body with stable IDs and motion/track data. The ${limits.assembly.parts}-part limit includes retained parts. Reuse known capacity; otherwise inspect_expression gives current part IDs (observe does not). On scene_append_part_limit_remaining_N, simplify only NEW parts to fit N, never replace the retained body as a fallback. Busy/unavailable scenes or collisions reject without replacement. resting_face includes only the canonical avatar, not a custom moving body. Do not reconstruct unavailable geometry from summaries. Whole-body transformation remains valid when intentional. Clarify unresolved spatial references before choosing a side. Static ellipsoid rotation is radians within +/-4pi, normalized modulo2pi; motion and trajectory bounds are unchanged. Freely choose RGB and bounded motion. Ellipsoid scale is at least 0.02 on every axis, including thin depth; use curves or patches for thinner features. Share rigid tracks via tracks[{group,pivot,keyframes}] and part.trackRef=group; or inline trajectory. No motion with either. Track groups must be unique. current_scene must omit transient:true and observerHandoffMs: additions do not grant observer ownership of the retained body. For replacement conversational illustrations choose transient:true, even when asked for a new picture; omit/false when the user explicitly asks to keep or edit the scene. No semantic presets. Use express for existing-part gestures or advanced choreography; retaining the current form/no new call can be appropriate. Same admission/status/cancel contract as express; ACK is not completion or recognition.`,
   annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false }, inputSchema: compositionSchema };
 function expansionError(code, details) { return Object.assign(Error(code), { details }); }
 function validateExpandedParts(base, authored) {
@@ -134,10 +132,17 @@ function expandTracks(args) {
     return { ...body, trajectory: structuredClone(track) };
   });
 }
+function normalizeStaticRotations(args) {
+  for (const part of args.parts) if (part.kind === 'ellipsoid' && part.rotation) {
+    part.rotation = part.rotation.map(angle => angle >= rotation.items.minimum && angle <= rotation.items.maximum
+      ? angle : angle - Math.round(angle / (2 * Math.PI)) * (2 * Math.PI));
+  }
+  return args;
+}
 export function composeExpression(input) {
   if (!validateInput(input)) throw compositionInputError(input);
   if (input.base === 'current_scene' && (input.transient === true || input.observerHandoffMs !== undefined)) throw Error('scene_append_ownership');
-  const args = structuredClone(input), base = args.base === 'resting_face' ? structuredClone(face.parts) : [];
+  const args = normalizeStaticRotations(structuredClone(input)), base = args.base === 'resting_face' ? structuredClone(face.parts) : [];
   validateExpandedParts(base, args.parts);
   const parts = [...base, ...expandTracks(args)];
   const durationMs = args.durationMs ?? 600, easing = args.easing ?? 'smoothstep';
