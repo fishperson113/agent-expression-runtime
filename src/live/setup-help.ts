@@ -76,7 +76,7 @@ export function mountLiveSetup(container: HTMLElement) {
   };
   const project = (value: unknown) => { if (!disposed) { dto = projection(value); paint(); } };
   project(undefined);
-  return { project, panelOwner: () => { panel = true; ui.local.textContent = 'Gửi tin nhắn và xử lý yêu cầu Native trong panel. Không tự cấp quyền hoặc gắn vào hội thoại Desktop bên ngoài. Camera vẫn cần bật và cấp quyền riêng; caption observer nằm ở nhật ký riêng. Reload hoặc đóng trang cần khởi chạy lại; không tự gửi lại yêu cầu cũ.'; paint(); }, externalHost: () => { external = true; paint(); }, externalObserver: (value: unknown) => {
+  return { project, panelOwner: () => { panel = true; ui.local.textContent = 'Gửi tin nhắn và xử lý yêu cầu Native trong panel. Không tự cấp quyền hoặc gắn vào hội thoại Desktop bên ngoài. Camera vẫn cần bật và cấp quyền riêng. Khi bật, mỗi tin nhắn panel gửi kèm một ảnh camera gần nhất tới Codex; tắt camera thì không gửi ảnh. Observer tự động vẫn chỉ nhận hình học; caption nằm ở nhật ký riêng. Reload hoặc đóng trang cần khởi chạy lại; không tự gửi lại yêu cầu cũ.'; paint(); }, externalHost: () => { external = true; paint(); }, externalObserver: (value: unknown) => {
     externalObserver = typeof value === 'string' && Object.hasOwn(observerMessages, value) ? value as Observer : 'unavailable'; paint();
   }, observerState: (value: boolean | undefined) => { active = value; paint(); }, dispose: () => { if (!disposed) { disposed = true; ui.host.remove(); } } };
 }

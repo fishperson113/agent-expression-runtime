@@ -31,7 +31,7 @@ After installation, run `fisch live` from the project you want to work in. From 
 
 Plain Live prepares proactive Native Codex reactions by default without manual reactive variables or a ledger. Explicit off/backend/budget settings remain respected; configuration-ready is not proof of a successful model response. See [Native launch details](docs/native-observation-loop.md).
 
-Camera starts off. Enable it only when you want local tracking; real camera images stay on your machine. Expression works with camera off. [Live controls and privacy](docs/fisch-live.md) covers optional hand tracking, setup options and stopping a session.
+Camera starts off. With camera enabled, each panel chat message can send one fresh, bounded camera snapshot to Codex. Camera-off chat sends no image; the independent observer still receives geometry only. Fisch does not save or cache these snapshots to files; Codex/provider data-retention policies apply. Expression works with camera off. [Live controls and privacy](docs/fisch-live.md) covers optional hand tracking, setup options and stopping a session.
 
 ## Documentation
 

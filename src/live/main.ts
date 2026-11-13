@@ -68,6 +68,13 @@ function logActivity(text: string) {
   }));
 }
 Object.assign(window, { fischLive: { chatObservation: () => chatObservation(observations.snapshot, body.scheduler.epoch, Date.now(), stopped || document.hidden, observations.sourceRevision),
+  chatCameraFrame: async () => {
+    if (stopped || document.hidden) return null;
+    const source = { sessionId: observations.snapshot.sessionId, revision: observations.sourceRevision };
+    const image = await camera.chatFrame();
+    if (!image || stopped || document.hidden || source.sessionId !== observations.snapshot.sessionId || source.revision !== observations.sourceRevision) return null;
+    return { image, source };
+  },
   chatObservationScope: () => ({ sessionId: observations.snapshot.sessionId, revision: observations.sourceRevision }), pair: (base: string, token: string) => bridge.connect(base, token),
   selectThread: () => { hands.reset(); resetReactive(); logActivity('Đã chọn phiên Codex.'); return bridge.cancel(); },
   panelControlStatus: (value: any) => { if (stopped) return; panelControls ??= mountPanelControls(element('conversation-tools'), value => (window as any).fischPanelRespond(value)); if (['mode', 'ready'].includes(value?.type)) { conversation.panelOwner(); liveSetup.panelOwner(); } else panelControls.project(value); },
