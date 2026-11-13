@@ -1,3 +1,4 @@
+import { expressionResponseSchema, parseExpressionResponse } from '../integrations/expression-response.mjs';
 import { nativeVisualAuthoringGuide } from '../integrations/native-visual-authoring.mjs';
 import { expect, it } from 'vitest';
 import { createServer } from 'node:http';
@@ -278,3 +279,34 @@ it('forwards current_scene intent through actual MCP without expanding remembere
     expect(forwarded.body.program.children[0].parts).toEqual([part()]);
   } finally { await client.close(); await new Promise(resolve => server.close(resolve)); }
 }, 15000);
+
+it('authors removal-only as a valid wait intent, never dummy geometry', () => {
+  const input = { base: 'current_scene', parts: [], removePartIds: ['authored'], expectedSceneRevision: 4, expectedEpoch: 'test' };
+  const value = composeExpression(input);
+  expect(value.body.program.children).toEqual([{ type: 'wait', durationMs: 600 }]);
+  expect(value.body.configuration).toMatchObject({ sceneAppend: true, sceneRemove: ['authored'], sceneRevision: 4 });
+  expect(value.expectedEpoch).toBe('test'); expect(input.parts).toEqual([]);
+});
+it.each(['base', 'epoch', 'revision', 'duplicate', 'unknown-field', 'empty', 'revision-only'])('rejects ambiguous selective edits: %s', mode => {
+  const input = { base: 'current_scene', parts: [], removePartIds: ['authored'], expectedSceneRevision: 4, expectedEpoch: 'test' };
+  if (mode === 'base') input.base = 'none';
+  if (mode === 'epoch') delete input.expectedEpoch;
+  if (mode === 'revision') delete input.expectedSceneRevision;
+  if (mode === 'duplicate') input.removePartIds.push('authored');
+  if (mode === 'unknown-field') input.removeEverything = true;
+  if (mode === 'empty') input.removePartIds = [];
+  if (mode === 'revision-only') { delete input.removePartIds; input.parts = [part()]; }
+  expect(() => composeExpression(input)).toThrow();
+});
+
+it('carries explicit removal easing without changing empty wait grammar', () => {
+  const value = composeExpression({base:'current_scene',parts:[],removePartIds:['authored'],expectedEpoch:'test',expectedSceneRevision:1,easing:'linear'});
+  expect(value.body.configuration.sceneEasing).toBe('linear');
+  expect(value.body.program.children).toEqual([{type:'wait',durationMs:600}]);
+});
+
+it('keeps observer schemas free of MAIN-only edit fields and valid animation decisions', () => {
+  const json=JSON.stringify(expressionResponseSchema);
+  for(const key of ['sceneRemove','sceneRevision','sceneEasing','sceneAppend','removePartIds','expectedSceneRevision']) expect(json).not.toContain('"'+key+'"');
+  expect(parseExpressionResponse(JSON.stringify({reply:'Hi',decision:{mode:'animate',reasonCode:'ack',payload:{controls:[],poses:[],lifetimeMs:1000}}}))).toMatchObject({mode:'animate',tool:'express'});
+});

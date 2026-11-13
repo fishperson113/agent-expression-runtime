@@ -114,3 +114,70 @@ it('returns authoritative remaining capacity through host rejection without losi
   expect(f.send(record(Array.from({length:8},(_,i)=>part('new'+i)),3))).toMatchObject({status:'rejected',code:'scene_append_part_limit_remaining_6'});
   expect(f.body.scheduler.sceneParts).toHaveLength(18);f.body.dispose();
 });
+
+function removal(f: ReturnType<typeof setup>, ids: string[], seq = 3, parts: Part[] = []) {
+  const value = record(parts, seq);
+  value.body.configuration.sceneRemove = ids;
+  value.body.configuration.sceneRevision = f.body.chatSceneContext()!.revision;
+  if (!parts.length) value.body.program.children = [{ type: 'wait', durationMs: 100 }];
+  return value;
+}
+it('removes only selected geometry while retaining exact motion and current body', () => {
+  const f = setup(); expect(f.send(record([part('prop')])).status).toBe('accepted'); f.advance(200);
+  const retained = structuredClone(f.body.scheduler.sceneParts.find(p => p.id === 'custom'));
+  expect(f.send(removal(f, ['prop'])).status).toBe('accepted'); f.advance(200);
+  expect(f.body.scheduler.sceneParts).toEqual([retained]); f.body.dispose();
+});
+it('supports explicit same-ID replacement without reconstructing unselected geometry', () => {
+  const f = setup(); expect(f.send(record([part('prop')])).status).toBe('accepted'); f.advance(200);
+  const old = structuredClone(f.body.scheduler.sceneParts.find(p => p.id === 'custom'));
+  const replacement = { ...part('prop'), center: [.6, 0, 0] } as Part;
+  expect(f.send(removal(f, ['prop'], 3, [replacement])).status).toBe('accepted'); f.advance(200);
+  expect(f.body.scheduler.sceneParts.find(p => p.id === 'custom')).toEqual(old);
+  expect(f.body.scheduler.sceneParts.find(p => p.id === 'prop')).toEqual(replacement); f.body.dispose();
+});
+it.each(['unknown','duplicate','empty-result','revision','epoch','busy','off','hidden'])('rejects selective edit %s without altering current scene', mode => {
+  const f = setup(), value = removal(f, ['custom'], 2), before = structuredClone(f.body.scheduler.sceneParts);
+  const prepare = vi.spyOn(f.body, 'prepareUserMutation');
+  if (mode === 'unknown') value.body.configuration.sceneRemove = ['missing'];
+  if (mode === 'duplicate') value.body.configuration.sceneRemove = ['custom', 'custom'];
+  if (mode === 'revision') value.body.configuration.sceneRevision++;
+  if (mode === 'epoch') value.epoch = 'obsolete'; else value.epoch = f.body.scheduler.epoch;
+  if (mode === 'busy') vi.spyOn(f.body.scheduler, 'queueDepth', 'get').mockReturnValue(1);
+  if (mode === 'off') f.body.controls.mode = 'off'; if (mode === 'hidden') f.hide();
+  expect(f.body.admit(value).status).toBe('rejected'); expect(prepare).not.toHaveBeenCalled();
+  expect(f.body.scheduler.sceneParts).toEqual(before); f.body.dispose();
+});
+it('refreshes lazy revision at admission so a same-epoch replacement invalidates old removal', () => {
+  const f = setup(), stale = removal(f, ['custom'], 3);
+  expect(f.send(record([part('custom'), part('new')], 2, false)).status).toBe('accepted'); f.advance(200);
+  expect(f.send(stale)).toMatchObject({status:'rejected',code:'scene_remove_stale_revision'});
+  expect(f.body.scheduler.sceneParts.map(p => p.id)).toEqual(['custom','new']); f.body.dispose();
+});
+it('prunes removed control targets without resetting retained clocks or resurrecting removed poses', () => {
+  const f = setup(), value = record([part('custom'),part('prop')],2,false);
+  value.body.configuration.poses = ['custom','prop'].map(id => ({type:'pose',target:{part:id,prop:'rotateZ'},value:.2,durationMs:1000}));
+  expect(f.send(value).status).toBe('accepted'); f.advance(200);
+  const installed = (f.body.controls as any).installedAt;
+  expect(f.send(removal(f,['prop']))).toMatchObject({status:'accepted'}); f.advance(200);
+  expect((f.body.controls as any).installedAt).toBe(installed);
+  expect((f.body.controls as any).configuration.poses.map((p:any)=>p.target.part)).toEqual(['custom']);
+  expect(f.send(record([part('prop')],4)).status).toBe('accepted'); f.advance(200);
+  expect((f.body.controls as any).configuration.poses.map((p:any)=>p.target.part)).toEqual(['custom']); f.body.dispose();
+});
+it('cancel revokes an admitted removal before application', () => {
+  const f=setup();expect(f.send(record([part('prop')])).status).toBe('accepted');f.advance(200);
+  expect(f.send(removal(f,['prop']))).toMatchObject({status:'accepted'});
+  f.body.scheduler.cancel('revoked',false);f.advance(200);expect(f.body.scheduler.sceneParts).toEqual([]);f.body.dispose();
+});
+
+it('permits explicit replacement of all selected identities but never an empty final scene', () => {
+  const f=setup(),value=removal(f,['custom'],2,[part('replacement')]);
+  expect(f.send(value).status).toBe('accepted');f.advance(200);
+  expect(f.body.scheduler.sceneParts.map(p=>p.id)).toEqual(['replacement']);f.body.dispose();
+});
+it('preserves requested pure-removal easing during host expansion', () => {
+  const f=setup(),value=removal(f,['custom'],2);value.body.configuration.sceneEasing='linear';
+  const expanded=appendScene(value,[part('custom'),part('retained')]);
+  expect(expanded.body.program.children[0]).toMatchObject({type:'assemble',durationMs:100,easing:'linear'});f.body.dispose();
+});

@@ -160,3 +160,24 @@ The 24-part budget includes retained parts. Reuse known capacity or count curren
 IDs from `inspect_expression` when unknown; `observe` is not an inventory.
 `scene_append_part_limit_remaining_N` reports capacity at rejection. Simplify
 only new geometry to fit N; do not replace the retained body as a fallback.
+
+
+## Selective current-scene edits
+
+For MAIN, `compose_expression` with `base:current_scene` can remove exact
+`removePartIds` while preserving all unselected host geometry and motion.
+Supply `parts:[]` for removal only, or supply new parts after removal. Re-adding
+an explicitly removed ID replaces that identity and retains its existing bindings.
+Use fresh `expectedEpoch` and `expectedSceneRevision` from the host scene inventory.
+The host refreshes its authoritative revision at admission; same-epoch scene
+changes also invalidate a stale edit. Unknown/duplicate IDs, empty final scenes,
+limits, busy/hidden/off state and observer ownership reject atomically.
+
+No agent reconstruction of the retained scene is needed. Removal-only uses a
+valid wait intent expanded by the host into its retained assembly before compilation,
+not dummy geometry. Retained control clocks stay unchanged. On actual application,
+existing topology cleanup removes controls/poses for IDs that disappear; reusing
+a deleted ID later does not resurrect those controls. Same-ID replacement preserves
+identity, including bindings, intentionally. Shared track collisions remain rejected.
+Cancel and epoch revocation still take precedence. Selective edits do not grant
+observer handoff/transient ownership; whole-body replacement remains separate.

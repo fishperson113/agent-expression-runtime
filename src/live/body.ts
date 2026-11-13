@@ -121,13 +121,15 @@ export class LiveBody {
     return new Set((state.ownedProperties ?? []).flatMap(property => (mapping[property] ?? []).map(prop => 'body:' + prop)));
   }
   admit(record: any) {
-    const append = record?.body?.configuration?.sceneAppend === true;
+    const append = record?.body?.configuration?.sceneAppend === true || record?.body?.configuration?.sceneRemove !== undefined || record?.body?.configuration?.sceneRevision !== undefined || record?.body?.configuration?.sceneEasing !== undefined;
     if (!append) this.prepareUserMutation();
     const at = performance.now();
     this.trace.record(record?.seq, 'received', at, undefined, record?.epoch, { origin: 'native' });
     try {
       if (append && (document.hidden || this.controls.mode === 'off' || this.scheduler.busy || this.scheduler.queueDepth || this.reactiveOwner)) throw Error('scene_append_unavailable');
       if (append && record.epoch !== this.scheduler.epoch) throw Error('stale_epoch');
+      if (record?.body?.configuration?.sceneRemove !== undefined &&
+          this.chatSceneContext()?.revision !== record.body.configuration.sceneRevision) throw Error('scene_remove_stale_revision');
       const compiled = record.kind === 'define' ? { program: this.compiler.compiler.prepareDefinition(record, at) } : this.compiler.compile(record, at, append ? this.scheduler.sceneParts : undefined);
       const result = this.admitCompiled(compiled, at), accepted = ['accepted', 'state', 'defined'].includes(result);
       if (accepted && append) this.prepareUserMutation();
