@@ -798,3 +798,11 @@ it('rejects bootstrap authority if an external turn becomes active', async () =>
   resolve({ result: { content: [{ type: 'text', text: JSON.stringify({ source: 'fisch-renderer', format: 'structured', session: 'own', epoch: 'scene-a' }) }] } });
   expect(await boot).toBe(false); expect(f.conversation.snapshot().canSend).toBe(false);
 });
+
+it('does not inspect an already active resumed turn', async () => {
+  const controllerRequest = vi.fn(); const f = fixture({ controllerRequest });
+  f.event({ method: 'turn/started', params: { threadId: 'thread-a', turn: { id: 'active', status: 'inProgress' } } });
+  f.conversation.holdControllerBootstrap();
+  expect(await f.conversation.bootstrapController('thread-a')).toBe(false);
+  expect(controllerRequest).not.toHaveBeenCalled();
+});

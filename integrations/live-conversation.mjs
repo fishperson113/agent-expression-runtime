@@ -46,7 +46,7 @@ export class LiveConversation {
     this.#sync();
     const scope = { thread: this.#thread, generation: this.#generation, intent: this.#intent }; let timer;
     try {
-      if (!this.#controllerBootstrap || !this.#available() || scope.thread !== threadId || this.#output.selection !== undefined) return false;
+      if (!this.#controllerBootstrap || !this.#available() || scope.thread !== threadId || this.#output.selection !== undefined || this.#owner()) return false;
       const reply = await Promise.race([
         this.#transport.request('mcpServer/tool/call', { threadId, server: 'fisch_live', tool: 'inspect_expression', arguments: {} }),
         new Promise(resolve => { timer = setTimeout(() => resolve(null), 1500); }),
