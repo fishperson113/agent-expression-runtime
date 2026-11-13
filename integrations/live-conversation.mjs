@@ -1,3 +1,4 @@
+import { sceneContextInput } from './chat-scene-context.mjs';
 import { validCameraJpeg } from './chat-camera-image.mjs';
 import { randomUUID } from 'node:crypto';
 
@@ -128,15 +129,21 @@ export class LiveConversation {
       this.#output.selection !== undefined || (!cancelling && this.#unknown.has(job.thread))) return false;
     if (!id(message?.id) || (job.rpcId !== undefined && job.rpcId !== message.id)) return false;
     job.rpcId = message.id;
+    if (job.sceneItem && message.params?.input) message.params.input = message.params.input.filter(item => item !== job.sceneItem);
     if (!cancelling && job.contextCapturedAt !== undefined && (job.contextRevoked || performance.now() - job.contextCapturedAt > job.contextValidForMs) && message.params?.input?.[1]) {
       if (job.imageContext) { job.contextText = undefined; message.params.input.splice(1); }
       else { job.contextText = contextUnavailable; message.params.input.splice(1, Infinity, { type: 'text', text: contextUnavailable, text_elements: [] }); }
     }
     if (cancelling) return this.#owner() === job.turn;
     if (this.#pending !== job) return false;
-    return !this.#output.turn && !this.#broker.turns?.size &&
+    const ready = !this.#output.turn && !this.#broker.turns?.size &&
       ![...(this.#broker.pending?.keys() ?? [])].some(key => key !== message?.id) &&
       !(this.#broker.queue ?? []).some(value => value.id !== message?.id);
+    if (ready && job.sceneSource) {
+      job.sceneItem = sceneContextInput(job.sceneSource);
+      if (job.sceneItem) message.params.input.push(job.sceneItem);
+    }
+    return ready;
   }
   #canSend() {
     return this.#available() && this.#output.selection === undefined && !this.#pending &&
@@ -183,7 +190,7 @@ export class LiveConversation {
     this.#clearObserver(); this.#sync();
     if (!this.#canSend() || value?.generation !== this.#generation) throw failure('conversation_unavailable');
     if (typeof value.text !== 'string' || !value.text.trim() || bytes(value.text) > 16000) throw failure('conversation_invalid_text');
-    const job = { generation: this.#generation, intent: this.#intent, thread: this.#thread, submissionId: randomUUID(), observerRevision: this.#observerRevision, observerText: value.text };
+    const job = { generation: this.#generation, intent: this.#intent, thread: this.#thread, submissionId: randomUUID(), observerRevision: this.#observerRevision, observerText: value.text, userText: value.text };
     this.#pending = job; this.#error = ''; this.#revision++;
     try {
       const input = [{ type: 'text', text: value.text, text_elements: [] }];
@@ -193,7 +200,7 @@ export class LiveConversation {
       if (reply?.error) throw Object.assign(failure('conversation_rejected'), { uncertain: false });
       if (!id(reply?.result?.turn?.id) || !['inProgress', 'completed', 'interrupted', 'failed'].includes(reply.result.turn.status))
         throw Object.assign(failure('conversation_unknown'), { uncertain: true });
-      if (job.contextText !== undefined) this.#rememberContext(reply.result.turn.id, job);
+      if ((job.contextText !== undefined || job.sceneItem)) this.#rememberContext(reply.result.turn.id, job);
       this.#confirmObserver(job, reply.result.turn, job.observerText);
       return Object.freeze({ status: 'accepted' });
     } catch (error) {
@@ -205,12 +212,16 @@ export class LiveConversation {
       throw failure(code);
     } finally { if (this.#pending === job) this.#pending = undefined; this.#revision++; }
   }
+  prepareSceneContext(rpcId, source) {
+    const job = this.#pending;
+    if (job?.rpcId === rpcId) job.sceneSource = source;
+  }
   fenceObservation(rpcId, currentScope) {
     const job = this.#pending;
     if (!job || job.rpcId !== rpcId || !job.sourceFence) return;
     let compatible = false;
     try {
-      const current = sourceScope(currentScope);
+      const current = sourceScope(currentScope && { documentToken: currentScope.documentToken, sessionId: currentScope.sessionId, revision: currentScope.revision });
       compatible = !!current && ['documentToken', 'sessionId', 'revision'].every(key => current[key] === job.sourceFence[key]);
     } catch { /* Unreadable scope cannot authorize old observation data. */ }
     if (!compatible) job.contextRevoked = true;
@@ -256,13 +267,13 @@ export class LiveConversation {
     const { method, params = {} } = message;
     if (message.id === this.#pending?.rpcId && this.#pending && !message.error && id(message.result?.turn?.id)) {
       this.#pending.observerTurnId = message.result.turn.id;
-      if (this.#pending.contextText !== undefined) this.#rememberContext(message.result.turn.id, this.#pending);
+      if ((this.#pending.contextText !== undefined || this.#pending.sceneItem)) this.#rememberContext(message.result.turn.id, this.#pending);
     }
     if (params.threadId !== this.#thread) return;
     if (method === 'turn/started' && this.#pending?.rpcId && id(params.turn?.id) && this.#output.turn === params.turn.id)
       this.#pending.observerTurnId = params.turn.id;
     if (method === 'turn/started' && !this.#pending?.rpcId && this.#observer?.turnId !== params.turn?.id) this.#clearObserver();
-    if (method === 'turn/started' && this.#pending?.rpcId && this.#pending.contextText !== undefined)
+    if (method === 'turn/started' && this.#pending?.rpcId && (this.#pending.contextText !== undefined || this.#pending.sceneItem))
       this.#rememberContext(params.turn?.id, this.#pending);
     if (method === 'turn/completed' && id(params.turn?.id) && this.#output.completed?.has(params.turn.id)) {
       if (this.#terminal.has(params.turn.id)) return;
@@ -308,8 +319,8 @@ export class LiveConversation {
     }
     if (item?.type === 'userMessage' && Array.isArray(item.content)) {
       const owned = this.#ownedContexts.get(turn);
-      const text = item.content.slice(0, 32).filter((value, index) => !(index === 1 && owned &&
-        item.content[0]?.type === 'text' && item.content[0].text === owned.userText && value?.type === 'text' && value.text === owned.contextText))
+      const text = item.content.slice(0, 32).filter((value, index) => !(index > 0 && owned &&
+        item.content[0]?.type === 'text' && item.content[0].text === owned.userText && value?.type === 'text' && (value.text === owned.contextText || value.text === owned.sceneItem?.text)))
         .filter(value => value?.type === 'text' && typeof value.text === 'string')
         .map(value => value.text.slice(0, 16000)).join('\n');
       this.#update(item.id, turn, 'user', text);

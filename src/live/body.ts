@@ -1,3 +1,4 @@
+import { capability } from '../primitives/registry';
 import { presentationDuration } from '../core/live/presentation-duration';
 import { ThreeRenderer } from '../adapters/three-renderer';
 import { Scheduler } from '../core/runtime/scheduler';
@@ -52,6 +53,17 @@ export class LiveBody {
     this.trace.record(ir.seq, status, performance.now(), undefined, ir.epoch, source);
     if (source.origin === 'native') this.feedback?.({ status, epoch: ir.epoch, seq: ir.seq });
   });
+  private chatSceneParts?: unknown;
+  private chatSceneRevision = 0;
+  chatSceneContext() {
+    if (document.hidden || this.controls.mode === 'off' || this.scheduler.busy || this.scheduler.queueDepth || this.reactiveOwner) return null;
+    const parts = this.scheduler.sceneParts;
+    if (!parts || !parts.length || parts.length > capability.assembly.parts) return null;
+    if (parts !== this.chatSceneParts) { this.chatSceneParts = parts; this.chatSceneRevision++; }
+    return { schemaVersion: 1, epoch: this.scheduler.epoch, revision: this.chatSceneRevision,
+      capturedAt: Date.now(), partIds: parts.map(part => part.id), capacity: capability.assembly.parts,
+      remaining: capability.assembly.parts - parts.length };
+  }
   output = 0;
   feedback?: (event: { epoch: string; seq: number; status: string }) => void;
   constructor(private canvas: HTMLCanvasElement, private status: (text: string) => void) {

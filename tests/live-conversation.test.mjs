@@ -704,3 +704,30 @@ it.each(['selection','thread','navigation','close'])('does not forward a held ca
  expect(call.guard(call.message)).toBe(false);
  f.fail(0,false);await expect(pending).rejects.toThrow();
 });
+
+const hostScene = () => ({documentToken:'doc-a',sessionId:'camera-a',revision:2,scene:{schemaVersion:1,epoch:'scene-a',revision:1,capturedAt:Date.now(),partIds:['face'],capacity:24,remaining:23}});
+it('keeps scene inventory after camera revocation and hides both from public/user chat', async () => {
+  const f=fixture({captureObservation:cameraContext}),pending=f.send('add a cup');await vi.waitFor(()=>expect(f.calls).toHaveLength(1));
+  const call=f.calls[0], source=hostScene();f.conversation.fenceObservation(call.message.id,source);f.conversation.prepareSceneContext(call.message.id,source);
+  expect(call.guard(call.message)).toBe(true);expect(call.message.params.input).toHaveLength(2);
+  expect(call.message.params.input[1].text).toContain('HOST SCENE DATA');expect(call.message.params.input.some(x=>x.type==='image')).toBe(false);
+  expect(call.guard(call.message)).toBe(true);expect(call.message.params.input).toHaveLength(2);
+  f.reply(0,{result:{turn:{id:'scene-turn',status:'inProgress'}}});await pending;
+  f.event({method:'item/completed',params:{threadId:'thread-a',turnId:'scene-turn',item:{id:'user-scene',type:'userMessage',content:call.message.params.input}}});
+  expect(f.conversation.snapshot().messages.find(x=>x.role==='user').text).toBe('add a cup');
+  expect(JSON.stringify(f.conversation.observerContext())).not.toContain('HOST SCENE');
+});
+it('adds camera-off inventory without camera boilerplate and drops aged inventory before repeat guard', async () => {
+  vi.useFakeTimers();try {
+    const f=fixture({captureObservation:()=>null}),pending=f.send('add a cup');await vi.advanceTimersByTimeAsync(0);
+    const call=f.calls[0];f.conversation.prepareSceneContext(call.message.id,hostScene());expect(call.guard(call.message)).toBe(true);
+    expect(call.message.params.input).toHaveLength(2);expect(call.message.params.input[1].text).not.toContain('Camera snapshot');
+    await vi.advanceTimersByTimeAsync(251);expect(call.guard(call.message)).toBe(true);expect(call.message.params.input).toHaveLength(1);
+    f.reply(0,{result:{turn:{id:'scene-turn',status:'completed'}}});await pending;
+  }finally{vi.useRealTimers();}
+});
+it.each(['navigation','close','selection'])('does not forward scene context after %s', async mode=>{
+ const f=fixture(),pending=f.send('cup');const call=f.calls[0];f.conversation.prepareSceneContext(call.message.id,hostScene());
+ if(mode==='navigation')f.conversation.navigation();if(mode==='close')f.conversation.close();if(mode==='selection')f.conversation.selectionAttempt();
+ expect(call.guard(call.message)).toBe(false);f.fail(0,false);await expect(pending).rejects.toThrow();
+});

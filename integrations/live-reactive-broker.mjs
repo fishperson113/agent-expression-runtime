@@ -93,7 +93,7 @@ export class LiveReactiveBroker {
         try {
           const source = await this.evaluate(async () => {
             const api = window.fischLive; await api.reactiveUserIntent();
-            try { return { ...api.chatObservationScope?.(), documentToken: api.conversationDocument }; } catch { return null; }
+            try { return { ...api.chatObservationScope?.(), documentToken: api.conversationDocument, scene: api.chatSceneContext?.() ?? null }; } catch { return null; }
           }, undefined, 'user_barrier');
           if (this.closed || this.browserUnavailable) { this.rejectInput(message, 'reactive_user_closed'); continue; }
           if (message.method === 'turn/steer' && (message.params?.threadId !== this.output.thread ||
