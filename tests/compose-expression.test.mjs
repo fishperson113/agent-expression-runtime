@@ -1,3 +1,4 @@
+import { expressionResponseSchema, parseExpressionResponse } from '../integrations/expression-response.mjs';
 import { nativeVisualAuthoringGuide } from '../integrations/native-visual-authoring.mjs';
 import { expect, it } from 'vitest';
 import { createServer } from 'node:http';
@@ -296,4 +297,16 @@ it.each(['base', 'epoch', 'revision', 'duplicate', 'unknown-field', 'empty', 're
   if (mode === 'empty') input.removePartIds = [];
   if (mode === 'revision-only') { delete input.removePartIds; input.parts = [part()]; }
   expect(() => composeExpression(input)).toThrow();
+});
+
+it('carries explicit removal easing without changing empty wait grammar', () => {
+  const value = composeExpression({base:'current_scene',parts:[],removePartIds:['authored'],expectedEpoch:'test',expectedSceneRevision:1,easing:'linear'});
+  expect(value.body.configuration.sceneEasing).toBe('linear');
+  expect(value.body.program.children).toEqual([{type:'wait',durationMs:600}]);
+});
+
+it('keeps observer schemas free of MAIN-only edit fields and valid animation decisions', () => {
+  const json=JSON.stringify(expressionResponseSchema);
+  for(const key of ['sceneRemove','sceneRevision','sceneEasing','sceneAppend','removePartIds','expectedSceneRevision']) expect(json).not.toContain('"'+key+'"');
+  expect(parseExpressionResponse(JSON.stringify({reply:'Hi',decision:{mode:'animate',reasonCode:'ack',payload:{controls:[],poses:[],lifetimeMs:1000}}}))).toMatchObject({mode:'animate',tool:'express'});
 });

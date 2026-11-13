@@ -8,6 +8,8 @@ delete live.$defs.configuration.properties.observerHandoffMs;
 delete live.$defs.configuration.properties.observerContext;
 delete live.$defs.configuration.properties.transient;
 delete live.$defs.configuration.properties.sceneAppend;
+for (const key of ['sceneRemove', 'sceneRevision', 'sceneEasing']) delete live.$defs.configuration.properties[key];
+delete live.$defs.configuration.dependencies;
 delete live.$defs.observerContext;
 const object = properties => ({ type: 'object', properties, required: Object.keys(properties), additionalProperties: false });
 function strictOptional(value) {
@@ -26,7 +28,8 @@ function withoutNulls(value) {
   if (!value || typeof value !== 'object') return value;
   return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== null).map(([k, v]) => [k, withoutNulls(v)]));
 }
-const { requestId, expectedEpoch, observerHandoffMs, observerContext, transient, ...geometry } = compositionSchema.properties;
+const { requestId, expectedEpoch, observerHandoffMs, observerContext, transient, removePartIds, expectedSceneRevision, ...geometry } = compositionSchema.properties;
+geometry.parts = { ...geometry.parts, minItems: 1 };
 geometry.base = { ...geometry.base, enum: ['none', 'resting_face'] };
 const configuration = structuredClone(live.$defs.configuration); configuration.properties.lifetimeMs.maximum = 10000;
 const reasonCode = { type: 'string', maxLength: 48, pattern: '^[a-z0-9_-]+$', description: 'Short audit label, not private reasoning or an emotional diagnosis.' };

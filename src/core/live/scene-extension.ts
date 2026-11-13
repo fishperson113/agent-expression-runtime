@@ -26,7 +26,7 @@ export function appendScene(record: any, currentParts?: readonly Part[]) {
   const expanded = structuredClone(record);
   const index = program.children.indexOf(shapes[0]);
   expanded.body.program.children[index] = shapes[0].type === 'wait'
-    ? { type: 'assemble', parts, durationMs: shapes[0].durationMs } : { ...expanded.body.program.children[index], parts };
+    ? { type: 'assemble', parts, durationMs: shapes[0].durationMs, easing: record.body.configuration.sceneEasing ?? 'smoothstep' } : { ...expanded.body.program.children[index], parts };
   const bytes = new TextEncoder().encode(JSON.stringify(expanded)).length;
   if (bytes > 32768) throw Error('record_too_large');
   return expanded;

@@ -170,3 +170,14 @@ it('cancel revokes an admitted removal before application', () => {
   expect(f.send(removal(f,['prop']))).toMatchObject({status:'accepted'});
   f.body.scheduler.cancel('revoked',false);f.advance(200);expect(f.body.scheduler.sceneParts).toEqual([]);f.body.dispose();
 });
+
+it('permits explicit replacement of all selected identities but never an empty final scene', () => {
+  const f=setup(),value=removal(f,['custom'],2,[part('replacement')]);
+  expect(f.send(value).status).toBe('accepted');f.advance(200);
+  expect(f.body.scheduler.sceneParts.map(p=>p.id)).toEqual(['replacement']);f.body.dispose();
+});
+it('preserves requested pure-removal easing during host expansion', () => {
+  const f=setup(),value=removal(f,['custom'],2);value.body.configuration.sceneEasing='linear';
+  const expanded=appendScene(value,[part('custom'),part('retained')]);
+  expect(expanded.body.program.children[0]).toMatchObject({type:'assemble',durationMs:100,easing:'linear'});f.body.dispose();
+});

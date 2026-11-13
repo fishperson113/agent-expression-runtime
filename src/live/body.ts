@@ -121,7 +121,7 @@ export class LiveBody {
     return new Set((state.ownedProperties ?? []).flatMap(property => (mapping[property] ?? []).map(prop => 'body:' + prop)));
   }
   admit(record: any) {
-    const append = record?.body?.configuration?.sceneAppend === true || record?.body?.configuration?.sceneRemove !== undefined || record?.body?.configuration?.sceneRevision !== undefined;
+    const append = record?.body?.configuration?.sceneAppend === true || record?.body?.configuration?.sceneRemove !== undefined || record?.body?.configuration?.sceneRevision !== undefined || record?.body?.configuration?.sceneEasing !== undefined;
     if (!append) this.prepareUserMutation();
     const at = performance.now();
     this.trace.record(record?.seq, 'received', at, undefined, record?.epoch, { origin: 'native' });
@@ -144,7 +144,7 @@ export class LiveBody {
           this.observerHandoff = { epoch: this.scheduler.epoch, seq: compiled.program.seq, from: this.userLeaseUntil, until: this.userLeaseUntil + ms };
       }
       this.trace.record(record.seq, accepted ? 'admitted' : 'rejected', performance.now(), accepted ? undefined : result, record.epoch, { origin: 'native' });
-      this.status(accepted ? 'BiÃ¡Â»Æ’u Ã„â€˜Ã¡ÂºÂ¡t Ã„â€˜ÃƒÂ£ Ã„â€˜Ã†Â°Ã¡Â»Â£c nhÃ¡ÂºÂ­n.' : result);
+      this.status(accepted ? 'Biểu đạt đã được nhận.' : result);
       return { status: accepted ? 'accepted' : 'rejected', code: accepted ? undefined : result, latencyMs: performance.now() - at };
     } catch (error) {
       const code = error instanceof Error ? error.message : 'live_compile_failed';
