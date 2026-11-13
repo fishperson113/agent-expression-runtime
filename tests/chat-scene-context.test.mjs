@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { LiveBody } from '../src/live/body';
-import { sceneContextInput } from '../integrations/chat-scene-context.mjs';
+import { sceneContextInput, controllerAuthorityReceipt } from '../integrations/chat-scene-context.mjs';
 const source = () => ({ documentToken: 'doc-a', sessionId: 'session-a', revision: 1, scene: {
   schemaVersion: 1, epoch: 'epoch-a', revision: 1, capturedAt: Date.now(), partIds: ['face'], capacity: 24, remaining: 23 } });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
@@ -78,4 +78,16 @@ it('requires proven controller epoch, never treats renderer epoch as a mutation 
   expect(sceneContextInput(value, Date.now(), {session:'controller',epoch:'wrong'}).text).toContain('controller_unavailable');
   const aligned = sceneContextInput(value, Date.now(), {session:'controller',epoch:'epoch-a'});
   expect(aligned.text).toContain('"rendererEpoch":"epoch-a"'); expect(aligned.text).toContain('"controllerEpoch":"epoch-a"'); expect(aligned.text).toContain('partIds');
+});
+
+it.each(['valid', 'error', 'oversize', 'multiple', 'json', 'source', 'epoch'])('validates bootstrap controller proof: %s', mode => {
+  const value = { source: 'fisch-renderer', format: 'structured', session: 'controller', epoch: 'epoch-a' };
+  if (mode === 'source') value.source = 'external';
+  if (mode === 'epoch') value.epoch = 'bad epoch';
+  const result = { content: [{ type: 'text', text: JSON.stringify(value) }] };
+  if (mode === 'error') result.isError = true;
+  if (mode === 'oversize') result.content[0].text = 'x'.repeat(16001);
+  if (mode === 'multiple') result.content.push(result.content[0]);
+  if (mode === 'json') result.content[0].text = '{';
+  expect(controllerAuthorityReceipt(result)).toEqual(mode === 'valid' ? { session: 'controller', epoch: 'epoch-a' } : null);
 });

@@ -471,3 +471,23 @@ If a provider silently downgrades the tier, requested priority is not evidence o
 priority execution. Neither tier changes DSL geometry, ownership checks or model
 reasoning settings. Tests without video recording are the speed reference; a
 recording can itself slow this laptop substantially.
+
+
+### Native tool context and controller readiness
+
+Live supplies the installed compose/inspect/status descriptors and full input
+schemas once with thread instructions. They are generated from the same tool
+exports the MCP server uses, not a copied schema or a prompt-to-scene template.
+Other tools remain discoverable; a contract mismatch requires actual discovery.
+Static schemas never confer live scene or mutation authority.
+
+Before enabling the browser composer, Live tries one bounded native controller
+inspection for the selected thread. It accepts only the structured Fisch receipt
+and checks thread, selection generation, intent and availability before retaining
+its controller session/epoch. Navigation, cancellation or an active turn invalidates
+that result. The submission barrier still samples fresh renderer inventory and
+requires a matching epoch; stale proof falls back to normal agent inspection.
+Unsupported RPC, rejection or timeout also falls back, without replaying any turn.
+The composer waits at most 1.5 seconds for this optional proof; late results
+are ignored. The outstanding read still uses the existing bounded transport
+request lifetime, without reconnecting or cancelling unrelated work. No camera is accessed and no scene is authored by this readiness step.

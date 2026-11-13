@@ -30,3 +30,7 @@ export function sceneAuthorityReceipt(item) {
     return inspected || composed ? {session:value.session,epoch:value.epoch} : null;
   } catch { return null; }
 }
+
+export function controllerAuthorityReceipt(result) {
+  return sceneAuthorityReceipt({ type: 'mcpToolCall', server: 'fisch_live', tool: 'inspect_expression', status: 'completed', result });
+}
