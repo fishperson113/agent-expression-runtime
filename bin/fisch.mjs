@@ -33,6 +33,10 @@ async function live(options) {
   const abort = new AbortController(), stop = () => abort.abort();
   process.once('SIGINT', stop); process.once('SIGTERM', stop);
   try {
+    const { ensureFischCodexLogin, prepareFischCodexRuntime } = await import('../integrations/fisch-codex-runtime.mjs');
+    const { codexCommand } = await import('../scripts/start-session.mjs');
+    const codexHost = await codexCommand();
+    await prepareFischCodexRuntime(codexHost, await ensureFischCodexLogin(codexHost, { signal: abort.signal }), { signal: abort.signal });
     const { ensureLiveDependencies } = await import('../scripts/prepare-live.mjs');
     await ensureLiveDependencies({ signal: abort.signal });
     const { runLiveSession } = await import('../scripts/live-session.mjs');

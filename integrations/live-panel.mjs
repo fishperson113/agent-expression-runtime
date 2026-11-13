@@ -1,3 +1,4 @@
+import { fischCodexRuntime } from './fisch-codex-runtime.mjs';
 import { nativeLiveInstructions } from './live-instruction-bundle.mjs';
 import { codexCommand } from '../scripts/start-session.mjs';
 import { createBridge, startLivePolling } from './live-terminal.mjs';
@@ -61,8 +62,9 @@ async function keepDisconnectedPanel(state, client, signal, page) {
 export async function runPanelCodex({ live, cwd, signal, host: suppliedHost, reactiveProvider, resumeThreadId, clientFactory = openPanelClient }) {
   if (signal?.aborted) return liveShutdownCode(signal.reason) ?? 130;
   const host = suppliedHost ?? await codexCommand();
-  const env = { ...nativeLiveEnvironment(process.env), AER_BASE_URL: live.base, AER_PAIRING_TOKEN: live.token, FISCH_LIVE: '1', FISCH_PLANNER_BACKEND: 'off' };
-  const configured = reactiveProvider === undefined ? createLiveReactiveProvider(process.env, { defaultNative: true }) : { provider: reactiveProvider, reason: reactiveProvider ? 'ready' : 'disabled_by_config' };
+  const runtime = fischCodexRuntime(); cwd = runtime.cwd;
+  const env = { ...nativeLiveEnvironment(runtime.env), AER_BASE_URL: live.base, AER_PAIRING_TOKEN: live.token, FISCH_LIVE: '1', FISCH_PLANNER_BACKEND: 'off' };
+  const configured = reactiveProvider === undefined ? createLiveReactiveProvider(runtime.env, { defaultNative: true }) : { provider: reactiveProvider, reason: reactiveProvider ? 'ready' : 'disabled_by_config' };
   const instructions = nativeLiveInstructions();
   const state = await createBridge({ live, host, cwd, env, configured, instructions });
   const done = Promise.withResolvers(); let client, timer, unbind, failed = false;
