@@ -13,7 +13,7 @@ export const expressionStatusTool = {
 export function createExpressionStatus({ base, token, subscribe = subscribePlaygroundFeedback,
   now = () => performance.now(), limit = 256, ttlMs = 60000 }) {
   const entries = new Map(), feedback = new Map();
-  let owner, stop, connected = false, generation = 0, closed = false;
+  let owner, stop, waiter, connected = false, generation = 0, closed = false;
   function prune(map) {
     const time = now();
     for (const [id, value] of map) if (time - value.updatedAt >= ttlMs) map.delete(id);
@@ -31,7 +31,7 @@ export function createExpressionStatus({ base, token, subscribe = subscribePlayg
     for (const entry of entries.values()) if (!terminal.has(entry.status)) {
       entry.status = 'unknown'; entry.reason = reason; entry.updatedAt = now();
     }
-    feedback.clear();
+    feedback.clear(); waiter?.wake();
   }
   function receive(value) {
     prune(entries); prune(feedback);
@@ -40,6 +40,7 @@ export function createExpressionStatus({ base, token, subscribe = subscribePlayg
     else update(previous, value);
     prune(feedback);
     for (const entry of entries.values()) if (entry.receipt && key(entry.receipt) === id) update(entry, feedback.get(id));
+    waiter?.wake();
   }
   function reset(reason = 'session_changed') {
     const held = stop; stop = undefined; owner = undefined;
@@ -80,6 +81,7 @@ export function createExpressionStatus({ base, token, subscribe = subscribePlayg
     update(entry, value);
     if (entry.receipt && connected && feedback.has(key(entry.receipt))) update(entry, feedback.get(key(entry.receipt)));
     if (!connected && !terminal.has(entry.status)) { entry.status = 'unknown'; entry.reason = 'feedback_unavailable'; }
+    waiter?.wake();
   }
   function read(args) {
     if (!args || typeof args !== 'object' || Array.isArray(args) || Object.keys(args).length !== 1 ||
@@ -89,9 +91,23 @@ export function createExpressionStatus({ base, token, subscribe = subscribePlayg
     return entry ? { ...entry, sessionId: undefined, updatedAt: undefined, visibility: 'unknown' } : {
       requestId: args.requestId, status: 'unknown', reason: 'not_retained', visibility: 'unknown' };
   }
+  function wait(args, maxMs = 800) {
+    const current = read(args);
+    const eligible = value => connected && !closed && ['accepted', 'pending', 'applied'].includes(value.status);
+    if (waiter || !eligible(current)) return Promise.resolve(current);
+    return new Promise(resolve => {
+      let timer;
+      const finish = () => {
+        clearTimeout(timer); waiter = undefined; resolve(read(args));
+      };
+      waiter = { wake: () => { if (!eligible(read(args))) finish(); } };
+      timer = setTimeout(finish, Math.max(0, Math.min(800, Number.isFinite(maxMs) ? maxMs : 800)));
+    });
+  }
   function failed(requestId) {
     const entry = entries.get(requestId);
     if (entry && !terminal.has(entry.status)) { entry.status = 'unknown'; entry.reason = 'admission_unknown'; }
+    waiter?.wake();
   }
-  return { begin, receipt, read, reset, failed, close: () => { closed = true; reset('connection_closed'); } };
+  return { begin, receipt, read, wait, reset, failed, close: () => { closed = true; reset('connection_closed'); } };
 }

@@ -65,23 +65,23 @@ it('a lost end response latches observer uncertainty even when its callback late
   await vi.waitFor(() => expect(s.uncertain()).toBe(true)); gate.resolve();
   await vi.waitFor(() => expect(s.busy()).toBe(false)); expect(s.uncertain()).toBe(true);
 });
-async function gateway() {
+async function gateway({ id = 'owner', epoch = 'epoch-1' } = {}) {
   const state = { requests: [], expressions: 0, streams: new Set() };
   const http = createServer(async (request, response) => {
     state.requests.push(request.url);
     if (request.url.endsWith('/events')) { response.writeHead(200, { 'Content-Type': 'text/event-stream' }); response.write(': ready\n\n'); state.streams.add(response); response.on('close', () => state.streams.delete(response)); return; }
     let text = ''; for await (const chunk of request) text += chunk;
     if (request.url.endsWith('/expressions') && state.rejectExpressions) { response.writeHead(400, { 'Content-Type': 'application/json' }); response.end(JSON.stringify({ code: 'fixture_mutation_rejected' })); return; }
-    const result = request.url === '/v1/sessions' ? { id: 'owner', epoch: 'epoch-1' }
-      : request.url.endsWith('/expressions') ? { session: 'owner', epoch: 'epoch-1', seq: ++state.expressions, status: 'accepted' } : {};
+    const result = request.url === '/v1/sessions' ? { id, epoch }
+      : request.url.endsWith('/expressions') ? { session: id, epoch, seq: ++state.expressions, status: 'accepted' } : {};
     response.writeHead(request.method === 'DELETE' ? 204 : 200, { 'Content-Type': 'application/json' }); response.end(JSON.stringify(result));
   });
   await new Promise(resolve => http.listen(0, '127.0.0.1', resolve));
   owned.push(async () => { http.closeAllConnections(); await new Promise(resolve => http.close(resolve)); });
   return { base: 'http://127.0.0.1:' + http.address().port, state };
 }
-async function mcp(control) {
-  const g = await gateway(), client = liveTestClient(g.base, token, { env: { FISCH_MCP_REQUIRE_THREAD: '1', FISCH_DESKTOP_INTENT_BASE: control.base } });
+async function mcp(control, identity) {
+  const g = await gateway(identity), client = liveTestClient(g.base, token, { env: { FISCH_MCP_REQUIRE_THREAD: '1', FISCH_DESKTOP_INTENT_BASE: control.base } });
   owned.push(() => client.close()); const initialized = await client.call('initialize');
   expect(initialized.instructions).toContain('independent camera observer');
   const invoke = (name, args = {}, thread = 'thread-one') => client.call('tools/call', { name, arguments: args, _meta: { threadId: thread } });
@@ -125,4 +125,23 @@ it('keeps a known mutation rejection alongside end uncertainty without exposing 
   expect(JSON.parse(value.content[1].text)).toEqual({ status: 'uncertain', code: 'desktop_intent_end_unknown', retry: false });
   expect(JSON.stringify(value)).not.toContain('PRIVATE_BARRIER_DETAIL'); expect(s.uncertain()).toBe(true);
   expect(m.state.requests.filter(path => path.endsWith('/expressions'))).toHaveLength(1);
+});
+
+it('compose lifecycle wait releases mutation queue and desktop lease before feedback, so cancel stays available', async () => {
+  const identity = { id: '11111111-1111-4111-8111-111111111111', epoch: '22222222-2222-4222-8222-222222222222' };
+  const s = await server(), m = await mcp(s, identity); await m.invoke('bind_controller');
+  const args = { base: 'none', requestId: 'waiting-compose', parts: [
+    { id: 'authored', kind: 'ellipsoid', center: [0,0,0], scale: [.2,.2,.2] }], durationMs: 600 };
+  let resolved = false;
+  const pending = m.invoke('compose_expression', args).then(value => { resolved = true; return value; });
+  await vi.waitFor(() => { expect(m.state.expressions).toBe(1); expect(s.busy()).toBe(false); });
+  for (const stream of m.state.streams) stream.write('event: feedback\ndata: ' + JSON.stringify({ session: identity.id, epoch: identity.epoch, seq: 1, status: 'applied' }) + '\n\n');
+  expect(resolved).toBe(false);
+  const other = toolValue(await m.invoke('compose_expression', { ...args, requestId: 'second-compose' }));
+  expect(other.lifecycle.status).toBe('accepted'); expect(resolved).toBe(false);
+  await m.invoke('cancel_expression');
+  const value = toolValue(await pending);
+  expect(value.status).toBe('accepted');
+  expect(value.lifecycle).toMatchObject({ status: 'unknown', reason: 'cancel_acknowledged', visibility: 'unknown' });
+  expect(m.state.expressions).toBe(2); expect(s.busy()).toBe(false);
 });
