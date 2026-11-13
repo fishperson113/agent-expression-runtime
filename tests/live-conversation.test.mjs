@@ -363,7 +363,9 @@ it.each(['throw','reject','missing','object','oversize','timeout'])('keeps text 
     const f=fixture({captureObservation}), pending=f.send('ordinary text');
     await vi.advanceTimersByTimeAsync(250);
     expect(f.calls).toHaveLength(1); const inputs=f.calls[0].message.params.input;
-    expect(inputs[0].text).toBe('ordinary text'); expect(inputs[1].text).toContain('unavailable'); expect(inputs[1].text).not.toContain('PRIVATE');
+    expect(inputs[0].text).toBe('ordinary text');
+    if (['object','oversize'].includes(mode)) { expect(inputs[1].text).toContain('unavailable'); expect(inputs[1].text).not.toContain('PRIVATE'); }
+    else expect(inputs).toHaveLength(1);
     f.reply(0,{result:{turn:{id:'fallback-turn',status:'completed'}}}); await pending;
   } finally { vi.useRealTimers(); }
 });
@@ -669,4 +671,36 @@ it('fences old in-flight observer context when the completed reply renews freshn
  const fresh={hostCapabilities:{currentTurnContext:f.conversation.observerContext()}};now=78000;
  expect(broker.sharedContextCurrent(fresh)).toBe(true);f.conversation.inputAttempt({method:'turn/start',id:'next'});
  expect(broker.sharedContextCurrent(fresh)).toBe(false);broker.close();
+});
+
+const cameraUrl = 'data:image/jpeg;base64,' + Buffer.from([255,216,255,192,0,11,8,0,1,0,1,1,1,17,0,255,217]).toString('base64');
+const cameraContext = () => ({text:'Camera snapshot metadata', validForMs:1000, image:{type:'image',url:cameraUrl},sourceFence:{documentToken:'doc-a',sessionId:'camera-a',revision:1}});
+it.each(['matching','revoked','expired'])('forwards real image input only while valid: %s',async mode=>{
+ vi.useFakeTimers();try {
+  const f=fixture({captureObservation:cameraContext}),pending=f.send('  alo  ');await vi.advanceTimersByTimeAsync(0);
+  const call=f.calls[0];expect(call.message.params.input[2]).toEqual({type:'image',url:cameraUrl});
+  if(mode==='revoked')f.conversation.fenceObservation(call.message.id,null);
+  if(mode==='expired')await vi.advanceTimersByTimeAsync(1001);
+  expect(call.guard(call.message)).toBe(true);expect(call.message.params.input[0].text).toBe('  alo  ');
+  expect(call.message.params.input).toHaveLength(mode==='matching'?3:1);
+  f.reply(0,{result:{turn:{id:'image-turn',status:'completed'}}});await pending;
+  f.event({method:'item/completed',params:{threadId:'thread-a',turnId:'image-turn',item:{id:'image-user',type:'userMessage',content:call.message.params.input}}});
+  expect(JSON.stringify(f.conversation.snapshot())).not.toContain(cameraUrl);
+  expect(JSON.stringify(f.conversation.observerContext())).not.toContain(cameraUrl);
+ }finally{vi.useRealTimers();}
+});
+it.each(['missing-fence','bad-image'])('omits unsafe camera enrichment: %s',async mode=>{
+ const value=cameraContext();if(mode==='missing-fence')delete value.sourceFence;else value.image.url='data:image/jpeg;base64,AAAA';
+ const f=fixture({captureObservation:()=>value}),pending=f.send('alo');await vi.waitFor(()=>expect(f.calls).toHaveLength(1));
+ expect(f.calls[0].message.params.input).toEqual([{type:'text',text:'alo',text_elements:[]}]);
+ f.reply(0,{result:{turn:{id:'image-turn',status:'completed'}}});await pending;
+});
+
+it.each(['selection','thread','navigation','close'])('does not forward a held camera image after %s',async mode=>{
+ const f=fixture({captureObservation:cameraContext}),pending=f.send('alo');await vi.waitFor(()=>expect(f.calls).toHaveLength(1));
+ const call=f.calls[0];expect(call.message.params.input[2].type).toBe('image');
+ if(mode==='selection')f.conversation.selectionAttempt();if(mode==='thread')f.select('different-thread');
+ if(mode==='navigation')f.conversation.navigation();if(mode==='close')f.conversation.close();
+ expect(call.guard(call.message)).toBe(false);
+ f.fail(0,false);await expect(pending).rejects.toThrow();
 });

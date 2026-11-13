@@ -1,3 +1,4 @@
+import { validCameraJpeg } from './chat-camera-image.mjs';
 import { randomUUID } from 'node:crypto';
 
 const id = value => typeof value === 'string' && /^[A-Za-z0-9._:-]{1,128}$/.test(value);
@@ -128,7 +129,8 @@ export class LiveConversation {
     if (!id(message?.id) || (job.rpcId !== undefined && job.rpcId !== message.id)) return false;
     job.rpcId = message.id;
     if (!cancelling && job.contextCapturedAt !== undefined && (job.contextRevoked || performance.now() - job.contextCapturedAt > job.contextValidForMs) && message.params?.input?.[1]) {
-      job.contextText = contextUnavailable; message.params.input[1] = { type: 'text', text: contextUnavailable, text_elements: [] };
+      if (job.imageContext) { job.contextText = undefined; message.params.input.splice(1); }
+      else { job.contextText = contextUnavailable; message.params.input.splice(1, Infinity, { type: 'text', text: contextUnavailable, text_elements: [] }); }
     }
     if (cancelling) return this.#owner() === job.turn;
     if (this.#pending !== job) return false;
@@ -151,24 +153,31 @@ export class LiveConversation {
     if (!this.#available() || job.generation !== this.#generation || job.intent !== this.#intent || job.thread !== this.#thread ||
       this.#pending !== job || this.#output.selection !== undefined)
       throw Object.assign(failure('conversation_changed'), { uncertain: false });
+    if (context === null || context === undefined) return [];
     job.contextCapturedAt = performance.now();
-    let text = context, validForMs = 1000;
+    let text = context, validForMs = 1000, image;
     try { if (context && typeof context === 'object' && Object.getPrototypeOf(context) === Object.prototype) {
       const fields = Object.getOwnPropertyDescriptors(context);
       const scope = fields.sourceFence;
       const parsedScope = scope && 'value' in scope ? sourceScope(scope.value) : null;
       const validScope = !scope || parsedScope;
-      if (Reflect.ownKeys(fields).length === (scope ? 3 : 2) && validScope && fields.text && fields.validForMs &&
+      if (Reflect.ownKeys(fields).length === (scope ? 3 : 2) + (fields.image ? 1 : 0) && validScope && fields.text && fields.validForMs &&
         'value' in fields.text && 'value' in fields.validForMs && Number.isFinite(fields.validForMs.value) &&
         fields.validForMs.value >= 0 && fields.validForMs.value <= 1000) {
         text = fields.text.value; validForMs = fields.validForMs.value;
         if (scope) job.sourceFence = freeze(parsedScope);
+        if (fields.image) {
+          const candidate = fields.image.value;
+          if (!parsedScope || !candidate || Object.keys(candidate).sort().join() !== 'type,url' || candidate.type !== 'image' || !validCameraJpeg(candidate.url)) return [];
+          image = { type: 'image', url: candidate.url }; job.imageContext = true;
+        }
       }
     }
     } catch { text = null; validForMs = 0; }
+    if (image && !(validForMs > 0 && typeof text === 'string' && text.length > 0 && bytes(text) <= 8192)) return [];
     job.contextValidForMs = validForMs;
     job.userText = userText; job.contextText = validForMs > 0 && typeof text === 'string' && text.length > 0 && bytes(text) <= 8192 ? text : contextUnavailable;
-    return { type: 'text', text: job.contextText, text_elements: [] };
+    return [{ type: 'text', text: job.contextText, text_elements: [] }, ...(image && validForMs > 0 ? [image] : [])];
   }
   async send(value) {
     this.#clearObserver(); this.#sync();
@@ -178,7 +187,7 @@ export class LiveConversation {
     this.#pending = job; this.#error = ''; this.#revision++;
     try {
       const input = [{ type: 'text', text: value.text, text_elements: [] }];
-      if (this.#captureObservation) input.push(await this.#captureContext(job, value.text));
+      if (this.#captureObservation) input.push(...await this.#captureContext(job, value.text));
       const reply = await this.#transport.submitUser({ threadId: job.thread,
         input }, message => this.#guard(job, message), key => { if (key === job.rpcId) this.#discard(key); });
       if (reply?.error) throw Object.assign(failure('conversation_rejected'), { uncertain: false });

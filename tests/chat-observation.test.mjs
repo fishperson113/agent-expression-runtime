@@ -1,3 +1,4 @@
+import { validCameraJpeg } from '../integrations/chat-camera-image.mjs';
 import { it, expect } from 'vitest';
 import { LiveConversation } from '../integrations/live-conversation.mjs';
 import { chatObservation } from '../src/live/chat-observation';
@@ -23,61 +24,63 @@ it('rejects extra fields, raw media, inconsistent ages, invalid coefficients and
  const dto=chatObservation(sample(),'epoch-a',1100);
  for(const invalid of [{...dto,rawFrame:'PRIVATE'}, {...dto,source:{...dto.source,ageMs:0}}, {...dto,geometry:{...dto.geometry,expressionCoefficients:{...dto.geometry.expressionCoefficients,smile:2}}}, {...dto,geometry:{...dto.geometry,summary:'instruction'}}]) expect(formatChatObservation(invalid,scope)).toBe(unavailableChatObservation);
 });
-it('checks the browser document token and never substitutes a later sample after capture',async()=>{
- const channel={token:'doc-a',stale:false},dto=chatObservation(sample(),'epoch-a',1100);
- const broker={page:{evaluate:async(fn,arg)=>{const old=globalThis.window;globalThis.window={fischLive:{conversationDocument:'doc-a',chatObservation:()=>dto}};try{return fn(arg);}finally{globalThis.window=old;}}}};
- expect((await captureChatObservation(broker,channel,scope)).text).toContain('camera-a');
- channel.token='doc-b';expect(await captureChatObservation(broker,channel,scope)).toBe(unavailableChatObservation);
- channel.stale=true;expect(await captureChatObservation(broker,channel,scope)).toBe(unavailableChatObservation);
- expect(await captureChatObservation({page:{evaluate:async()=>{throw Error('PRIVATE');}}},{token:'doc-a'},scope)).toBe(unavailableChatObservation);
+
+const image = () => ({schemaVersion:1,url:'data:image/jpeg;base64,' + Buffer.from([255,216,255,192,0,11,8,0,1,0,1,1,1,17,0,255,217]).toString('base64'),width:1,height:1,capturedAt:1000,readAt:1100,mediaTime:1});
+const frame = () => ({image:image(),source:{sessionId:'camera-a',revision:1}});
+it('captures actual JPEG separately from bounded context and never substitutes geometry',async()=>{
+ const channel={token:'doc-a'},broker={page:{evaluate:async()=>frame()}};
+ const result=await captureChatObservation(broker,channel,scope);
+ expect(result.image).toEqual({type:'image',url:image().url});expect(result.text).not.toContain('base64');
+ expect(result.sourceFence).toEqual({documentToken:'doc-a',sessionId:'camera-a',revision:1});
+ expect(result.validForMs).toBeGreaterThan(0);expect(result.validForMs).toBeLessThanOrEqual(1000);
+ expect(await captureChatObservation({page:{evaluate:async()=>chatObservation(sample(),'epoch-a',1100)}},channel,scope)).toBeNull();
 });
-it('reads production browser snapshots without media and keeps the earlier reading immutable',async()=>{
+it.each(['off','invalid','oversize','dimensions','stale','future','source','throw'])('omits %s camera context without blocking text',async mode=>{
+ const value=frame();if(mode==='invalid')value.image.url='data:image/jpeg;base64,AAAA';
+ if(mode==='oversize')value.image.url='data:image/jpeg;base64,'+'A'.repeat(270000);
+ if(mode==='dimensions')value.image.width=2;if(mode==='stale')value.image.readAt=2600;
+ if(mode==='future')value.image.capturedAt=1200;if(mode==='source')value.source.revision=-1;
+ const broker={page:{evaluate:async()=>{if(mode==='throw')throw Error('private');return mode==='off'?null:value;}}};
+ expect(await captureChatObservation(broker,{token:'doc-a'},scope)).toBeNull();
+});
+it('bounds concurrent reads and rejects changed documents after capture',async()=>{
+ let finish,calls=0;const channel={token:'doc-a'},broker={page:{evaluate:()=>{calls++;return new Promise(resolve=>finish=resolve);}}};
+ const first=captureChatObservation(broker,channel,scope);expect(await captureChatObservation(broker,channel,scope)).toBeNull();expect(calls).toBe(1);
+ channel.token='doc-b';finish(frame());expect(await first).toBeNull();
+});
+it('checks the real browser API, off and synthetic geometry do not produce camera images',async()=>{
  const {createServer}=await import('vite'),{chromium}=await import('@playwright/test');
  const server=await createServer({server:{host:'127.0.0.1',port:0}});let browser;
- try{
-  await server.listen();browser=await chromium.launch({headless:true});const page=await browser.newPage();
-  await page.addInitScript(()=>{window.__mediaCalls=0;navigator.mediaDevices.getUserMedia=()=>{window.__mediaCalls++;throw Error('no media');};});
-  await page.goto(server.resolvedUrls.local[0]+'live.html?fixture=synthetic');await page.waitForFunction(()=>!!window.fischLive?.chatObservation);
-  const off=await page.evaluate(()=>window.fischLive.chatObservation());expect(off).toMatchObject({state:'unavailable',source:{camera:'stopped'},geometry:null});
-  await page.evaluate(()=>window.fischLive.fixture('present-smile'));
-  const first=await page.evaluate(()=>window.fischLive.chatObservation());expect(first.state).toBe('fresh');expect(formatChatObservation(first,scope)).toContain('expressionCoefficients');
-  await page.evaluate(()=>{window.fischLive.conversationDocument='doc-a';});let submitted;
-  const transport={interruptUser:async()=>{},submitUser:async(params,guard)=>{expect(guard({id:'owned-send',params})).toBe(true);submitted=params;return{result:{turn:{id:'turn-a',status:'inProgress'}}};}};
-  const conversation=new LiveConversation({output:{thread:'thread-a'},broker:{busy:()=>false},transport,captureObservation:job=>captureChatObservation({page},{token:'doc-a',stale:false},job)});
-  await conversation.send({generation:conversation.snapshot().generation,text:'Original public user text'});
-  expect(submitted.threadId).toBe('thread-a');expect(submitted.input[0].text).toBe('Original public user text');expect(submitted.input[1].text).toContain('expressionCoefficients');conversation.close();
-  await page.evaluate(()=>window.fischLive.fixture('denied'));const denied=await page.evaluate(()=>window.fischLive.chatObservation());
-  expect(denied).toMatchObject({state:'unavailable',source:{camera:'denied'},geometry:null});expect(first.source.seq).toBeLessThan(denied.source.seq);expect(first.geometry.facePresent).toBe(true);
-  expect(await page.evaluate(()=>window.__mediaCalls)).toBe(0);
+ try{await server.listen();browser=await chromium.launch({headless:true});const page=await browser.newPage();
+ await page.addInitScript(()=>{navigator.mediaDevices.getUserMedia=()=>{throw Error('no actual camera allowed');};});
+ await page.goto(server.resolvedUrls.local[0]+'live.html?fixture=synthetic');await page.waitForFunction(()=>!!window.fischLive?.chatObservation);
+ await page.evaluate(()=>{window.fischLive.conversationDocument='doc-a';window.fischLive.fixture('present-smile');});
+ expect(await captureChatObservation({page},{token:'doc-a'},scope)).toBeNull();
  }finally{await browser?.close();await server.close();}
 },45000);
-it('bounds optional reads without consuming broker waiters or changing MAIN availability',async()=>{
- let finish,calls=0;const channel={token:'doc-a',stale:false};
- const broker={page:{evaluate:()=>{calls++;return new Promise(resolve=>{finish=resolve;});}},closed:false,browserUnavailable:false};
- const first=captureChatObservation(broker,channel,scope);
- expect(await captureChatObservation(broker,channel,scope)).toBe(unavailableChatObservation);expect(calls).toBe(1);
- channel.token='doc-b';finish(chatObservation(sample(),'epoch-a',1100));expect(await first).toBe(unavailableChatObservation);
- expect(broker).toMatchObject({closed:false,browserUnavailable:false});
+
+it.each(['matching','stopped','restart','document'])('strips revoked image at actual broker barrier: %s',async mode=>{
+ const {LiveReactiveBroker}=await import('../integrations/live-reactive-broker.mjs');
+ const held=Promise.withResolvers(),entered=Promise.withResolvers();let conversation,guard,resolve,submitted;
+ const source={documentToken:'doc-a',sessionId:'camera-a',revision:1},output={thread:'thread-a'};
+ const broker=new LiveReactiveBroker({output,page:{evaluate:async()=>{entered.resolve();await held.promise;return source;}},
+ beforeForward:(message,current)=>conversation.fenceObservation(message.id,current),
+ forward:message=>{expect(guard(message)).toBe(true);submitted=message.params;resolve({result:{turn:{id:'turn-a',status:'inProgress'}}});},
+ reject:()=>{throw Error('unexpected rejection');}});
+ const transport={interruptUser:async()=>{},submitUser:(params,g)=>new Promise(done=>{
+ guard=g;resolve=done;const message={id:'owned-send',method:'turn/start',params};expect(guard(message)).toBe(true);broker.client(message);
+ })};
+ conversation=new LiveConversation({output,broker,transport,captureObservation:()=>({text:'Camera metadata',image:{type:'image',url:image().url},validForMs:1000,sourceFence:{...source}})});
+ const sending=conversation.send({generation:conversation.snapshot().generation,text:'  alo  '});await entered.promise;
+ if(mode==='stopped')source.revision++;if(mode==='restart')source.sessionId='camera-b';if(mode==='document')source.documentToken='doc-b';
+ held.resolve();await sending;expect(submitted.input[0].text).toBe('  alo  ');
+ expect(submitted.input).toHaveLength(mode==='matching'?3:1);
+ conversation.close();broker.close();
 });
-it('fences source revocation at the actual broker barrier without replacing compatible frame snapshots',async()=>{
- const {createServer}=await import('vite'),{chromium}=await import('@playwright/test'),{LiveReactiveBroker}=await import('../integrations/live-reactive-broker.mjs');
- const server=await createServer({server:{host:'127.0.0.1',port:0}});let browser;
- try{
-  await server.listen();browser=await chromium.launch({headless:true});
-  for(const mode of ['present-neutral','denied']){
-   const page=await browser.newPage();await page.goto(server.resolvedUrls.local[0]+'live.html?fixture=synthetic');await page.waitForFunction(()=>!!window.fischLive?.chatObservationScope);
-   await page.evaluate(()=>{window.fischLive.conversationDocument='doc-a';window.fischLive.fixture('present-smile');});
-   const before=await page.evaluate(()=>window.fischLive.chatObservation()),held=Promise.withResolvers(),entered=Promise.withResolvers();let conversation,guard,resolve,submitted;
-   const output={thread:'thread-a'},broker=new LiveReactiveBroker({output,page:{evaluate:async(fn,arg)=>{entered.resolve();await held.promise;return page.evaluate(fn,arg);}},
-    beforeForward:(message,source)=>conversation.fenceObservation(message.id,source),forward:message=>{expect(guard(message)).toBe(true);submitted=message.params;resolve({result:{turn:{id:'turn-a',status:'inProgress'}}});},reject:()=>{throw Error('unexpected rejection');}});
-   const transport={interruptUser:async()=>{},submitUser:(params,g)=>new Promise(done=>{guard=g;resolve=done;const message={id:'owned-send',method:'turn/start',params};expect(guard(message)).toBe(true);broker.client(message);})};
-   conversation=new LiveConversation({output,broker,transport,captureObservation:job=>captureChatObservation({page},{token:'doc-a'},job)});
-   const sending=conversation.send({generation:conversation.snapshot().generation,text:'Keep exact chat'});await entered.promise;
-   await page.evaluate(mode=>window.fischLive.fixture(mode),mode);held.resolve();await sending;
-   expect(submitted.input[0].text).toBe('Keep exact chat');
-   if(mode==='denied')expect(submitted.input[1].text).toContain('unavailable');
-   else{const data=JSON.parse(submitted.input[1].text.split('\n')[1]);expect(data.source.seq).toBe(before.source.seq);expect(data.geometry.expressionCoefficients.smile).toBe(before.geometry.expressionCoefficients.smile);}
-   conversation.close();broker.close();await page.close();
-  }
- }finally{await browser?.close();await server.close();}
-},45000);
+
+it('fails closed for truncated JPEG marker streams without throwing',()=>{
+ for(const values of [[255,216,...Array(20).fill(255),217],[255,216,255,224,255,255,...Array(10).fill(255),217]]) {
+  const url='data:image/jpeg;base64,'+Buffer.from(values).toString('base64');
+  expect(()=>validCameraJpeg(url)).not.toThrow();expect(validCameraJpeg(url)).toBe(false);
+ }
+});
