@@ -45,7 +45,7 @@ it('keeps native observer trajectory through its endpoint before restoring', asy
  f.frame();
  for(let i=0;i<50;i++){ f.advance(100); f.observe(); f.frame(); }
  const formation=(f.body.scheduler as any).formation;
- expect(formation.trajectoryElapsed).toBeLessThan(8000);expect(f.body.metrics.reactiveOwner).not.toBeNull();
+ expect(formation.partTrajectory[0]).toBeLessThan(8000);expect(f.body.metrics.reactiveOwner).not.toBeNull();
  const cancel=vi.spyOn(f.body.scheduler,'cancel');
  f.advance(200);f.observe();f.frame();
  expect(f.body.metrics.reactiveOwner).not.toBeNull();expect(cancel).not.toHaveBeenCalled();
@@ -59,17 +59,17 @@ it('delays MAIN handoff until after its finite trajectory',()=>{
  expect(f.body.admit({v:1,epoch:f.body.scheduler.epoch,seq:1,kind:'program',track:'body',policy:'replace',body:{type:'live',program:longScene(),configuration:{controls:[],poses:[],lifetimeMs:1000,observerHandoffMs:10000}}}).status).toBe('accepted');
  f.frame();for(let i=0;i<12;i++){f.advance(100);f.observe();f.frame();}
  const formation=(f.body.scheduler as any).formation;
- expect(formation.trajectoryElapsed).toBeLessThan(8000);expect(f.body.canReactive()).toBe(false);expect(f.body.metrics.userGeometryLocked).toBe(true);
+ expect(formation.partTrajectory[0]).toBeLessThan(8000);expect(f.body.canReactive()).toBe(false);expect(f.body.metrics.userGeometryLocked).toBe(true);
  for(let i=0;i<72;i++){f.advance(100);f.observe();f.frame();}
- expect(f.body.canReactive()).toBe(true);expect(formation.trajectoryElapsed).toBeGreaterThanOrEqual(8000);
+ expect(f.body.canReactive()).toBe(true);expect(formation.partTrajectory[0]).toBeGreaterThanOrEqual(8000);
  f.body.dispose();
 });
 
 it('motion-off revokes permission and resume does not resurrect MAIN handoff',()=>{
  const f=setup(); f.body.admit({v:1,epoch:f.body.scheduler.epoch,seq:1,kind:'program',track:'body',policy:'replace',body:{type:'live',program:longScene(),configuration:{controls:[],poses:[],lifetimeMs:1000,observerHandoffMs:10000}}});
  f.frame();f.advance(200);f.frame();f.body.motion('off');f.frame();
- const formation=(f.body.scheduler as any).formation, elapsed=formation.trajectoryElapsed;
- f.advance(10000);f.frame();expect(formation.trajectoryElapsed).toBe(elapsed);
+ const formation=(f.body.scheduler as any).formation, elapsed=formation.partTrajectory[0];
+ f.advance(10000);f.frame();expect(formation.partTrajectory[0]).toBe(elapsed);
  f.body.motion('normal');f.frame();expect(f.body.canReactive()).toBe(false);expect(f.body.metrics.observerHandoff).toBeNull();f.body.dispose();
 });
 it.each(['off','rollback','intent'])('still revokes observer trajectory on %s',async reason=>{

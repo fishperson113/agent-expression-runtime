@@ -3,7 +3,7 @@ kind: object
 universe: live
 status: verified
 verified_at: 2026-11-13
-source_revision: e1bd851
+source_revision: 8ad92f2 + incremental-part-preservation working tree
 ---
 # Expression - agent input becomes deterministic geometry
 
@@ -21,6 +21,13 @@ Authoring convenience and runtime geometry have separate owners.
 - [LiveCompiler](../../../src/core/live/compiler.ts) wraps the shared
   [compiler](../../../src/core/compiler/compiler.ts), outside model inference.
 
+- [ParticleFormation](../../../src/core/geometry/morph.ts) preserves unchanged
+  same-ID samples and motion during incremental scene edits through
+  [incrementalAssignment](../../../src/core/geometry/incremental.ts). Fixed particle
+  budgets can redistribute density; additions do not increase particle count.
+  Identical whole-scene reissues replay motion; edits to a shared trajectory group
+  reset that group's timing together. Public input remains a full scene snapshot.
+
 ## Connected to
 Owned by the authoring/contract/core boundary. Delivered through [Live body](live-body.md).
 A shared track reference is input compression, not another scheduler or model.
@@ -35,4 +42,5 @@ MCP/HTTP authoring writes; compiler and renderer consume validated geometry.
 ## See
 [Composition guide](../../composable-expression.md);
 [composition E2E](../../../tests/expression-composition-e2e.test.mjs),
-[trajectory framing test](../../../tests/trajectory-framing.test.ts).
+[trajectory framing test](../../../tests/trajectory-framing.test.ts),
+[incremental geometry test](../../../tests/incremental-geometry.test.ts).
