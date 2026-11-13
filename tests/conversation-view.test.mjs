@@ -440,3 +440,44 @@ it('keys rows by turn and generation while pruning history and rejecting stale s
     }, ready)).toEqual({ pruned: true, stale: true, reset: true, oldGenerationIgnored: true, rows: 1 });
   } finally { await page.close(); }
 }, 45000);
+
+
+it('formats completed explanations safely without interpreting streamed text or user syntax', async () => {
+  const { page, panel } = await open();
+  try {
+    const text = '**Queue**: FIFO.\n\n```text\n<svg onload=alert(1)> [1] [2]\n```\nUse `enqueue`. [link](javascript:alert(1))';
+    const message = { id: 'format', turn: 't', role: 'assistant', text, status: 'streaming', truncated: false };
+    await page.evaluate(value => window.conversation.project(value), { ...ready, messages: [message] });
+    expect(await panel.locator('li strong, li code').count()).toBe(0);
+    await page.evaluate(value => window.conversation.project(value), { ...ready, revision: 2, messages: [{ ...message, status: 'completed' }] });
+    expect(await panel.locator('li strong').textContent()).toBe('Queue');
+    expect(await panel.locator('li pre code').textContent()).toBe('<svg onload=alert(1)> [1] [2]');
+    expect(await panel.locator('li svg, li a, li script').count()).toBe(0);
+    expect(await panel.locator('li').textContent()).toContain('[link](javascript:alert(1))');
+    await page.evaluate(value => window.conversation.project(value), { ...ready, revision: 3, messages: [{ ...message, role: 'user', status: 'completed' }] });
+    expect(await panel.locator('li').textContent()).toContain(text);
+    expect(await panel.locator('li strong, li code').count()).toBe(0);
+    await page.evaluate(value => window.conversation.project(value), { ...ready, revision: 4, messages: [{ ...message, text: '```text\n[1] [2]\n```', status: 'completed' }] });
+    expect(await panel.locator('li pre code').textContent()).toBe('[1] [2]');
+  } finally { await page.close(); }
+}, 45000);
+
+it('leaves incomplete fences literal and preserves selected text at stream completion', async () => {
+  const { page, panel } = await open();
+  try {
+    const item = { id: 'selected-format', turn: 't', role: 'assistant', text: '**Keep** this', status: 'streaming', truncated: false };
+    const selected = await page.evaluate(({base,item}) => {
+      window.conversation.project({...base,messages:[item]});
+      const node=document.querySelector('#conversation-test ol li').firstChild;
+      const range=document.createRange();range.setStart(node,0);range.setEnd(node,10);
+      getSelection().removeAllRanges();getSelection().addRange(range);
+      window.conversation.project({...base,revision:2,messages:[{...item,status:'completed'}]});
+      return getSelection().toString();
+    }, {base:ready,item});
+    expect(selected).toBe('Codex: **K');
+    expect(await panel.locator('li strong').count()).toBe(0);
+    await page.evaluate(value => {getSelection().removeAllRanges();window.conversation.project(value);}, {...ready,revision:3,messages:[{...item,status:'completed',text:'```text\n**unfinished**'}]});
+    expect(await panel.locator('li').textContent()).toContain('```text\n**unfinished**');
+    expect(await panel.locator('li strong, li pre').count()).toBe(0);
+  } finally { await page.close(); }
+}, 45000);
