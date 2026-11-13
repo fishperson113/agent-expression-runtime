@@ -10,6 +10,7 @@ import { playgroundToolDefinitions } from './playground-tools.mjs';
 import { capabilityResource, capabilityResourceList } from './capability-contract.mjs';
 import { composeExpression, compositionTool } from './compose-expression.mjs';
 import { createExpressionStatus, expressionStatusTool } from './expression-status.mjs';
+import { withComposeLifecycle } from './compose-receipt.mjs';
 import { createDesktopIntentClient } from './desktop-intent.mjs';
 const base = process.env.AER_BASE_URL,
   token = process.env.AER_PAIRING_TOKEN;
@@ -331,6 +332,7 @@ async function handle(message) {
   ] };
   if (method === 'resources/read') return resources(params);
   if (method === 'tools/call') {
+    const compose = live && params?.name === 'compose_expression';
     if (requireThread) { const gated = threadGate(params); if (gated) return gated; }
     if (live && params?.name === 'compose_expression') {
       try { params = { name: 'express', arguments: composeExpression(params.arguments) }; }
@@ -349,8 +351,8 @@ async function handle(message) {
     }
     if (live && ['observe', 'look', 'inspect_expression', 'preview_expression'].includes(params?.name)) return liveCall(params.name, params.arguments);
     if (live && params?.name === 'playground_state') return playgroundRead(params.arguments);
-    if (desktopIntent && mutations.has(params?.name)) return fencedMutation(params);
-    return mutation(params);
+    const result = desktopIntent && mutations.has(params?.name) ? fencedMutation(params) : mutation(params);
+    return compose ? withComposeLifecycle(result, expressionStatus) : result;
   }
   throw Error('method_not_found');
 }
