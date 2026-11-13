@@ -1,0 +1,656 @@
+{
+  "old8": {
+    "rejected": {
+      "base": "current_scene",
+      "durationMs": 500,
+      "easing": "smoothstep",
+      "parts": [
+        {
+          "id": "coffee_flower_stem",
+          "kind": "curve",
+          "color": "#8CD595",
+          "radius": 0.012,
+          "points": [
+            [
+              1.09,
+              -0.67,
+              0.24
+            ],
+            [
+              1.14,
+              -0.57,
+              0.24
+            ],
+            [
+              1.17,
+              -0.43,
+              0.24
+            ]
+          ]
+        },
+        {
+          "id": "coffee_flower_leaf",
+          "kind": "curve",
+          "color": "#A6E2A3",
+          "radius": 0.012,
+          "points": [
+            [
+              1.14,
+              -0.57,
+              0.24
+            ],
+            [
+              1.19,
+              -0.555,
+              0.24
+            ],
+            [
+              1.22,
+              -0.52,
+              0.24
+            ]
+          ]
+        },
+        {
+          "id": "coffee_flower_petal_0",
+          "kind": "ellipsoid",
+          "center": [
+            1.17,
+            -0.382,
+            0.24
+          ],
+          "scale": [
+            0.042,
+            0.027,
+            0.02
+          ],
+          "rotation": [
+            0,
+            0,
+            1.5707963267948966
+          ],
+          "color": "#FFAACC"
+        },
+        {
+          "id": "coffee_flower_petal_1",
+          "kind": "ellipsoid",
+          "center": [
+            1.1243492872178327,
+            -0.4151671842700025,
+            0.24
+          ],
+          "scale": [
+            0.042,
+            0.027,
+            0.02
+          ],
+          "rotation": [
+            0,
+            0,
+            2.827433388230814
+          ],
+          "color": "#FFAACC"
+        },
+        {
+          "id": "coffee_flower_petal_2",
+          "kind": "ellipsoid",
+          "center": [
+            1.1417863078899613,
+            -0.46883281572999747,
+            0.24
+          ],
+          "scale": [
+            0.042,
+            0.027,
+            0.02
+          ],
+          "rotation": [
+            0,
+            0,
+            4.084070449666731
+          ],
+          "color": "#FFAACC"
+        },
+        {
+          "id": "coffee_flower_petal_3",
+          "kind": "ellipsoid",
+          "center": [
+            1.1982136921100386,
+            -0.46883281572999747,
+            0.24
+          ],
+          "scale": [
+            0.042,
+            0.027,
+            0.02
+          ],
+          "rotation": [
+            0,
+            0,
+            5.340707511102648
+          ],
+          "color": "#FFAACC"
+        },
+        {
+          "id": "coffee_flower_petal_4",
+          "kind": "ellipsoid",
+          "center": [
+            1.2156507127821674,
+            -0.41516718427000254,
+            0.24
+          ],
+          "scale": [
+            0.042,
+            0.027,
+            0.02
+          ],
+          "rotation": [
+            0,
+            0,
+            6.5973445725385655
+          ],
+          "color": "#FFAACC"
+        },
+        {
+          "id": "coffee_flower_center",
+          "kind": "ellipsoid",
+          "center": [
+            1.17,
+            -0.43,
+            0.266
+          ],
+          "scale": [
+            0.028,
+            0.028,
+            0.022
+          ],
+          "color": "#FFDF82"
+        }
+      ]
+    },
+    "corrected": {
+      "base": "current_scene",
+      "durationMs": 500,
+      "easing": "smoothstep",
+      "parts": [
+        {
+          "id": "coffee_flower_stem",
+          "kind": "curve",
+          "color": "#8CD595",
+          "radius": 0.012,
+          "points": [
+            [
+              1.09,
+              -0.67,
+              0.24
+            ],
+            [
+              1.14,
+              -0.57,
+              0.24
+            ],
+            [
+              1.17,
+              -0.43,
+              0.24
+            ]
+          ]
+        },
+        {
+          "id": "coffee_flower_leaf",
+          "kind": "curve",
+          "color": "#A6E2A3",
+          "radius": 0.012,
+          "points": [
+            [
+              1.14,
+              -0.57,
+              0.24
+            ],
+            [
+              1.19,
+              -0.555,
+              0.24
+            ],
+            [
+              1.22,
+              -0.52,
+              0.24
+            ]
+          ]
+        },
+        {
+          "id": "coffee_flower_petal_0",
+          "kind": "ellipsoid",
+          "center": [
+            1.17,
+            -0.382,
+            0.24
+          ],
+          "scale": [
+            0.042,
+            0.027,
+            0.02
+          ],
+          "rotation": [
+            0,
+            0,
+            1.5707963267948966
+          ],
+          "color": "#FFAACC"
+        },
+        {
+          "id": "coffee_flower_petal_1",
+          "kind": "ellipsoid",
+          "center": [
+            1.1243492872178327,
+            -0.4151671842700025,
+            0.24
+          ],
+          "scale": [
+            0.042,
+            0.027,
+            0.02
+          ],
+          "rotation": [
+            0,
+            0,
+            2.827433388230814
+          ],
+          "color": "#FFAACC"
+        },
+        {
+          "id": "coffee_flower_petal_2",
+          "kind": "ellipsoid",
+          "center": [
+            1.1417863078899613,
+            -0.46883281572999747,
+            0.24
+          ],
+          "scale": [
+            0.042,
+            0.027,
+            0.02
+          ],
+          "rotation": [
+            0,
+            0,
+            -2.1991148575128556
+          ],
+          "color": "#FFAACC"
+        },
+        {
+          "id": "coffee_flower_petal_3",
+          "kind": "ellipsoid",
+          "center": [
+            1.1982136921100386,
+            -0.46883281572999747,
+            0.24
+          ],
+          "scale": [
+            0.042,
+            0.027,
+            0.02
+          ],
+          "rotation": [
+            0,
+            0,
+            -0.9424777960769383
+          ],
+          "color": "#FFAACC"
+        },
+        {
+          "id": "coffee_flower_petal_4",
+          "kind": "ellipsoid",
+          "center": [
+            1.2156507127821674,
+            -0.41516718427000254,
+            0.24
+          ],
+          "scale": [
+            0.042,
+            0.027,
+            0.02
+          ],
+          "rotation": [
+            0,
+            0,
+            0.3141592653589791
+          ],
+          "color": "#FFAACC"
+        },
+        {
+          "id": "coffee_flower_center",
+          "kind": "ellipsoid",
+          "center": [
+            1.17,
+            -0.43,
+            0.266
+          ],
+          "scale": [
+            0.028,
+            0.028,
+            0.022
+          ],
+          "color": "#FFDF82"
+        }
+      ]
+    }
+  },
+  "new7": {
+    "rejected": {
+      "base": "current_scene",
+      "durationMs": 500,
+      "easing": "smoothstep",
+      "parts": [
+        {
+          "id": "coffee_flower_stem",
+          "kind": "curve",
+          "color": "#A5D797",
+          "points": [
+            [
+              1.16,
+              -0.54,
+              0.13
+            ],
+            [
+              1.2,
+              -0.44,
+              0.13
+            ],
+            [
+              1.23,
+              -0.32,
+              0.14
+            ],
+            [
+              1.24,
+              -0.23,
+              0.15
+            ]
+          ],
+          "radius": 0.012,
+          "weight": 0.42
+        },
+        {
+          "id": "coffee_flower_center",
+          "kind": "ellipsoid",
+          "color": "#FFE185",
+          "center": [
+            1.24,
+            -0.21,
+            0.17
+          ],
+          "scale": [
+            0.041,
+            0.041,
+            0.025
+          ],
+          "weight": 0.36
+        },
+        {
+          "id": "coffee_flower_petal_1",
+          "kind": "ellipsoid",
+          "color": "#FFADC9",
+          "center": [
+            1.24,
+            -0.141,
+            0.15
+          ],
+          "scale": [
+            0.053,
+            0.036,
+            0.022
+          ],
+          "rotation": [
+            0,
+            0,
+            1.5707963267948966
+          ],
+          "weight": 0.32
+        },
+        {
+          "id": "coffee_flower_petal_2",
+          "kind": "ellipsoid",
+          "color": "#FFADC9",
+          "center": [
+            1.1743771003756345,
+            -0.1886778273881286,
+            0.15
+          ],
+          "scale": [
+            0.053,
+            0.036,
+            0.022
+          ],
+          "rotation": [
+            0,
+            0,
+            2.827433388230814
+          ],
+          "weight": 0.32
+        },
+        {
+          "id": "coffee_flower_petal_3",
+          "kind": "ellipsoid",
+          "color": "#FFADC9",
+          "center": [
+            1.1994428175918193,
+            -0.26582217261187135,
+            0.15
+          ],
+          "scale": [
+            0.053,
+            0.036,
+            0.022
+          ],
+          "rotation": [
+            0,
+            0,
+            4.084070449666731
+          ],
+          "weight": 0.32
+        },
+        {
+          "id": "coffee_flower_petal_4",
+          "kind": "ellipsoid",
+          "color": "#FFADC9",
+          "center": [
+            1.2805571824081807,
+            -0.26582217261187135,
+            0.15
+          ],
+          "scale": [
+            0.053,
+            0.036,
+            0.022
+          ],
+          "rotation": [
+            0,
+            0,
+            5.340707511102648
+          ],
+          "weight": 0.32
+        },
+        {
+          "id": "coffee_flower_petal_5",
+          "kind": "ellipsoid",
+          "color": "#FFADC9",
+          "center": [
+            1.3056228996243655,
+            -0.18867782738812863,
+            0.15
+          ],
+          "scale": [
+            0.053,
+            0.036,
+            0.022
+          ],
+          "rotation": [
+            0,
+            0,
+            6.5973445725385655
+          ],
+          "weight": 0.32
+        }
+      ]
+    },
+    "corrected": {
+      "base": "current_scene",
+      "durationMs": 500,
+      "easing": "smoothstep",
+      "parts": [
+        {
+          "id": "coffee_flower_stem",
+          "kind": "curve",
+          "color": "#A5D797",
+          "points": [
+            [
+              1.16,
+              -0.54,
+              0.13
+            ],
+            [
+              1.2,
+              -0.44,
+              0.13
+            ],
+            [
+              1.23,
+              -0.32,
+              0.14
+            ],
+            [
+              1.24,
+              -0.23,
+              0.15
+            ]
+          ],
+          "radius": 0.012,
+          "weight": 0.42
+        },
+        {
+          "id": "coffee_flower_center",
+          "kind": "ellipsoid",
+          "color": "#FFE185",
+          "center": [
+            1.24,
+            -0.21,
+            0.17
+          ],
+          "scale": [
+            0.041,
+            0.041,
+            0.025
+          ],
+          "weight": 0.36
+        },
+        {
+          "id": "coffee_flower_petal_1",
+          "kind": "ellipsoid",
+          "color": "#FFADC9",
+          "center": [
+            1.24,
+            -0.141,
+            0.15
+          ],
+          "scale": [
+            0.053,
+            0.036,
+            0.022
+          ],
+          "rotation": [
+            0,
+            0,
+            1.5707963267948966
+          ],
+          "weight": 0.32
+        },
+        {
+          "id": "coffee_flower_petal_2",
+          "kind": "ellipsoid",
+          "color": "#FFADC9",
+          "center": [
+            1.1743771003756345,
+            -0.1886778273881286,
+            0.15
+          ],
+          "scale": [
+            0.053,
+            0.036,
+            0.022
+          ],
+          "rotation": [
+            0,
+            0,
+            2.827433388230814
+          ],
+          "weight": 0.32
+        },
+        {
+          "id": "coffee_flower_petal_3",
+          "kind": "ellipsoid",
+          "color": "#FFADC9",
+          "center": [
+            1.1994428175918193,
+            -0.26582217261187135,
+            0.15
+          ],
+          "scale": [
+            0.053,
+            0.036,
+            0.022
+          ],
+          "rotation": [
+            0,
+            0,
+            -2.1991148575128556
+          ],
+          "weight": 0.32
+        },
+        {
+          "id": "coffee_flower_petal_4",
+          "kind": "ellipsoid",
+          "color": "#FFADC9",
+          "center": [
+            1.2805571824081807,
+            -0.26582217261187135,
+            0.15
+          ],
+          "scale": [
+            0.053,
+            0.036,
+            0.022
+          ],
+          "rotation": [
+            0,
+            0,
+            -0.9424777960769383
+          ],
+          "weight": 0.32
+        },
+        {
+          "id": "coffee_flower_petal_5",
+          "kind": "ellipsoid",
+          "color": "#FFADC9",
+          "center": [
+            1.3056228996243655,
+            -0.18867782738812863,
+            0.15
+          ],
+          "scale": [
+            0.053,
+            0.036,
+            0.022
+          ],
+          "rotation": [
+            0,
+            0,
+            0.3141592653589791
+          ],
+          "weight": 0.32
+        }
+      ]
+    }
+  }
+}

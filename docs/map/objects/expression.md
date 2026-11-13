@@ -3,7 +3,7 @@ kind: object
 universe: live
 status: verified
 verified_at: 2026-11-13
-source_revision: 8ad92f2 + incremental-part-preservation working tree
+source_revision: 67d77ef + static-rotation-authoring working tree
 ---
 # Expression - agent input becomes deterministic geometry
 
@@ -14,6 +14,10 @@ Authoring convenience and runtime geometry have separate owners.
 ## Shape and source
 - [compose-expression.mjs](../../../integrations/compose-expression.mjs) owns public
   composition expansion, including shared tracks into per-part trajectories.
+  Static ellipsoid rotation accepts radians within +/-4pi at this boundary and
+  canonicalizes out-of-runtime-range values modulo2pi. Motion, trajectory and
+  raw AST limits are unchanged; no degree conversion is inferred. See
+  [static rotation tests](../../../tests/static-rotation-authoring.test.mjs).
   Its tool description and [Live instructions](../../../integrations/live-instructions.md)
   distinguish additive props from intentional whole-body transformation; default
   `base:none` still means replacement; MAIN `base:current_scene` emits an atomic
