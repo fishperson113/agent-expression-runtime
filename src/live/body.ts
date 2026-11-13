@@ -44,7 +44,7 @@ export class LiveBody {
   private userLeaseUntil = 0;
   private userGeometryLocked = false;
   private transientScene?: { epoch: string; seq: number };
-  private publicContext?: { epoch: string; seq: number; until: number; text: string; mode: 'open' | 'quiet' };
+  private publicContext?: { epoch: string; seq: number; until: number; text: string; mode: 'open' | 'quiet'; expired?: boolean };
   private observerHandoff?: { epoch: string; seq: number; from: number; until: number };
   private origins = new WeakMap<Compiled, TraceAttribution>();
   private lifecycle = new ExpressionLifecycle((status, ir) => {
@@ -141,11 +141,22 @@ export class LiveBody {
   revokeObserverHandoff(preserveScene = false) { this.observerHandoff = undefined; this.publicContext = undefined; if (!preserveScene) this.transientScene = undefined; }
   observerContext() {
     const value = this.publicContext;
-    if (value && (value.epoch !== this.scheduler.epoch || performance.now() >= value.until)) this.publicContext = undefined;
-    return this.publicContext ? { revision: this.publicContext.seq, text: this.publicContext.text, mode: this.publicContext.mode } : null;
+    if (value && (value.epoch !== this.scheduler.epoch || performance.now() >= value.until + 120000)) this.publicContext = undefined;
+    if (this.publicContext && performance.now() >= this.publicContext.until) this.publicContext.expired = true;
+    return this.publicContext && !this.publicContext.expired ? { revision: this.publicContext.seq, text: this.publicContext.text, mode: this.publicContext.mode } : null;
   }
   observerContextRemainingMs() { return this.observerContext() ? Math.max(0, this.publicContext!.until - performance.now()) : 0; }
-  matchesObserverContext(revision: number | null) { return (this.observerContext()?.revision ?? null) === revision; }
+  recentObserverContext() {
+    if (this.observerContext()) return null;
+    const value = this.publicContext;
+    return value ? { revision: value.seq, text: value.text, previousMode: value.mode, expired: true as const } : null;
+  }
+  observerContextReadKey(): number | string | null {
+    const active = this.observerContext();
+    if (active) return active.revision;
+    return this.recentObserverContext() ? `expired:${this.publicContext!.seq}:${this.publicContext!.until}` : null;
+  }
+  matchesObserverContext(revision: number | string | null) { return this.observerContextReadKey() === revision; }
   prepareUserMutation() { this.revokeObserverHandoff(); this.attention.revoke(); this.reactive?.userIntent(); }
   get userSceneOwned() { return this.userGeometryLocked; }
   canConverse() { return this.controls.mode !== 'off' && this.observerContext()?.mode !== 'quiet' && performance.now() >= this.userLeaseUntil && !this.scheduler.busy; }

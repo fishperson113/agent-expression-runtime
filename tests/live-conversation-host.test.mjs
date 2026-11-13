@@ -564,9 +564,10 @@ it.skipIf(!nativeGateway)('keeps a long public brief above usable chat with publ
     expect(await input.inputValue()).toBe('Bản nháp phải còn nguyên khi brief đếm ngược.');expect(calls).toBe(2);
     const replace=async durationMs=>toolValue(await client.tool('compose_expression',{durationMs:100,observerContext:{text,mode:'open',durationMs},
       parts:[{id:'layout_form',kind:'ellipsoid',center:[0,0,0],scale:[0.3,0.3,0.1]}]}));
-    expect((await replace(1000)).status).toBe('accepted');await expect.poll(()=>brief.isVisible(),{timeout:6000}).toBe(false);
-    expect(await brief.textContent()).toBe('');expect(await input.inputValue()).toBe('Bản nháp phải còn nguyên khi brief đếm ngược.');
+    expect((await replace(1000)).status).toBe('accepted');await expect.poll(()=>brief.textContent(),{timeout:6000}).toContain('vừa hết hạn');
+    expect(await brief.isVisible()).toBe(true);expect(await brief.textContent()).toContain(text);expect(await input.inputValue()).toBe('Bản nháp phải còn nguyên khi brief đếm ngược.');
     await page.locator('.fisch-conversation button[type=submit]').click();
+    await expect.poll(()=>brief.isVisible()).toBe(false);expect(await brief.textContent()).toBe('');
     await expect.poll(async()=>(await f.call('test/snapshot')).result.seen.filter(row=>row.method==='turn/start').length).toBe(2);
     expect((await f.call('test/snapshot')).result.seen.filter(row=>row.method==='turn/start').at(-1).text).toBe('Bản nháp phải còn nguyên khi brief đếm ngược.');
     expect((await replace(60000)).status).toBe('accepted');await expect.poll(()=>brief.isVisible()).toBe(true);
@@ -760,4 +761,60 @@ it.skipIf(!existsSync(gatewayExecutable()) && !requireGateway)('fences a held ob
     expect(f.provider.decide).toHaveBeenCalledOnce();
   } finally { await f.close(); }
   expect(f.provider.close).toHaveBeenCalledOnce();
+}, 60000);
+
+
+it('retains only bounded expired public brief without renewing authority or read deadlines',async()=>{
+  const {LiveBody}=await import('../src/live/body.ts');
+  const body=Object.create(LiveBody.prototype);body.scheduler={epoch:'a',busy:false};body.controls={mode:'normal'};body.userLeaseUntil=0;
+  let now=9000;const clock=vi.spyOn(performance,'now').mockImplementation(()=>now);
+  try{
+    body.publicContext={epoch:'a',seq:7,until:10000,text:'Quiet shared moment',mode:'quiet'};
+    expect(body.observerContextReadKey()).toBe(7);expect(body.canConverse()).toBe(false);
+    now=10000;const key=body.observerContextReadKey();
+    expect(body.observerContext()).toBeNull();expect(body.canConverse()).toBe(true);
+    expect(body.recentObserverContext()).toEqual({revision:7,text:'Quiet shared moment',previousMode:'quiet',expired:true});
+    expect(body.matchesObserverContext(7)).toBe(false);expect(body.matchesObserverContext(key)).toBe(true);
+    now=129999;expect(body.observerContextReadKey()).toBe(key);
+    now=130000;expect(body.recentObserverContext()).toBeNull();expect(body.matchesObserverContext(key)).toBe(false);
+    body.publicContext={epoch:'a',seq:8,until:10000,text:'Old brief',mode:'open'};now=11000;
+    body.revokeObserverHandoff();expect(body.recentObserverContext()).toBeNull();
+    body.publicContext={epoch:'old',seq:9,until:10000,text:'Wrong epoch',mode:'open'};
+    expect(body.recentObserverContext()).toBeNull();
+  }finally{clock.mockRestore();}
+});
+it('validates historical brief as expired data, never active quiet authority',async()=>{
+  const {freezeNativeHostCapabilities}=await import('../integrations/native-reaction-provider.mjs');
+  const recent={revision:2,text:'Public quiet moment',previousMode:'quiet',expired:true};
+  const input={schemaVersion:1,expressionAllowed:false,recentInteractionContext:recent};
+  const frozen=freezeNativeHostCapabilities(input);recent.text='changed';
+  expect(frozen.recentInteractionContext.text).toBe('Public quiet moment');expect(Object.isFrozen(frozen.recentInteractionContext)).toBe(true);
+  expect(frozen.interactionContext).toBeUndefined();expect(frozen.expressionAllowed).toBe(false);
+  for(const bad of [{...recent,expired:false},{...recent,text:'x'.repeat(241)},{...recent,mode:'quiet'},{...recent,previousMode:'unknown'},
+    {...recent,get text(){throw Error('getter should not execute');}}])
+    expect(()=>freezeNativeHostCapabilities({...input,recentInteractionContext:bad})).toThrow('native_host_capabilities_invalid');
+  expect(()=>freezeNativeHostCapabilities({...input,interactionContext:{revision:2,text:'active',mode:'open'}})).toThrow('native_host_capabilities_invalid');
+});
+
+for (const revoke of ['expiry', 'thread']) it.skipIf(!nativeGateway)(`fences pending historical brief on ${revoke} without unlocking its scene`, async () => {
+  let resolve, request; const provider = { conversationLane: true, contractVersion: 1,
+    decide: window => { request = window.request; return new Promise(done => { resolve = done; }); } };
+  const f = await nativeBrowserLoop(provider); let client;
+  try {
+    client = await shareInteraction(f, 'quiet', 1000);
+    await expect.poll(() => f.live.page.evaluate(() => window.fischLive.nativeReactionCapabilities().recentInteractionContext?.expired), { timeout: 6000 }).toBe(true);
+    await arrive(f); await expect.poll(() => typeof resolve, { timeout: 10000 }).toBe('function');
+    expect(await f.live.page.evaluate(() => window.fischLive.nativeReactionCapabilities().expressionAllowed)).toBe(false);
+    if (revoke === 'expiry') await f.live.page.evaluate(() => {
+      const original = performance.now.bind(performance); Object.defineProperty(performance, 'now', { value: () => original() + 120001, configurable: true });
+    });
+    else await f.live.page.evaluate(() => window.fischLive.selectThread());
+    const late = { decision: { schemaVersion: 1, requestId: request.requestId, decisionId: 'expired_history',
+      mode: 'observe', validUntil: request.deadline, action: null }, reply: 'HISTORICAL_STALE_CANARY' };
+    const result = await f.live.page.evaluate(({ id, data }) => window.fischLive.deliverNativeReaction(id, data), { id: request.requestId, data: late });
+    expect(result.chatPublished).toBe(false); resolve(late);
+    expect(await f.live.page.evaluate(() => window.fischLive.nativeReactionCapabilities().recentInteractionContext ?? null)).toBeNull();
+    expect(await f.live.page.locator('.observation-messages').innerText()).not.toContain(late.reply);
+    if (revoke === 'expiry') expect(result.reason).toBe('interaction_context_expired');
+  } finally { await client?.close(); await f.close(); }
 }, 60000);

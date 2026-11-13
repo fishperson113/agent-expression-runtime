@@ -23,6 +23,12 @@ and unprivileged; a bounded public conversation brief is not full coding history
   See [projection scope](../../chat-stream-projection.md) and
   [view tests](../../../tests/conversation-view.test.mjs) for reading/selection checks.
 
+- [LiveBody](../../../src/live/body.ts) retains one explicitly public expired brief
+  for at most 120 seconds beyond its original deadline, never renewing authority.
+  Read keys fence active/expired/absent transitions; new intent/reset revokes history.
+  [History tests](../../../tests/public-brief-history.test.mjs) cover expiry, rollback,
+  protected geometry and coexistence with fresh current-turn context.
+
 ## Connected to
 MAIN can author an expression; observer decisions still pass [Live body](live-body.md)
 causality/ownership checks. A completed text reply is not proof a frame was drawn.
