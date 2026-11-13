@@ -21,22 +21,24 @@ export const compositionSchema = {
   properties: {
     transient: { type: 'boolean' },
     tracks: { type: 'array', minItems: 1, maxItems: limits.assembly.parts, items: { $ref: '#/$defs/track' } },
-    parts: { type: 'array', minItems: 1, maxItems: limits.assembly.parts, items: { $ref: '#/$defs/part' }, description: [
+    parts: { type: 'array', minItems: 0, maxItems: limits.assembly.parts, items: { $ref: '#/$defs/part' }, description: [
       'Stable IDs; xyz. Track groups match; atMs starts at 0 and increases; no motion. Weight default 1. Color inherits.',
     ].join(' ') },
-    base: { enum: ['none', 'resting_face', 'current_scene'], default: 'none', description: `none: replace; resting_face: add ${face.parts.length} face parts; current_scene: append (MAIN). ${limits.assembly.parts} unique IDs max.` },
+    base: { enum: ['none', 'resting_face', 'current_scene'], default: 'none' },
     durationMs: { ...node('assemble').properties.durationMs, default: 600 },
     easing: node('assemble').properties.easing,
-    observerContext: { ...contextSchema, description: 'MAIN brief; quiet pauses observer, no geometry authority.' },
-    observerHandoffMs: { type: 'integer', minimum: 1000, maximum: 60000, description: 'MAIN: one replacement after lease; no restore. Omit to protect.' },
+    observerContext: { ...contextSchema, description: 'MAIN brief, not geometry authority.' },
+    observerHandoffMs: { type: 'integer', minimum: 1000, maximum: 60000, description: 'MAIN one-shot handoff after lease.' },
     style: { type: 'object', additionalProperties: false, minProperties: 1, properties: pick(node('style'), ['color', 'brightness', 'pointSize', 'dispersion']) },
     flow: { type: 'object', additionalProperties: false, required: ['field', 'strength'], properties: pick(node('flow'), ['field', 'strength']) },
     requestId: { type: 'string', minLength: 1, maxLength: 128 },
+    removePartIds: { type: 'array', minItems: 1, maxItems: limits.assembly.parts, uniqueItems: true, items: structuredClone(protocol.$defs.assemblyTrajectory.properties.group) },
+    expectedSceneRevision: { type: 'integer', minimum: 1 },
     expectedEpoch: { type: 'string', minLength: 1, maxLength: 128 },
   },
 };
 compositionSchema.properties.style.properties.pointSize = { ...compositionSchema.properties.style.properties.pointSize,
-  description: 'Sprite pixels, not radius; start 2-4. Brightness fades.' };
+  description: 'Sprite pixels (2-4), not radius.' };
 const vector = part.anyOf[0].properties.points.items;
 compositionSchema.$defs.position = vector;
 function sharePosition(value) {
@@ -103,7 +105,7 @@ function compositionInputError(input) {
 }
 const validateProgram = ajv.compile({ $defs: protocol.$defs, $ref: '#/$defs/node' });
 export const compositionTool = { name: 'compose_expression',
-  description: `For an ordinary conversational prop/illustration, prefer current_scene to retain the current body unless whole-body transformation is intended. Author a particle silhouette or spatial composition from your own geometry (v1, base ${compositionContract.baseFingerprint.slice(0, 12)}). Omitted base means standalone replacement, not append. For additive props prefer current_scene: send only new parts; the MAIN host retains its current authored body with stable IDs and motion/track data. The ${limits.assembly.parts}-part limit includes retained parts. Reuse the host scene inventory supplied with the current message for known IDs/capacity; inspect_expression only when needed facts are absent/stale (observe is not geometry). On scene_append_part_limit_remaining_N, simplify only NEW parts to fit N, never replace the retained body as a fallback. Busy/unavailable scenes or collisions reject without replacement. resting_face includes only the canonical avatar, not a custom moving body. Do not reconstruct unavailable geometry from summaries. Whole-body transformation remains valid when intentional. Clarify unresolved spatial references before choosing a side. Static ellipsoid rotation is radians within +/-4pi, normalized modulo2pi; motion and trajectory bounds are unchanged. Freely choose RGB and bounded motion. Ellipsoid scale is at least 0.02 on every axis, including thin depth; use curves or patches for thinner features. Share rigid tracks via tracks[{group,pivot,keyframes}] and part.trackRef=group; or inline trajectory. No motion with either. Track groups must be unique. current_scene must omit transient:true and observerHandoffMs: additions do not grant observer ownership of the retained body. For replacement conversational illustrations choose transient:true, even when asked for a new picture; omit/false when the user explicitly asks to keep or edit the scene. No semantic presets. Use express for existing-part gestures or advanced choreography; retaining the current form/no new call can be appropriate. Same admission/status/cancel contract as express; ACK is not completion or recognition. A returned lifecycle.status=completed is sufficient scheduler completion evidence, so do not redundantly call expression_status. Applied/pending/unknown are not completion; query status only when needed. visibility=unknown remains unknown, never proof of visual meaning.`,
+  description: `For an ordinary conversational prop/illustration, prefer current_scene to retain the current body unless whole-body transformation is intended. Author a particle silhouette or spatial composition from your own geometry (v1, base ${compositionContract.baseFingerprint.slice(0, 12)}). Omitted base means standalone replacement, not append. For selective removal/edit use current_scene, removePartIds with exact IDs, parts:[] for removal only or authored replacement parts, and fresh expectedEpoch+expectedSceneRevision from the host inventory. The host preserves all unselected geometry/motion and rejects stale revisions or unknown IDs; never reconstruct the retained scene. Re-adding a removed ID preserves its identity and bindings. Do not remove every part; intentional whole-body replacement uses base:none. For additive props prefer current_scene: send only new parts; the MAIN host retains its current authored body with stable IDs and motion/track data. The ${limits.assembly.parts}-part limit includes retained parts. Reuse the host scene inventory supplied with the current message for known IDs/capacity; inspect_expression only when needed facts are absent/stale (observe is not geometry). On scene_append_part_limit_remaining_N, simplify only NEW parts to fit N, never replace the retained body as a fallback. Busy/unavailable scenes or collisions reject without replacement. resting_face includes only the canonical avatar, not a custom moving body. Do not reconstruct unavailable geometry from summaries. Whole-body transformation remains valid when intentional. Clarify unresolved spatial references before choosing a side. Static ellipsoid rotation is radians within +/-4pi, normalized modulo2pi; motion and trajectory bounds are unchanged. Freely choose RGB and bounded motion. Ellipsoid scale is at least 0.02 on every axis, including thin depth; use curves or patches for thinner features. Share rigid tracks via tracks[{group,pivot,keyframes}] and part.trackRef=group; or inline trajectory. No motion with either. Track groups must be unique. current_scene must omit transient:true and observerHandoffMs: additions do not grant observer ownership of the retained body. For replacement conversational illustrations choose transient:true, even when asked for a new picture; omit/false when the user explicitly asks to keep or edit the scene. No semantic presets. Use express for existing-part gestures or advanced choreography; retaining the current form/no new call can be appropriate. Same admission/status/cancel contract as express; ACK is not completion or recognition. A returned lifecycle.status=completed is sufficient scheduler completion evidence, so do not redundantly call expression_status. Applied/pending/unknown are not completion; query status only when needed. visibility=unknown remains unknown, never proof of visual meaning.`,
   annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false }, inputSchema: compositionSchema };
 function expansionError(code, details) { return Object.assign(Error(code), { details }); }
 function validateExpandedParts(base, authored) {
@@ -141,17 +143,19 @@ function normalizeStaticRotations(args) {
 }
 export function composeExpression(input) {
   if (!validateInput(input)) throw compositionInputError(input);
+  if (input.removePartIds !== undefined ? input.base !== 'current_scene' || !input.expectedEpoch || !Number.isSafeInteger(input.expectedSceneRevision)
+    : !input.parts.length || input.expectedSceneRevision !== undefined) throw Error('composition_edit_fence');
   if (input.base === 'current_scene' && (input.transient === true || input.observerHandoffMs !== undefined)) throw Error('scene_append_ownership');
   const args = normalizeStaticRotations(structuredClone(input)), base = args.base === 'resting_face' ? structuredClone(face.parts) : [];
   validateExpandedParts(base, args.parts);
   const parts = [...base, ...expandTracks(args)];
   const durationMs = args.durationMs ?? 600, easing = args.easing ?? 'smoothstep';
-  const children = [{ type: 'assemble', parts, durationMs, easing }];
+  const children = parts.length ? [{ type: 'assemble', parts, durationMs, easing }] : [{ type: 'wait', durationMs }];
   if (args.style) children.push({ type: 'style', ...args.style, durationMs, easing });
   if (args.flow) children.push({ type: 'flow', ...args.flow, durationMs, easing });
   const body = { type: 'parallel', children };
   if (!validateProgram(body)) throw Error('composition_program');
-  const output = args.observerHandoffMs === undefined && args.observerContext === undefined && args.transient !== true && args.base !== 'current_scene' ? body : { type: 'live', program: body, configuration: { controls: [], poses: [], ...(args.base === 'current_scene' ? { sceneAppend: true } : {}), ...(args.transient === true ? { transient: true } : {}), lifetimeMs: Math.max(1000, durationMs), ...(args.observerHandoffMs === undefined ? {} : { observerHandoffMs: args.observerHandoffMs }), ...(args.observerContext === undefined ? {} : { observerContext: args.observerContext }) } };
+  const output = args.observerHandoffMs === undefined && args.observerContext === undefined && args.transient !== true && args.base !== 'current_scene' ? body : { type: 'live', program: body, configuration: { controls: [], poses: [], ...(args.base === 'current_scene' ? { sceneAppend: true, ...(args.removePartIds ? { sceneRemove: args.removePartIds, sceneRevision: args.expectedSceneRevision } : {}) } : {}), ...(args.transient === true ? { transient: true } : {}), lifetimeMs: Math.max(1000, durationMs), ...(args.observerHandoffMs === undefined ? {} : { observerHandoffMs: args.observerHandoffMs }), ...(args.observerContext === undefined ? {} : { observerContext: args.observerContext }) } };
   const result = { body: output, policy: 'replace', ...(args.requestId ? { requestId: args.requestId } : {}), ...(args.expectedEpoch ? { expectedEpoch: args.expectedEpoch } : {}) };
   if (Buffer.byteLength(JSON.stringify(result), 'utf8') > limits.limits.recordBytes - 512) throw Error('composition_bytes');
   return result;
