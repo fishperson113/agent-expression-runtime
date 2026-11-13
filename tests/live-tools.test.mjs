@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
 import { createLiveTools, liveInputSchema } from '../integrations/live-tools.mjs';
+import { liveTestClient } from '../integrations/live-test-client.mjs';
 import { liveHook } from '../scripts/live-hook.mjs';
 
 it('keeps observe cursors independent and resets them on a new controller', async () => {
@@ -123,4 +124,19 @@ it('returns only bounded actual renderer preview image and rejects stale or arbi
   }
   let reads=0;const stale=createLiveTools(async()=>result,async()=>({id:'s',epoch:++reads===1?'e':'new'}));
   expect((await stale('preview_expression')).isError).toBe(true);
+});
+
+it('delivers conditional observation guidance through actual MCP without removing the tool', async () => {
+  const client = liveTestClient('http://127.0.0.1:1', 'synthetic-guidance-only');
+  try {
+    const { tools } = await client.call('tools/list');
+    const observe = tools.find(tool => tool.name === 'observe');
+    expect(observe.description).toContain('local geometric or observer-coordination diagnostic');
+    expect(observe.description).toContain('may skip this read');
+    expect(observe.description).toContain('this tool does not fetch them');
+    expect(observe.description).toContain('stale/unknown is not absence');
+    expect(observe.description).toContain('execution feedback remain separate requirements');
+    expect(observe.description).not.toContain('start of every turn');
+    expect(tools.find(tool => tool.name === 'inspect_expression')).toBeDefined();
+  } finally { await client.close(); }
 });
