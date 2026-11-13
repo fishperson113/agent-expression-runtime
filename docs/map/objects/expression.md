@@ -14,6 +14,10 @@ Authoring convenience and runtime geometry have separate owners.
 ## Shape and source
 - [compose-expression.mjs](../../../integrations/compose-expression.mjs) owns public
   composition expansion, including shared tracks into per-part trajectories.
+  Its tool description and [Live instructions](../../../integrations/live-instructions.md)
+  distinguish additive props from intentional whole-body transformation; default
+  `base:none` still means replacement, not append. See
+  [contextual review](../../contextual-expression-review.md) for model-behavior gates.
 - [assembly.schema.json](../../../src/contracts/assembly.schema.json) and
   [geometry types](../../../src/core/geometry/types.ts) describe the runtime data.
 - [trajectory.ts](../../../src/core/geometry/trajectory.ts) evaluates trajectory
