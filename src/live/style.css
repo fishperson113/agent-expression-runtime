@@ -42,3 +42,8 @@ footer{display:flex;align-items:center;gap:16px;color:var(--muted);font-size:11p
 
 #camera-placeholder[hidden]{display:none}
 @media(min-width:701px) and (max-width:900px){.camera-glyph{display:none}#camera-stop:disabled{display:none}}
+
+/* Completed replies use a text-only Markdown subset; streaming stays literal. */
+.fisch-conversation li pre { margin: 8px 0; padding: 10px; border: 1px solid var(--line); border-radius: 6px; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bg); }
+.fisch-conversation li code { font-family: ui-monospace, Consolas, monospace; font-size: .92em; }
+.fisch-conversation li strong { font-weight: 650; }

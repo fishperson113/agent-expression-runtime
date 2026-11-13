@@ -19,7 +19,10 @@ and unprivileged; a bounded public conversation brief is not full coding history
   browser-authorized observer requests with the bounded context source.
 - [conversation view](../../../src/live/conversation-view.ts) renders panel chat.
   Its `messageRows` reconciler retains DOM rows by generation/turn/item/role and
-  edits plaintext in place; it does not execute streamed JSON or tool arguments.
+  edits streaming plaintext in place. Completed assistant replies display a limited
+  text-only Markdown subset (bold, inline code, closed fenced code); HTML and links
+  remain inert text. Selection defers formatting; user messages remain literal.
+  It does not execute streamed JSON or tool arguments.
   See [projection scope](../../chat-stream-projection.md) and
   [view tests](../../../tests/conversation-view.test.mjs) for reading/selection checks.
 

@@ -1,3 +1,4 @@
+import { formatCompletedMessage } from './message-format';
 type Message = { id: string; turn: string; role: 'user' | 'assistant'; text: string; status: string; truncated: boolean };
 type Snapshot = { generation: number; revision: number; ownerTurn: string | null; available: boolean; canSend: boolean; canCancel: boolean; pending: boolean; stopping: boolean; waiting: boolean; error: string; messages: Message[] };
 type Request = (value: { action: 'send' | 'cancel'; generation: number; text?: string }) => Promise<unknown>;
@@ -90,7 +91,11 @@ function messageRows(list: HTMLOListElement) {
         const key = identity + ':' + occurrence;
         let node = rows.get(key);
         if (!node) { node = document.createElement('li'); node.append(document.createTextNode('')); }
-        updateMessageText(node.firstChild as Text, messageText(item));
+        const text = messageText(item);
+        if (!formatCompletedMessage(node, text, item.role === 'assistant' && item.status === 'completed')) {
+          if (!(node.firstChild instanceof Text) || node.childNodes.length !== 1) node.replaceChildren(document.createTextNode(''));
+          updateMessageText(node.firstChild as Text, text);
+        }
         if (node !== cursor) list.insertBefore(node, cursor);
         cursor = node.nextSibling; retained.set(key, node);
       }

@@ -52,3 +52,11 @@ reset and stale snapshots. Existing tests cover internal scroll, reader gestures
 composer/stop and failed transport. Partial JSON and HTML-looking text remain literal
 text; rendering text grants no execution or expression authority. Native model
 interaction quality is outside this projection-only claim.
+
+## Completed message formatting
+
+Streaming and user text stay literal. Completed assistant replies support bold,
+inline code and closed triple-backtick code blocks via text nodes only. HTML,
+images, links and other Markdown are not interpreted. Incomplete fences stay
+literal; active selection defers formatting. Code whitespace is preserved. This
+is a display subset, not a Markdown execution surface or a full CommonMark renderer.
