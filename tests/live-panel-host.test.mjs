@@ -42,12 +42,20 @@ it('does not initialize any client when the host is already cancelled', async ()
   expect(clientFactory).not.toHaveBeenCalled();
 });
 
-it('fences cancellation while a real app-server fixture holds thread initialization', async () => {
+it('delivers contextual restraint to app-server thread initialization and fences cancellation', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'fisch-panel-init-')), marker = join(directory, 'requested');
-  const script = `const fs=require('node:fs');let b='';process.stdin.on('data',c=>{b+=c;let n;while((n=b.indexOf('\\n'))>=0){let m=JSON.parse(b.slice(0,n));b=b.slice(n+1);if(m.method==='initialize')process.stdout.write(JSON.stringify({id:m.id,result:{}})+'\\n');if(m.method==='thread/start')fs.writeFileSync(${JSON.stringify(marker)},m.method);}});`;
+  const script = `const fs=require('node:fs');let b='';process.stdin.on('data',c=>{b+=c;let n;while((n=b.indexOf('\\n'))>=0){let m=JSON.parse(b.slice(0,n));b=b.slice(n+1);if(m.method==='initialize')process.stdout.write(JSON.stringify({id:m.id,result:{}})+'\\n');if(m.method==='thread/start')fs.writeFileSync(${JSON.stringify(marker)},JSON.stringify(m.params));}});`;
   const { page } = panelPage(), abort = new AbortController();
   const run = runPanelCodex({ live: { page, base: 'http://127.0.0.1:1', token: 'fixture' }, cwd: process.cwd(), signal: abort.signal, reactiveProvider: null, host: { command: process.execPath, args: ['-e', script, '--'] } });
-  try { await vi.waitFor(async () => expect(await readFile(marker, 'utf8')).toBe('thread/start'), { timeout: 5000 }); }
+  try {
+    await vi.waitFor(async () => {
+      const request = JSON.parse(await readFile(marker, 'utf8'));
+      expect(request.developerInstructions).toContain(nativeLiveInstructions());
+      expect(request.developerInstructions).toContain('For ordinary chat, default to subtle expression');
+      expect(request.developerInstructions).toContain('not keywords, a fixed emotion table');
+      expect(request.developerInstructions).not.toContain('rather than relying on the local mouth indicator');
+    }, { timeout: 5000 });
+  }
   finally { abort.abort(); expect(await run).toBe(130); await rm(directory, { recursive: true, force: true }); }
 });
 it('routes default panel and explicit terminal options without changing Desktop ownership', async () => {
