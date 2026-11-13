@@ -130,3 +130,15 @@ it('normalizes nullable shared tracks and preserves shorthand for the existing c
   response.decision.payload.parts[0].trackRef = 'missing';
   expect(() => parseExpressionResponse(JSON.stringify(response))).toThrow('composition_track_missing');
 });
+
+it('does not grant observer current-scene append authority through shared composition schema', () => {
+  const response = compose(); response.decision.payload.base = 'current_scene';
+  expect(() => parseExpressionResponse(JSON.stringify(response))).toThrow('response_schema');
+  const animate = { reply: '', decision: { mode: 'animate', reasonCode: 'presence',
+    payload: { controls: [], poses: [], lifetimeMs: 1000, sceneAppend: true } } };
+  expect(() => parseExpressionResponse(JSON.stringify(animate))).toThrow('response_schema');
+  for (const base of ['none', 'resting_face']) {
+    response.decision.payload.base = base;
+    expect(parseExpressionResponse(JSON.stringify(response)).args.base).toBe(base);
+  }
+});

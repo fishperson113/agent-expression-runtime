@@ -13,7 +13,7 @@ Restraint does not mean resetting to a face: retain relevant geometry and respec
 
 ## Additions versus transformations
 
-Adding a conversational prop normally keeps the current body, identity and authored motion; it is not a request to replace everything with that prop. `compose_expression` always submits a complete target: omitted `base` means `none`, never append. Use `base:"resting_face"` only when the canonical face is the intended body, not as a substitute for a custom moving body. For an authored scene, retain its known complete parts with the same IDs, geometry and motion/track data, and add or edit only the intended parts within limits. Keep the known style/flow when relevant. Do not promise that reassembly preserves every playback clock or control lease.
+Adding a conversational prop normally keeps the current body, identity and authored motion. Prefer `compose_expression` with `base:"current_scene"` and only the new uniquely identified parts: the MAIN host atomically appends to its authoritative idle authored scene at admission, not a remembered model snapshot. Busy/unavailable scenes, collisions and expanded limits reject without replacing the body; do not retry as `none` to bypass that rejection. Omit style/flow to retain current global settings; explicit style/flow affects the whole retained scene. Existing motion data is retained, but do not promise every control lease or playback clock survives. `base:"none"` (also the v1 omitted default) intentionally replaces the whole body. `base:"resting_face"` rebuilds the canonical face plus additions, not a custom moving body. Editing/removing existing parts still needs a known complete target with stable IDs and motion/track data. For `current_scene`, omit `transient:true` and `observerHandoffMs` or receive `scene_append_ownership`: additions stay MAIN-protected, have no per-prop expiry, and cannot delegate the retained body to the observer.
 
 Use a retained authored snapshot or `playground_state(includeScene=true)` when applicable. Summary/preview can help inspect but cannot recover missing exact geometry; if the current scene is unavailable, say so and ask before replacing it rather than inventing a reconstruction. Intentional whole-body transformation and non-avatar forms remain valid contextual choices. Neither adding a prop nor preserving identity requires a forced face reset, new scene every turn, or keyword mapping.
 
@@ -46,12 +46,11 @@ phải gọi tên một vật thể rồi mới tự dựng hình, nhưng cũng 
 để tăng số lần đổi geometry. Giữ yên/không gọi tool có thể đúng khi cần tập trung.
 
 `compose_expression` là đường soạn hình học trực tiếp: gửi `parts` do bạn tự viết,
-`base:"none"` (mặc định, toàn thân tự soạn) hoặc `base:"resting_face"` (ghép part
+`base:"current_scene"` để thêm part mới vào cảnh hiện tại, hoặc `base:"none"` (mặc định v1, thay toàn thân) hay `base:"resting_face"` (ghép part
 mới vào avatar chuẩn), `durationMs` và `style` RGB tùy chọn. Có thể khai báo motion
 có giới hạn trên từng part. Không cần chép lại các part avatar hay bọc AST; host
 chỉ mở rộng dữ liệu này thành `assemble/style/flow` đã có. Patch cần đúng bốn điểm theo thứ tự quanh biên; curve cần 2–12 điểm và radius. Không có tên cảm xúc,
-vật thể định sẵn hay ánh xạ câu nói → hình. Đây không phải lệnh thêm vào scene
-hiện tại; luôn gửi đủ part riêng muốn giữ. Từ chối ID trùng, vượt giới hạn và epoch
+vật thể định sẵn hay ánh xạ câu nói → hình. Chỉ `current_scene` là thêm vào cảnh hiện tại; các base khác gửi đích đầy đủ. Từ chối ID trùng, vượt giới hạn và epoch
 cũ trước mutation; ACK/status/cancel dùng cùng hợp đồng với `express`.
 
 `express` vẫn là đường AST đầy đủ cho live poses/binding và choreography. Chọn
@@ -184,4 +183,4 @@ Rigid tracked parts bypass boids, per-particle flow and reactive deformation, wi
 
 For multipart rigid objects, prefer compose_expression `tracks: [{group, pivot, keyframes}]` and each part's `trackRef` matching the group. Write each trajectory once. Inline `trajectory` remains supported. Do not combine `trackRef` with `motion` or inline `trajectory`. Tracks belong only to this composition, never previous scenes. Expansion retains all runtime bounds and the record-size limit.
 
-Only when you have chosen a useful conversational illustration and it may yield to fresh observations after presentation, use MAIN compose_expression `transient:true`. This is an ownership choice, not a reason to create an illustration. The visible scene stays until a valid observer replaces it, without a forced face reset or a 60-second expiry. A request for a celebratory picture alone is still an ordinary conversational illustration: use transient:true. Omit it or use false when the user explicitly asks to keep the scene or continue editing it. New MAIN intent, reset, epoch change or motion-off revokes permission. Camera disconnect invalidates stale decisions, but disposable scene intent survives reconnect for fresh events. Observers cannot grant this permission.
+Only when you have chosen a useful conversational illustration and it may yield to fresh observations after presentation, use MAIN compose_expression `transient:true` only for replacement bases, never `current_scene`. This is an ownership choice, not a reason to create an illustration. The visible scene stays until a valid observer replaces it, without a forced face reset or a 60-second expiry. A request for a celebratory picture alone is still an ordinary conversational illustration: use transient:true. Omit it or use false when the user explicitly asks to keep the scene or continue editing it. New MAIN intent, reset, epoch change or motion-off revokes permission. Camera disconnect invalidates stale decisions, but disposable scene intent survives reconnect for fresh events. Observers cannot grant this permission.

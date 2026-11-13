@@ -132,3 +132,26 @@ and visible output separately: calling a geometry tool alone is not novelty,
 recognition, relevance or naturalness. More geometry is not automatically success;
 retaining a useful form or abstaining may be appropriate. First expressive tool
 latency and full Native turn duration remain separate measures.
+
+## Add to the current scene (MAIN only)
+
+Use `base:"current_scene"` with only new parts to retain the current authored body
+and its motion data without serializing a remembered snapshot. Node emits a
+`live` envelope with `configuration.sceneAppend:true`; the browser host resolves
+the authoritative scene atomically at admission. This is spatial addition, not
+the queue policy `append`. Busy, unavailable or unstable scenes, duplicate IDs,
+trajectory-group conflicts and expanded limits reject without partial mutation.
+Do not fall back to replacement to bypass a rejection.
+
+Omitted style/flow leaves global state alone. Explicit style/flow applies globally,
+including retained parts. Existing control leases and every playback clock are
+not guaranteed by this authoring shortcut. To edit/remove existing parts use a
+known complete replacement. `none` and omitted base keep v1 replacement semantics;
+`resting_face` explicitly rebuilds the canonical face, never a custom moving body.
+Observers cannot request `current_scene` or `sceneAppend`.
+
+Review with actual fresh-session and ongoing-scene additive prompts, ambiguous
+placement clarification, and explicit whole-body transformation. Contract tests
+prove envelope delivery and isolation, not model choice or visual quality.
+
+For `current_scene`, omit `transient:true` and `observerHandoffMs`; these reject with `scene_append_ownership`. An added prop does not delegate the retained body to the observer, and has no independent expiry.

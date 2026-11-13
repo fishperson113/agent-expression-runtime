@@ -16,7 +16,8 @@ Authoring convenience and runtime geometry have separate owners.
   composition expansion, including shared tracks into per-part trajectories.
   Its tool description and [Live instructions](../../../integrations/live-instructions.md)
   distinguish additive props from intentional whole-body transformation; default
-  `base:none` still means replacement, not append. See
+  `base:none` still means replacement; MAIN `base:current_scene` emits an atomic
+  host-resolved addition intent, not a model-reconstructed full snapshot. See
   [contextual review](../../contextual-expression-review.md) for model-behavior gates.
 - [assembly.schema.json](../../../src/contracts/assembly.schema.json) and
   [geometry types](../../../src/core/geometry/types.ts) describe the runtime data.
@@ -30,7 +31,8 @@ Authoring convenience and runtime geometry have separate owners.
   [incrementalAssignment](../../../src/core/geometry/incremental.ts). Fixed particle
   budgets can redistribute density; additions do not increase particle count.
   Identical whole-scene reissues replay motion; edits to a shared trajectory group
-  reset that group's timing together. Public input remains a full scene snapshot.
+  reset that group's timing together. Raw assemble remains a full scene snapshot; the MAIN sceneAppend envelope
+  requests host-side expansion before compilation.
 
 ## Connected to
 Owned by the authoring/contract/core boundary. Delivered through [Live body](live-body.md).
