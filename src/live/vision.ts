@@ -1,7 +1,9 @@
+import { encodeChatFrame, type ChatCameraFrame } from './chat-camera-frame';
 import type { FaceSample } from './observation';
 
 export class VisionCamera {
   hands = false;
+  private chatCapturing = false;
   private stream?: MediaStream;
   private worker?: Worker;
   private active = false;
@@ -33,6 +35,24 @@ export class VisionCamera {
       stream.getVideoTracks()[0].onended = () => this.ended();
       await this.video.play(); this.schedule(generation);
     } catch (error) { if (generation === this.generation) this.fail(error instanceof DOMException && error.name === 'NotAllowedError' ? 'denied' : 'camera_failed'); }
+  }
+  private chatFrameReady(generation: number, capturedAt: number) {
+    const track = this.stream?.getVideoTracks()[0], age = Date.now() - capturedAt;
+    return this.active && generation === this.generation && !document.hidden &&
+      this.video.srcObject === this.stream && track?.readyState === 'live' && track.enabled && !track.muted &&
+      this.video.readyState >= 2 && this.video.videoWidth > 0 && this.video.videoHeight > 0 &&
+      capturedAt >= 0 && age >= 0 && age <= 1500;
+  }
+  async chatFrame(): Promise<ChatCameraFrame | null> {
+    const generation = this.generation, capturedAt = this.availableAt, mediaTime = this.availableTime;
+    if (this.chatCapturing || mediaTime < 0 || !this.chatFrameReady(generation, capturedAt)) return null;
+    this.chatCapturing = true;
+    try {
+      const image = await encodeChatFrame(this.video);
+      if (!image || !this.chatFrameReady(generation, capturedAt)) return null;
+      return { schemaVersion: 1, ...image, capturedAt, readAt: Date.now(), mediaTime };
+    } catch { return null; }
+    finally { this.chatCapturing = false; }
   }
   private message(data: any, generation: number) {
     if (generation !== this.generation || !this.active) return;
