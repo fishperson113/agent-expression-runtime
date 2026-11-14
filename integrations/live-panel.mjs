@@ -1,7 +1,6 @@
 import { fischCodexRuntime } from './fisch-codex-runtime.mjs';
-import { nativeLiveInstructions } from './live-instruction-bundle.mjs';
 import { codexCommand } from '../scripts/start-session.mjs';
-import { createBridge, startLivePolling } from './live-terminal.mjs';
+import { createBridge, startLivePolling, presentationCall } from './live-terminal.mjs';
 import { createLiveReactiveProvider, nativeLiveEnvironment } from './live-reactive-provider.mjs';
 import { bindLiveConversation } from './live-conversation.mjs';
 import { liveShutdownCode, closeLiveOwned } from './live-shutdown.mjs';
@@ -40,7 +39,7 @@ function panelPublication(state, value) {
 async function keepDisconnectedPanel(state, client, signal, page) {
   state.conversation.transportLost();
   const token = state.channel.token, snapshot = state.conversation.snapshot();
-  state.channel.stale = true; state.broker.close();
+  state.channel.stale = true; presentationCall(state, 'close'); state.broker.close();
   await closeLiveOwned([() => client?.close(), () => state.transport.close()], true);
   if (signal.aborted) return 1;
   let timer;
@@ -65,12 +64,11 @@ export async function runPanelCodex({ live, cwd, signal, host: suppliedHost, rea
   const runtime = fischCodexRuntime(); cwd = runtime.cwd;
   const env = { ...nativeLiveEnvironment(runtime.env), AER_BASE_URL: live.base, AER_PAIRING_TOKEN: live.token, FISCH_LIVE: '1', FISCH_PLANNER_BACKEND: 'off' };
   const configured = reactiveProvider === undefined ? createLiveReactiveProvider(runtime.env, { defaultNative: true }) : { provider: reactiveProvider, reason: reactiveProvider ? 'ready' : 'disabled_by_config' };
-  const instructions = nativeLiveInstructions();
-  const state = await createBridge({ live, host, cwd, env, configured, instructions });
+  const state = await createBridge({ live, host, cwd, env, configured });
   const done = Promise.withResolvers(); let client, timer, unbind, failed = false;
   state.fail = code => done.resolve(code);
   const onAbort = () => {
-    state.channel.stale = true; state.conversation.close(); state.broker.close();
+    state.channel.stale = true; state.conversation.close(); presentationCall(state, 'close'); state.broker.close();
     done.resolve(liveShutdownCode(signal.reason) ?? 130); void state.transport.close().catch(() => {});
   };
   signal.addEventListener('abort', onAbort, { once: true });
@@ -81,11 +79,9 @@ export async function runPanelCodex({ live, cwd, signal, host: suppliedHost, rea
       navigation: () => { state.channel.stale = true; state.channel.token = undefined; state.conversation.navigation(); try { client?.close(); } catch { state.fail(1); } } });
     await bindControls(live, state, value => client?.respond(value) ?? Promise.reject(Error('panel_not_ready')));
     await state.publishSetup('waiting', state.channel.token); await panelPublication(state, { type: 'mode' });
-    state.conversation.holdControllerBootstrap();
     client = await clientFactory({ url: state.transport.url, token: state.transport.token, cwd, resumeThreadId,
       onControl: value => { void panelPublication(state, value); }, onFailure: () => state.fail(1) });
     if (state.output.thread !== client.threadId) throw Error('panel_thread_not_selected');
-    await state.conversation.bootstrapController(client.threadId);
     await state.publishSetup('connected');
     await panelPublication(state, { type: 'ready', threadId: client.threadId });
     timer = startLivePolling(live, state, () => state.fail(1));
@@ -111,7 +107,7 @@ export async function runPanelCodex({ live, cwd, signal, host: suppliedHost, rea
       }, { token, feedback, snapshot });
       if (!published) throw Error('panel_startup_publication_failed');
     } finally {
-      state.channel.stale = true; state.broker.close();
+      state.channel.stale = true; presentationCall(state, 'close'); state.broker.close();
       await closeLiveOwned([() => client?.close(), () => state.transport.close()], true);
     }
     // Connection closure can settle `done`; only an explicit Stop ends this offline screen.
@@ -120,7 +116,7 @@ export async function runPanelCodex({ live, cwd, signal, host: suppliedHost, rea
   }
   finally {
     clearInterval(timer); signal.removeEventListener('abort', onAbort); state.channel.stale = true;
-    state.conversation.close(); state.broker.close();
+    state.conversation.close(); presentationCall(state, 'close'); state.broker.close();
     await closeLiveOwned([() => unbind?.(), () => client?.close(), () => state.transport.close()], failed);
   }
 }

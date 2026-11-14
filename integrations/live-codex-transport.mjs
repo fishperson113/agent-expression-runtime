@@ -6,22 +6,25 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { stopChild } from '../scripts/start-session.mjs';
 import { closeLiveOwned } from './live-shutdown.mjs';
 
-export function liveInstructions(message, instructions) {
-  if (!['thread/start', 'thread/resume', 'thread/fork'].includes(message.method)) return message;
-  const params = { ...message.params }, existing = params.developerInstructions ?? '';
-  params.developerInstructions = existing.includes('FISCH_LIVE_BODY') ? existing : existing + '\nFISCH_LIVE_BODY\n' + instructions;
-  return { ...message, params };
+const existingThread = method => ['thread/resume', 'thread/fork'].includes(method);
+const freshThreadMessage = 'Fisch requires a new primary thread to keep saved visual instructions out of native conversation. Existing threads are preserved; start fisch live without --thread.';
+const nativeConfigKeys = new Set(['model', 'model_provider', 'model_reasoning_effort', 'model_reasoning_summary', 'model_verbosity', 'service_tier']);
+function nativeConversationConfig(config) {
+  if (!config || typeof config !== 'object' || Array.isArray(config)) return undefined;
+  const entries = Object.entries(config).filter(([key, value]) => nativeConfigKeys.has(key) && (typeof value === 'string' || value === null));
+  return entries.length ? Object.fromEntries(entries) : undefined;
 }
 
 export function scopedLiveRequest(message, cwd, instructions, serviceTier = fischCodexServiceTier()) {
   if (!['thread/start', 'thread/resume', 'thread/fork', 'turn/start'].includes(message.method)) return message;
   const params = { ...message.params, cwd };
-  if (message.method !== 'turn/start' && params.serviceTier == null) params.serviceTier = serviceTier;
-  delete params.config; delete params.path; delete params.environment;
+  const config = nativeConversationConfig(params.config);
+  if (message.method !== 'turn/start' && params.serviceTier == null) params.serviceTier = config?.service_tier ?? serviceTier;
+  if (config) params.config = config; else delete params.config;
+  delete params.path; delete params.environment;
   if (message.method !== 'turn/start') {
-    delete params.developerInstructions; delete params.baseInstructions;
     delete params.skillRoots; delete params.dynamicTools;
-    return liveInstructions({ ...message, params }, instructions);
+    return { ...message, params };
   }
   return { ...message, params };
 }
@@ -59,6 +62,7 @@ export async function openCodexTransport({ host, args, cwd, env, instructions, o
   const sockets = new WebSocketServer({ noServer: true, maxPayload: 1048576 });
   let child, client, closed = false, closing;
   const rpc = new LiveRequests(message => {
+    if (existingThread(message.method)) throw Error(freshThreadMessage);
     if (closed || !child?.stdin.writable || child.stdin.writableLength > 1048576) throw Error('relay_unavailable');
     child.stdin.write(JSON.stringify(scopedLiveRequest(message, cwd, instructions, fischCodexServiceTier(env))) + '\n');
   });
@@ -87,8 +91,11 @@ export async function openCodexTransport({ host, args, cwd, env, instructions, o
     connection.on('message', bytes => {
       try {
         if (child.stdin.writableLength > 1048576) throw Error('relay_backpressure');
-        const message = liveInstructions(JSON.parse(bytes.toString()), instructions);
+        const message = JSON.parse(bytes.toString());
         if (rejectReservedClient(connection, message, rpc.prefix)) return;
+        if (existingThread(message.method)) {
+          connection.send(JSON.stringify({ id: message.id, error: { code: -32602, message: freshThreadMessage } })); return;
+        }
         if (onRequest(message) !== false) rpc.client(message);
       }
       catch { fail(); }

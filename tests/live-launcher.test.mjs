@@ -7,7 +7,7 @@ import { createLivePane, livePageOptions } from '../integrations/live-launch.mjs
 it('keeps credentials in inherited environment, never command arguments or a new prompt', () => {
   const args = liveCodexArguments(process.cwd());
   expect(args).toContain('--no-daemon');
-  expect(args).toContain('mcp_servers.fisch_live.env_vars=["AER_BASE_URL","AER_PAIRING_TOKEN","FISCH_LIVE"]');
+  expect(args.some(value => value.includes('mcp_servers.fisch_live'))).toBe(false);
   expect(args.some(value => value.includes('Read aer://'))).toBe(false);
   expect(() => selectLiveSource({ agents: [{ agent: 'codex' }, { agent: 'codex' }] })).toThrow('Open a Herdr shell');
 });

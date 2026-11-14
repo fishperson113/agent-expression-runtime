@@ -1,7 +1,8 @@
+import { presentationCall } from '../integrations/live-terminal.mjs';
 import { expect, it } from 'vitest';
 import { selectLiveHost } from '../scripts/live-session.mjs';
 import { LiveOutput } from '../integrations/live-output.mjs';
-import { openCodexTransport, liveInstructions } from '../integrations/live-codex-transport.mjs';
+import { openCodexTransport, scopedLiveRequest } from '../integrations/live-codex-transport.mjs';
 import { WebSocket } from 'ws';
 import { once } from 'node:events';
 
@@ -9,12 +10,12 @@ it('uses the current workspace without contacting Herdr when it is absent', asyn
   const host = await selectLiveHost({ env: {}, cwd: '/tmp/workspace', call: () => { throw Error('must not call Herdr'); } });
   expect(host).toEqual({ kind: 'terminal', cwd: '/tmp/workspace' });
 });
-it('preserves existing thread instructions and adds Live context exactly once', () => {
+it('preserves native thread instructions without adding visual context', () => {
   const input = { id: 1, method: 'thread/start', params: { developerInstructions: 'Keep existing policy.' } };
-  const result = liveInstructions(input, 'Use your body.');
+  const result = scopedLiveRequest(input, '/fisch', 'Use your body.');
   expect(result.params.developerInstructions).toContain('Keep existing policy.');
-  expect(result.params.developerInstructions).toContain('Use your body.');
-  expect(liveInstructions(result, 'Use your body.')).toEqual(result);
+  expect(result.params.developerInstructions).toBe('Keep existing policy.');
+  expect(scopedLiveRequest(result, '/fisch', 'Use your body.')).toEqual(result);
   expect(input.params.developerInstructions).toBe('Keep existing policy.');
 });
 it('authenticates the owned relay and carries stdio messages without copying credentials into arguments', async () => {
@@ -32,7 +33,7 @@ it('authenticates the owned relay and carries stdio messages without copying cre
     socket.send(JSON.stringify({ id: 1, method: 'thread/start', params: { cwd: '/tmp/workspace' } }));
     const [bytes] = await response;
     pid = JSON.parse(bytes.toString()).result.pid;
-    expect(JSON.parse(bytes.toString()).result.developerInstructions).toContain('Live instructions');
+    expect(JSON.parse(bytes.toString()).result.developerInstructions).toBeUndefined();
     expect(requests).toEqual(['thread/start']);
     expect(transport.url).not.toContain(transport.token);
   } finally { socket?.terminate(); await transport.close(); }
@@ -149,4 +150,25 @@ it('bounds ACK and completion correlation without reopening old completed ACKs a
   stream.accept({ id: 502, result: { turn: { id: 'fresh', status: 'inProgress' } } }); expect(stream.turn).toBe('fresh');
   for (let i = 0; i < 65; i++) stream.request({ id: 1000 + i, method: 'turn/start', params: { threadId: 'native' } });
   expect(stream.turnRequests.size).toBe(64);
+});
+
+it.each(['thread/resume', 'thread/fork'])('refuses %s without forwarding potentially persisted visual instructions', async method => {
+  const script = "process.stdin.on('data',()=>{process.stdout.write('UNEXPECTED_THREAD_REQUEST\\n')})";
+  const requests = [];
+  const transport = await openCodexTransport({ host: { command: process.execPath, args: ['-e', script, '--'] }, args: [],
+    cwd: process.cwd(), env: process.env, onRequest: message => requests.push(message) });
+  const socket = new WebSocket(transport.url, { headers: { Authorization: 'Bearer ' + transport.token } });
+  try {
+    await once(socket, 'open'); const response = once(socket, 'message');
+    socket.send(JSON.stringify({ id: 1, method, params: { threadId: 'preserved' } }));
+    const [bytes] = await response; const value = JSON.parse(bytes.toString());
+    expect(value.error.code).toBe(-32602); expect(value.error.message).toContain('Existing threads are preserved');
+    expect(requests).toEqual([]);
+  } finally { socket.terminate(); await transport.close(); }
+});
+
+it.each(['observe', 'invalidate', 'close'])('contains synchronous and rejected presentation %s failures', async method => {
+  expect(() => presentationCall({ presentation: { [method]() { throw Error('visual-only failure'); } } }, method)).not.toThrow();
+  expect(() => presentationCall({ presentation: { [method]() { return Promise.reject(Error('visual-only rejection')); } } }, method)).not.toThrow();
+  await Promise.resolve();
 });
