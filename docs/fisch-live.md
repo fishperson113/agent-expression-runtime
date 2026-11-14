@@ -430,8 +430,13 @@ that scoped login without copying global credentials.
 
 Panel, terminal and Herdr sessions use a clean workspace inside that home,
 while the owned observation worker uses its own temporary workspace with the same
-scoped Codex home. Hooks, plugins, app connectors and host
-skill discovery are disabled; project instructions are not loaded. Only the
+scoped Codex home. Hooks and host skill discovery are disabled; project
+instructions are not loaded. Unrelated MCP, plugin and marketplace configuration
+is empty and checked through scoped `config/read`, without enumerating connected
+MCP tools. Native shell, multi-agent, computer/browser, image generation and app
+capabilities are not disabled by this isolation layer; availability and approval
+remain controlled by Codex. Isolation does not override the model or reasoning
+effort. Only the
 Fisch MCP integration is supplied. Thread requests cannot override the runtime
 cwd or add configuration. Do not install custom skills or hooks in this home.
 Development harness rules still apply when editing the repository.

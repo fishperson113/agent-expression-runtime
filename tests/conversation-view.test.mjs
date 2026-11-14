@@ -1,3 +1,5 @@
+import { LiveConversation } from '../integrations/live-conversation.mjs';
+import { LiveOutput } from '../integrations/live-output.mjs';
 import { beforeAll, afterAll, expect, it } from 'vitest';
 import { createServer } from 'vite';
 import { chromium } from '@playwright/test';
@@ -480,4 +482,24 @@ it('leaves incomplete fences literal and preserves selected text at stream compl
     expect(await panel.locator('li').textContent()).toContain('```text\n**unfinished**');
     expect(await panel.locator('li strong, li pre').count()).toBe(0);
   } finally { await page.close(); }
+}, 45000);
+
+it('accepts optional host snapshot thread identity and keeps malformed extra fields fail closed', async () => {
+  const output = new LiveOutput(); output.thread = 'thread-host';
+  const host = new LiveConversation({ output, broker: { busy: () => false }, transport: { submitUser() {}, interruptUser() {} } });
+  const legacy = host.snapshot(); expect(legacy.canSend).toBe(true);
+  const dto = { ...legacy, threadId: 'thread-host' };
+  const { page, input } = await open();
+  try {
+    for (const bad of [{ ...dto, threadId: {} }, { ...dto, threadId: 'bad id' }, { ...dto, privateField: true }]) {
+      await page.evaluate(value => window.conversation.project(value), bad);
+      expect(await input.isDisabled()).toBe(true);
+    }
+    for (const compatible of [legacy, { ...dto, threadId: null }, dto]) {
+      await page.evaluate(value => window.conversation.project(value), compatible);
+      expect(await input.isDisabled()).toBe(false);
+    }
+    await input.fill('xin chao'); await input.press('Enter');
+    expect(await page.evaluate(() => window.calls)).toEqual([{ action: 'send', generation: dto.generation, text: 'xin chao' }]);
+  } finally { await page.close(); host.close(); }
 }, 45000);
