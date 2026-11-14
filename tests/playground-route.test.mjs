@@ -1,4 +1,4 @@
-import { externalPlayground } from './fixtures/playground-external.mjs';
+import { externalPlayground, fixtureNativeCall } from './fixtures/playground-external.mjs';
 import { expect, it } from 'vitest';
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
@@ -124,8 +124,7 @@ async function launch(provider) {
       new Promise((_, reject) => { timer = setTimeout(() => reject(Error('scripted_native_launch_timeout')), 60000); })]); }
     finally { clearTimeout(timer); }
     const ready = await next(); expect(ready).toMatchObject({ type: 'ready', lane: 'native-fixture' });
-    const nativeCall = async command => { child.stdin.write(JSON.stringify(command) + '\n'); const reply = await next();
-      expect(reply.type, stderr).toBe('result'); return reply.value; };
+    const nativeCall = fixtureNativeCall(child, next);
     external = await externalPlayground(live.base, live.token, nativeCall, abort.signal);
     expect(external.tools).toContain('playground_edit'); expect(external.tools).toContain('playground_state');
     void running.finally(() => external.close()).catch(() => {});

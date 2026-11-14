@@ -1,4 +1,4 @@
-import { externalPlayground } from './fixtures/playground-external.mjs';
+import { externalPlayground, fixtureNativeCall } from './fixtures/playground-external.mjs';
 import { expect, it } from 'vitest';
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
@@ -66,7 +66,7 @@ async function launch() {
     await expect.poll(() => record.live.page.locator('.setup-observer').textContent()).toContain('tắt trong cấu hình');
     record.url = record.live.page.url();
     record.send = command => record.child.stdin.write(JSON.stringify(command) + '\n');
-    const nativeCall = async command => { record.child.stdin.write(JSON.stringify(command) + '\n'); const reply = await record.next().catch(error => { throw Error('restart_' + command.operation + ': ' + error.message); }); expect(reply.type).toBe('result'); return reply.value; };
+    const nativeCall = fixtureNativeCall(record.child, record.next);
     record.external = await externalPlayground(record.live.base, record.live.token, nativeCall, abort.signal);
     record.send = command => record.external.send(command); record.call = record.external.call;
     record.running = running.finally(() => record.external.close());

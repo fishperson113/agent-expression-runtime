@@ -1,7 +1,28 @@
 import { liveTestClient } from '../../integrations/live-test-client.mjs';
 
-export async function externalPlayground(base, token, nativeCall, signal) {
-  const client = liveTestClient(base, token); let closed = false, closing, pending;
+const nativeClosed = () => Object.assign(Error('fixture_native_closed'), { code: 'fixture_native_closed' });
+export function fixtureNativeCall(child, next) {
+  let failure, rejectClosed;
+  const unavailable = new Promise((_, reject) => { rejectClosed = reject; }); unavailable.catch(() => {});
+  const fail = error => { if (!failure) { failure = error; rejectClosed(error); } };
+  child.stdin.on('error', error => fail(['EPIPE', 'ERR_STREAM_DESTROYED', 'ERR_STREAM_WRITE_AFTER_END'].includes(error.code) ? nativeClosed() : error));
+  child.once('exit', () => fail(nativeClosed())); child.stdin.once('close', () => fail(nativeClosed()));
+  const available = () => !failure && child.exitCode === null && child.signalCode === null && child.stdin.writable && !child.stdin.destroyed;
+  const call = async command => {
+    if (!available()) throw failure ?? nativeClosed();
+    const written = new Promise((resolve, reject) => child.stdin.write(JSON.stringify(command) + '\n', error => {
+      if (error) { fail(['EPIPE', 'ERR_STREAM_DESTROYED', 'ERR_STREAM_WRITE_AFTER_END'].includes(error.code) ? nativeClosed() : error); reject(failure); } else resolve();
+    }));
+    await Promise.race([written, unavailable]);
+    const reply = await Promise.race([next(), unavailable]);
+    if (reply.type !== 'result') throw Error('fixture_native_reply');
+    return reply.value;
+  };
+  call.available = available; return call;
+}
+
+export async function externalPlayground(base, token, nativeCall, signal, clientFactory = liveTestClient) {
+  const client = clientFactory(base, token); let closed = false, closing, pending;
   const close = () => closing ??= (async () => { closed = true; signal?.removeEventListener('abort', stop); await client.close(); })();
   const stop = () => { void close().catch(() => {}); };
   signal?.addEventListener('abort', stop, { once: true });
@@ -23,7 +44,10 @@ export async function externalPlayground(base, token, nativeCall, signal) {
     if (['selectThread', 'failedSelect'].includes(command.operation)) return nativeCall(command);
     if (command.operation === 'inspectState') return action(command);
     const ack = await nativeCall(command), value = await action(command);
-    if (!closed) await nativeCall({ operation: 'complete', turnId: ack.turnId });
+    if (!closed) {
+      try { await nativeCall({ operation: 'complete', turnId: ack.turnId }); }
+      catch (error) { if (error.code !== 'fixture_native_closed') throw error; }
+    }
     return value;
   };
   try {
