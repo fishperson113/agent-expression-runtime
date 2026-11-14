@@ -495,7 +495,7 @@ request lifetime, without reconnecting or cancelling unrelated work. No camera i
 
 ## Native agent and presentation boundary
 
-Fisch keeps a dedicated Codex home and workspace so global hooks, skills, plugins and MCP integrations do not leak into a Live session. This isolation does not disable native web search, shell, multi-agent, browser/computer or image tools: actual availability still depends on the installed Codex version, provider and host. Model and reasoning choices are not reduced for animation speed.
+Fisch keeps a dedicated Codex home and workspace so global hooks, skills, plugins and MCP integrations do not leak into a Live session. Native account-connected apps remain available; preflight verifies empty custom integration configuration without enumerating the full native app tool catalog. This isolation does not disable native web search, shell, multi-agent, browser/computer or image tools: actual availability still depends on the installed Codex version, provider and host. Model and reasoning choices are not reduced for animation speed.
 
 Authenticated native requests retain their base/developer instructions and explicit model, reasoning, verbosity and tier choices. Request configuration for global extensions, custom skills, project instruction discovery and alternate environments remains excluded from this isolated session. Sandbox and approval policy are not relaxed. The browser panel supports only its documented approval/input controls; unsupported requests fail closed rather than silently granting permission. This is not a claim of complete Codex UI or capability parity.
 

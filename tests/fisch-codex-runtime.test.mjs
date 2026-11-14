@@ -26,7 +26,7 @@ it('rejects the global default and custom home', () => {
 });
 it('disables inherited hooks, host skills and unrelated MCP configuration', () => {
   const args = fischCodexArguments();
-  for (const value of ['mcp_servers={}', 'project_doc_max_bytes=0', 'features.skip_host_skill_discovery=true', 'hooks', 'plugins', 'apps']) expect(args).toContain(value);
+  for (const value of ['mcp_servers={}', 'project_doc_max_bytes=0', 'features.skip_host_skill_discovery=true', 'hooks', 'plugins={}', 'marketplaces={}']) expect(args).toContain(value);
 });
 it.each(['thread/start', 'thread/resume', 'thread/fork'])('isolates %s while appending expression instructions to native instructions', method => {
   const input = { method, params: { cwd: '/external', config: { mcp_servers: {} }, path: '/global/session', developerInstructions: 'external', skillRoots: ['external'], threadId: 'keep' } };
@@ -58,13 +58,15 @@ it('disables all discovered skills through scoped Codex API before use', async (
       calls.push({ method, params });
       if (method === 'skills/config/write') enabled = false;
       if (method === 'skills/list') return { data: [{ errors: [], skills: [{ path: '/external/SKILL.md', enabled }] }] };
-      if (method === 'mcpServerStatus/list') return { data: [], nextCursor: null };
+      if (method === 'config/read') return { config: { mcp_servers: {}, plugins: {}, marketplaces: {} } };
       return {};
     }
   }
   const runtime = { cwd: '/fisch', env: { CODEX_HOME: '/fisch' } };
   expect(await prepareFischCodexRuntime({ command: 'codex', args: [] }, runtime, { Rpc })).toBe(runtime);
   expect(calls).toContainEqual({ method: 'skills/config/write', params: { path: '/external/SKILL.md', enabled: false } });
+  expect(calls.some(call => call.method === 'mcpServerStatus/list')).toBe(false);
+  expect(calls).toContainEqual({ method: 'config/read', params: { cwd: '/fisch', includeLayers: false } });
 });
 
 it('forwards a custom dedicated Codex home to the Herdr child', async () => {
@@ -114,7 +116,7 @@ it('lets turns inherit the thread or explicitly override tier without automatic 
 
 it('isolates extensions without disabling native tools or changing model effort', () => {
   const args = fischCodexArguments();
-  for (const feature of ['shell_tool', 'multi_agent', 'computer_use', 'browser_use', 'image_generation']) expect(args).not.toContain(feature);
+  for (const feature of ['shell_tool', 'multi_agent', 'computer_use', 'browser_use', 'image_generation', 'apps', 'plugins']) expect(args).not.toContain(feature);
   expect(args.some(value => /web_search|model_reasoning_effort|model=/.test(value))).toBe(false);
 });
 it.each(['thread/start', 'thread/resume', 'thread/fork', 'turn/start'])('preserves native choices and approval boundaries for %s', method => {
@@ -134,4 +136,16 @@ it.each(['thread/start', 'thread/resume', 'thread/fork', 'turn/start'])('preserv
     expect(result.params.dynamicTools).toBeUndefined(); expect(result.params.skillRoots).toBeUndefined();
   }
   expect(input.params.config.hooks).toEqual({});
+});
+
+it.each(['mcp_servers', 'plugins', 'marketplaces'])('fails closed on unexpected scoped %s configuration', async key => {
+  class Rpc {
+    settled = Promise.resolve(); send() {} close() {}
+    async request(method) {
+      if (method === 'skills/list') return { data: [{ errors: [], skills: [] }] };
+      if (method === 'config/read') return { config: { mcp_servers: {}, plugins: {}, marketplaces: {}, [key]: { external: {} } } };
+      return {};
+    }
+  }
+  await expect(prepareFischCodexRuntime({ command: 'codex', args: [] }, { cwd: '/fisch', env: {} }, { Rpc })).rejects.toThrow('isolated integration configuration');
 });
