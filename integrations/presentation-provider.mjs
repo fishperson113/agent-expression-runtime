@@ -1,3 +1,4 @@
+import { diagramAuthorPolicy, diagramAuthorInput, parseDiagramAuthorRecord } from './diagram-author.mjs';
 import {compactPresentationSchema, parseCompactPresentationRecord} from './presentation-compact.mjs';
 import { createPresentationRecordStream, presentationRecordSchema } from './presentation-records.mjs';
 import { randomUUID } from 'node:crypto';
@@ -103,15 +104,18 @@ function presentationNotifications({job,streaming,records,publish,resolve,reject
 }
 
 export class NativePresentationProvider {
-  constructor({ host, runtime = fischCodexRuntime(), Rpc = PlannerRpc, timeoutMs = 60000, visualModel, visualEffort, compact = false, miniScene = false }) {
-    Object.assign(this, { host, runtime, Rpc, timeoutMs, visualModel, visualEffort, compact, miniScene });
+  constructor({ host, runtime = fischCodexRuntime(), Rpc = PlannerRpc, timeoutMs = 60000, visualModel, visualEffort, compact = false, miniScene = false, protocol = 'freeform' }) {
+    if(!['freeform','diagram'].includes(protocol))throw Error('presentation_protocol_invalid');
+    Object.assign(this, { host, runtime, Rpc, timeoutMs, visualModel, visualEffort, compact, miniScene, protocol });
   }
   async generate(exchange, signal, scene, streaming) {
     if (this.active || this.closed || signal.aborted) throw Error('presentation_unavailable');
+    if(this.protocol==='diagram'&&!streaming)throw Error('diagram_requires_streaming');
+    const diagramInput=this.protocol==='diagram'?diagramAuthorInput(exchange):null;
     const job = { id: randomUUID(), text: undefined };
     let timer, resolve, reject, cancelRequest;
     const cancelled=new Promise((_,no)=>{cancelRequest=no;});cancelled.catch(()=>{});
-    const records = streaming ? createPresentationRecordStream({ ...(this.compact ? {parseRecord:this.miniScene?parseMiniPresentation:parseCompactPresentationRecord} : {}), isCurrent: () => !signal.aborted && streaming.isCurrent() }) : null;
+    const records = streaming ? createPresentationRecordStream({ ...(diagramInput ? {parseRecord:text=>parseDiagramAuthorRecord(text,exchange)} : this.compact ? {parseRecord:this.miniScene?parseMiniPresentation:parseCompactPresentationRecord} : {}), isCurrent: () => !signal.aborted && streaming.isCurrent() }) : null;
     const publish = text => { for (const record of records.push(text)) {streaming.onPhase?.('record');streaming.onRecord(record);} };
     const phase=name=>{try{streaming?.onPhase?.(name);}catch{}};
     const done = new Promise((yes, no) => { resolve = yes; reject = error => { job.failed = true; cancelRequest(error); no(error); }; }); done.catch(() => {});
@@ -135,13 +139,13 @@ export class NativePresentationProvider {
         const model = catalog.data?.find(row => row.model === this.visualModel);
         if (!model || !model.supportedReasoningEfforts?.some(row => row.reasoningEffort === this.visualEffort)) throw Error('presentation_model_unsupported');
       }
-      const started = await request('thread/start', { cwd: this.runtime.cwd, ephemeral: true, ...(streaming && this.visualModel ? { model: this.visualModel } : {}), serviceTier: fischCodexServiceTier(this.runtime.env), sandbox: 'read-only', approvalPolicy: 'never', baseInstructions: streaming ? streamingPolicy(this.compact,this.miniScene) : policy, developerInstructions: '' });
+      const started = await request('thread/start', { cwd: this.runtime.cwd, ephemeral: true, ...(streaming && this.visualModel ? { model: this.visualModel } : {}), serviceTier: fischCodexServiceTier(this.runtime.env), sandbox: 'read-only', approvalPolicy: 'never', baseInstructions: diagramInput ? diagramAuthorPolicy : streaming ? streamingPolicy(this.compact,this.miniScene) : policy, developerInstructions: '' });
       job.threadId = started.thread.id;phase('thread_started');
       try {streaming?.onConfiguration?.({model:started.model,reasoningEffort:started.reasoningEffort,serviceTier:started.serviceTier});} catch {}
       const catalog = await request('mcpServerStatus/list', { threadId: job.threadId });
       if (catalog.nextCursor || !Array.isArray(catalog.data) || catalog.data.some(row => Object.keys(row.tools ?? {}).length || row.resources?.length || row.resourceTemplates?.length)) throw Error('presentation_catalog');
       if (signal.aborted || this.closed) throw Error('presentation_aborted');
-      const data = { userText: exchange.userText, assistantText: exchange.assistantText, scene, ...(streaming ? { target: exchange.target } : {}) };
+      const data = diagramInput ?? { userText: exchange.userText, assistantText: exchange.assistantText, scene, ...(streaming ? { target: exchange.target } : {}) };
       phase('turn_request');const ack = await request('turn/start', { threadId: job.threadId, ...(streaming && this.visualEffort ? { effort: this.visualEffort } : {}), input: [{ type: 'text', text: JSON.stringify(data), text_elements: [] }], ...(streaming ? {} : { outputSchema: presentationSchema }) });
       if (job.turnId && job.turnId !== ack.turn?.id) throw Error('presentation_turn_mismatch');
       job.turnId = ack.turn?.id; if (!job.turnId) throw Error('presentation_turn_missing'); await done;

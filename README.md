@@ -25,13 +25,13 @@ npm link
 fisch live
 ```
 
-The first launch installs dependencies, builds the app and downloads face-tracking models. Fisch opens the particle body and a ready-to-chat Codex session together in your browser. Type in the conversation panel; no terminal thread selection is needed. Use `fisch live --thread <id>` to resume a known thread, or `fisch live --terminal` for the legacy terminal interface. `--panel` remains a compatible alias for the default.
+The first launch installs dependencies, builds the app and downloads face-tracking models. Fisch opens the particle body and a ready-to-chat Codex session together in your browser. Type in the conversation panel; no terminal thread selection is needed. Start a fresh thread; resuming or forking saved threads is currently rejected to avoid restoring old visual instructions. Use `fisch live --terminal` for the optional terminal interface, also with a fresh thread. `--panel` remains a compatible alias for the default.
 
 After installation, run `fisch live` from the project you want to work in. From the Fisch checkout, `npm start` also works.
 
 Plain Live prepares proactive Native Codex reactions by default without manual reactive variables or a ledger. Explicit off/backend/budget settings remain respected; configuration-ready is not proof of a successful model response. See [Native launch details](docs/native-observation-loop.md).
 
-Camera starts off. With camera enabled, each panel chat message can send one fresh, bounded camera snapshot to Codex. Camera-off chat sends no image; the independent observer still receives geometry only. Fisch does not save or cache these snapshots to files; Codex/provider data-retention policies apply. Expression works with camera off. [Live controls and privacy](docs/fisch-live.md) covers optional hand tracking, setup options and stopping a session.
+Camera starts off. With camera enabled, each panel chat message can send one fresh, bounded camera snapshot to Codex. Camera-off chat sends no image; the camera observer receives bounded typed observations, while a separate visual author follows public conversation text without changing Codex replies. Fisch does not save or cache these snapshots to files; Codex/provider data-retention policies apply. Expression works with camera off. [Live controls and privacy](docs/fisch-live.md) covers optional hand tracking, setup options and stopping a session.
 
 ## Documentation
 

@@ -59,8 +59,8 @@ export async function createBridge({ live, host, cwd, env, configured, instructi
         const rejected = { id: message.id, error }; state.output.accept(rejected); state.conversation?.accept(rejected); state.transport.reject(message, error);
       }, log: text => { state.logs.push(text); state.logs.splice(0, Math.max(0, state.logs.length - 20)); } });
     state.conversation = new LiveConversation({ output: state.output, transport: state.transport, broker: state.broker, captureObservation: scope => captureChatObservation(state.broker, state.channel, scope) });
-    try { state.presentation = new LiveStreamingPresentationBridge({ state, page: live.page, host, runtime: fischCodexRuntime() }); }
-    catch { state.logs.push('presentation_unavailable'); }
+    try { state.presentation = new LiveStreamingPresentationBridge({ state, page: live.page, host, runtime: fischCodexRuntime(), protocol: process.env.FISCH_PRESENTATION_PROTOCOL ?? 'freeform' }); }
+    catch (error) { const code=error?.message==='presentation_protocol_invalid'?'presentation_protocol_invalid':'presentation_unavailable';state.logs.push(code);if(code==='presentation_protocol_invalid')console.error('FISCH_PRESENTATION_PROTOCOL must be freeform or diagram. Visual lane disabled; native chat remains available.'); }
     state.publishSetup = (native, token) => state.broker.evaluate(({ value, token }) => {
       const api = window.fischLive; if (api.conversationOffline === true) return;
       if (token) api.conversationDocument = token; api.setupStatus?.(value);

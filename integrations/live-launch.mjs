@@ -11,6 +11,13 @@ export const liveRoot = fileURLToPath(new URL('../', import.meta.url));
 export function livePageOptions(headless = false) {
   return { viewport: headless ? { width: 1360, height: 950 } : null };
 }
+export function livePageQuery(env=process.env,synthetic=false) {
+  const query=new URLSearchParams();
+  if(env.FISCH_VISION_DELEGATE==='CPU')query.set('vision','cpu');
+  if(synthetic)query.set('fixture','synthetic');
+  if(env.FISCH_PRESENTATION_PROTOCOL==='diagram')query.set('diagramLab','1');
+  return query;
+}
 export async function closeLiveResources(actions) {
   const results = await Promise.allSettled(actions.map(action => Promise.resolve().then(action)));
   const failed = results.find(result => result.status === 'rejected');
@@ -32,9 +39,7 @@ export async function openLive({ hands, assets, headless = false, signal, inspec
     browser = await launchLiveBrowser(headless);
     const page = await browser.newPage(livePageOptions(headless));
     await inspect(page);
-    const query = new URLSearchParams();
-    if (process.env.FISCH_VISION_DELEGATE === 'CPU') query.set('vision', 'cpu');
-    if (synthetic) query.set('fixture', 'synthetic');
+    const query = livePageQuery(process.env,synthetic);
     await page.goto(origin + '/live.html?' + query, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForFunction(() => !!window.fischLive);
     await page.evaluate(({ base, token }) => window.fischLive.pair(base, token), { base, token });
