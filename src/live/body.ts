@@ -58,6 +58,13 @@ export class LiveBody {
   private chatSceneRevision = 0;
   chatSceneContext() {
     if (document.hidden || this.controls.mode === 'off' || this.scheduler.busy || this.scheduler.queueDepth || this.reactiveOwner) return null;
+    return this.presentationSceneContext();
+  }
+  presentationAnnotationContext() {
+    if (document.hidden || this.controls.mode === 'off') return null;
+    return this.presentationSceneContext();
+  }
+  private presentationSceneContext() {
     const parts = this.scheduler.sceneParts;
     if (!parts || !parts.length || parts.length > capability.assembly.parts) return null;
     if (parts !== this.chatSceneParts) { this.chatSceneParts = parts; this.chatSceneRevision++; }
@@ -151,6 +158,38 @@ export class LiveBody {
       this.trace.record(record?.seq, 'rejected', performance.now(), code, record?.epoch, { origin: 'native' });
       return { status: 'rejected', code };
     }
+  }
+  revokePresentationGeometry(scope: { epoch: string; sceneRevision: number; seq: number }) {
+    const scene = this.presentationSceneContext();
+    if (!scene || scene.epoch !== scope.epoch || scene.revision !== scope.sceneRevision || this.scheduler.nextSequence !== scope.seq + 1) return false;
+    this.lifecycle.cancel(); this.scheduler.cancel(this.scheduler.epoch, false); this.controls.release();
+    this.userGeometryLocked = false; this.userLeaseUntil = 0; this.restFace(0);
+    return true;
+  }
+  admitPresentation(body: unknown, scope: { epoch: string; sceneRevision: number }, valid: () => boolean) {
+    const rejected = (code: string) => ({ status: 'rejected' as const, code });
+    const current = () => valid() && this.scheduler.epoch === scope.epoch &&
+      this.chatSceneContext()?.revision === scope.sceneRevision;
+    try {
+      if (!current()) return rejected('presentation_stale');
+      const at = performance.now(), record = { v: 1, epoch: scope.epoch, seq: this.scheduler.nextSequence,
+        kind: 'program', track: 'body', policy: 'replace', body };
+      const compiled = this.compiler.compile(record, at, this.scheduler.sceneParts);
+      if (compiled.configuration?.observerContext || compiled.configuration?.observerHandoffMs !== undefined ||
+          compiled.configuration?.transient) return rejected('presentation_delegation_forbidden');
+      this.validateParts(compiled);
+      // No await between the final scope check and scheduler admission.
+      if (!current()) return rejected('presentation_stale');
+      const result = this.admitCompiled(compiled, at);
+      if (result !== 'accepted') return rejected(result);
+      this.prepareUserMutation();
+      this.userLeaseUntil = Math.max(this.userLeaseUntil, this.leaseUntil(compiled, at));
+      this.userGeometry(compiled, at);
+      this.trace.record(record.seq, 'admitted', performance.now(), undefined, record.epoch, { origin: 'native' });
+      this.scheduler.tick();
+      const scene = this.presentationSceneContext();
+      return { status: 'accepted' as const, epoch: record.epoch, seq: record.seq, sceneRevision: scene?.revision };
+    } catch (error) { return rejected(error instanceof Error ? error.message : 'presentation_invalid'); }
   }
   attachReactive(session: ReactiveSession) { this.reactive = session; }
   revokeObserverHandoff(preserveScene = false) { this.observerHandoff = undefined; this.publicContext = undefined; if (!preserveScene) this.transientScene = undefined; }
