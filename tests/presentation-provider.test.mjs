@@ -124,3 +124,30 @@ it('stops processing queued public deltas after first parser failure',async()=>{
  await expect(provider.generate({userText:'x',assistantText:'y'},new AbortController().signal,{}, {isCurrent:()=>true,onRecord(){},onRejectedRecord:r=>rejected.push(r)})).rejects.toThrow();
  expect(rejected).toHaveLength(1);expect(rejected[0].text).toBe('not json');provider.close();
 });
+
+it('clears active ownership when transport construction throws',async()=>{
+ class BrokenRpc {constructor(){throw Error('fixture_spawn_failure');}}
+ const provider=new NativePresentationProvider({host:{command:'fake',args:[]},runtime:{cwd:'fake',env:{}},Rpc:BrokenRpc});
+ await expect(provider.generate({userText:'x',assistantText:'y'},new AbortController().signal,{})).rejects.toThrow('fixture_spawn_failure');expect(provider.active).toBeUndefined();
+ provider.Rpc=Rpc;expect(await provider.generate({userText:'x',assistantText:'y'},new AbortController().signal,{})).toHaveLength(1);provider.close();
+});
+it.each(['initialize','turn/start'])('close rejects pending %s without relying on transport failure callback',async phase=>{
+ let reached,closed=0;const ready=new Promise(r=>reached=r);
+ class SilentRpc extends Rpc {close(){closed++;}async request(method,params){if(method===phase){reached();return new Promise(()=>{});}return super.request(method,params);}}
+ const provider=new NativePresentationProvider({host:{command:'fake',args:[]},runtime:{cwd:'fake',env:{}},Rpc:SilentRpc});
+ const running=provider.generate({userText:'x',assistantText:'y'},new AbortController().signal,{});const rejected=expect(running).rejects.toThrow('presentation_aborted');await ready;provider.close();await rejected;
+ expect(provider.active).toBeUndefined();expect(provider.rpc).toBeUndefined();expect(closed).toBeGreaterThan(0);expect(provider.closed).toBe(true);
+});
+
+it('closing after an emitted record never replays or retracts that receipt',async()=>{
+ class RecordRpc extends Rpc {
+  close(){}
+  async request(method,params){if(method!=='turn/start')return super.request(method,params);queueMicrotask(()=>{
+   this.notify('item/started',{threadId:'visual-thread',item:{id:'v',type:'agentMessage',phase:'final_answer'}});
+   this.notify('item/agentMessage/delta',{threadId:'visual-thread',itemId:'v',delta:'{"mode":"retain","payload":null}'});
+  });return {turn:{id:'visual-turn'}};}
+ }
+ const records=[];const provider=new NativePresentationProvider({host:{command:'fake',args:[]},runtime:{cwd:'fake',env:{}},Rpc:RecordRpc});
+ await expect(provider.generate({userText:'x',assistantText:'y'},new AbortController().signal,{}, {isCurrent:()=>true,onRecord:record=>{records.push(record);provider.close();}})).rejects.toThrow('presentation_aborted');
+ expect(records).toEqual([{mode:'retain',payload:null}]);expect(provider.active).toBeUndefined();
+});

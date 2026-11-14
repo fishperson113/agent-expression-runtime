@@ -108,44 +108,50 @@ export class NativePresentationProvider {
   }
   async generate(exchange, signal, scene, streaming) {
     if (this.active || this.closed || signal.aborted) throw Error('presentation_unavailable');
-    const job = { id: randomUUID(), text: undefined }; this.active = job;
-    let timer, resolve, reject;
+    const job = { id: randomUUID(), text: undefined };
+    let timer, resolve, reject, cancelRequest;
+    const cancelled=new Promise((_,no)=>{cancelRequest=no;});cancelled.catch(()=>{});
     const records = streaming ? createPresentationRecordStream({ ...(this.compact ? {parseRecord:this.miniScene?parseMiniPresentation:parseCompactPresentationRecord} : {}), isCurrent: () => !signal.aborted && streaming.isCurrent() }) : null;
     const publish = text => { for (const record of records.push(text)) {streaming.onPhase?.('record');streaming.onRecord(record);} };
     const phase=name=>{try{streaming?.onPhase?.(name);}catch{}};
-    const done = new Promise((yes, no) => { resolve = yes; reject = error => { job.failed = true; no(error); }; }); done.catch(() => {});
+    const done = new Promise((yes, no) => { resolve = yes; reject = error => { job.failed = true; cancelRequest(error); no(error); }; }); done.catch(() => {});
     const notify = presentationNotifications({job,streaming,records,publish,resolve,reject});
     const args = [...this.host.args, 'app-server', '--stdio', ...fischCodexArguments(), '-c', 'web_search="disabled"', ...disabled.flatMap(key => ['--disable', key])];
-    const rpc = new this.Rpc(this.host.command, args, this.runtime.cwd, notify, code => reject(Error(code)), this.runtime.env); this.rpc = rpc;
-    const abort = () => { reject(Error('presentation_aborted')); rpc.close(); };
+    let rpc; this.active=job;
+    try { rpc = new this.Rpc(this.host.command, args, this.runtime.cwd, notify, code => reject(Error(code)), this.runtime.env); }
+    catch(error){if(this.active===job)this.active=undefined;throw error;}
+    this.rpc = rpc;
+    const request=(...values)=>Promise.race([rpc.request(...values),cancelled]);
+    const abort = () => { const error=Error('presentation_aborted');reject(error);cancelRequest(error);try{rpc.close();}catch{} };
+    job.cancel=abort;
     signal.addEventListener('abort', abort, { once: true }); timer = setTimeout(abort, this.timeoutMs);
     try {
       if (signal.aborted) abort();
-      await rpc.request('initialize', { clientInfo: { name: 'fisch_presentation', version: '1' }, capabilities: { experimentalApi: true } }); phase('initialized');rpc.send({ method: 'initialized' });
-      const { config } = await rpc.request('config/read', { includeLayers: false });
+      await request('initialize', { clientInfo: { name: 'fisch_presentation', version: '1' }, capabilities: { experimentalApi: true } }); phase('initialized');rpc.send({ method: 'initialized' });
+      const { config } = await request('config/read', { includeLayers: false });
       if (!config || disabled.some(key => config.features?.[key] !== false) || Object.keys(config.mcp_servers ?? {}).length) throw Error('presentation_isolation');
       if (streaming && (this.visualModel || this.visualEffort)) {
-        const catalog = await rpc.request('model/list', { includeHidden: false });
+        const catalog = await request('model/list', { includeHidden: false });
         const model = catalog.data?.find(row => row.model === this.visualModel);
         if (!model || !model.supportedReasoningEfforts?.some(row => row.reasoningEffort === this.visualEffort)) throw Error('presentation_model_unsupported');
       }
-      const started = await rpc.request('thread/start', { cwd: this.runtime.cwd, ephemeral: true, ...(streaming && this.visualModel ? { model: this.visualModel } : {}), serviceTier: fischCodexServiceTier(this.runtime.env), sandbox: 'read-only', approvalPolicy: 'never', baseInstructions: streaming ? streamingPolicy(this.compact,this.miniScene) : policy, developerInstructions: '' });
+      const started = await request('thread/start', { cwd: this.runtime.cwd, ephemeral: true, ...(streaming && this.visualModel ? { model: this.visualModel } : {}), serviceTier: fischCodexServiceTier(this.runtime.env), sandbox: 'read-only', approvalPolicy: 'never', baseInstructions: streaming ? streamingPolicy(this.compact,this.miniScene) : policy, developerInstructions: '' });
       job.threadId = started.thread.id;phase('thread_started');
       try {streaming?.onConfiguration?.({model:started.model,reasoningEffort:started.reasoningEffort,serviceTier:started.serviceTier});} catch {}
-      const catalog = await rpc.request('mcpServerStatus/list', { threadId: job.threadId });
+      const catalog = await request('mcpServerStatus/list', { threadId: job.threadId });
       if (catalog.nextCursor || !Array.isArray(catalog.data) || catalog.data.some(row => Object.keys(row.tools ?? {}).length || row.resources?.length || row.resourceTemplates?.length)) throw Error('presentation_catalog');
       if (signal.aborted || this.closed) throw Error('presentation_aborted');
       const data = { userText: exchange.userText, assistantText: exchange.assistantText, scene, ...(streaming ? { target: exchange.target } : {}) };
-      phase('turn_request');const ack = await rpc.request('turn/start', { threadId: job.threadId, ...(streaming && this.visualEffort ? { effort: this.visualEffort } : {}), input: [{ type: 'text', text: JSON.stringify(data), text_elements: [] }], ...(streaming ? {} : { outputSchema: presentationSchema }) });
+      phase('turn_request');const ack = await request('turn/start', { threadId: job.threadId, ...(streaming && this.visualEffort ? { effort: this.visualEffort } : {}), input: [{ type: 'text', text: JSON.stringify(data), text_elements: [] }], ...(streaming ? {} : { outputSchema: presentationSchema }) });
       if (job.turnId && job.turnId !== ack.turn?.id) throw Error('presentation_turn_mismatch');
       job.turnId = ack.turn?.id; if (!job.turnId) throw Error('presentation_turn_missing'); await done;
       if (signal.aborted || this.closed) throw Error('presentation_aborted');
       return streaming ? undefined : parsePresentation(job.text);
     } finally {
-      clearTimeout(timer); signal.removeEventListener('abort', abort); rpc.close();
+      clearTimeout(timer); signal.removeEventListener('abort', abort); try{rpc.close();}catch{}
       // Do not allow another generation until this process has actually settled.
-      await rpc.settled; if (this.active === job) this.active = undefined;
+      try{await rpc.settled;}finally{if(this.active===job)this.active=undefined;if(this.rpc===rpc)this.rpc=undefined;}
     }
   }
-  close() { this.closed = true; this.rpc?.close(); }
+  close() { this.closed = true; this.active?.cancel?.(); try{this.rpc?.close();}catch{} }
 }
