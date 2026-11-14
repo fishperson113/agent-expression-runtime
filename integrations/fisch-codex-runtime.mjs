@@ -30,9 +30,9 @@ export function fischCodexServiceTier(env = process.env) {
 }
 
 export function fischCodexArguments() {
-  return ['-c', 'mcp_servers={}', '-c', 'project_doc_max_bytes=0', '-c', 'developer_instructions=""', '-c', 'web_search="disabled"',
+  return ['-c', 'mcp_servers={}', '-c', 'project_doc_max_bytes=0', '-c', 'developer_instructions=""',
     '-c', 'features.skip_host_skill_discovery=true', '-c', 'features.omit_skill_descriptions=true',
-    ...['hooks', 'plugins', 'apps', 'skill_search', 'shell_tool', 'multi_agent', 'computer_use', 'browser_use', 'image_generation']
+    ...['hooks', 'plugins', 'apps', 'skill_search']
       .flatMap(name => ['--disable', name])];
 }
 

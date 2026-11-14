@@ -13,13 +13,21 @@ export function liveInstructions(message, instructions) {
   return { ...message, params };
 }
 
+const nativeConfigKeys = new Set(['model', 'model_provider', 'model_reasoning_effort', 'model_reasoning_summary', 'model_verbosity', 'service_tier']);
+function nativeConversationConfig(config) {
+  if (!config || typeof config !== 'object' || Array.isArray(config)) return undefined;
+  const entries = Object.entries(config).filter(([key, value]) => nativeConfigKeys.has(key) && (typeof value === 'string' || value === null));
+  return entries.length ? Object.fromEntries(entries) : undefined;
+}
+
 export function scopedLiveRequest(message, cwd, instructions, serviceTier = fischCodexServiceTier()) {
   if (!['thread/start', 'thread/resume', 'thread/fork', 'turn/start'].includes(message.method)) return message;
   const params = { ...message.params, cwd };
   if (message.method !== 'turn/start' && params.serviceTier == null) params.serviceTier = serviceTier;
-  delete params.config; delete params.path; delete params.environment;
+  const config = nativeConversationConfig(params.config);
+  if (config) params.config = config; else delete params.config;
+  delete params.path; delete params.environment;
   if (message.method !== 'turn/start') {
-    delete params.developerInstructions; delete params.baseInstructions;
     delete params.skillRoots; delete params.dynamicTools;
     return liveInstructions({ ...message, params }, instructions);
   }

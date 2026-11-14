@@ -28,14 +28,14 @@ it('disables inherited hooks, host skills and unrelated MCP configuration', () =
   const args = fischCodexArguments();
   for (const value of ['mcp_servers={}', 'project_doc_max_bytes=0', 'features.skip_host_skill_discovery=true', 'hooks', 'plugins', 'apps']) expect(args).toContain(value);
 });
-it.each(['thread/start', 'thread/resume', 'thread/fork'])('pins %s to the scoped workspace and Fisch instructions', method => {
+it.each(['thread/start', 'thread/resume', 'thread/fork'])('isolates %s while appending expression instructions to native instructions', method => {
   const input = { method, params: { cwd: '/external', config: { mcp_servers: {} }, path: '/global/session', developerInstructions: 'external', skillRoots: ['external'], threadId: 'keep' } };
   const result = scopedLiveRequest(input, '/fisch/workspace', 'Body instructions');
   expect(result.params.cwd).toBe('/fisch/workspace');
   expect(result.params.config).toBeUndefined(); expect(result.params.path).toBeUndefined();
   expect(result.params.skillRoots).toBeUndefined(); expect(result.params.threadId).toBe('keep');
   expect(result.params.developerInstructions).toContain('Body instructions');
-  expect(result.params.developerInstructions).not.toContain('external');
+  expect(result.params.developerInstructions).toContain('external');
   expect(input.params.cwd).toBe('/external');
 });
 it('keeps turn input but not request-level config or cwd overrides', () => {
@@ -110,4 +110,28 @@ it('lets turns inherit the thread or explicitly override tier without automatic 
   const input = { method: 'turn/start', params: { threadId: 'same', serviceTier: 'default', serviceTierForTurn: 'priority' } };
   expect(scopedLiveRequest(input, '/fisch', '', 'default').params).toEqual({ ...input.params, cwd: '/fisch' });
   expect(scopedLiveRequest({ method: 'turn/start', params: {} }, '/fisch', '', 'priority').params).toEqual({ cwd: '/fisch' });
+});
+
+it('isolates extensions without disabling native tools or changing model effort', () => {
+  const args = fischCodexArguments();
+  for (const feature of ['shell_tool', 'multi_agent', 'computer_use', 'browser_use', 'image_generation']) expect(args).not.toContain(feature);
+  expect(args.some(value => /web_search|model_reasoning_effort|model=/.test(value))).toBe(false);
+});
+it.each(['thread/start', 'thread/resume', 'thread/fork', 'turn/start'])('preserves native choices and approval boundaries for %s', method => {
+  const input = { method, params: { model: 'native-choice', effort: 'high', approvalPolicy: 'on-request', sandbox: 'read-only',
+    baseInstructions: 'Native baseline', developerInstructions: 'User selected style',
+    config: { model: 'native-choice', model_reasoning_effort: 'high', model_verbosity: 'high', service_tier: 'default',
+      hooks: {}, 'features.hooks': true, mcp_servers: { extra: {} }, developer_instructions: 'global leak', project_doc_max_bytes: 999 },
+    dynamicTools: [{ name: 'external' }], skillRoots: ['/global'] } };
+  const result = scopedLiveRequest(input, '/fisch', 'Expression API');
+  expect(result.params.config).toEqual({ model: 'native-choice', model_reasoning_effort: 'high', model_verbosity: 'high', service_tier: 'default' });
+  expect(result.params.model).toBe('native-choice'); expect(result.params.effort).toBe('high');
+  expect(result.params.approvalPolicy).toBe('on-request'); expect(result.params.sandbox).toBe('read-only');
+  expect(result.params.baseInstructions).toBe('Native baseline');
+  expect(result.params.developerInstructions).toContain('User selected style');
+  if (method !== 'turn/start') {
+    expect(result.params.developerInstructions).toContain('Expression API');
+    expect(result.params.dynamicTools).toBeUndefined(); expect(result.params.skillRoots).toBeUndefined();
+  }
+  expect(input.params.config.hooks).toEqual({});
 });
