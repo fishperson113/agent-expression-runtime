@@ -59,7 +59,3 @@ export function parseCompactPresentationRecord(text) {
   if (annotations?.arrows?.some(arrow => arrow.from[0] === arrow.to[0] && arrow.from[1] === arrow.to[1])) throw Error('compact_arrow_degenerate');
   return { ...decision, ...(annotations ? { annotations: { labels: annotations.labels ?? [], arrows: annotations.arrows ?? [] } } : {}) };
 }
-
-
-
-

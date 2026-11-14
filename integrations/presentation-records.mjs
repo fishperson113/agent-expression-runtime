@@ -92,5 +92,3 @@ function consume(state, char, maxDepth, fail) {
   }
   return false;
 }
-
-
