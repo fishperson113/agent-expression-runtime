@@ -1,5 +1,6 @@
 import { expect, it, vi } from 'vitest';
-import { once } from 'node:events';
+import { once, EventEmitter } from 'node:events';
+import { fixtureNativeCall, externalPlayground } from './fixtures/playground-external.mjs';
 import { fileURLToPath } from 'node:url';
 import { WebSocket } from 'ws';
 import { LiveRequests, openCodexTransport } from '../integrations/live-codex-transport.mjs';
@@ -131,7 +132,7 @@ it('observes an ACK-only owned turn before resolving, preserves Native notificat
     expect(f.writes).toEqual(['thread/start', 'turn/start', 'turn/interrupt']);
   } finally { await f.close(); }
 });
-it('rejects a queued browser send when Native selection changes before the shared barrier releases', async () => {
+it('rejects a queued browser send when Native starts a thread before the shared barrier releases', async () => {
   const f = await fixture(); let release;
   try {
     f.barrier(() => new Promise(resolve => { release = resolve; }));
@@ -139,7 +140,7 @@ it('rejects a queued browser send when Native selection changes before the share
     const result = f.transport.submitUser(params(), () => f.output.revision === revision && f.output.selection === undefined, f.discard);
     const rejected = expect(result).rejects.toMatchObject({ uncertain: false });
     await vi.waitFor(() => expect(release).toBeTypeOf('function'));
-    f.socket.send(JSON.stringify({ id: 2, method: 'thread/resume', params: { threadId: 'other' } }));
+    f.socket.send(JSON.stringify({ id: 2, method: 'thread/start', params: {} }));
     await vi.waitFor(() => expect(f.output.selection).toBe(2)); f.barrier(async () => {}); release(); await rejected;
     await vi.waitFor(() => expect(f.native.some(value => value.id === 2)).toBe(true));
     f.socket.send(JSON.stringify({ id: 3, method: 'test/snapshot', params: {} }));
@@ -177,4 +178,50 @@ it('reserves future private IDs before any owned reservation exists', async () =
     const ack = await f.transport.submitUser(params(), () => true, f.discard);
     expect(ack.id).toBe(next); expect(f.output.turn).toBe('owned-turn'); expect(f.broker.turns.has('owned-turn')).toBe(true);
   } finally { await f.close(); }
+});
+
+it.each(['EPIPE', 'unexpected'])('owns native fixture write errors without unhandled events: %s', async code => {
+  const child = Object.assign(new EventEmitter(), { exitCode: null, signalCode: null, stdin: Object.assign(new EventEmitter(), { writable: true, destroyed: false }) });
+  const error = Object.assign(Error(code), { code });
+  child.stdin.write = (_data, callback) => queueMicrotask(() => { callback(error); child.stdin.emit('error', error); });
+  const call = fixtureNativeCall(child, async () => ({ type: 'result', value: 'must_not_arrive' }));
+  await expect(call({ operation: 'complete' })).rejects.toMatchObject({ code: code === 'EPIPE' ? 'fixture_native_closed' : code });
+  expect(call.available()).toBe(false);
+});
+it('rejects a pending native reply when the fixture exits', async () => {
+  const child = Object.assign(new EventEmitter(), { exitCode: null, signalCode: null, stdin: Object.assign(new EventEmitter(), { writable: true, destroyed: false }) });
+  child.stdin.write = (_data, callback) => callback();
+  const call = fixtureNativeCall(child, () => new Promise(() => {})), pending = call({ operation: 'state' });
+  const rejected = expect(pending).rejects.toMatchObject({ code: 'fixture_native_closed' });
+  child.emit('exit', 0); await rejected;
+});
+it.each(['closed', 'unexpected'])('external completion distinguishes lost native ownership from other failures: %s', async mode => {
+  const calls = [], client = { call: async method => method === 'tools/list' ? { tools: [] } : {}, close: async () => {},
+    tool: async () => ({ content: [{ text: JSON.stringify({ revision: 1 }) }] }) };
+  const native = async command => { calls.push(command.operation); if (command.operation === 'complete') throw Object.assign(Error(mode), { code: mode === 'closed' ? 'fixture_native_closed' : 'unexpected' }); return { turnId: 'turn' }; };
+  const route = await externalPlayground('synthetic', 'synthetic', native, undefined, () => client);
+  try {
+    if (mode === 'closed') expect(await route.call({ operation: 'state' })).toEqual({ revision: 1 });
+    else await expect(route.call({ operation: 'state' })).rejects.toMatchObject({ code: 'unexpected' });
+    expect(calls).toEqual(['state', 'complete']);
+  } finally { await route.close(); }
+});
+
+it.each(['EPIPE', 'EIO'])('preserves the native failure recorded while MCP action is pending: %s', async code => {
+  const child = Object.assign(new EventEmitter(), { exitCode: null, signalCode: null, stdin: Object.assign(new EventEmitter(), { writable: true, destroyed: false }) });
+  const writes = []; child.stdin.write = (text, callback) => { writes.push(JSON.parse(text)); callback(); };
+  const native = fixtureNativeCall(child, async () => ({ type: 'result', value: { turnId: 'turn' } }));
+  let release, entered;
+  const started = new Promise(resolve => { entered = resolve; });
+  const client = { call: async method => method === 'tools/list' ? { tools: [] } : {}, close: async () => {},
+    tool: () => new Promise(resolve => { release = resolve; entered(); }) };
+  const route = await externalPlayground('synthetic', 'synthetic', native, undefined, () => client);
+  try {
+    const result = route.call({ operation: 'state' }); const observed = result.catch(error => error);
+    await started; child.stdin.emit('error', Object.assign(Error(code), { code }));
+    release({ content: [{ text: JSON.stringify({ revision: 1 }) }] });
+    if (code === 'EPIPE') expect(await observed).toEqual({ revision: 1 });
+    else expect(await observed).toMatchObject({ code: 'EIO' });
+    expect(writes.map(value => value.operation)).toEqual(['state']);
+  } finally { await route.close(); }
 });
