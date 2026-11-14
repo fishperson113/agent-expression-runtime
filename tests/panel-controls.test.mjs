@@ -174,3 +174,14 @@ it('does not revive offline approvals when complete file details arrive late',as
   await project(page,request);expect(await panel.locator('button').count()).toBe(0);expect(await page.evaluate(()=>window.__calls)).toEqual([]);
  }finally{await page.close();}
 },45000);
+
+it('projects an oversized status-less web search as a valid truncated DTO without granting anything',()=>{
+ const events=[],writes=[],protocol=new PanelProtocol({write:value=>writes.push(value),onControl:value=>events.push(value)});
+ protocol.threadId='t';protocol.receive({method:'turn/started',params:{threadId:'t',turn:{id:'u'}}});
+ for(const method of ['item/started','item/completed'])protocol.receive({method,params:{threadId:'t',turnId:'u',item:{id:'search',type:'webSearch',action:{query:'x'.repeat(17000)}}}});
+ expect(events).toHaveLength(2);
+ for(const event of events){expect(event.item).toEqual({id:'search',type:'webSearch',truncated:true});expect(parsePanelControl(event)?.item).toEqual(event.item);}
+ expect(writes).toEqual([]);expect(protocol.controls.size).toBe(0);
+ expect(parsePanelControl({...events[0],item:{...events[0].item,status:undefined}})).toBeUndefined();
+ protocol.close();
+});

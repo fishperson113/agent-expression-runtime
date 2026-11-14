@@ -153,7 +153,7 @@ export class PanelProtocol {
     if (!['commandExecution', 'fileChange', 'mcpToolCall', 'dynamicToolCall', 'webSearch'].includes(p.item.type)) {
       this.items.delete(p.item.id); this.updateEligibility(); return;
     }
-    const item = bounded(p.item, 16384) ? structuredClone(p.item) : { id: p.item.id, type: p.item.type, status: p.item.status, truncated: true };
+    const item = bounded(p.item, 16384) ? structuredClone(p.item) : { id: p.item.id, type: p.item.type, ...(typeof p.item.status === 'string' ? { status: p.item.status } : {}), truncated: true };
     this.items.set(item.id, item); if (this.items.size > 32) this.items.delete(this.items.keys().next().value);
     this.emit({ type: 'tool', phase: message.method === 'item/started' ? 'started' : 'completed', threadId: p.threadId, turnId: p.turnId, item });
     this.updateEligibility();
