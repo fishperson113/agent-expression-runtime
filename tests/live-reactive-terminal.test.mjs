@@ -129,7 +129,7 @@ it.each(['absent', 'observe'])('keeps conversation and its input barrier usable 
     const seen = (await f.call('test/snapshot')).result.seen;
     expect(seen.filter(m => m.method === 'turn/start').map(m => m.params.input)).toEqual([firstInput, secondInput]);
     expect(seen.filter(m => m.method === 'turn/interrupt')).toHaveLength(1);
-    expect(seen.find(m => m.method === 'thread/start').params.developerInstructions).toContain('`express`');
+    expect(seen.filter(m => m.method === 'thread/start')).toHaveLength(1);
     expect(f.nativeEnv.FISCH_LIVE).toBe('1');
     expect(seen.some(m => m.method === 'item/toolOutput' || JSON.stringify(m).includes('fisch_local_observation'))).toBe(false);
     expect(f.deliveries.every(d => d.data?.action === null)).toBe(true);

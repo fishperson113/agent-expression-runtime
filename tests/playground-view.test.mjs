@@ -28,6 +28,10 @@ async function open(fallback = false) {
 it('explicit copy stays camera-off and changes neither the body nor storage', async () => {
   const { page, panel } = await open();
   try {
+    expect(await panel.textContent()).toContain('client đã kết nối Fisch MCP');
+    expect(await panel.textContent()).toContain('playground_state/playground_edit');
+    expect(await panel.textContent()).toContain('Chat Native và biểu đạt tự động là luồng riêng');
+    expect(await panel.textContent()).not.toContain('Dán vào terminal Codex đang chạy cùng Fisch');
     const mutations = []; page.on('request', request => { if (request.method() !== 'GET' || new URL(request.url()).pathname.startsWith('/v1/')) mutations.push(request.method()); });
     const controls = await page.locator('#cancel').boundingBox();
     expect(controls.y + controls.height).toBeLessThanOrEqual(950);
@@ -41,7 +45,8 @@ it('explicit copy stays camera-off and changes neither the body nor storage', as
     const request = await page.evaluate(() => window.copiedRequests[0]);
     expect(request).toContain('Một chiếc lá phát sáng'); expect(request).toContain('playground_edit'); expect(request).toContain('create');
     expect(request).not.toContain('"type":"assemble"'); expect(await panel.locator('details').getAttribute('open')).toBeNull();
-    expect(await summary.evaluate(node => node === document.activeElement)).toBe(true);
+    await expect.poll(() => panel.locator('dialog[open]').count()).toBe(0);
+    await expect.poll(() => summary.evaluate(node => node === document.activeElement)).toBe(true);
     expect(await page.locator('#body').screenshot()).toEqual(body);
     expect(await page.locator('video').evaluate(video => video.srcObject)).toBeNull(); expect(await page.evaluate(() => window.persistence)).toBe(0);
     expect(mutations).toEqual([]);

@@ -10,7 +10,7 @@ const css = `.fisch-playground{min-width:0}.fisch-playground .pg-fields{display:
 function elements() {
   const host = document.createElement('section'), id = `fisch-playground-${++mounts}`; host.className = 'fisch-playground';
   host.innerHTML = `<details><summary aria-describedby="${id}-copy">Cùng sáng tạo</summary><div class="pg-fields">
-    <p>Chép để gửi Codex. Dán vào terminal Codex đang chạy cùng Fisch; trang này không tự gửi yêu cầu.</p>
+    <p>Chỉ dành cho client đã kết nối Fisch MCP và có playground_state/playground_edit. Không dán yêu cầu công cụ vào phiên thiếu hai tool này. Chat Native và biểu đạt tự động là luồng riêng; trang này không tự gửi yêu cầu.</p>
     <label for="${id}-idea">Ý tưởng<textarea id="${id}-idea" class="pg-idea" rows="2" aria-describedby="${id}-limits"></textarea></label>
     <label for="${id}-goal">Mục tiêu tùy chọn<textarea id="${id}-goal" class="pg-goal" rows="1" aria-describedby="${id}-limits"></textarea></label>
     <p id="${id}-limits">Ý tưởng tối đa 500 ký tự, mục tiêu 160 ký tự. Vui lòng nhập một dòng; nội dung chỉ nằm trong trang này cho đến khi bạn chép.</p>
@@ -72,10 +72,10 @@ export function mountPlayground(container: HTMLElement) {
     catch (error) { ui.error.textContent = (error as Error).message; return; }
     try {
       await navigator.clipboard.writeText(text); if (disposed || generation !== attempt || !ui.details.open) return;
-      ui.copied.textContent = 'Đã chép; chưa gửi. Bạn tự dán vào terminal Codex khi muốn.'; ui.details.open = false; ui.summary.focus();
+      ui.copied.textContent = 'Đã chép; chưa gửi. Chỉ dán vào client đã kết nối Fisch MCP.'; ui.details.open = false; ui.summary.focus();
     } catch {
       if (disposed || generation !== attempt || !ui.details.open) return;
-      ui.copied.textContent = 'Chưa chép được; chưa gửi. Chọn nội dung bên dưới để chép rồi tự gửi Codex.';
+      ui.copied.textContent = 'Chưa chép được; chưa gửi. Chép nội dung bên dưới rồi gửi client đã kết nối Fisch MCP.';
       ui.output.value = text; ui.output.hidden = false; ui.details.open = true; ui.output.focus(); ui.output.select();
     }
   }
