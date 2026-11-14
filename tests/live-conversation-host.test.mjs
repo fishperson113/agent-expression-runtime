@@ -15,12 +15,12 @@ import { runLiveSession } from '../scripts/live-session.mjs';
 import { openLive } from '../integrations/live-launch.mjs';
 import { gatewayExecutable } from '../scripts/start-session.mjs';
 const fixture = fileURLToPath(new URL('./fixtures/conversation-host-agent.mjs', import.meta.url));
-async function browserRoute({ expression = false } = {}) {
+async function browserRoute() {
   const abort = new AbortController(); let live, child, next, tag = 0;
   const running = runLiveSession({ headless: true, assets: false, signal: abort.signal,
     open: options => openLive({ ...options, production: false, synthetic: true }),
     runHost: options => { live = options.live; return runTerminalCodex({ ...options, reactiveProvider: null,
-      host: { command: process.execPath, args: [expression ? fileURLToPath(new URL('./fixtures/playground-agent.mjs', import.meta.url)) : fixture] }, spawnClient: (command, args, settings) => {
+      host: { command: process.execPath, args: [fixture] }, spawnClient: (command, args, settings) => {
         child = spawn(command, args, { ...settings, stdio: ['pipe', 'pipe', 'pipe'] });
         child.stderr.resume(); next = inbox(child); return child;
       } }); } });
@@ -210,25 +210,30 @@ it.skipIf(!existsSync(gatewayExecutable()) && !requireBrowserGateway)('sends and
   } finally { await route.close(); }
 }, 90000);
 
-it.skipIf(!existsSync(gatewayExecutable()) && !requireBrowserGateway)('uses the chat DOM to invoke a scripted agent expression through actual MCP without projecting tool output as chat', async () => {
-  const route = await browserRoute({ expression: true }), page = route.live.page;
+it.skipIf(!existsSync(gatewayExecutable()) && !requireBrowserGateway)('keeps canonical chat unchanged while an independent MCP client applies an expression', async () => {
+  const route = await browserRoute(), page = route.live.page;
+  const client = liveTestClient(route.live.base, route.live.token);
   try {
-    expect(route.ready.tools).toContain('express'); expect(route.ready.tools).toContain('observe');
+    await client.call('initialize');
     const chat = page.locator('.fisch-conversation'), input = chat.locator('textarea');
     await expect.poll(() => input.isEnabled(), { timeout: 5000 }).toBe(true);
-    await input.fill(JSON.stringify({ operation: 'express' }));
-    await chat.getByRole('button', { name: 'Gửi', exact: true }).click();
-    const result = await route.next(value => value.type === 'result' && value.command === 'express');
-    expect(result.value.status).toBe('accepted');
+    await input.fill('xin chao'); await input.press('Enter');
+    await expect.poll(() => chat.locator('ol').textContent()).toContain('Public synthetic reply.');
+    const canonical = await chat.locator('ol').textContent();
+    const result = toolValue(await client.tool('express', { body: { type: 'morph', target: 'wall', durationMs: 100 } }));
+    expect(result.status).toBe('accepted');
     await expect.poll(() => page.evaluate(() => window.fischLive.metrics().scene)).toBe('wall');
     const metrics = await page.evaluate(() => window.fischLive.metrics());
     expect(metrics.diagnostics.events.some(event => event.origin === 'native' && event.phase === 'applied')).toBe(true);
     await expect.poll(() => page.evaluate(() => window.fischLive.metrics().diagnostics.events.some(event =>
       event.origin === 'native' && event.phase === 'frame_changed_proxy'))).toBe(true);
-    expect(await chat.locator('ol').textContent()).toBe('');
+    expect(await chat.locator('ol').textContent()).toBe(canonical);
+    const seen = (await route.call('test/snapshot')).result.seen;
+    expect(seen.filter(row => row.method === 'turn/start').map(row => row.text)).toEqual(['xin chao']);
+    expect(seen.some(row => row.method === 'mcpServer/tool/call')).toBe(false);
     expect(metrics.cameraActive).toBe(false);
     if (process.env.FISCH_CHAT_EXPRESSION_SCREENSHOT) await page.screenshot({ path: process.env.FISCH_CHAT_EXPRESSION_SCREENSHOT });
-  } finally { await route.close(); }
+  } finally { await client.close(); await route.close(); }
 }, 90000);
 
 const nativeGateway = existsSync(gatewayExecutable());
@@ -272,10 +277,12 @@ it.skipIf(!nativeGateway)('observes and publishes a causal reaction while the se
     const before=await f.live.page.evaluate(()=>window.fischLive.metrics()); await f.live.page.waitForTimeout(800);
     const during=await f.live.page.evaluate(()=>window.fischLive.metrics());expect(during.cameraSeq).toBeGreaterThan(before.cameraSeq);expect(during.render.frame).toBeGreaterThan(before.render.frame);
     resolve(authored(seen.request));
-    await expect.poll(()=>f.live.page.locator('.observation-messages').innerText(),{timeout:10000}).toContain('Lời chủ động từ fixture');
+    await expect.poll(()=>published.length,{timeout:10000}).toBe(1);
+    expect(await f.live.page.locator('.observation-messages').innerText()).toBe('');
+    expect(await f.live.page.locator('.fisch-conversation ol').innerText()).toContain('Public synthetic reply.');
     await expect.poll(()=>f.live.page.evaluate(()=>window.fischLive.metrics().parts)).toEqual(['scripted_reaction']);
     await expect.poll(()=>published.length).toBe(1);
-    expect(published[0]).toMatchObject({request:{requestId:seen.request.requestId},receipt:{source:'native-observation',reason:'accepted',chatPublished:true}});
+    expect(published[0]).toMatchObject({request:{requestId:seen.request.requestId},receipt:{source:'native-observation',reason:'accepted',chatPublished:false}});
     await f.live.page.waitForTimeout(1000);expect(calls).toBe(1);
     const state=(await f.call('test/snapshot')).result;expect(state.seen.filter(row=>row.method==='turn/interrupt')).toHaveLength(0);
     const result=await evidence(f,'scripted');expect(result.metrics.cameraActive).toBe(false);
@@ -362,9 +369,10 @@ for (const mode of ['observe','express']) it.skipIf(!nativeGateway)(`keeps a pro
     await expect.poll(()=>calls.length,{timeout:10000}).toBe(1);
     expect(calls[0]).toEqual({schemaVersion:1,expressionAllowed:false});
     await expect.poll(()=>receipts.length,{timeout:10000}).toBe(1);
-    expect(receipts[0]).toMatchObject({reason:mode==='observe'?'observed':'admission_failed',chatPublished:mode==='observe'});
+    expect(receipts[0]).toMatchObject({reason:mode==='observe'?'observed':'admission_failed',chatPublished:false});
     const text=await f.live.page.locator('.observation-messages').innerText();
-    if(mode==='observe')expect(text).toContain('Lời fixture');else expect(text).toBe('');
+    expect(text).toBe('');
+    expect(await f.live.page.locator('.fisch-conversation ol').innerText()).toContain('Public synthetic reply.');
     const metrics=await f.live.page.evaluate(()=>window.fischLive.metrics());
     expect(metrics.parts).toEqual(['protected_form']);expect(metrics.userGeometryLocked).toBe(true);expect(metrics.reactiveOwner).toBeNull();
     expect(metrics.diagnostics.events.some(row=>row.origin==='reactive'&&['admitted','applied'].includes(row.phase))).toBe(false);
@@ -416,7 +424,7 @@ it.skipIf(!nativeGateway)('hands off only an explicitly disposable MAIN form thr
         &&row.requestId===decision.requestId&&row.decisionId===decision.decisionId&&row.actionId===decision.action.actionId);
     },{timeout:10000}).toBe(true);
     expect(calls).toEqual([{schemaVersion:1,expressionAllowed:true}]);
-    expect(receipts[0]).toMatchObject({reason:'accepted',chatPublished:true});
+    expect(receipts[0]).toMatchObject({reason:'accepted',chatPublished:false});
     const metrics=await f.live.page.evaluate(()=>window.fischLive.metrics());
     expect(metrics.userGeometryLocked).toBe(false);expect(metrics.observerHandoff).toBeNull();
     expect(metrics.parts).not.toContain('disposable_main_form');expect(metrics.cameraActive).toBe(false);
@@ -475,7 +483,7 @@ it.skipIf(!nativeGateway)('shares only explicit public context while retaining i
     expect(calls[0]).toMatchObject({expressionAllowed:false,interactionContext:{mode:'open',text:'Public game: continue the shared activity without assuming an answer.'}});
     expect(JSON.stringify(calls[0])).not.toContain('Public scripted coding task');
     expect(await f.live.page.locator('.observer-context').innerText()).toContain('Public game:');
-    expect(receipts[0]).toMatchObject({reason:'observed',chatPublished:true});
+    expect(receipts[0]).toMatchObject({reason:'observed',chatPublished:false});
     const metrics=await f.live.page.evaluate(()=>window.fischLive.metrics());expect(metrics.parts).toEqual(['shared_game_form']);expect(metrics.userGeometryLocked).toBe(true);
   }finally{await client?.close();await f.close();}
 },60000);
@@ -519,7 +527,7 @@ it.skipIf(!nativeGateway)('rejects observer-authored context even when MAIN gran
   }finally{await client?.close();await f.close();}
 },60000);
 
-it.skipIf(!nativeGateway)('keeps a long public brief above usable chat with published fixture captions across desktop and mobile without losing drafts',async()=>{
+it.skipIf(!nativeGateway)('keeps a long public brief above usable chat without observer chat insertion across desktop and mobile without losing drafts',async()=>{
   let calls=0;const receipts=[];
   const provider={conversationLane:true,contractVersion:1,policy:{deadlineMs:60000,cooldownMs:1000,maxPerMinute:4},confirmPublication:(_request,value)=>receipts.push(value),
     decide:async window=>{calls++;return{decision:{schemaVersion:1,requestId:window.request.requestId,decisionId:'layout_'+window.request.requestId,mode:'observe',validUntil:window.request.deadline,action:null},
@@ -535,8 +543,8 @@ it.skipIf(!nativeGateway)('keeps a long public brief above usable chat with publ
     await expect.poll(()=>brief.innerText()).toContain(text);
     await page.evaluate(()=>{window.__observationMode='present-neutral';});await expect.poll(()=>receipts.length,{timeout:10000}).toBe(1);
     await page.evaluate(()=>{window.__observationMode='present-smile';});await expect.poll(()=>receipts.length,{timeout:10000}).toBe(2);
-    expect(receipts.every(receipt=>receipt.chatPublished===true)).toBe(true);expect(await page.locator('.observation-messages > div').count()).toBe(2);
-    if(process.env.FISCH_BRIEF_LAYOUT_EVIDENCE)writeFileSync(process.env.FISCH_BRIEF_LAYOUT_EVIDENCE+'/publication.json',JSON.stringify({actualModelCalls:0,mainBackend:'Native protocol fixture',observerBackend:'scripted provider',fakeProviderCalls:calls,captionRows:2,receipts},null,2));
+    expect(receipts.every(receipt=>receipt.chatPublished===false)).toBe(true);expect(await page.locator('.observation-messages > div').count()).toBe(0);
+    if(process.env.FISCH_BRIEF_LAYOUT_EVIDENCE)writeFileSync(process.env.FISCH_BRIEF_LAYOUT_EVIDENCE+'/publication.json',JSON.stringify({actualModelCalls:0,mainBackend:'Native protocol fixture',observerBackend:'scripted provider',fakeProviderCalls:calls,captionRows:0,receipts},null,2));
     await input.fill('Bản nháp phải còn nguyên khi brief đếm ngược.');
     for(const[width,height]of[[1360,950],[1440,900],[1280,720],[390,844],[320,568],[844,390],[640,450]]){
       await page.setViewportSize({width,height});
@@ -560,7 +568,8 @@ it.skipIf(!nativeGateway)('keeps a long public brief above usable chat with publ
     await brief.focus();await page.keyboard.press('End');
     await expect.poll(()=>brief.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);await page.waitForTimeout(1100);
     expect(await brief.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);expect(await brief.textContent()).toContain(text);
-    const reaction=page.locator('.observation-messages');await reaction.focus();await page.keyboard.press('End');await expect.poll(()=>reaction.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);
+    expect(await page.locator('.observation-messages').innerText()).toBe('');
+    expect(await page.locator('.fisch-conversation ol').innerText()).toContain('Public synthetic reply.');
     expect(await input.inputValue()).toBe('Bản nháp phải còn nguyên khi brief đếm ngược.');expect(calls).toBe(2);
     const replace=async durationMs=>toolValue(await client.tool('compose_expression',{durationMs:100,observerContext:{text,mode:'open',durationMs},
       parts:[{id:'layout_form',kind:'ellipsoid',center:[0,0,0],scale:[0.3,0.3,0.1]}]}));
@@ -576,14 +585,15 @@ it.skipIf(!nativeGateway)('keeps a long public brief above usable chat with publ
   }finally{await client?.close();await f.close();}
 },90000);
 
-it.skipIf(!nativeGateway)('returns public Fisch history with strict inspect and best-effort observe diagnostics',async()=>{
+it.skipIf(!nativeGateway)('excludes unpublished observer replies from public history with strict inspect and best-effort observe diagnostics',async()=>{
   const receipts=[];const provider={conversationLane:true,contractVersion:1,confirmPublication:(_request,value)=>receipts.push(value),
     decide:async window=>({decision:{schemaVersion:1,requestId:window.request.requestId,decisionId:'public_'+window.request.requestId,
       mode:'observe',validUntil:window.request.deadline,action:null},reply:'Bạn chọn lối trái hay lối phải? PUBLIC_QUESTION'})};
   const f=await nativeBrowserLoop(provider),client=liveTestClient(f.live.base,f.live.token);
   const publicHistory=coordination=>{
     expect(coordination).toMatchObject({schemaVersion:1,source:'fisch-host',available:true,state:{schemaVersion:1}});
-    expect(coordination.state.recentPublished[0].text).toContain('PUBLIC_QUESTION');
+    expect(coordination.state.recentPublished).toEqual([]);
+    expect(JSON.stringify(coordination)).not.toContain('PUBLIC_QUESTION');
     expect(JSON.stringify(coordination)).not.toContain('Public scripted coding task');
   };
   const unavailable=coordination=>{
@@ -592,7 +602,9 @@ it.skipIf(!nativeGateway)('returns public Fisch history with strict inspect and 
     expect(Number.isInteger(coordination.elapsedMs)).toBe(true);expect(coordination.elapsedMs).toBeGreaterThanOrEqual(0);expect(coordination.elapsedMs).toBeLessThanOrEqual(60000);
   };
   try{await client.call('initialize');await arrive(f);await expect.poll(()=>receipts.length,{timeout:10000}).toBe(1);
-    expect(receipts[0].chatPublished).toBe(true);
+    expect(receipts[0].chatPublished).toBe(false);
+    expect(await f.live.page.locator('.observation-messages').innerText()).toBe('');
+    expect(await f.live.page.locator('.fisch-conversation ol').innerText()).toContain('Public synthetic reply.');
     const inspected=toolValue(await client.tool('inspect_expression'));publicHistory(inspected.coordination);
     expect(inspected.coordination.epoch).toBe(inspected.epoch);expect(inspected.coordination.session).toBe(inspected.session);
     await f.live.page.waitForTimeout(1100);
@@ -716,15 +728,16 @@ it.skipIf(!existsSync(gatewayExecutable()) && !requireGateway)('publishes one sc
     const before = await f.live.page.evaluate(() => window.fischLive.metrics());
     await f.live.page.evaluate(() => { window.fixtureSource = setInterval(() => window.fischLive.fixture('present-neutral'), 150); });
     await expect.poll(() => f.state.request, { timeout: 10000 }).toBeTruthy();
+    const canonicalBefore = await f.live.page.locator('.fisch-conversation ol').textContent();
     const value = scriptedObserverExpression(f.state.request, 'FIXTURE proactive caption'); f.state.response.resolve(value);
-    await expect.poll(() => f.live.page.locator('.observation-messages').textContent(), { timeout: 10000 }).toContain(value.reply);
     const events = () => f.live.page.evaluate(id => window.fischLive.metrics().diagnostics.events.filter(event => event.requestId === id), f.state.request.requestId);
     await expect.poll(async () => (await events()).map(event => event.phase), { timeout: 5000 }).toContain('completed');
     for (const phase of ['admitted', 'applied', 'frame_submitted', 'completed']) expect((await events()).some(event => event.phase === phase)).toBe(true);
     expect((await events()).filter(event => event.phase === 'applied')).toHaveLength(1);
     await f.live.page.evaluate(({ id, value }) => window.fischLive.deliverNativeReaction(id, value), { id: f.state.request.requestId, value });
     const captions = await f.live.page.locator('.observation-messages').textContent();
-    expect(captions.split(value.reply)).toHaveLength(2); expect((await events()).filter(event => event.phase === 'applied')).toHaveLength(1);
+    expect(captions).toBe('');
+    expect(await f.live.page.locator('.fisch-conversation ol').textContent()).toBe(canonicalBefore); expect((await events()).filter(event => event.phase === 'applied')).toHaveLength(1);
     const inspection = await f.tool('inspect_expression');
     expect(inspection.epoch).toBe(f.state.request.epoch); expect(inspection.summary.color).toBe('#00ff00');
     const final = await f.live.page.evaluate(() => ({ metrics: window.fischLive.metrics(), media: window.fixtureMediaRequests }));
