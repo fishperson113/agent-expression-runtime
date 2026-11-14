@@ -28,14 +28,14 @@ it('disables inherited hooks, host skills and unrelated MCP configuration', () =
   const args = fischCodexArguments();
   for (const value of ['mcp_servers={}', 'project_doc_max_bytes=0', 'features.skip_host_skill_discovery=true', 'hooks', 'plugins={}', 'marketplaces={}']) expect(args).toContain(value);
 });
-it.each(['thread/start', 'thread/resume', 'thread/fork'])('pins %s to the scoped workspace and Fisch instructions', method => {
+it.each(['thread/start', 'thread/resume', 'thread/fork'])('isolates %s without changing native instructions', method => {
   const input = { method, params: { cwd: '/external', config: { mcp_servers: {} }, path: '/global/session', developerInstructions: 'external', skillRoots: ['external'], threadId: 'keep' } };
   const result = scopedLiveRequest(input, '/fisch/workspace', 'Body instructions');
   expect(result.params.cwd).toBe('/fisch/workspace');
   expect(result.params.config).toBeUndefined(); expect(result.params.path).toBeUndefined();
   expect(result.params.skillRoots).toBeUndefined(); expect(result.params.threadId).toBe('keep');
-  expect(result.params.developerInstructions).toContain('Body instructions');
-  expect(result.params.developerInstructions).not.toContain('external');
+  expect(result.params.developerInstructions).not.toContain('Body instructions');
+  expect(result.params.developerInstructions).toContain('external');
   expect(input.params.cwd).toBe('/external');
 });
 it('keeps turn input but not request-level config or cwd overrides', () => {
@@ -119,6 +119,24 @@ it('isolates extensions without disabling native tools or changing model effort'
   for (const feature of ['shell_tool', 'multi_agent', 'computer_use', 'browser_use', 'image_generation', 'apps', 'plugins']) expect(args).not.toContain(feature);
   expect(args.some(value => /web_search|model_reasoning_effort|model=/.test(value))).toBe(false);
 });
+it.each(['thread/start', 'thread/resume', 'thread/fork', 'turn/start'])('preserves native choices and approval boundaries for %s', method => {
+  const input = { method, params: { model: 'native-choice', effort: 'high', approvalPolicy: 'on-request', sandbox: 'read-only',
+    baseInstructions: 'Native baseline', developerInstructions: 'User selected style',
+    config: { model: 'native-choice', model_reasoning_effort: 'high', model_verbosity: 'high', service_tier: 'default',
+      hooks: {}, 'features.hooks': true, mcp_servers: { extra: {} }, developer_instructions: 'global leak', project_doc_max_bytes: 999 },
+    dynamicTools: [{ name: 'external' }], skillRoots: ['/global'] } };
+  const result = scopedLiveRequest(input, '/fisch', 'Expression API');
+  expect(result.params.config).toEqual({ model: 'native-choice', model_reasoning_effort: 'high', model_verbosity: 'high', service_tier: 'default' });
+  expect(result.params.model).toBe('native-choice'); expect(result.params.effort).toBe('high');
+  expect(result.params.approvalPolicy).toBe('on-request'); expect(result.params.sandbox).toBe('read-only');
+  expect(result.params.baseInstructions).toBe('Native baseline');
+  expect(result.params.developerInstructions).toContain('User selected style');
+  if (method !== 'turn/start') {
+    expect(result.params.developerInstructions).toBe('User selected style');
+    expect(result.params.dynamicTools).toBeUndefined(); expect(result.params.skillRoots).toBeUndefined();
+  }
+  expect(input.params.config.hooks).toEqual({});
+});
 
 it.each(['mcp_servers', 'plugins', 'marketplaces'])('fails closed on unexpected scoped %s configuration', async key => {
   class Rpc {
@@ -130,4 +148,11 @@ it.each(['mcp_servers', 'plugins', 'marketplaces'])('fails closed on unexpected 
     }
   }
   await expect(prepareFischCodexRuntime({ command: 'codex', args: [] }, { cwd: '/fisch', env: {} }, { Rpc })).rejects.toThrow('isolated integration configuration');
+});
+
+it('respects a native config tier without overriding an explicit request tier', () => {
+  const input = { method: 'thread/start', params: { config: { service_tier: 'default' } } };
+  expect(scopedLiveRequest(input, '/fisch', '', 'priority').params.serviceTier).toBe('default');
+  expect(scopedLiveRequest({ ...input, params: { ...input.params, serviceTier: 'priority' } }, '/fisch', '', 'default').params.serviceTier).toBe('priority');
+  expect(input.params.serviceTier).toBeUndefined();
 });

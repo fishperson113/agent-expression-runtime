@@ -1,7 +1,7 @@
 import { fischCodexRuntime } from './fisch-codex-runtime.mjs';
 import { spawn } from 'node:child_process';
 import { captureChatObservation } from './chat-observation.mjs';
-import { nativeLiveInstructions } from './live-instruction-bundle.mjs';
+import { LiveStreamingPresentationBridge } from './presentation-streaming-bridge.mjs';
 import { randomUUID } from 'node:crypto';
 import { liveCodexArguments } from '../scripts/live-codex.mjs';
 import { codexCommand, stopChild } from '../scripts/start-session.mjs';
@@ -15,8 +15,15 @@ import { liveSetupStatus } from './live-setup-status.mjs';
 import { liveRoot } from './live-launch.mjs';
 import { liveShutdownCode, closeLiveOwned } from './live-shutdown.mjs';
 
+export function presentationCall(state, method, ...args) {
+  try {
+    const pending = state.presentation?.[method](...args);
+    if (pending && typeof pending.catch === 'function') pending.catch(() => {});
+  } catch { /* Presentation failures never become conversation failures. */ }
+}
+
 async function selectThread(state, thread, previous) {
-  state.projection.select(thread);
+  presentationCall(state, 'invalidate'); state.projection.select(thread);
   if (!state.channel.stale) state.channel.token = randomUUID();
   await state.broker.evaluate(async ({ token, snapshot, clear }) => {
     const api = window.fischLive; if (api.conversationOffline === true) return;
@@ -28,7 +35,7 @@ async function selectThread(state, thread, previous) {
   await state.publishSetup('connected');
 }
 async function observeMessage(state, message) {
-  await state.output.accept(message); state.broker.event(message); state.conversation.accept(message);
+  await state.output.accept(message); state.broker.event(message); state.conversation.accept(message); presentationCall(state, 'observe', message);
   const started = state.output.turn ? state.projection.accept({ method: 'turn/started',
     params: { threadId: state.output.thread, turn: { id: state.output.turn } } }) : null;
   const value = state.projection.accept(message) ?? started;
@@ -39,18 +46,21 @@ export async function createBridge({ live, host, cwd, env, configured, instructi
   state.output = new LiveOutput((thread, previous) => selectThread(state, thread, previous));
   const original = liveCodexArguments(liveRoot, cwd, env), config = original.slice(original.indexOf('-c'));
   try {
-    state.transport = await openCodexTransport({ host, args: config, cwd, env, instructions,
+    state.transport = await openCodexTransport({ host, args: config, cwd, env: Object.fromEntries(Object.entries(env).filter(([key]) => !key.startsWith('AER_'))),
       onEvent: message => observeMessage(state, message), onFailure: () => state.fail?.(1),
       onRequest: message => {
+        if (['turn/start', 'turn/steer', 'turn/interrupt', 'thread/start', 'thread/resume', 'thread/fork'].includes(message.method)) presentationCall(state, 'invalidate');
         state.conversation?.inputAttempt(message);
         if (['thread/start', 'thread/resume', 'thread/fork'].includes(message.method)) state.conversation?.selectionAttempt();
         state.output.request(message); return state.broker?.client(message);
       } });
     state.broker = new LiveReactiveBroker({ page: live.page, provider: configured.provider, output: state.output,
-      forward: state.transport.forward, contextSource: () => state.conversation?.observerContext() ?? null, beforeForward: (message, source) => { state.conversation?.fenceObservation(message.id, source); state.conversation?.prepareSceneContext(message.id, source?.documentToken === state.channel.token ? source : null); }, reject: (message, error) => {
+      forward: state.transport.forward, contextSource: () => state.conversation?.observerContext() ?? null, beforeForward: (message, source) => { state.conversation?.fenceObservation(message.id, source); }, reject: (message, error) => {
         const rejected = { id: message.id, error }; state.output.accept(rejected); state.conversation?.accept(rejected); state.transport.reject(message, error);
       }, log: text => { state.logs.push(text); state.logs.splice(0, Math.max(0, state.logs.length - 20)); } });
     state.conversation = new LiveConversation({ output: state.output, transport: state.transport, broker: state.broker, captureObservation: scope => captureChatObservation(state.broker, state.channel, scope) });
+    try { state.presentation = new LiveStreamingPresentationBridge({ state, page: live.page, host, runtime: fischCodexRuntime() }); }
+    catch { state.logs.push('presentation_unavailable'); }
     state.publishSetup = (native, token) => state.broker.evaluate(({ value, token }) => {
       const api = window.fischLive; if (api.conversationOffline === true) return;
       if (token) api.conversationDocument = token; api.setupStatus?.(value);
@@ -67,12 +77,12 @@ export async function runTerminalCodex({ live, cwd, signal, spawnClient = spawn,
   const runtime = fischCodexRuntime(); cwd = runtime.cwd;
   const env = { ...nativeLiveEnvironment(runtime.env), AER_BASE_URL: live.base, AER_PAIRING_TOKEN: live.token, FISCH_LIVE: '1', FISCH_PLANNER_BACKEND: 'off' };
   const configured = reactiveProvider === undefined ? createLiveReactiveProvider(runtime.env, { defaultNative: true }) : { provider: reactiveProvider, reason: reactiveProvider ? 'ready' : 'disabled_by_config' };
-  const instructions = nativeLiveInstructions();
-  const state = await createBridge({ live, host, cwd, env, configured, instructions });
+
+  const state = await createBridge({ live, host, cwd, env, configured });
   let child, stopping = false, stoppedCode = 1, closing, failed = false;
   const cleanupFailure = Promise.withResolvers(); void cleanupFailure.promise.catch(() => {});
   const cleanup = () => closing ??= closeLiveOwned([() => state.unbind?.(), () => stopChild(child), () => state.transport.close()]);
-  const closeConversation = () => { state.channel.stale = true; state.channel.token = undefined; state.conversation.close(); };
+  const closeConversation = () => { presentationCall(state, 'close'); state.channel.stale = true; state.channel.token = undefined; state.conversation.close(); };
   const stop = code => { if (stopping) return; stopping = true; stoppedCode = state.broker.browserUnavailable ? 1 : code;
     closeConversation(); state.broker.close(); void cleanup().catch(cleanupFailure.reject); };
   state.fail = stop;

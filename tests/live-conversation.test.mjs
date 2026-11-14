@@ -705,104 +705,17 @@ it.each(['selection','thread','navigation','close'])('does not forward a held ca
  f.fail(0,false);await expect(pending).rejects.toThrow();
 });
 
-const hostScene = () => ({documentToken:'doc-a',sessionId:'camera-a',revision:2,scene:{schemaVersion:1,epoch:'scene-a',revision:1,capturedAt:Date.now(),partIds:['face'],capacity:24,remaining:23}});
-it('keeps scene inventory after camera revocation and hides both from public/user chat', async () => {
-  const f=fixture({captureObservation:cameraContext}),pending=f.send('add a cup');await vi.waitFor(()=>expect(f.calls).toHaveLength(1));
-  const call=f.calls[0], source=hostScene();f.conversation.fenceObservation(call.message.id,source);f.conversation.prepareSceneContext(call.message.id,source);
-  expect(call.guard(call.message)).toBe(true);expect(call.message.params.input).toHaveLength(2);
-  expect(call.message.params.input[1].text).toContain('HOST SCENE DATA');expect(call.message.params.input.some(x=>x.type==='image')).toBe(false);
-  expect(call.guard(call.message)).toBe(true);expect(call.message.params.input).toHaveLength(2);
-  f.reply(0,{result:{turn:{id:'scene-turn',status:'inProgress'}}});await pending;
-  f.event({method:'item/completed',params:{threadId:'thread-a',turnId:'scene-turn',item:{id:'user-scene',type:'userMessage',content:call.message.params.input}}});
-  expect(f.conversation.snapshot().messages.find(x=>x.role==='user').text).toBe('add a cup');
-  expect(JSON.stringify(f.conversation.observerContext())).not.toContain('HOST SCENE');
-});
-it('adds camera-off inventory without camera boilerplate and drops aged inventory before repeat guard', async () => {
-  vi.useFakeTimers();try {
-    const f=fixture({captureObservation:()=>null}),pending=f.send('add a cup');await vi.advanceTimersByTimeAsync(0);
-    const call=f.calls[0];f.conversation.prepareSceneContext(call.message.id,hostScene());expect(call.guard(call.message)).toBe(true);
-    expect(call.message.params.input).toHaveLength(2);expect(call.message.params.input[1].text).not.toContain('Camera snapshot');
-    await vi.advanceTimersByTimeAsync(251);expect(call.guard(call.message)).toBe(true);expect(call.message.params.input).toHaveLength(1);
-    f.reply(0,{result:{turn:{id:'scene-turn',status:'completed'}}});await pending;
-  }finally{vi.useRealTimers();}
-});
-it.each(['navigation','close','selection'])('does not forward scene context after %s', async mode=>{
- const f=fixture(),pending=f.send('cup');const call=f.calls[0];f.conversation.prepareSceneContext(call.message.id,hostScene());
- if(mode==='navigation')f.conversation.navigation();if(mode==='close')f.conversation.close();if(mode==='selection')f.conversation.selectionAttempt();
- expect(call.guard(call.message)).toBe(false);f.fail(0,false);await expect(pending).rejects.toThrow();
-});
 
-const proofEvent = (f, completed, extra = {}) => f.event({method:completed?'item/completed':'item/started',params:{threadId:'thread-a',turnId:'proof-turn',...extra,
- item:{type:'mcpToolCall',id:'inspect-one',server:'fisch_live',tool:'inspect_expression',status:completed?'completed':'inProgress',
- result:completed?{content:[{type:'text',text:JSON.stringify({source:'fisch-renderer',format:'structured',session:'own-controller',epoch:'scene-a'})}]}:null,...extra.item}}});
-it.each(['valid','unpaired','other-thread','wrong-tool','failed','cancel','selection','epoch-change'])('scene controller proof is scoped: %s', async mode => {
- const f=fixture(), pending=f.send('hello'); f.reply(0,{result:{turn:{id:'proof-turn',status:'inProgress'}}}); await pending;
- if(mode!=='unpaired') proofEvent(f,false);
- if(mode==='cancel') { const cancelled=f.conversation.cancel({generation:f.conversation.snapshot().generation});f.reply(1,{result:{}});await cancelled; }
- if(mode==='selection') f.select('thread-a');
- proofEvent(f,true, mode==='other-thread'?{threadId:'other'}:mode==='wrong-tool'?{item:{tool:'compose_expression'}}:mode==='failed'?{item:{status:'failed'}}:{});
- f.event({method:'turn/completed',params:{threadId:'thread-a',turn:{id:'proof-turn',status:mode==='cancel'?'interrupted':'completed'}}});
- const next=f.send('cup'), index=f.calls.length-1, call=f.calls[index], context=hostScene();
- if(mode==='epoch-change') context.scene.epoch='revoked-epoch';
- f.conversation.prepareSceneContext(call.message.id,context);expect(call.guard(call.message)).toBe(true);
- const text=call.message.params.input[1].text;
- expect(text.includes('"controllerEpoch":"scene-a"')).toBe(mode==='valid');
- expect(text.includes('controller_unavailable')).toBe(mode!=='valid');
- f.reply(index,{result:{turn:{id:'next-turn',status:'completed'}}});await next;
-});
-
-
-it.each(['valid','error','invalid','selection','navigation','close','epoch-change'])('host controller bootstrap stays fenced: %s', async mode => {
-  let resolve; const controllerRequest = vi.fn(() => new Promise(r => { resolve = r; }));
-  const f = fixture({controllerRequest}); f.conversation.holdControllerBootstrap();
-  expect(f.conversation.snapshot().canSend).toBe(false);
-  await expect(f.send()).rejects.toThrow('conversation_unavailable');
-  const boot = f.conversation.bootstrapController('thread-a');
-  expect(controllerRequest).toHaveBeenCalledWith('mcpServer/tool/call', {threadId:'thread-a',server:'fisch_live',tool:'inspect_expression',arguments:{}});
-  if(mode==='selection') f.select('thread-a');
-  if(mode==='navigation') f.conversation.navigation();
-  if(mode==='close') f.conversation.close();
-  const proof={source:'fisch-renderer',format:'structured',session:'own-controller',epoch:'scene-a'};
-  resolve(mode==='error'?{error:{code:-1}}:{result:{content:[{type:'text',text:JSON.stringify(mode==='invalid'?{}:proof)}]}});
-  expect(await boot).toBe(['valid','epoch-change'].includes(mode));
-  expect(f.conversation.snapshot().messages).toHaveLength(0);
-  if(['navigation','close'].includes(mode)) return;
-  const next=f.send('cup'), call=f.calls[0], source=hostScene();
-  if(mode==='epoch-change')source.scene.epoch='new-epoch';
-  f.conversation.prepareSceneContext(call.message.id,source);expect(call.guard(call.message)).toBe(true);
-  expect(call.message.params.input[1].text.includes('controller_unavailable')).toBe(mode!=='valid');
-  f.reply(0,{result:{turn:{id:'next',status:'completed'}}}); await next;
-});
-
-it.each(['reject', 'timeout'])('optional bootstrap releases composer and ignores late proof: %s', async mode => {
-  vi.useFakeTimers();
-  try {
-    let resolve;
-    const controllerRequest = () => mode === 'reject' ? Promise.reject(Error('unsupported')) : new Promise(r => { resolve = r; });
-    const f = fixture({ controllerRequest }); f.conversation.holdControllerBootstrap();
-    const boot = f.conversation.bootstrapController('thread-a');
-    if (mode === 'timeout') await vi.advanceTimersByTimeAsync(1500);
-    expect(await boot).toBe(false); expect(f.conversation.snapshot().canSend).toBe(true);
-    resolve?.({ result: { content: [{ type: 'text', text: JSON.stringify({ source: 'fisch-renderer', format: 'structured', session: 'own', epoch: 'scene-a' }) }] } });
-    await Promise.resolve();
-    const next = f.send('cup'), call = f.calls[0];
-    f.conversation.prepareSceneContext(call.message.id, hostScene()); expect(call.guard(call.message)).toBe(true);
-    expect(call.message.params.input[1].text).toContain('controller_unavailable');
-    f.reply(0, { result: { turn: { id: 'next', status: 'completed' } } }); await next;
-  } finally { vi.useRealTimers(); }
-});
-it('rejects bootstrap authority if an external turn becomes active', async () => {
-  let resolve; const f = fixture({ controllerRequest: () => new Promise(r => { resolve = r; }) });
-  f.conversation.holdControllerBootstrap(); const boot = f.conversation.bootstrapController('thread-a');
-  f.event({ method: 'turn/started', params: { threadId: 'thread-a', turn: { id: 'external', status: 'inProgress' } } });
-  resolve({ result: { content: [{ type: 'text', text: JSON.stringify({ source: 'fisch-renderer', format: 'structured', session: 'own', epoch: 'scene-a' }) }] } });
-  expect(await boot).toBe(false); expect(f.conversation.snapshot().canSend).toBe(false);
-});
-
-it('does not inspect an already active resumed turn', async () => {
-  const controllerRequest = vi.fn(); const f = fixture({ controllerRequest });
-  f.event({ method: 'turn/started', params: { threadId: 'thread-a', turn: { id: 'active', status: 'inProgress' } } });
-  f.conversation.holdControllerBootstrap();
-  expect(await f.conversation.bootstrapController('thread-a')).toBe(false);
+it('sends camera-off user text unchanged without scene inventory or controller bootstrap', async () => {
+  const controllerRequest = vi.fn();
+  const f = fixture({ captureObservation: () => null, controllerRequest });
+  expect(f.conversation.snapshot().canSend).toBe(true);
+  const text = 'flink la gi, cdc toi biet roi';
+  const pending = f.send(text); await vi.waitFor(() => expect(f.calls).toHaveLength(1));
+  const call = f.calls[0]; expect(call.guard(call.message)).toBe(true);
+  expect(call.message.params.input).toEqual([{ type: 'text', text, text_elements: [] }]);
   expect(controllerRequest).not.toHaveBeenCalled();
+  expect(f.conversation.prepareSceneContext).toBeUndefined();
+  expect(f.conversation.bootstrapController).toBeUndefined();
+  f.reply(0, { result: { turn: { id: 'plain-turn', status: 'completed' } } }); await pending;
 });
