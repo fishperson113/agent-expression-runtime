@@ -16,6 +16,8 @@ function fixture(){
 it('starts from a public final-answer checkpoint before MAIN completion, no private fields',async()=>{
  const f=fixture();f.append('Day la cau giai thich thu nhat. ');await tick();
  const call=f.calls.find(c=>c.ex);expect(call.ex.assistantText).toContain('thu nhat');expect(f.snapshot.ownerTurn).toBe('t');
+ const identity=f.calls.find(c=>c.arg?.identity).arg.identity;
+ expect(identity.sourceQuote).toBe(call.ex.target);expect(identity.textPrefix.slice(identity.sourceStart,identity.sourceEnd)).toBe(call.ex.target);
  expect(call.ex).not.toHaveProperty('privateReasoning');expect(f.calls.find(c=>c.arg?.identity).arg.identity.messageId).toBe('a');expect(f.calls.find(c=>c.arg?.identity).arg.identity.section).toBe(0);
  f.bridge.close();f.releases.forEach(r=>r());await tick();
 });
@@ -127,6 +129,9 @@ it('opt-in exact excerpts use first completed source time and exact author targe
  f.append(quote+'\n\n');await tick();const call=f.calls.find(c=>c.ex);
  expect(call.ex.target).toBe(quote);expect(call.ex.publicContext).toBe('**A section**\n'+quote);expect(f.snapshot.messages[1].text).toBe('**A section**\n'+quote+'\n\n');expect(f.bridge.selected.sourceAt).toBe(10000);expect(f.bridge.selected.expiresAt).toBe(20000);
  expect(f.events.find(e=>e.type==='checkpoint').sourceAt).toBe(10000);
+ const identity=f.calls.find(c=>c.arg?.identity).arg.identity;
+ expect(identity).toMatchObject({sourceStart:'**A section**\n'.length,sourceEnd:('**A section**\n'+quote).length,sourceQuote:quote});
+ expect(identity.textPrefix.slice(identity.sourceStart,identity.sourceEnd)).toBe(call.ex.target);
  f.advance(1000);f.append('Correction: the previous explanation needs a different qualification.');await tick();expect(call.signal.aborted).toBe(true);
  f.bridge.close();f.releases.forEach(r=>r());await tick();
 });

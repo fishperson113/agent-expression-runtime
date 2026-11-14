@@ -76,6 +76,9 @@ export class LiveStreamingPresentationBridge {
     const job={...id,controller:new AbortController(),lastNow:this.now(),monotonicDeadline:performance.now()+Math.max(0,sourceAt+Math.min(this.ttlMs,this.exactExcerptLease?10000:Infinity)-this.now()),section:this.exactExcerptLease?presentationSection(cp.textPrefix):section,serial:this.serial,checkpoint:cp,generation:snapshot.generation,publicRevision:snapshot.revision,
       userText:user.text,sourceAt,sectionPublishedAt:this.sectionPublishedAt,expiresAt:sourceAt+Math.min(this.ttlMs,this.exactExcerptLease?10000:Infinity),
       sourceHash:createHash('sha256').update(cp.textPrefix).digest('hex')};
+    job.sourceStart=Math.max(job.section,cp.sourceStart);job.sourceEnd=cp.sourceEnd;
+    job.sourceQuote=cp.target??cp.textPrefix.slice(job.sourceStart,job.sourceEnd);
+    if(cp.textPrefix.slice(job.sourceStart,job.sourceEnd)!==job.sourceQuote){this.emit('drop',{code:'source_binding_invalid'});return;}
     this.emit('checkpoint',{sourceAt,revision:cp.checkpointRevision,sourceStart:Math.max(job.section,cp.sourceStart),previousCheckpointEnd:cp.previousEnd,sourceEnd:cp.sourceEnd,publishedAt:cp.observedAt,sectionPublishedAt:job.sectionPublishedAt,sourceHash:job.sourceHash});
     if(this.boundedSourceLease&&this.selected?.admitted&&this.valid(this.selected)&&this.now()<this.selected.holdUntil){this.pending=job;this.emit('coalesced',{revision:cp.checkpointRevision});this.scheduleDrain();return;}
     if(!this.boundedSourceLease&&this.selected?.admitted&&this.selected.section===section&&this.valid(this.selected)){this.emit('covered',{revision:cp.checkpointRevision});return;}
@@ -97,7 +100,7 @@ export class LiveStreamingPresentationBridge {
       // execution and wall-clock rollback must not renew the original source lease.
       job.scene=await this.evaluate(({identity,expiresAt,sentWall,monotonicDeadline,remainingMs})=>{const wall=Date.now(),left=Math.min(remainingMs,expiresAt-wall,monotonicDeadline-(performance.timeOrigin+performance.now()));if(wall<sentWall||left<=0)return null;return window.fischLive?.presentationSnapshot?.({...identity,remainingTtlMs:Math.min(30000,left)});},
         {identity:{documentId:job.documentId,threadId:job.threadId,turnId:job.turnId,generation:job.generation,messageId:job.messageId,
-          textPrefix:job.checkpoint.textPrefix,publicRevision:job.publicRevision,section:job.section},expiresAt:job.expiresAt,sentWall:Date.now(),monotonicDeadline:performance.timeOrigin+job.monotonicDeadline,remainingMs:this.remaining(job)},job);
+          textPrefix:job.checkpoint.textPrefix,publicRevision:job.publicRevision,section:job.section,sourceStart:job.sourceStart,sourceEnd:job.sourceEnd,sourceQuote:job.sourceQuote},expiresAt:job.expiresAt,sentWall:Date.now(),monotonicDeadline:performance.timeOrigin+job.monotonicDeadline,remainingMs:this.remaining(job)},job);
       if(job.scene?.scope)break;await sleep(50);
     }
     if(!this.valid(job)||!job.scene?.scope){this.emit('drop',{code:'source_unavailable',revision:job.checkpoint.checkpointRevision});return;}
@@ -114,7 +117,7 @@ export class LiveStreamingPresentationBridge {
     const timer=setTimeout(()=>{this.emit('source_expired',{revision:job.checkpoint.checkpointRevision});controller.abort();},Math.max(1,this.remaining(job)));
     let admission=Promise.resolve();
     void Promise.resolve().then(()=>this.provider.generate({userText:job.userText,assistantText:job.checkpoint.sourceText,
-      target:job.checkpoint.target??job.checkpoint.textPrefix.slice(Math.max(job.section,job.checkpoint.sourceStart)),
+      target:job.sourceQuote,
       ...(this.exactExcerptLease?{publicContext:job.checkpoint.textPrefix.slice(-4096)}:{})},controller.signal,{partIds:job.scene.partIds},{
       isCurrent:()=>this.valid(job),onConfiguration:config=>this.emit('configuration',{revision:job.checkpoint.checkpointRevision,config}),onRejectedRecord:value=>this.emit('rejected_record',{revision:job.checkpoint.checkpointRevision,...value}),onPhase:phase=>this.emit('phase',{revision:job.checkpoint.checkpointRevision,phase}),onUsage:usage=>this.emit('usage',{revision:job.checkpoint.checkpointRevision,usage}),onRecord:record=>{admission=this.apply(job,record);admission.catch(()=>{});}
     })).then(()=>admission).catch(error=>{this.emit('drop',{code:error.message,revision:job.checkpoint.checkpointRevision});

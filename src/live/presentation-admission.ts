@@ -1,9 +1,11 @@
 import { presentationSection } from './presentation-section.mjs';
 import { validateAnnotations, type Annotations } from './presentation-annotations';
-type Identity = { documentId: string; threadId: string; turnId: string; generation: number; messageId?: string; textPrefix?: string; publicRevision?: number; remainingTtlMs?: number; section?: number };
+type Identity = { documentId: string; threadId: string; turnId: string; generation: number; messageId?: string; textPrefix?: string; publicRevision?: number; remainingTtlMs?: number; section?: number; sourceStart?: number; sourceEnd?: number; sourceQuote?: string };
 type Scene = { epoch: string; revision: number; partIds: string[] };
 type Scope = Identity & { epoch: string; sceneRevision: number; intentVersion: number; admissionVersion: number; prefixLength?: number };
 type State = { documentId?: string; stopped: boolean; hidden: boolean; busy?: boolean; snapshot?: any; scene: Scene | null };
+const sourceKeys = ['sourceStart', 'sourceEnd', 'sourceQuote'] as const;
+const sameScope = (issued: Scope, value: Scope) => value && [...Object.keys(issued), ...sourceKeys].every(key => value[key as keyof Scope] === issued[key as keyof Scope]);
 const id = (value: unknown) => typeof value === 'string' && /^[A-Za-z0-9._:-]{1,128}$/.test(value);
 export class PresentationAdmission {
   private intent = 0;
@@ -15,7 +17,7 @@ export class PresentationAdmission {
   invalidate() { this.intent++; this.issued = undefined; try { this.clearAnnotations(); } catch { /* Visual cleanup must never block native chat publication. */ } }
   leaseDeadline(scope: Scope) {
     const issued=this.issued;
-    try { const state=this.read(); if(!issued || !scope || Object.keys(issued.scope).some(key=>scope[key as keyof Scope]!==issued.scope[key as keyof Scope]) ||
+    try { const state=this.read(); if(!issued || !scope || !sameScope(issued.scope,scope) ||
       this.now()<issued.at || this.now()>=issued.at+issued.leaseMs || !this.available(issued.scope,state,issued.textPrefix) || !this.sceneMatches(issued.scope,state)) return null;
       return issued.at+issued.leaseMs;
     } catch {return null;}
@@ -53,10 +55,18 @@ export class PresentationAdmission {
       if (streaming && (!id(identity.messageId) || typeof identity.textPrefix !== 'string' || !identity.textPrefix.trim() ||
           new TextEncoder().encode(identity.textPrefix).length > 64000 || !Number.isSafeInteger(identity.publicRevision) || identity.publicRevision! < 0 ||
           !Number.isSafeInteger(identity.section) || identity.section! < 0 || !Number.isFinite(identity.remainingTtlMs) || identity.remainingTtlMs! <= 0 || identity.remainingTtlMs! > 30000)) return null;
+      const sourced = sourceKeys.some(key => Object.hasOwn(identity,key));
+      if (sourced && (!streaming || !sourceKeys.every(key => Object.hasOwn(identity,key)) ||
+          !Number.isSafeInteger(identity.sourceStart) || !Number.isSafeInteger(identity.sourceEnd) ||
+          identity.sourceStart! < identity.section! || identity.sourceEnd! <= identity.sourceStart! || identity.sourceEnd! > identity.textPrefix!.length ||
+          typeof identity.sourceQuote !== 'string' || !identity.sourceQuote.trim() ||
+          identity.textPrefix!.slice(identity.sourceStart,identity.sourceEnd) !== identity.sourceQuote ||
+          /[\uDC00-\uDFFF]/u.test(identity.textPrefix![identity.sourceStart!] ?? '') || /[\uDC00-\uDFFF]/u.test(identity.textPrefix![identity.sourceEnd!] ?? ''))) return null;
       const state = this.read();
       if (!this.available(identity, state, identity.textPrefix) || !state.scene) return null;
       const scope = { documentId: identity.documentId, threadId: identity.threadId, turnId: identity.turnId, generation: identity.generation, epoch: state.scene.epoch, sceneRevision: state.scene.revision, intentVersion: this.intent, admissionVersion: ++this.serial,
-        ...(streaming ? { messageId: identity.messageId, section: identity.section, publicRevision: identity.publicRevision, prefixLength: identity.textPrefix!.length } : {}) };
+        ...(streaming ? { messageId: identity.messageId, section: identity.section, publicRevision: identity.publicRevision, prefixLength: identity.textPrefix!.length } : {}),
+        ...(sourced ? { sourceStart: identity.sourceStart, sourceEnd: identity.sourceEnd, sourceQuote: identity.sourceQuote } : {}) };
       this.issued = { scope, at: this.now(), leaseMs: streaming ? Math.min(identity.remainingTtlMs!, this.boundedSourceLease ? 10000 : 30000) : 120000, ...(streaming ? { textPrefix: identity.textPrefix } : {}) };
       return { scope: { ...scope }, partIds: [...state.scene.partIds] };
     } catch { return null; }
@@ -66,7 +76,7 @@ export class PresentationAdmission {
     const valid = () => {
       try {
         if (!issued || this.issued !== issued || !value?.scope ||
-            Object.keys(issued.scope).some(key => value.scope[key as keyof Scope] !== issued.scope[key as keyof Scope])) return false;
+            !sameScope(issued.scope,value.scope)) return false;
         const state = this.read(), age = this.now() - issued.at;
         return age >= 0 && age < issued.leaseMs && this.available(issued.scope, state, issued.textPrefix) &&
           state.scene?.epoch === issued.scope.epoch && state.scene.revision === issued.scope.sceneRevision;
@@ -75,7 +85,7 @@ export class PresentationAdmission {
     if (!valid()) {
       let state: State; try { state = this.read(); } catch { return { status: 'rejected', code: 'presentation_stale' }; }
       const age = issued ? this.now() - issued.at : Infinity;
-      const same = issued && value?.scope && Object.keys(issued.scope).every(key => value.scope[key as keyof Scope] === issued.scope[key as keyof Scope]);
+      const same = issued && value?.scope && sameScope(issued.scope,value.scope);
       return { status: 'rejected', code: same && age >= 0 && age < issued!.leaseMs && state.busy && this.available(issued!.scope, state, issued!.textPrefix) ? 'presentation_busy' : 'presentation_stale' };
     }
     try {
