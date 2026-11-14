@@ -64,3 +64,22 @@ it('launch and bridge opt in only for diagram, preserving default freeform and r
  expect(normal.exactExcerptLease).toBe(false);expect(diagram.exactExcerptLease).toBe(true);expect(diagram.boundedSourceLease).toBe(true);
  expect(()=>new LiveStreamingPresentationBridge({...args,protocol:'oops'})).toThrow('presentation_protocol_invalid');normal.close();diagram.close();
 });
+
+it.each(['qualifier_risk','missing_context'])('forwards prior restrictions and preserves mocked %s abstention without geometry',async reason=>{
+ const f=fixture();const inputExchange={...exchange,target:'The system drops frames to keep the conversation moving while the worker drains its queue.',publicContext:'Only when the queue is full may this happen. It is not guaranteed.\n\nThe system drops frames to keep the conversation moving while the worker drains its queue.'};
+ const before=structuredClone(inputExchange),running=f.provider.generate(inputExchange,f.controller.signal,{},f.stream);
+ await f.ready;const request=f.calls.find(c=>c.method==='turn/start').params,input=JSON.parse(request.input[0].text);
+ expect(input.units).toEqual([{unitId:'u0',text:inputExchange.target}]);expect(input.context.publicPrefix).toBe(inputExchange.publicContext);
+ const policy=f.calls.find(c=>c.method==='thread/start').params.baseInstructions;
+ expect(policy).toContain('binding restrictions');expect(policy).toContain('public prefix may be truncated');
+ const retained=JSON.stringify({mode:'retain',reason});f.start();f.delta(retained);f.finish(retained);await running;
+ expect(f.emitted).toEqual([{mode:'retain',payload:null,reason}]);expect(inputExchange).toEqual(before);f.provider.close();
+});
+it('bounds forwarded prefix at 4096 without treating removed qualifications as supplied evidence',async()=>{
+ const f=fixture(),missing='Only if the queue is full. ',tail='x'.repeat(4096),inputExchange={...exchange,publicContext:missing+tail};
+ const running=f.provider.generate(inputExchange,f.controller.signal,{},f.stream);await f.ready;
+ const input=JSON.parse(f.calls.find(c=>c.method==='turn/start').params.input[0].text);
+ expect(input.context.publicPrefix).toBe(tail);expect(input.context.publicPrefix).not.toContain(missing);expect(input.units[0].text).toBe(exchange.target);
+ const retained=JSON.stringify({mode:'retain',reason:'missing_context'});f.start();f.finish(retained);await running;
+ expect(f.emitted[0]).toEqual({mode:'retain',payload:null,reason:'missing_context'});f.provider.close();
+});

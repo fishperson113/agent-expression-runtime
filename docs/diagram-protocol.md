@@ -26,3 +26,13 @@ This is opt-in experimental wiring, not evidence of general semantic correctness
 or lower latency. Exact substrings do not prove an arrow is entailed. Provider
 unit tests use mocked RPC, and browser fixture checks do not involve real models
 or cameras. The provider still cold-starts a separate process per generation.
+
+Earlier public context can restrict a selected paragraph through conditions,
+negation, modality or uncertainty. The visual-only policy requires preserving
+those restrictions, using a faithful no-edge grouping or retaining the existing
+scene when the selected quote cannot express them. Only the last 4096 characters
+of public context are forwarded; an earlier qualification may be absent.
+The caption shows the selected quote, not the full context. Parser checks remain
+structural and exact-span checks, not semantic entailment or keyword heuristics.
+Mocked tests verify context forwarding, truncation and handling of authored
+abstention, not that a real model reliably chooses abstention or faithful arrows.
