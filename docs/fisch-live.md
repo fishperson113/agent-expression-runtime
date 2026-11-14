@@ -1,6 +1,6 @@
 # Fisch Live POC
 
-Fisch Live là trang web local gồm cơ thể hạt WebGL, camera tùy chọn và hội thoại Native Codex trong cùng cửa sổ. `fisch live` tự mở một thread trong panel; `--terminal` giữ giao diện Codex terminal cũ và `--agent` là adapter Herdr tùy chọn. Codex đọc quan sát có kiểu bằng MCP và tự chọn cách biểu đạt bằng DSL. Camera và phản xạ local không chờ model.
+Fisch Live là trang web local gồm cơ thể hạt WebGL, camera tùy chọn và hội thoại Native Codex. `fisch live` mở thread mới trong panel; `--terminal` dùng giao diện terminal. Codex chính không nhận chỉ dẫn biểu cảm hay Fisch MCP. Một process biểu đạt độc lập theo dõi text công khai đang stream để viết DSL; camera và phản xạ local không chờ model.
 
 Tin nhắn từ **panel hội thoại** khi camera đang bật có thể gửi kèm một ảnh JPEG camera thật gần nhất tới Codex (cạnh dài tối đa 640 px, tối đa 192 KiB, tuổi tối đa 1,5 giây). Camera tắt, bị từ chối, thiếu frame hoặc frame cũ: chỉ gửi chat, không gửi ảnh/context camera. Ảnh là dữ liệu lịch sử tại thời điểm gửi, không phải trạng thái hiện tại được bảo đảm. Tắt/thu hồi camera hoặc đổi nguồn trước forward sẽ bỏ ảnh chưa gửi. Fisch không lưu ảnh này ra file hay cache; chính sách dữ liệu/lưu giữ của Codex và nhà cung cấp áp dụng sau khi gửi. Observer tự động vẫn chỉ nhận hình học và brief công khai có giới hạn, không nhận ảnh camera; không tự bật camera hay ghi âm. Đường terminal/Dictate bên ngoài panel chưa tự gắn ảnh này. Đây là hợp đồng dữ liệu, không phải nghiệm thu khả năng hiểu ảnh hay trải nghiệm.
 
@@ -19,9 +19,8 @@ lại Live. Chuyển thread thành công xóa lịch sử và bản nháp ở pa
 giữ bản nháp. Reload yêu cầu khởi chạy lại Live để nối lại, không tự replay nội dung.
 **Dừng toàn bộ** xóa panel và đóng tài nguyên thuộc phiên.
 
-Camera mặc định tắt và cần bạn bật riêng. Observer camera không nhận nội dung chat
-hoặc code; phản ứng tự động không được thêm vào thread coding. Agent Native có thể
-chủ động dùng expression tools theo ngữ cảnh hội thoại/công việc của chính nó.
+Camera mặc định tắt và cần bạn bật riêng. Observer camera xử lý quan sát có kiểu và brief công khai có giới hạn, không nhận ảnh hay lịch sử coding đầy đủ. Kết quả observer chỉ đi vào hình ảnh, không chèn lời thoại vào panel hoặc thread Codex chính.
+
 
 ## Khởi chạy trong terminal đã chuẩn bị
 
@@ -31,11 +30,11 @@ Chạy đúng một lệnh:
 fisch live
 ```
 
-Lệnh chuẩn bị build/gateway và mở browser với cơ thể Fisch cùng panel Codex đã chọn thread mới. Workspace là thư mục đang gọi; không cần mở Codex trước hay chọn thread ở terminal. Dùng `fisch live --thread <id>` để tiếp tục thread đã biết. `--panel` vẫn là alias tương thích; `fisch live --terminal` là fallback rõ ràng về giao diện terminal. `--agent <pane>` giữ adapter Herdr cũ. Các phiên khác không bị thay thế, login hiện có được dùng lại và cấu hình global không bị viết lại. Nếu asset thị giác chưa tải được, Live vẫn dùng được camera-off.
+Lệnh chuẩn bị build/gateway và mở browser với thread Codex mới trong workspace riêng của Fisch. Không cần mở Codex trước. `--panel` là alias; `fisch live --terminal` dùng giao diện terminal. Cả panel và terminal đều từ chối resume/fork để không khôi phục chỉ dẫn biểu cảm cũ: chạy không có `--thread`, và tạo thread mới trong terminal. Lịch sử cũ được giữ nguyên. Adapter `--agent <pane>` là đường Herdr legacy riêng. Không sửa cấu hình global; asset chưa tải được thì vẫn dùng camera-off.
 
 Sau `npm link`, lệnh `fisch` có trên PATH. Với checkout mới, chạy bước link một lần sau chuẩn bị; sau đó luôn dùng `fisch live`. `fisch run` và các CLI `fisch express`/`fisch cancel` đã được bỏ; `npm start` trong checkout cũng khởi chạy Live. Xem [hướng dẫn chuyển từ panel](multiplexer.md). Tùy chọn `--agent` chỉ dành cho debug/chọn workspace nguồn tường minh, không cần trong luồng thường ngày.
 
-Launcher mở Edge/Chromium với camera mặc định **tắt**. Fisch ở panel trái; camera và hội thoại ở panel phải. Khi trạng thái Codex đã kết nối, nhập ngay trong panel; các yêu cầu quyền Native cũng xuất hiện tại đó. Chọn **Bật camera** nếu muốn xử lý tại máy. Nhật ký kỹ thuật không phải tin nhắn. Với `--terminal`, chọn hoặc bắt đầu thread trong terminal rồi dùng panel hoặc terminal như trước. Launcher không sửa global Codex/Herdr config hoặc bypass hook trust.
+Launcher mở Edge/Chromium với camera mặc định **tắt**. Fisch ở panel trái; camera và hội thoại ở panel phải. Khi trạng thái Codex đã kết nối, nhập ngay trong panel; các yêu cầu quyền Native cũng xuất hiện tại đó. Chọn **Bật camera** nếu muốn xử lý tại máy. Nhật ký kỹ thuật không phải tin nhắn. Với `--terminal`, bắt đầu thread mới trong terminal rồi dùng panel hoặc terminal như trước. Launcher không sửa global Codex/Herdr config hoặc bypass hook trust.
 
 Đóng cửa sổ browser, chọn **Dừng toàn bộ**, hoặc Ctrl+C tại launcher để dừng camera/gateway/renderer. Đường terminal đóng cả Codex do chính phiên Live sở hữu; các agent không liên quan giữ nguyên. Browser, gateway và agent có đường cleanup độc lập. Herdr giữ vòng đời pane riêng; tool Live không còn dùng được sau khi gateway dừng. Chạy lại Live tạo pairing token mới.
 
@@ -61,17 +60,17 @@ Downloading assets never enables camera or hand tracking. Use the browser contro
 ## Những gì có thể thử
 
 1. Bật camera, di chuyển trong khung: cơ thể orient local theo vị trí. Arrival/departure chỉ thành sự kiện sau khoảng 1 giây ổn định; đổi hướng đầu sau khoảng 700 ms. Độ trễ debounce khác độ trễ render sau sự kiện.
-2. Hỏi Codex một câu bình thường. Chỉ dẫn MCP yêu cầu `observe` đầu lượt; agent được yêu cầu chủ động chọn biểu đạt phù hợp bằng `express` cùng câu trả lời thường; mức độ nhất quán vẫn cần holdout thật. Có thể yêu cầu minh họa một khái niệm mới bằng các part hình học. Không có bảng câu hỏi → hình hoặc suy anatomy từ tên part.
+2. Hỏi Codex một câu bình thường hoặc nhờ giải thích khái niệm. Text trả lời giữ nguyên; visual author độc lập nhận các checkpoint text công khai và đề xuất DSL. Không có bước bắt Codex chính gọi `observe`/`express`. Hình có thể bị bỏ qua nếu nguồn hết hạn; chất lượng và độ khớp scene/text vẫn cần kiểm thử thật.
 3. Hỏi về quan sát hiện tại: agent chỉ được dùng trường world state thật sự hỗ trợ. Smile là hệ số hình học, hướng đầu không phải ánh nhìn, mouthMoving không phải phát hiện giọng nói. Camera tắt/lỗi/stale phải được coi là chưa biết.
 4. Thử **Giảm chuyển động**, **Tắt chuyển động**, **Dừng biểu đạt**; các điều khiển dùng được bằng bàn phím. Debug JSON nằm trong vùng mở rộng, không được đọc ra 10 lần/giây bằng live region.
-5. Yêu cầu `look` để kiểm thử thị giác: chỉ có ảnh tổng hợp hình tròn/mã số, có indicator và reason. Không dùng tool này để xem mặt thật của bạn.
+5. Với client MCP độc lập/legacy (không phải Codex chính của Live), yêu cầu `look` để kiểm thử thị giác: chỉ có ảnh tổng hợp hình tròn/mã số, có indicator và reason. Không dùng tool này để xem mặt thật của bạn.
 6. Tắt camera giữa phiên; Codex tiếp tục dùng được và dữ liệu khuôn mặt trở thành unknown.
 
 Không có TTS hoặc STT riêng. Đầu vào mong muốn là Dictate có sẵn của Codex (ghi âm rồi gửi text); đường vào đúng thread Fisch chưa được nghiệm thu. Không coi CLI `/voice` là dictation-only. Xem [bản thử nhanh](try-tonight.md) và [ranh giới dictation](native-dictation-interop.md).
 
 ## Quyền riêng tư của POC này
 
-Tracking camera chạy trong browser, không ghi video hay thu mic. Khi bật camera, host panel gửi một ảnh JPEG giới hạn tới Codex cùng tin nhắn như mô tả ở đầu trang; không lưu ảnh ra file/cache của Fisch. MCP `observe` có thể trả world state có kiểu cho Codex khi tool được gọi. Phản ứng camera tự động dùng observer Native Codex riêng, được chuẩn bị mặc định khi chạy `fisch live` hoặc `fisch desktop`; không cần API key hay ledger thủ công. Camera vẫn cần bật và cấp quyền riêng. Khi có sự kiện hợp lệ, cửa sổ quan sát có kiểu được gửi tới observer, không được thêm vào thread coding của Codex. Cấu hình off/backend/budget tường minh vẫn được tôn trọng; xem [Native observer](native-observation-loop.md). Cửa sổ này có thể gồm tọa độ tay có cấu trúc khi theo dõi tay được bật; không gửi ảnh hoặc âm thanh. `look` bị giới hạn **synthetic-only** cả ở tool contract và gateway/browser implementation. Ảnh tổng hợp có thể được Codex/provider nhận; ảnh camera thật chỉ được gửi theo đường snapshot của panel khi camera đang bật, không qua `look` hay observer tự động. CSP trên cả trang và Worker chỉ cho phép kết nối loopback, chặn cả endpoint logging có trong SDK MediaPipe đã pin. Cài asset qua Node là bước tải vào; camera inference không cần kết nối ngoài máy.
+Tracking camera chạy trong browser, không ghi video hay thu mic. Khi bật camera, host panel gửi một ảnh JPEG giới hạn tới Codex cùng tin nhắn như mô tả ở đầu trang; không lưu ảnh ra file/cache của Fisch. MCP `observe` vẫn dành cho client MCP độc lập/legacy, không được gắn vào Codex chính của Live. Phản ứng camera tự động dùng observer Native Codex riêng, được chuẩn bị mặc định khi chạy `fisch live` hoặc `fisch desktop`; không cần API key hay ledger thủ công. Camera vẫn cần bật và cấp quyền riêng. Khi có sự kiện hợp lệ, cửa sổ quan sát có kiểu được gửi tới observer, không được thêm vào thread coding của Codex. Cấu hình off/backend/budget tường minh vẫn được tôn trọng; xem [Native observer](native-observation-loop.md). Cửa sổ này có thể gồm tọa độ tay có cấu trúc khi theo dõi tay được bật; không gửi ảnh hoặc âm thanh. `look` bị giới hạn **synthetic-only** cả ở tool contract và gateway/browser implementation. Ảnh tổng hợp có thể được Codex/provider nhận; ảnh camera thật chỉ được gửi theo đường snapshot của panel khi camera đang bật, không qua `look` hay observer tự động. CSP trên cả trang và Worker chỉ cho phép kết nối loopback, chặn cả endpoint logging có trong SDK MediaPipe đã pin. Cài asset qua Node là bước tải vào; camera inference không cần kết nối ngoài máy.
 
 Token đi trong environment, HTTP Authorization và message WebSocket đầu tiên, không nằm trong URL, command line, Git hay file cấu hình. Không xuất credential từ environment khi debug. Các artifact `.runtime/` là local/ignored; evidence trong Git chỉ gồm metadata đã lọc, không có ảnh mặt hoặc payload model/private prompt.
 
@@ -95,6 +94,8 @@ fisch live
 Probe Windows lịch sử ghi nhận khoảng 8–10 mẫu thị giác/giây, chưa đạt mục tiêu 24 FPS. Render FPS được đo riêng; không dùng FPS camera danh nghĩa 30 để thay cho throughput inference. Số đo soak cuối cùng được ghi riêng trong validation.
 
 ## Hợp đồng Live
+
+Các công cụ MCP dưới đây dành cho client MCP độc lập/legacy. Codex chính của Live không được gắn các công cụ này; visual author sử dụng đường presentation riêng.
 
 World state v1 có sessionId, sequence, timestamp, camera status, quality dựa trên độ ổn định tracking, pose/expression hoặc null, turn và summary. Gateway giữ snapshot mới nhất; event history tối đa 64 bản ghi, cursor độc lập và gap detection. Quan sát quá 1.5 giây thành stale. Hook/context read không tiêu thụ cursor của agent.
 
@@ -127,9 +128,9 @@ Mặt nghỉ được biên dịch từ curve/ellipsoid với role mắt, lông 
 
 ## Hooks và nhịp chữ
 
-Đường terminal nối UI Codex đang có qua relay loopback có xác thực vào app-server stdio. Chỉ agent-message delta của thread/turn đang theo dõi tạo nhịp; tool/reasoning/spinner không tạo nhịp, và decay về 0 trong 600 ms. Developer instructions được bổ sung, không thay thế chính sách hiện có. Remote UI/WebSocket phụ thuộc phiên bản CLI và còn thử nghiệm; xem [tài liệu chính thức](https://learn.chatgpt.com/docs/app-server). Không tuyên bố lip-sync hoặc speech detection. Model thật đã trả lời qua TUI trên Cloud với cấu hình tạm thời untrusted/read-only; không đổi trust lưu bền. Xem [audit folder trust](codex-project-trust.md).
+Đường terminal nối UI Codex đang có qua relay loopback có xác thực vào app-server stdio. Chỉ agent-message delta của thread/turn đang theo dõi tạo nhịp; tool/reasoning/spinner không tạo nhịp, và decay về 0 trong 600 ms. Relay không thêm chỉ dẫn biểu cảm; giữ chỉ dẫn và lựa chọn Native của request. Remote UI/WebSocket phụ thuộc phiên bản CLI và còn thử nghiệm; xem [tài liệu chính thức](https://learn.chatgpt.com/docs/app-server). Không tuyên bố lip-sync hoặc speech detection. Model thật đã trả lời qua TUI trên Cloud với cấu hình tạm thời untrusted/read-only; không đổi trust lưu bền. Xem [audit folder trust](codex-project-trust.md).
 
-Runner của Fisch đã cài/trust có thể giao lifecycle qua private IPC của pane Live. Launcher không tự sửa/cấp trust; `/hooks` vẫn thuộc quyền người dùng. Module context hook có deadline 180 ms, nhưng native context injection chưa được xác nhận. Đường được hỗ trợ hiện tại là **observe-first qua MCP**.
+Historical/legacy hook integration: trusted pane hooks and observe-first MCP were used by earlier Live versions. The current Live-owned primary thread uses neither visual instruction injection nor observe-first MCP; external MCP clients retain their own setup.
 
 Nhịp chữ Herdr chỉ là proxy thử nghiệm, mặc định tắt. Để thử:
 
@@ -309,8 +310,8 @@ With an enabled source, stable typed geometric events can produce a frozen
 observation window. Observation summaries are stripped; typed
 coordinates, including structured hand observations when available, may remain.
 No image or audio is sent. This path never adds camera events, model decisions or
-`toolOutput` messages to the selected Native coding thread. Explicit native MCP
-`observe` calls remain available and are a separate path.
+`toolOutput` messages to the selected Native coding thread. Explicit MCP
+`observe` remains an external/legacy client path, not a tool on the Live primary thread.
 
 Typed hand reactions use this same isolated provider after explicit hand-tracking
 opt-in; hand tracking is still optional. The event gate and semantic read-sets preserve
@@ -397,26 +398,21 @@ khi chờ I/O; `LiveBody.admit()` luôn kiểm tra lại hàng rào này trướ
 Tin nhắn gửi từ panel chỉ trở thành context observer sau ACK Native hợp lệ. Host chia sẻ tối đa 240 ký tự của đúng câu người dùng vừa gửi, kèm thread/turn/submission/revision, trong tối đa 60 giây; không chia toàn transcript, ảnh hay context máy. Khi cùng lượt có `agentMessage` ở phase `final_answer` hoàn tất và Native xác nhận lượt thành công, host bổ sung tối đa 480 ký tự câu trả lời công khai đó, kèm message ID và cờ cắt ngắn. Commentary, delta chưa hoàn tất, reasoning và tool output không được đưa vào. Bổ sung này tăng revision để thu hồi observer đang dùng context cũ, không gia hạn TTL. Observer dùng đoạn trao đổi để tránh mở thêm câu hỏi cạnh tranh, không coi nó là chỉ dẫn hay suy diễn phần bị cắt. Lượt mới, đổi thread, hủy, lỗi hoặc kết quả chưa rõ thu hồi context. Kết quả observer dựa trên context hết hạn/đã đổi bị bỏ, không replay. Brief công khai do MAIN tự soạn vẫn độc lập và quiet có ưu tiên; đoạn trích không cấp quyền thay hình. Nguồn hội thoại ngoài panel không tự được suy thành context. Đây là wiring/protocol đã kiểm thử bằng fixture, chưa xác nhận chất lượng hội thoại qua Codex thật.
 
 
-### Static reference bootstrap
+### Historical static reference bootstrap
 
-New Native terminal and panel threads receive the installed host's exact
-`aer://capabilities/v1` and `aer://workflow/v1` contents with their instructions.
-This avoids requiring model-driven reads of the same static references before
-ordinary expression authoring. Other resource discovery remains available;
-`observe`, live ownership, scene and receipt checks are unchanged. A different
-connected contract must be read rather than inferred from this snapshot.
-External MCP-only clients retain their normal discovery flow. This does not
-promise a latency target or more spontaneous expression; real conversation
-quality and timing must be evaluated separately.
+Earlier Live versions appended `aer://capabilities/v1`, `aer://workflow/v1`
+and visual tool schemas to primary-thread instructions. The current Native
+panel/terminal no longer does this. External MCP clients retain ordinary
+resource discovery; these historical helpers are not the primary chat path.
 
-### Brief công khai vừa hết hạn
+### Historical explicit brief handoff
 
-Một brief do MAIN chủ động chia sẻ có thể còn hiển thị tối đa 120 giây sau khi hết hạn, với nhãn lịch sử. Observer có thể dùng nó để nối tiếp tương tác, nhưng quiet và quyền đổi hình không được gia hạn. Intent mới, đổi thread, Stop hoặc thu hồi nguồn xóa brief. Không có lượt model chỉ vì hết hạn.
+Đường MCP legacy: một brief do MAIN chủ động chia sẻ có thể còn hiển thị tối đa 120 giây sau khi hết hạn, với nhãn lịch sử. Observer có thể dùng nó để nối tiếp tương tác, nhưng quiet và quyền đổi hình không được gia hạn. Intent mới, đổi thread, Stop hoặc thu hồi nguồn xóa brief. Không có lượt model chỉ vì hết hạn.
 
 ### Native panel startup deadline
 
-The panel allows up to 30 seconds for Codex thread creation or resumption, including
-cold tool initialization. Connection, protocol initialization and ordinary requests
+The panel allows up to 30 seconds for Codex fresh-thread creation. Resume/fork requests are rejected by the Live relay;
+existing saved threads are not deleted. Connection, protocol initialization and ordinary requests
 retain their 10-second limits. A timeout does not retry or create another thread;
 stopping Live cancels the pending request. This startup allowance does not change
 model response latency or expression execution deadlines.
@@ -436,9 +432,9 @@ is empty and checked through scoped `config/read`, without enumerating connected
 MCP tools. Native shell, multi-agent, computer/browser, image generation and app
 capabilities are not disabled by this isolation layer; availability and approval
 remain controlled by Codex. Isolation does not override the model or reasoning
-effort. Only the
-Fisch MCP integration is supplied. Thread requests cannot override the runtime
-cwd or add configuration. Do not install custom skills or hooks in this home.
+effort. No Fisch MCP integration or AER pairing environment is supplied to the
+primary process. Thread requests cannot override the runtime cwd or integration
+configuration; native model/reasoning/verbosity/service-tier choices remain allowed. Do not install custom skills or hooks in this home.
 Development harness rules still apply when editing the repository.
 
 Desktop-attached mode uses an external user-owned Codex session, not an
@@ -478,21 +474,22 @@ reasoning settings. Tests without video recording are the speed reference; a
 recording can itself slow this laptop substantially.
 
 
-### Native tool context and controller readiness
+### Native conversation and streamed presentation
 
-Live supplies the installed compose/inspect/status descriptors and full input
-schemas once with thread instructions. They are generated from the same tool
-exports the MCP server uses, not a copied schema or a prompt-to-scene template.
-Other tools remain discoverable; a contract mismatch requires actual discovery.
-Static schemas never confer live scene or mutation authority.
+The primary Codex thread receives no Fisch visual instructions, scene inventory,
+static tool bundle or controller-bootstrap request. Camera-off panel messages
+preserve the user's text; camera-on snapshots keep their freshness and revocation
+checks. Native approval/sandbox choices remain authoritative.
 
-Before enabling the browser composer, Live tries one bounded native controller
-inspection for the selected thread. It accepts only the structured Fisch receipt
-and checks thread, selection generation, intent and availability before retaining
-its controller session/epoch. Navigation, cancellation or an active turn invalidates
-that result. The submission barrier still samples fresh renderer inventory and
-requires a matching epoch; stale proof falls back to normal agent inspection.
-Unsupported RPC, rejection or timeout also falls back, without replaying any turn.
-The composer waits at most 1.5 seconds for this optional proof; late results
-are ignored. The outstanding read still uses the existing bounded transport
-request lifetime, without reconnecting or cancelling unrelated work. No camera is accessed and no scene is authored by this readiness step.
+`LiveStreamingPresentationBridge` observes public `final_answer` text from the
+tracked conversation, not hidden reasoning or tool output. It sends bounded
+checkpoints to a separate visual author and applies only currently authorized
+presentation results. Primary text never waits for visual generation; visual
+failure, expiry or cancellation must not replace or rewrite the answer. The
+camera observer also remains visual-only and cannot publish an extra chat reply.
+
+The input path still awaits the bounded browser intent/revocation barrier. This
+separation does not establish a latency target, scene/text synchronization quality,
+or real-model acceptance. Mocked relay/provider regressions demonstrate continued
+partial and completed text delivery during visual hangs or failures. No new voice
+pipeline is introduced; native dictation interoperability remains separately unverified.
