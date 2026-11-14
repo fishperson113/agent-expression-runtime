@@ -1,3 +1,4 @@
+import { externalPlayground } from './fixtures/playground-external.mjs';
 import { expect, it } from 'vitest';
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
@@ -55,7 +56,6 @@ async function soak(call, page) {
     const result = await call({ operation: 'remix', scene: scene('soak-' + turns % 3) });
     expect(result).toMatchObject({ status: 'committed', revision: before.revision + 1, pending: null });
     expect(await page.evaluate(() => window.fischLive.metrics().parts)).toEqual(['soak-' + turns % 3]);
-    await expect.poll(() => page.locator('.fisch-playground .pg-status').textContent()).toContain('Lần cập nhật ' + result.revision);
     expect(await page.locator('video').evaluate(video => video.srcObject)).toBeNull(); turns++;
   }
   if (soakMs) {
@@ -98,15 +98,16 @@ async function threadSelection(route) {
   expect(await route.call({ operation: 'failedSelect' })).toEqual({ selected: false });
   expect(await panel.getByLabel('Ý tưởng', { exact: true }).inputValue()).toBe('Ý tưởng tổng hợp của route test');
   expect(await panel.locator('.pg-status').textContent()).toBe(before);
+  const externalBefore = await route.call({ operation: 'state', includeScene: true });
   expect(await route.call({ operation: 'selectThread' })).toEqual({ selected: true });
+  expect(await route.call({ operation: 'state', includeScene: true })).toEqual({ ...externalBefore, recoveryRequired: true });
   expect(await panel.getByLabel('Ý tưởng', { exact: true }).inputValue()).toBe('');
   expect(await panel.getByLabel('Mục tiêu tùy chọn', { exact: true }).inputValue()).toBe('');
   expect(await panel.getByLabel('Yêu cầu chưa gửi tới Codex').inputValue()).toBe('');
-  await expect.poll(() => panel.locator('.pg-status').textContent()).toContain('Chưa xác nhận');
 }
 
 async function launch(provider) {
-  let live, child, next, stderr = '', resolveSpawn;
+  let live, child, next, external, stderr = '', resolveSpawn;
   const spawned = new Promise(resolve => { resolveSpawn = resolve; });
   const abort = new AbortController();
   const running = dispatch(['live', '--no-assets'], { live: options => runLiveSession({ ...options, headless: true, signal: abort.signal,
@@ -122,10 +123,12 @@ async function launch(provider) {
     try { await Promise.race([spawned, running.then(() => { throw Error('scripted_native_exited_before_start'); }),
       new Promise((_, reject) => { timer = setTimeout(() => reject(Error('scripted_native_launch_timeout')), 60000); })]); }
     finally { clearTimeout(timer); }
-    const ready = await next(); expect(ready.type).toBe('ready');
-    expect(ready.tools).toContain('playground_edit'); expect(ready.tools).toContain('playground_state');
-    const call = async command => { child.stdin.write(JSON.stringify(command) + '\n'); const reply = await next();
+    const ready = await next(); expect(ready).toMatchObject({ type: 'ready', lane: 'native-fixture' });
+    const nativeCall = async command => { child.stdin.write(JSON.stringify(command) + '\n'); const reply = await next();
       expect(reply.type, stderr).toBe('result'); return reply.value; };
+    external = await externalPlayground(live.base, live.token, nativeCall, abort.signal);
+    expect(external.tools).toContain('playground_edit'); expect(external.tools).toContain('playground_state');
+    void running.finally(() => external.close()).catch(() => {});
     await live.page.evaluate(() => { window.routeCopied = ''; Object.defineProperty(navigator, 'clipboard', {
       configurable: true, value: { writeText: async text => { window.routeCopied = text; } } });
       window.routeDeliveries = []; const deliver = window.fischLive.deliverReactiveDecision;
@@ -134,10 +137,10 @@ async function launch(provider) {
       window.routeBarriers = []; const intent = window.fischLive.reactiveUserIntent;
       window.fischLive.reactiveUserIntent = () => { window.routeBarriers.push({ at: performance.now(), ...window.fischLive.reactiveStatus() });
         window.routeBarriers.splice(0, Math.max(0, window.routeBarriers.length - 8)); return intent(); }; });
-    return { live, call, send: command => child.stdin.write(JSON.stringify(command) + '\n'), next,
-      exit: async () => { child.stdin.write('{"operation":"exit"}\n'); return running; },
-      close: async () => { abort.abort(); child?.stdin.end(); await running.catch(() => {}); } };
-  } catch (error) { abort.abort(); child?.stdin.end(); await running.catch(() => {}); throw error; }
+    return { live, call: external.call, send: external.send, next: external.next,
+      exit: async () => { await external.close(); child.stdin.write('{"operation":"exit"}\n'); return running; },
+      close: async () => { abort.abort(); await external?.close(); child?.stdin.end(); await running.catch(() => {}); } };
+  } catch (error) { abort.abort(); await external?.close(); child?.stdin.end(); await running.catch(() => {}); throw error; }
 }
 
 async function creationLoop(route, candidate, release, firstText) {
@@ -165,7 +168,6 @@ async function creationLoop(route, candidate, release, firstText) {
       }
       expect(await pending).toMatchObject({ status: 'committed', revision });
       await expect.poll(() => page.evaluate(() => window.fischLive.metrics().parts)).toEqual([part]);
-      await expect.poll(() => page.locator('.fisch-playground .pg-status').textContent()).toContain('Lần cập nhật ' + revision);
   }
   expect((await call({ operation: 'state', includeScene: true })).scene).toEqual(scene('a'));
 }
@@ -174,14 +176,16 @@ async function recovery(route) {
   const { call, live: { page } } = route;
   await page.locator('#motion').selectOption('off');
   route.send({ operation: 'remix', scene: scene('interrupted') });
-  await page.waitForTimeout(100); await page.locator('#cancel').click();
+  await expect.poll(() => page.evaluate(() => window.fischLive.metrics().schedulerBusy)).toBe(true);
+  expect((await call({ operation: 'inspectState' })).pending).not.toBeNull();
+  await page.locator('#cancel').click();
   expect((await route.next()).value).toMatchObject({ status: 'uncertain', recoveryRequired: true });
   await page.locator('#motion').selectOption('normal');
   expect(await call({ operation: 'recover', text: await copyRequest(page, 'recover') })).toMatchObject({ status: 'recovered', revision: 0 });
   expect(await call({ operation: 'create', scene: scene('fresh') })).toMatchObject({ status: 'committed', revision: 1 });
 }
 
-it.skipIf(!existsSync(gatewayExecutable()) && !required)('routes CLI Live through ACK-only scripted Native, configured MCP, Rust and rendered playground', async () => {
+it.skipIf(!existsSync(gatewayExecutable()) && !required)('routes CLI Live through ACK-only native input and independent MCP, Rust and rendered playground', async () => {
   expect(existsSync(fixture), 'Scripted Native fixture must exist').toBe(true);
   expect(existsSync(gatewayExecutable()), 'Required standalone gateway is missing').toBe(true);
   let release; const requests = [];

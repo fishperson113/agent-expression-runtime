@@ -1,3 +1,4 @@
+import { externalPlayground } from './fixtures/playground-external.mjs';
 import { expect, it } from 'vitest';
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
@@ -53,19 +54,23 @@ async function launch() {
         } });
     } });
   void running.catch(() => {});
-  record.close = async () => { abort.abort(); record.child?.stdin.end(); await running.catch(() => {}); };
+  record.close = async () => { abort.abort(); await record.external?.close(); record.child?.stdin.end(); await running.catch(() => {}); };
   record.abort = () => abort.abort(); record.running = running;
   try {
     let timer;
     try { await Promise.race([spawned, running.then(() => { throw Error('restart_launch_early_exit'); }),
       new Promise((_, reject) => { timer = setTimeout(() => reject(Error('restart_launch_timeout')), 60000); })]); }
     finally { clearTimeout(timer); }
-    expect((await record.next()).type).toBe('ready');
+    expect(await record.next().catch(error => { throw Error('restart_ready: ' + error.message); })).toMatchObject({ type: 'ready', lane: 'native-fixture' });
     await expect.poll(() => record.live.page.locator('.setup-native').textContent()).toContain('đã chọn phiên');
     await expect.poll(() => record.live.page.locator('.setup-observer').textContent()).toContain('tắt trong cấu hình');
     record.url = record.live.page.url();
     record.send = command => record.child.stdin.write(JSON.stringify(command) + '\n');
-    record.call = async command => { record.send(command); const reply = await record.next(); expect(reply.type).toBe('result'); return reply.value; };
+    const nativeCall = async command => { record.child.stdin.write(JSON.stringify(command) + '\n'); const reply = await record.next().catch(error => { throw Error('restart_' + command.operation + ': ' + error.message); }); expect(reply.type).toBe('result'); return reply.value; };
+    record.external = await externalPlayground(record.live.base, record.live.token, nativeCall, abort.signal);
+    record.send = command => record.external.send(command); record.call = record.external.call;
+    record.running = running.finally(() => record.external.close());
+    void record.running.catch(() => {});
     return record;
   } catch (error) { await record.close(); throw error; }
 }
@@ -84,7 +89,7 @@ async function pendingCreation(route) {
   await page.locator('#motion').selectOption('off');
   route.send({ operation: 'create', scene });
   await expect.poll(() => page.evaluate(() => window.fischLive.metrics().schedulerBusy)).toBe(true);
-  await expect.poll(() => panel.locator('.pg-status').textContent()).toContain('đang xử lý');
+  expect((await route.call({ operation: 'inspectState' })).pending).not.toBeNull();
   await noMedia(route);
 }
 
@@ -117,7 +122,7 @@ async function fresh(route, old) {
 }
 
 for (const mode of ['ui', 'page-close', 'abort']) {
-  it.skipIf(!required && !existsSync(gatewayExecutable()))(`restarts privately after ${mode} stops a pending creation through the real terminal route`, async () => {
+  it.skipIf(!required && !existsSync(gatewayExecutable()))(`restarts privately after ${mode} stops an independent MCP creation alongside the real terminal route`, async () => {
     expect(existsSync(gatewayExecutable())).toBe(true);
     let first, second;
     try {

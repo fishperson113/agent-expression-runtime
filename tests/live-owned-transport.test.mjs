@@ -131,7 +131,7 @@ it('observes an ACK-only owned turn before resolving, preserves Native notificat
     expect(f.writes).toEqual(['thread/start', 'turn/start', 'turn/interrupt']);
   } finally { await f.close(); }
 });
-it('rejects a queued browser send when Native selection changes before the shared barrier releases', async () => {
+it('rejects a queued browser send when Native starts a thread before the shared barrier releases', async () => {
   const f = await fixture(); let release;
   try {
     f.barrier(() => new Promise(resolve => { release = resolve; }));
@@ -139,7 +139,7 @@ it('rejects a queued browser send when Native selection changes before the share
     const result = f.transport.submitUser(params(), () => f.output.revision === revision && f.output.selection === undefined, f.discard);
     const rejected = expect(result).rejects.toMatchObject({ uncertain: false });
     await vi.waitFor(() => expect(release).toBeTypeOf('function'));
-    f.socket.send(JSON.stringify({ id: 2, method: 'thread/resume', params: { threadId: 'other' } }));
+    f.socket.send(JSON.stringify({ id: 2, method: 'thread/start', params: {} }));
     await vi.waitFor(() => expect(f.output.selection).toBe(2)); f.barrier(async () => {}); release(); await rejected;
     await vi.waitFor(() => expect(f.native.some(value => value.id === 2)).toBe(true));
     f.socket.send(JSON.stringify({ id: 3, method: 'test/snapshot', params: {} }));
