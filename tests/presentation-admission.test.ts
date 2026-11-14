@@ -100,3 +100,45 @@ it('reconcile fails closed after clock regression',()=>{
  const {state,admit}=fixture();let now=10;const gate=new PresentationAdmission(()=>state,admit,()=>now);
  gate.snapshot(identity);now=9;expect(gate.reconcile()).toBe(true);
 });
+function sourcedFixture(){
+ const f=fixture();let now=0;const gate=new PresentationAdmission(()=>f.state,f.admit,()=>now,()=>{},true);
+ const prefix='Repeat. Repeat.';Object.assign(f.state.snapshot,{ownerTurn:'turn',revision:1});
+ Object.assign(f.state.snapshot.messages[1],{id:'a',text:prefix,status:'streaming'});
+ const request={...identity,messageId:'a',textPrefix:prefix,publicRevision:1,remainingTtlMs:1000,section:0,sourceStart:8,sourceEnd:15,sourceQuote:'Repeat.'};
+ return {...f,gate,request,time:(n:number)=>now=n};
+}
+it('binds the exact repeated occurrence and rejects forged receipt source fields',()=>{
+ const {gate,request,admit}=sourcedFixture();const shot=gate.snapshot(request)!;
+ expect(shot.scope).toMatchObject({sourceStart:8,sourceEnd:15,sourceQuote:'Repeat.'});
+ for(const patch of [{sourceStart:0,sourceEnd:7},{sourceQuote:'Different.'},{sourceEnd:14}])
+ expect(gate.apply({scope:{...shot.scope,...patch},body:{}}).code).toBe('presentation_stale');
+ expect(admit).not.toHaveBeenCalled();expect(gate.apply({scope:shot.scope,body:{}}).status).toBe('accepted');
+});
+it('validates all-or-none source bounds and exact quote before issuing scope',()=>{
+ const {gate,request}=sourcedFixture();
+ for(const patch of [{sourceStart:undefined},{sourceStart:-1},{sourceStart:1.5},{sourceEnd:100},{sourceEnd:8},{sourceQuote:'not present'}])
+ expect(gate.snapshot({...request,...patch})).toBeNull();
+ const {sourceEnd,...partial}=request;expect(gate.snapshot(partial)).toBeNull();
+ expect(gate.snapshot({...identity,sourceStart:0,sourceEnd:7,sourceQuote:'Repeat.'})).toBeNull();
+});
+it('does not attach author-invented source metadata to a legacy generic scope',()=>{
+ const {gate}=fixture();const shot=gate.snapshot(identity)!;
+ expect(shot.scope).not.toHaveProperty('sourceQuote');
+ expect(gate.apply({scope:{...shot.scope,sourceStart:0,sourceEnd:1,sourceQuote:'x'},body:{}}).status).toBe('rejected');
+ expect(gate.apply({scope:shot.scope,body:{}}).status).toBe('accepted');
+});
+it('preserves original expiry across sourced scene receipts and rejects source rewriting',()=>{
+ const f=sourcedFixture(),shot=f.gate.snapshot(f.request)!;f.time(900);
+ const receipt=f.gate.apply({scope:shot.scope,body:{}});expect(receipt.status).toBe('accepted');
+ expect(f.gate.leaseDeadline(receipt.scope)).toBe(1000);f.time(1000);
+ expect(f.gate.apply({scope:receipt.scope,body:{}}).status).toBe('rejected');
+ const g=sourcedFixture(),before=g.gate.snapshot(g.request)!;g.state.snapshot.messages[1].text='Edited. Repeat.';
+ expect(g.gate.apply({scope:before.scope,body:{}}).status).toBe('rejected');
+});
+it('rejects UTF-16 boundaries inside an emoji',()=>{
+ const f=sourcedFixture();f.state.snapshot.messages[1].text='A\u{1f600}B';
+ const request={...f.request,textPrefix:'A\u{1f600}B'};
+ expect(f.gate.snapshot({...request,sourceStart:2,sourceEnd:3,sourceQuote:'\ude00'})).toBeNull();
+ expect(f.gate.snapshot({...request,sourceStart:1,sourceEnd:2,sourceQuote:'\ud83d'})).toBeNull();
+ expect(f.gate.snapshot({...request,sourceStart:1,sourceEnd:3,sourceQuote:'\u{1f600}'})).not.toBeNull();
+});

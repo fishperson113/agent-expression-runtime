@@ -1,3 +1,4 @@
+import { DiagramLab, validateLabDiagram } from './diagram-lab';
 import { PresentationAnnotations } from './presentation-annotations';
 import { PresentationAdmission } from './presentation-admission';
 import type { ReactiveRequest } from '../core/live/decision-types';
@@ -33,6 +34,8 @@ const synthetic = new URLSearchParams(location.search).get('fixture') === 'synth
 const body = new LiveBody(element<HTMLCanvasElement>('body'), text => { element('body-status').textContent = text; });
 const recording = new LiveRecording(() => body.scheduler.epoch, synthetic ? 'synthetic' : 'live-structured');
 body.trace.setSink(recording.record);
+const diagramEnabled = new URLSearchParams(location.search).get('diagramLab') === '1';
+let diagramLab: DiagramLab | undefined;
 let presentationChat: any;
 let presentationGeometry: { epoch: string; sceneRevision: number; seq: number } | undefined;
 const annotations = new PresentationAnnotations(element('body').parentElement!, () => stopped ? null : body.presentationAnnotationContext());
@@ -44,14 +47,34 @@ const presentation = new PresentationAdmission(() => ({ documentId: (window as a
     annotations.prepare(labels);
     const result = body.admitPresentation(value, scope, valid);
     if (result.status === 'accepted' && result.sceneRevision !== undefined) {
+      diagramLab?.clear();
       presentationGeometry = { epoch: result.epoch, sceneRevision: result.sceneRevision, seq: result.seq };
       annotations.set(labels, presentationGeometry, deadline);
     }
     return result;
   }, () => performance.now(), () => {
     const owned = presentationGeometry; presentationGeometry = undefined;
-    try { annotations.clear(); } finally { if (owned) body.revokePresentationGeometry(owned); }
-  });
+    try { diagramLab?.clear(); annotations.clear(); } finally { if (owned) body.revokePresentationGeometry(owned); }
+  }, diagramEnabled);
+if (diagramEnabled) diagramLab = new DiagramLab(element<HTMLCanvasElement>('body'),
+  () => { const scene=body.presentationAnnotationContext();return scene ? {...scene,seq:body.scheduler.nextSequence-1,busy:body.scheduler.busy} : null; },
+  () => body.renderer.projectDisplayedParts(), () => presentation.invalidate());
+function applyDiagramPresentation(value:any) {
+  if (!diagramLab) return {status:'rejected',code:'diagram_lab_disabled'};
+  let admitted=false;
+  try {
+    const scope=value?.scope;
+    if(typeof scope?.sourceQuote!=='string' || !Number.isSafeInteger(scope.sourceStart) || !Number.isSafeInteger(scope.sourceEnd)) throw Error('diagram_source');
+    const diagram=validateLabDiagram(value.diagram,value.body,scope.sourceQuote);
+    const before=body.renderer.projectDisplayedParts()?.contentFrame??0;
+    const receipt=presentation.apply({scope,body:value.body});
+    if(receipt.status==='accepted') {
+      admitted=true;const deadline=presentation.leaseDeadline(receipt.scope);if(deadline===null)throw Error('diagram_expired');
+      diagramLab.start(diagram,{epoch:receipt.epoch,sceneRevision:receipt.sceneRevision,seq:receipt.seq},before,deadline);
+    }
+    return receipt;
+  } catch { if(admitted)presentation.invalidate();return {status:'rejected',code:'diagram_invalid'}; }
+}
 let presentationFrame = 0;
 const reconcilePresentation = () => {
   if (stopped) return;
@@ -109,7 +132,8 @@ Object.assign(window, { fischLive: { chatObservation: () => chatObservation(obse
   revokePresentation: () => presentation.invalidate(),
   presentationSnapshot: (scope: any) => presentation.snapshot(scope),
   applyPresentation: (value: any) => presentation.apply(value),
-  applyDiagramPresentation: () => ({ status: 'rejected', code: 'diagram_lab_disabled' }),
+  applyDiagramPresentation,
+  diagramLabStatus: () => diagramLab?.status() ?? {visible:false,reason:'disabled'},
   selectThread: () => { presentation.invalidate(); hands.reset(); resetReactive(); logActivity('Đã chọn phiên Codex.'); return bridge.cancel(); },
   panelControlStatus: (value: any) => { if (stopped) return; panelControls ??= mountPanelControls(element('conversation-tools'), value => (window as any).fischPanelRespond(value)); if (['mode', 'ready'].includes(value?.type)) { conversation.panelOwner(); liveSetup.panelOwner(); } else panelControls.project(value); },
   logActivity, playgroundStatus: (value: unknown) => playground.project(value), playgroundClear: () => playground.clear(),
@@ -275,7 +299,7 @@ const timer = setInterval(() => {
 }, 500);
 function stop(reason: 'ui' | 'pagehide') {
   if (stopped) return;
-  presentation.invalidate(); cancelAnimationFrame(presentationFrame); annotations.dispose();
+  presentation.invalidate(); cancelAnimationFrame(presentationFrame); diagramLab?.dispose(); annotations.dispose();
   if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
   logActivity('Đã dừng phiên Live.'); resetReactive(); sharedContextLabel.data = sharedContextText.data = ''; sharedContext.hidden = true; reactive.configure(false); stopped = true;
   recording.dispose(); camera.stop(); hands.reset(); cameraStatus('stopped', 'shutdown'); clearInterval(timer); bridge.stop(); body.dispose(); playground.dispose(); liveSetup.dispose(); conversation.dispose(); panelControls?.dispose();
