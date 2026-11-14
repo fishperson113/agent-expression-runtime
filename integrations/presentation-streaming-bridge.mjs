@@ -9,10 +9,12 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 // Independent, best-effort public-text observer. Never awaited by the native relay.
 export class LiveStreamingPresentationBridge {
-  constructor({state,page,host,runtime,provider,now=Date.now,onEvent=()=>{},ttlMs=10000,checkpoints={},boundedSourceLease=false,exactExcerptLease=false}) {
+  constructor({state,page,host,runtime,provider,now=Date.now,onEvent=()=>{},ttlMs=10000,checkpoints={},boundedSourceLease=false,exactExcerptLease=false,protocol='freeform'}) {
+    if(!['freeform','diagram'].includes(protocol))throw Error('presentation_protocol_invalid');
+    exactExcerptLease ||= protocol==='diagram';
     Object.assign(this,{state,page,now,onEvent,ttlMs:boundedSourceLease||exactExcerptLease?Math.min(ttlMs,10000):ttlMs,boundedSourceLease:boundedSourceLease||exactExcerptLease,exactExcerptLease});
     this.excerpts=new PublicTextExcerpts();
-    this.provider=provider??new NativePresentationProvider({host,runtime,timeoutMs:30000});
+    this.provider=provider??new NativePresentationProvider({host,runtime,timeoutMs:30000,protocol});
     this.checkpoints=new PublicTextCheckpoints(checkpoints);
     this.flushes=new Map();this.serial=0;this.finalIds=new Map();this.closed=false;this.selected=null;this.active=null;this.pending=null;
   }
