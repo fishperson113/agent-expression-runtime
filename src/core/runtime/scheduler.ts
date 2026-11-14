@@ -66,6 +66,7 @@ export class Scheduler {
     this.formation = new ParticleFormation(particleCount);
     if (restingStyle) { Object.assign(this.baseline, restingStyle); Object.assign(this.state, restingStyle); }
   }
+  get nextSequence() { return this.lastSeq + 1; }
   get queueDepth() {
     return this.queue.length;
   }
