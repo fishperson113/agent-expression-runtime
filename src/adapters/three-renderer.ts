@@ -1,3 +1,4 @@
+import { projectParticleParts } from './displayed-part-projection';
 import * as THREE from 'three';
 import type { BodyState, RendererSink } from '../core/ports';
 import { MotionPhase } from './motion-phase';
@@ -103,17 +104,19 @@ export class ThreeRenderer implements RendererSink {
   }
   private onLost = (e: Event) => {
     e.preventDefault();
-    this.lost = true;
+    this.lost = true; this.displayedValid = false;
     this.rejectPreview('preview_context_lost');
     this.fault('context_lost');
   };
   private onRestore = () => {
+    this.displayedValid = false;
     if (this.restores++ < 1) {
       this.lost = false;
       this.fault('context_restored');
     } else this.fault('context_recovery_exhausted');
   };
   resize(width: number, height: number, dpr: number) {
+    this.displayedValid = false; this.displayedViewport = { width, height };
     this.renderer.setPixelRatio(Math.min(2, dpr));
     this.renderer.setSize(width, height, false);
     fitCamera(this.camera, Math.max(1, width) / Math.max(1, height));
@@ -122,7 +125,7 @@ export class ThreeRenderer implements RendererSink {
     if (!this.lost && this.submittedFrames > 0) {
       this.renderer.render(this.scene, this.camera);
       this.submittedFrames++;
-      this.outputAt = Date.now();
+      this.outputAt = Date.now(); this.markDisplayed();
     }
   }
   quality(count: number) {
@@ -132,10 +135,26 @@ export class ThreeRenderer implements RendererSink {
   private outputParts: { id: string; kind: string; color?: string }[] = [];
   private outputGroups = new Uint8Array();
   private outputAt = 0;
+  private displayedValid = false;
+  private displayedCount = 0;
+  private displayedViewport = { width: 0, height: 0 };
+  private displayedClip = new THREE.Matrix4();
+  private markDisplayed() {
+    this.points.updateMatrixWorld(); this.camera.updateMatrixWorld();
+    this.displayedClip.copy(this.camera.projectionMatrix).multiply(this.camera.matrixWorldInverse).multiply(this.points.matrixWorld);
+    this.displayedCount = this.count; this.displayedValid = true;
+  }
+  projectDisplayedParts() {
+    if (this.lost || this.disposed || !this.displayedValid || !this.submittedFrames) return null;
+    return { frameId: this.submittedFrames, contentFrame: this.outputFrame, capturedAt: this.outputAt,
+      viewport: { ...this.displayedViewport },
+      parts: projectParticleParts(this.positions, this.displayedCount, this.outputGroups, this.outputParts.map(p => p.id), this.displayedClip) };
+  }
   private outputFrame = 0;
   get contentFrame() { return this.outputFrame; }
   apply(state: BodyState, now: number) {
     if (this.lost) return;
+    this.displayedValid = false;
     const amp = this.reducedMotion ? 0.08 : 1;
     const angle = this.orbit.advance(now, state.flowStrength * amp * state.flowWeights[capability.fields.indexOf('orbit')]);
     sampleBody(this.shapes, this.positions, this.count, state, now, angle, this.reducedMotion);
@@ -152,7 +171,7 @@ export class ThreeRenderer implements RendererSink {
     this.outputGroups = new Uint8Array(state.particleGroups ?? []);
     this.outputFrame = this.submittedFrames;
     this.outputParts = (state.particleParts ?? []).map(part => ({ id: part.id, kind: part.kind, ...(part.color ? { color: part.color } : {}) }));
-    this.outputAt = Date.now();
+    this.outputAt = Date.now(); this.markDisplayed();
     void this.capturePreviewFrame();
   }
   private frameScene(state: BodyState) {
