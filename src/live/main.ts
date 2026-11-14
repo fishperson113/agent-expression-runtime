@@ -1,3 +1,5 @@
+import { PresentationAnnotations } from './presentation-annotations';
+import { PresentationAdmission } from './presentation-admission';
 import type { ReactiveRequest } from '../core/live/decision-types';
 import './style.css';
 import { chatObservation } from './chat-observation';
@@ -24,13 +26,40 @@ const playgroundContainer = element('playground-tools');
 const playground = mountPlayground(playgroundContainer);
 const setupContainer = element('setup-tools');
 const liveSetup = mountLiveSetup(setupContainer);
-const conversation = mountConversation(element('conversation-tools'), value => { if (nativeConversation) (window as any).fischLive?.reactiveUserIntent?.(); return (window as any).fischLiveConversation(value); });
+const conversation = mountConversation(element('conversation-tools'), value => { presentation.invalidate(); if (nativeConversation) (window as any).fischLive?.reactiveUserIntent?.(); return (window as any).fischLiveConversation(value); });
 let panelControls: ReturnType<typeof mountPanelControls> | undefined;
 mountDisclosures(element('app'));
 const synthetic = new URLSearchParams(location.search).get('fixture') === 'synthetic';
 const body = new LiveBody(element<HTMLCanvasElement>('body'), text => { element('body-status').textContent = text; });
 const recording = new LiveRecording(() => body.scheduler.epoch, synthetic ? 'synthetic' : 'live-structured');
 body.trace.setSink(recording.record);
+let presentationChat: any;
+let presentationGeometry: { epoch: string; sceneRevision: number; seq: number } | undefined;
+const annotations = new PresentationAnnotations(element('body').parentElement!, () => stopped ? null : body.presentationAnnotationContext());
+const presentation = new PresentationAdmission(() => ({ documentId: (window as any).fischLive?.conversationDocument,
+  stopped, hidden: document.hidden, busy: body.scheduler.busy, snapshot: presentationChat, scene: body.chatSceneContext() }),
+  (value, scope, valid, labels) => {
+    const deadline = presentation.leaseDeadline(scope);
+    if (deadline === null) return { status: 'rejected', code: 'presentation_stale' };
+    annotations.prepare(labels);
+    const result = body.admitPresentation(value, scope, valid);
+    if (result.status === 'accepted' && result.sceneRevision !== undefined) {
+      presentationGeometry = { epoch: result.epoch, sceneRevision: result.sceneRevision, seq: result.seq };
+      annotations.set(labels, presentationGeometry, deadline);
+    }
+    return result;
+  }, () => performance.now(), () => {
+    const owned = presentationGeometry; presentationGeometry = undefined;
+    try { annotations.clear(); } finally { if (owned) body.revokePresentationGeometry(owned); }
+  });
+let presentationFrame = 0;
+const reconcilePresentation = () => {
+  if (stopped) return;
+  presentation.reconcile();
+  presentationFrame = requestAnimationFrame(reconcilePresentation);
+};
+// Browser-owned expiry continues even if the author process stops publishing.
+presentationFrame = requestAnimationFrame(reconcilePresentation);
 const hands = new HandGestures();
 const observations = new FaceObservations(crypto.randomUUID());
 const handEvents = new HandEventSource(() => performance.now());
@@ -52,7 +81,7 @@ const reactive = new ReactiveSession({ now: () => performance.now(), wallNow: ()
     const pending = nativeReplies.get(owner.requestId);
     if (pending && !body.matchesObserverContext(pending.contextRevision)) throw Error('interaction_context_expired');
     body.admitReactive(compiled, owner);
-    if (pending?.text.trim()) { pending.published = conversation.reaction({ requestId: owner.requestId, text: pending.text }); if (!pending.published) throw Error('reaction_ui_unavailable'); }
+    // The camera observer may express visually, but never publishes chat text.
   }, cancel: (owner, reason) => body.cancelReactive(owner, reason), record: recording.record, handState: () => handEvents.handState(), handMotion: () => handEvents.handMotion(), handResetVersion: () => handEvents.resetVersion });
 body.attachReactive(reactive);
 let lastActivity = 'idle';
@@ -77,12 +106,16 @@ Object.assign(window, { fischLive: { chatObservation: () => chatObservation(obse
   },
   chatSceneContext: () => stopped ? null : body.chatSceneContext(),
   chatObservationScope: () => ({ sessionId: observations.snapshot.sessionId, revision: observations.sourceRevision }), pair: (base: string, token: string) => bridge.connect(base, token),
-  selectThread: () => { hands.reset(); resetReactive(); logActivity('Đã chọn phiên Codex.'); return bridge.cancel(); },
+  revokePresentation: () => presentation.invalidate(),
+  presentationSnapshot: (scope: any) => presentation.snapshot(scope),
+  applyPresentation: (value: any) => presentation.apply(value),
+  applyDiagramPresentation: () => ({ status: 'rejected', code: 'diagram_lab_disabled' }),
+  selectThread: () => { presentation.invalidate(); hands.reset(); resetReactive(); logActivity('Đã chọn phiên Codex.'); return bridge.cancel(); },
   panelControlStatus: (value: any) => { if (stopped) return; panelControls ??= mountPanelControls(element('conversation-tools'), value => (window as any).fischPanelRespond(value)); if (['mode', 'ready'].includes(value?.type)) { conversation.panelOwner(); liveSetup.panelOwner(); } else panelControls.project(value); },
   logActivity, playgroundStatus: (value: unknown) => playground.project(value), playgroundClear: () => playground.clear(),
   configureReactive: (available: boolean, handVersion = 0, contractVersion = 1, native = false, policy?: { deadlineMs: number; cooldownMs: number; maxPerMinute: number }) => configureReactive(available, handVersion, contractVersion, native, policy),
   setReactiveUserBusy: (busy: boolean) => reactive.setUserBusy(busy),
-  reactiveUserIntent: () => { semanticEvents.length = 0; body.prepareUserMutation(); },
+  reactiveUserIntent: () => { presentation.invalidate(); semanticEvents.length = 0; body.prepareUserMutation(); },
   takeReactiveRequest: () => { const candidate = reactive.takeRequest();
     if (candidate && nativeConversation) { nativeRequests.set(candidate.request.requestId, { request: candidate.request, read: reactive.nativeReadSet(candidate.observationWindow.events), contextRevision: body.observerContextReadKey() }); if (nativeRequests.size > 8) nativeRequests.delete(nativeRequests.keys().next().value!); }
     return candidate; },
@@ -94,8 +127,7 @@ Object.assign(window, { fischLive: { chatObservation: () => chatObservation(obse
     if (data !== null && (typeof data?.reply !== 'string' || data.reply.length > 600)) { await reactive.deliver(id, null); return { reason: 'invalid_reply', chatPublished: false }; }
     const pending = { text: data?.reply ?? '', published: false, contextRevision: held?.contextRevision ?? null }; nativeReplies.set(id, pending);
     let result; try { result = await reactive.deliver(id, data?.decision ?? null); } finally { nativeReplies.delete(id); }
-    const admitted = !!held && body.matchesObserverContext(held.contextRevision) && !!result && ['accepted', 'observed'].includes(result.reason) && nativeConversation && !stopped && reactive.canPublish(held.request, held.read);
-    const chatPublished = pending.published || (admitted && result?.reason === 'observed' && pending.text.trim() ? conversation.reaction({ requestId: id, text: pending.text }) : false);
+    const chatPublished = false;
     return { ...result, chatPublished, source: 'native-observation' };
   }, authorizeReactiveRequest: (id: string) => reactive.authorize(id),
   deliverReactiveDecision: (id: string, data: unknown) => reactive.deliver(id, data), failReactiveDecision: (id: string) => reactive.fail(id),
@@ -119,7 +151,7 @@ Object.assign(window, { fischLive: { chatObservation: () => chatObservation(obse
     cameraStatus: element('camera-status').textContent, cameraActive: !!element<HTMLVideoElement>('camera').srcObject,
     cameraTransitions, stopped,
     simulatedParticles: body.scheduler.state.particlePositions?.length ? body.scheduler.state.particlePositions.length / 3 : 2000 }), event: (type: string) => {
-    if (type === 'user_message') { semanticEvents.length = 0; body.prepareUserMutation(); }
+    if (type === 'user_message') { presentation.invalidate(); semanticEvents.length = 0; body.prepareUserMutation(); }
     const turn = type === 'user_message' ? 'working' : type === 'needs_user' ? 'waiting' : type === 'interrupted' ? 'interrupted' : 'idle';
     body.activity(turn); events(handEvents.publish(observations.turn(turn, Date.now())));
     if (type === 'interrupted') void bridge.cancel();
@@ -127,7 +159,7 @@ Object.assign(window, { fischLive: { chatObservation: () => chatObservation(obse
 Object.assign((window as any).fischLive, { setupStatus: (value: unknown) => liveSetup.project(value),
   externalHostPresentation: () => { if (!stopped) liveSetup.externalHost(); },
   externalObserverStatus: (reason: unknown) => { if (!stopped) liveSetup.externalObserver(reason); },
-  conversationStatus: (value: unknown) => { if (!stopped) conversation.project(value); }, conversationClear: () => { conversation.clear(); panelControls?.clear(); } });
+  conversationStatus: (value: unknown) => { if (!stopped) { presentationChat = value; const revoked = presentation.reconcile(); conversation.project(value); return { publishedAt: performance.now(), revoked }; } }, conversationClear: () => { presentation.invalidate(); presentationChat = undefined; conversation.clear(); panelControls?.clear(); } });
 const recent: LiveSourceEvent[] = [];
 let sampleCount = 0, sampleAt = performance.now(), inferenceMs = 0, stopped = false;
 const camera = new VisionCamera(element<HTMLVideoElement>('camera'), sample, cameraStatus,
@@ -243,6 +275,7 @@ const timer = setInterval(() => {
 }, 500);
 function stop(reason: 'ui' | 'pagehide') {
   if (stopped) return;
+  presentation.invalidate(); cancelAnimationFrame(presentationFrame); annotations.dispose();
   if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
   logActivity('Đã dừng phiên Live.'); resetReactive(); sharedContextLabel.data = sharedContextText.data = ''; sharedContext.hidden = true; reactive.configure(false); stopped = true;
   recording.dispose(); camera.stop(); hands.reset(); cameraStatus('stopped', 'shutdown'); clearInterval(timer); bridge.stop(); body.dispose(); playground.dispose(); liveSetup.dispose(); conversation.dispose(); panelControls?.dispose();
@@ -272,6 +305,7 @@ function configureReactive(available: boolean, handVersion = 0, contractVersion 
     : body.userSceneOwned ? nativeConversation ? body.canReactive() ? 'MAIN đã cho phép observer thay minh họa dùng một lần; không khôi phục hình cũ.' : 'Đang giữ hình bạn tạo; hội thoại chủ động vẫn có thể tiếp tục, không thay hình.' : 'Đang giữ hình bạn tạo; phản ứng tự động tạm nhường quyền.' : nativeConversation ? choice.checked ? 'Codex chủ động đã cấu hình. Chỉ dùng dữ liệu hình học khi bạn cho phép camera; không nhận diện cảm xúc/đồ vật. Đây chưa phải xác nhận lượt trả lời thành công.' : 'Đã tạm tắt phản ứng chủ động theo lựa chọn của bạn.' : 'Bộ quyết định đã kết nối; phản ứng camera là tùy chọn.';
 }
 document.addEventListener('visibilitychange', () => {
+  presentation.invalidate();
   if (!document.hidden) return;
   resetReactive(); recording.clear(); camera.stop(); cameraStatus('stopped', 'hidden');
 });

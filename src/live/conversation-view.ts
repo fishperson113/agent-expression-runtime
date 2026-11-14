@@ -1,6 +1,6 @@
 import { formatCompletedMessage } from './message-format';
 type Message = { id: string; turn: string; role: 'user' | 'assistant'; text: string; status: string; truncated: boolean };
-type Snapshot = { generation: number; revision: number; ownerTurn: string | null; available: boolean; canSend: boolean; canCancel: boolean; pending: boolean; stopping: boolean; waiting: boolean; error: string; messages: Message[] };
+type Snapshot = { threadId?: string | null; generation: number; revision: number; ownerTurn: string | null; available: boolean; canSend: boolean; canCancel: boolean; pending: boolean; stopping: boolean; waiting: boolean; error: string; messages: Message[] };
 type Request = (value: { action: 'send' | 'cancel'; generation: number; text?: string }) => Promise<unknown>;
 type CancelScope = { generation: number; revision: number; ownerTurn: string | null };
 const cancelSettled = (state: Snapshot, scope: CancelScope) => state.generation === scope.generation &&
@@ -34,7 +34,8 @@ function record(value: unknown): Record<string, unknown> {
 function snapshot(value: unknown): Snapshot | undefined {
   try {
     const dto = record(value), keys = ['generation', 'revision', 'available', 'canSend', 'canCancel', 'pending', 'stopping', 'waiting', 'error', 'messages', 'ownerTurn'];
-    if (Object.keys(dto).length !== keys.length || Object.keys(dto).some(key => !keys.includes(key))) return;
+    if (keys.some(key => !Object.hasOwn(dto, key)) || Object.keys(dto).some(key => key !== 'threadId' && !keys.includes(key))) return;
+    if (Object.hasOwn(dto, 'threadId') && dto.threadId !== null && (typeof dto.threadId !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(dto.threadId))) return;
     if (!['generation', 'revision'].every(key => Number.isSafeInteger(dto[key]) && (dto[key] as number) >= 0)) return;
     if (dto.ownerTurn !== null && (typeof dto.ownerTurn !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(dto.ownerTurn))) return;
     if (!keys.slice(2, 8).every(key => typeof dto[key] === 'boolean') || typeof dto.error !== 'string' ||

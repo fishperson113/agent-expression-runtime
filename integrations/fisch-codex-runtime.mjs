@@ -30,9 +30,9 @@ export function fischCodexServiceTier(env = process.env) {
 }
 
 export function fischCodexArguments() {
-  return ['-c', 'mcp_servers={}', '-c', 'project_doc_max_bytes=0', '-c', 'developer_instructions=""', '-c', 'web_search="disabled"',
+  return ['-c', 'mcp_servers={}', '-c', 'plugins={}', '-c', 'marketplaces={}', '-c', 'project_doc_max_bytes=0', '-c', 'developer_instructions=""',
     '-c', 'features.skip_host_skill_discovery=true', '-c', 'features.omit_skill_descriptions=true',
-    ...['hooks', 'plugins', 'apps', 'skill_search', 'shell_tool', 'multi_agent', 'computer_use', 'browser_use', 'image_generation']
+    ...['hooks', 'skill_search']
       .flatMap(name => ['--disable', name])];
 }
 
@@ -71,8 +71,11 @@ export async function prepareFischCodexRuntime(host, runtime = fischCodexRuntime
     }
     const checked = await rpc.request('skills/list', { cwds: [runtime.cwd], forceReload: true });
     if (!checked.data?.length || checked.data.some(row => row.errors?.length || row.skills?.some(skill => skill.enabled))) throw Error('Fisch could not disable external skills.');
-    const catalog = await rpc.request('mcpServerStatus/list', {});
-    if (catalog.nextCursor != null || catalog.data?.some(server => Object.keys(server.tools ?? {}).length)) throw Error('Fisch found an unexpected MCP integration.');
+    const effective = await rpc.request('config/read', { cwd: runtime.cwd, includeLayers: false });
+    for (const key of ['mcp_servers', 'plugins', 'marketplaces']) {
+      const entries = effective.config?.[key];
+      if (!entries || typeof entries !== 'object' || Array.isArray(entries) || Object.keys(entries).length) throw Error('Fisch could not verify isolated integration configuration.');
+    }
     return runtime;
   } finally { signal?.removeEventListener('abort', abort); rpc.close(); await rpc.settled; }
 }
