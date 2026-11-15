@@ -9,9 +9,17 @@ beforeAll(async () => {
     args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 });
 afterAll(async () => { await browser?.close(); await server?.close(); });
-async function fixture() {
+async function fixture(frameDelay = 0) {
   const page = await browser.newPage();
   await page.clock.install({ time: new Date('2026-11-09T12:00:00Z') });
+  if (frameDelay) await page.addInitScript(() => {
+    const frame = window.requestAnimationFrame.bind(window);
+    window.requestAnimationFrame = callback => frame(at => {
+      const remaining = (window.__recordingFrameUntil ?? 0) - performance.now();
+      if (remaining > 0) setTimeout(() => callback(performance.now()), remaining);
+      else callback(at);
+    });
+  });
   await page.goto(server.resolvedUrls.local[0] + 'live.html?fixture=synthetic');
   await page.waitForFunction(() => !!window.fischLive);
   await page.clock.pauseAt(new Date('2026-11-09T12:00:30Z'));
@@ -37,21 +45,47 @@ function expression(request) {
     action: { actionId: 'recorded_action', body: { type: 'live', program: null,
       configuration: { controls: [], poses: [{ type: 'pose', target: { part: 'body', prop: 'rotateY' }, value: 0.2, durationMs: 800 }], lifetimeMs: 1000 } } } };
 }
+async function recordedApplication(page, request) {
+  while (true) {
+    const state = await page.evaluate(id => {
+      const bundle = window.fischLive.recordingSnapshot();
+      const linked = bundle.records.filter(r => r.payload.origin === 'reactive' &&
+        r.payload.requestId === id && r.payload.decisionId === 'recorded_decision' && r.payload.actionId === 'recorded_action');
+      return { bundle, now: performance.now(), applied: linked.some(r => r.kind === 'execution' && r.payload.phase === 'applied'),
+        frame: linked.some(r => r.kind === 'execution' && r.payload.phase === 'frame_submitted'),
+        cancelled: linked.some(r => r.kind === 'execution' && r.payload.phase === 'cancelled'),
+        metrics: window.fischLive.metrics(), reactive: window.fischLive.reactiveStatus() };
+    }, request.requestId);
+    if (state.applied && state.frame) return state;
+    if (state.cancelled || state.now + 16 >= request.deadline || state.bundle.manifest.incomplete)
+      throw Error('recorded_application_missing:' + JSON.stringify(state));
+    await page.clock.runFor(16);
+  }
+}
 async function downloadBundle(page) {
   const event = page.waitForEvent('download'); await page.locator('#trace-export').click();
   const download = await event, chunks = [], stream = await download.createReadStream();
   for await (const chunk of stream) chunks.push(chunk);
   return { name: download.suggestedFilename(), text: Buffer.concat(chunks).toString('utf8') };
 }
-it('records only after opt-in and exports linked observer/render evidence without activity or provider text', async () => {
-  const page = await fixture();
+it.each([0, 240])('records linked observer/render evidence after application with %ims frame delay', async frameDelay => {
+  const page = await fixture(frameDelay);
   try {
     expect(await page.evaluate(() => window.fischLive.recordingSnapshot())).toEqual({ schemaVersion: 1, manifest: null, records: [] });
     await page.evaluate(() => window.fischLive.logActivity('PRIVATE_ACTIVITY_CANARY'));
     await page.locator('#trace-start').click(); const request = await candidate(page);
+    if (frameDelay) await page.evaluate(delay => { window.__recordingFrameUntil = performance.now() + delay; }, frameDelay);
     expect((await page.evaluate(({ id, data }) => window.fischLive.deliverReactiveDecision(id, data),
       { id: request.requestId, data: expression(request) })).reason).toBe('accepted');
-    await page.clock.runFor(160); await page.locator('#trace-stop').click();
+    if (frameDelay) {
+      await page.clock.runFor(160);
+      expect((await page.evaluate(() => window.fischLive.recordingSnapshot())).records.some(r =>
+        r.kind === 'execution' && r.payload.origin === 'reactive' && r.payload.phase === 'applied')).toBe(false);
+    }
+    const applied = await recordedApplication(page, request);
+    expect(applied.now).toBeLessThan(request.deadline);
+    expect(applied.bundle.manifest.droppedRecords).toBe(0);
+    await page.locator('#trace-stop').click();
     const downloaded = await downloadBundle(page), bundle = JSON.parse(downloaded.text);
     expect(downloaded.name).toMatch(/^fisch-causal-[a-z0-9-]+\.json$/);
     expect(bundle.manifest.mode).toBe('synthetic'); expect(bundle.manifest.active).toBe(false);
@@ -65,6 +99,21 @@ it('records only after opt-in and exports linked observer/render evidence withou
     expect(bundle.records.some(record => record.kind === 'execution' && record.payload.origin === 'reactive' && record.payload.phase === 'applied')).toBe(true);
     expect(downloaded.text).not.toContain('PRIVATE_ACTIVITY_CANARY');
     expect(await page.locator('video').evaluate(video => video.srcObject)).toBeNull();
+  } finally { await page.close(); }
+}, 45000);
+it('does not replace an expired action with a later applied receipt', async () => {
+  const page = await fixture(6000);
+  try {
+    await page.locator('#trace-start').click(); const request = await candidate(page);
+    await page.evaluate(() => { window.__recordingFrameUntil = performance.now() + 6000; });
+    expect((await page.evaluate(({ id, data }) => window.fischLive.deliverReactiveDecision(id, data),
+      { id: request.requestId, data: expression(request) })).reason).toBe('accepted');
+    await expect(recordedApplication(page, request)).rejects.toThrow('recorded_application_missing:');
+    await page.clock.runFor(1200);
+    const bundle = await page.evaluate(() => window.fischLive.recordingSnapshot());
+    const linked = bundle.records.filter(r => r.payload.requestId === request.requestId && r.payload.actionId === 'recorded_action');
+    expect(linked.some(r => r.kind === 'execution' && r.payload.phase === 'applied')).toBe(false);
+    expect(linked.some(r => r.kind === 'execution' && r.payload.phase === 'cancelled')).toBe(true);
   } finally { await page.close(); }
 }, 45000);
 it('retains only safe outcome metadata for revoked and invalid decisions', async () => {
