@@ -12,11 +12,11 @@ Use zero edges when relationships, negation or conditions cannot be expressed fa
 Do not convert comparisons into causation or imply that every mentioned concept is related.
 The complete exact excerpt remains visible; preserve its qualifications rather than summarizing them away.
 Return one JSON record, no markdown or tools:
-{"mode":"diagram","unitId":"u0","nodes":[{"id":"short_id","term":"exact substring","slot":0}],"edges":[]}.
+{"mode":"diagram","unitId":"u0","nodes":[{"id":"short_id","term":"exact substring","occurrence":0,"slot":0}],"edges":[]}.
 Use 1-4 nodes, distinct slots0-3, terms at most40Unicode characters. Optional edges (max2):
-{"id":"short_id","from":"node_id","to":"node_id","predicate":"exact substring","direction":"none"}.
+{"id":"short_id","from":"node_id","to":"node_id","predicate":"exact substring","occurrence":0,"direction":"none"}.
 A directed edge uses direction forward only when FROM predicate TO is actually asserted, with qualifiers intact.
-Predicates are at most96characters. For repeated term/predicate text, include occurrence:0 (or the intended zero-based occurrence).
+Predicates are at most96characters. Include occurrence for every term and predicate: the zero-based index of the intended exact substring match in the unit text. Count all case-sensitive substring matches from left to right, including matches inside longer words and overlapping matches; this is not a word-token index. For example, in "Cats catch cats", "cat" has occurrence0 inside "catch" and occurrence1 in "cats"; "Cats" has only occurrence0. In "aaa", "aa" has occurrences0 and1. Use the occurrence that denotes your intended source span, never guess when the intended span is unclear; retain instead.
 Use exact substrings from units only, never context. No topic presets or invented terms.
 When no useful faithful illustration is possible, return {"mode":"retain","reason":"not_visual"},
 where reason is not_visual, missing_context, ambiguous_relation, or qualifier_risk.
