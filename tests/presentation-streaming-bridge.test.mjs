@@ -250,3 +250,19 @@ it('a failure after a freeform acceptance revokes only that received identity',a
  expect(cleanup.arg).toEqual({epoch:'e',sceneRevision:2,seq:3});
  expect(f.calls.some(c=>c.fn?.includes('revokePresentation'))).toBe(false);f.bridge.close();
 });
+
+it('stamps a replacement prepare after a delayed explicit source revocation resolves',async()=>{
+ const f=fixture();let release,cutoff=-Infinity,delayed=true;const old=f.bridge.page.evaluate;
+ f.bridge.page.evaluate=async(fn,arg)=>{
+  if(!arg&&String(fn).includes('revokePresentation')&&delayed){delayed=false;await new Promise(r=>release=r);cutoff=performance.timeOrigin+performance.now()+60000;return cutoff;}
+  if(arg?.identity&&arg.preparationVersion<=cutoff)return null;
+  return old(fn,arg);
+ };
+ f.bridge.invalidateSource('source_rewritten');f.append('A new complete explanation after correction. ');await tick();
+ expect(f.calls.some(c=>c.ex)).toBe(false);release();await tick();await tick();
+ const prepared=f.calls.find(c=>c.arg?.identity);expect(prepared.arg.preparationVersion).toBeGreaterThan(cutoff);
+ expect(f.calls.filter(c=>c.ex)).toHaveLength(1);
+ f.advance();f.append('Another complete explanation follows the corrected source. ');await tick();f.releases.shift()();await tick();
+ expect(f.calls.filter(c=>c.arg?.identity).at(-1).arg.preparationVersion).toBeGreaterThan(prepared.arg.preparationVersion);
+ f.bridge.close();f.releases.forEach(r=>r());await tick();
+});

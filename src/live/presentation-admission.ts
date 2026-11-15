@@ -17,7 +17,7 @@ export class PresentationAdmission {
   constructor(private read: () => State,
     private admit: (body: unknown, scope: Scope, valid: () => boolean, annotations: Annotations) => any,
     private now = () => performance.now(), private clearAnnotations = () => {}, private boundedSourceLease = false) {}
-  invalidate() { this.preparationVersion=Math.max(this.preparationVersion,performance.timeOrigin+this.now()); this.intent++; this.issued = undefined; this.candidate = undefined; this.prepared = undefined; try { this.clearAnnotations(); } catch { /* Visual cleanup must never block native chat publication. */ } }
+  invalidate() { this.preparationVersion=Math.max(this.preparationVersion,performance.timeOrigin+this.now()); this.intent++; this.issued = undefined; this.candidate = undefined; this.prepared = undefined; try { this.clearAnnotations(); } catch { /* Visual cleanup must never block native chat publication. */ } return this.preparationVersion; }
   leaseDeadline(scope: Scope) {
     const issued=this.candidate && scope && sameScope(this.candidate.scope,scope) ? this.candidate : this.issued;
     try { const state=this.read(); if(!issued || !scope || !sameScope(issued.scope,scope) ||

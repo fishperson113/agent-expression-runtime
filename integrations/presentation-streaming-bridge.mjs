@@ -40,7 +40,7 @@ export class LiveStreamingPresentationBridge {
   invalidate() {
     this.displayed=null;clearTimeout(this.holdTimer);this.selected?.controller?.abort();this.serial++;this.selected=null;this.pending=null;this.active?.controller.abort();this.finalIds.clear();this.checkpoints.revoke();this.excerpts.revoke();this.sectionKey=null;
     for(const timer of this.flushes.values())clearTimeout(timer);this.flushes.clear();
-    if(!this.browserFault)void this.evaluate(()=>window.fischLive?.revokePresentation?.()).catch(()=>{});
+    this.revokeBrowser();
   }
   close(){this.closed=true;this.invalidate();this.provider.close?.();}
   observe(message) { try {this.observePublic(message);} catch(error){this.emit('error',{code:error.message});this.invalidate();} }
@@ -89,16 +89,24 @@ export class LiveStreamingPresentationBridge {
     if(this.active&&(this.boundedSourceLease||this.selected?.section===section)&&this.valid(this.selected)){this.pending=job;this.emit('coalesced',{revision:cp.checkpointRevision});return;}
     this.dispatch(job);
   }
-  dispatch(job){if(this.protocol==='diagram'){prepareDiagram(this,job);return;}clearTimeout(this.holdTimer);this.selected?.controller.abort();this.serial++;job.serial=this.serial;job.preparationVersion=performance.timeOrigin+performance.now();this.selected=job;this.pending=job;
+  dispatch(job){if(this.protocol==='diagram'){prepareDiagram(this,job);return;}clearTimeout(this.holdTimer);this.selected?.controller.abort();this.serial++;job.serial=this.serial;this.selected=job;this.pending=job;
     void this.selectBrowser(job).catch(error=>this.emit('error',{code:error.message}));}
   invalidateSource(reason='source_selected'){this.displayed=null;clearTimeout(this.holdTimer);if(this.selected)this.emit('source_revoked',{revision:this.selected.checkpoint.checkpointRevision,reason});this.selected?.controller?.abort();this.serial++;this.selected=null;this.pending=null;this.active?.controller.abort();
-    this.revocation=this.browserFault?Promise.resolve():this.evaluate(()=>window.fischLive?.revokePresentation?.()).catch(()=>{});}
+    this.revokeBrowser();}
+  revokeBrowser(){
+    this.revocation=this.browserFault?Promise.resolve():this.evaluate(()=>window.fischLive?.revokePresentation?.()).then(floor=>{
+      if(Number.isFinite(floor))this.preparationFloor=Math.max(this.preparationFloor??-Infinity,floor);
+    }).catch(()=>{});
+  }
   valid(job){const s=this.state.conversation.snapshot();return !this.closed&&!this.browserFault&&this.selected===job&&this.remaining(job)>0&&
     !this.state.channel.stale&&s.available&&!s.pending&&!s.stopping&&!s.error&&s.messages.filter(m=>m.role==='user').at(-1)?.turn===job.turnId&&s.generation===job.generation&&
     (!s.ownerTurn||s.ownerTurn===job.turnId)&&this.state.channel.token===job.documentId&&this.state.output.thread===job.threadId&&
     s.messages.some(m=>m.id===job.messageId&&m.turn===job.turnId&&!m.truncated&&['streaming','completed'].includes(m.status)&&m.text.startsWith(job.checkpoint.textPrefix)&&(this.boundedSourceLease||presentationSection(m.text)===job.section));}
   async selectBrowser(job){
     await this.revocation;
+    if(!this.valid(job))return;
+    job.preparationVersion=Math.max(performance.timeOrigin+performance.now(),(this.preparationFloor??-Infinity)+1);
+    this.preparationFloor=job.preparationVersion;
     for(let n=0;n<20&&this.valid(job);n++){
       // Recheck both wall and monotonic elapsed time inside the browser; delayed
       // execution and wall-clock rollback must not renew the original source lease.
