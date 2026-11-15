@@ -66,3 +66,15 @@ original rejected receipt remains queryable within the existing bounded retentio
 and is never reassigned to the new
 session. Live still rejects session-loss requests without automatic replay.
 This does not change camera observation or add a voice channel.
+
+## Source-bound diagram rendering
+
+The opt-in diagram compiler assigns its plane geometry a shared stationary rigid
+track using the existing trajectory contract. The 120 ms assembly transition is
+retained, but target-boids lag and ambient deformation do not distort diagram
+anchors afterward. Existing trajectory framing applies; this is a diagram-local
+presentation choice, not a global motion or camera setting. Labels still require
+a fresh exact-owner displayed frame, stable bounds, valid viewport, collision-free
+fit and the original source deadline. No settle threshold or admission gate changes.
+Rigid diagram parts also ignore live transforms, presence poses and per-part
+performances, as other trajectories do. Freeform expression remains unchanged.

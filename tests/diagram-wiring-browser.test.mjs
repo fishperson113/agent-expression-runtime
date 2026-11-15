@@ -3,14 +3,17 @@ import {createServer} from 'vite';
 import {chromium} from '@playwright/test';
 import {parseDiagramAuthorRecord} from '../integrations/diagram-author.mjs';
 import {composeExpression} from '../integrations/compose-expression.mjs';
-it('shows an exact-source diagram on actual frames and revokes without changing native text',async()=>{
- const quote='Queues buffer work.';
- const record=parseDiagramAuthorRecord(JSON.stringify({mode:'diagram',unitId:'u0',nodes:[{id:'q',term:'Queues',slot:0},{id:'w',term:'work',slot:1}],edges:[{id:'e',from:'q',to:'w',predicate:'buffer',direction:'none'}]}),{target:quote});
+it.each(['single','four','mixed'])('shows %s diagram on actual frames and revokes without changing native text',async(kind)=>{
+ const quote=kind==='mixed'?'Queues buffer work and organize Results with events.':'Queues buffer work. Results summarize events.';
+ const nodes=[{id:'q',term:'Queues',slot:0},{id:'w',term:'work',slot:1},{id:'r',term:'Results',slot:2},{id:'e',term:'events',slot:3}];
+ const edges=[{id:'qw',from:'q',to:'w',predicate:'buffer',direction:'none'},{id:'re',from:'r',to:'e',predicate:'summarize',direction:'none'}];
+ const selected=kind==='single'?nodes.slice(0,1):nodes;
+ const record=parseDiagramAuthorRecord(JSON.stringify({mode:'diagram',unitId:'u0',nodes:selected,edges:kind==='single'?[]:kind==='mixed'?[edges[0],{id:'qr',from:'q',to:'r',predicate:'organize',direction:'none'}]:edges}),{target:quote});
  const body=composeExpression(record.payload).body;
  const server=await createServer({server:{host:'127.0.0.1',port:0}});await server.listen();let browser;
  try{
   browser=await chromium.launch({headless:true,...(process.platform==='win32'?{channel:'msedge'}:{}),args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
-  const page=await browser.newPage({viewport:{width:1800,height:1100}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+  const page=await browser.newPage({viewport:kind==='mixed'?{width:1100,height:850}:{width:1800,height:1100}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto(server.resolvedUrls.local[0]+'live.html?diagramLab=1');await page.waitForFunction(()=>window.fischLive?.chatSceneContext());
   const result=await page.evaluate(({quote,body,diagram})=>{
    const api=window.fischLive;api.conversationDocument='doc';window.diagramBody=body;window.diagram=diagram;
@@ -47,6 +50,7 @@ it('shows an exact-source diagram on actual frames and revokes without changing 
   await page.waitForFunction(()=>window.fischLive.chatSceneContext());
   await page.evaluate(()=>{const api=window.fischLive;const scope=api.presentationSnapshot({...window.identity,remainingTtlMs:1200}).scope;api.applyDiagramPresentation({scope,body:window.diagramBody,diagram:window.diagram});});
   await page.waitForFunction(()=>window.fischLive.diagramLabStatus().visible);
+  if(kind==='mixed')await page.setViewportSize({width:1440,height:900});
   await page.waitForFunction(()=>!window.fischLive.diagramLabStatus().visible&&window.fischLive.chatSceneContext());
   expect(await page.locator('[data-semantic-diagram] div').count()).toBe(0);
   await page.locator('#stop-all').click();expect(await page.locator('[data-semantic-diagram]').count()).toBe(0);expect(errors).toEqual([]);

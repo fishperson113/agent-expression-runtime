@@ -39,3 +39,18 @@ test('maps every node and edge to distinct compiled parts; invalid refs reject',
  assert.throws(()=>compileDiagramGeometry({...plan,edges:[{...plan.edges[0],to:'absent'}]}));
  assert.throws(()=>compileDiagramGeometry({...plan,nodes:[plan.nodes[0],plan.nodes[0]]}));
 });
+
+test('keeps diagram geometry on a bounded stationary rigid track without changing source bindings',()=>{
+ const plan=compileSemanticDiagram(source,input),result=compileDiagramGeometry(plan);
+ assert.equal(result.payload.durationMs,120);
+ assert.equal(result.payload.tracks.length,1);
+ const track=result.payload.tracks[0];
+ assert.deepEqual(track,{group:'diagram_plane',pivot:[0,0,0],keyframes:[
+  {atMs:0,translate:[0,0,0],rotate:[0,0,0]},
+  {atMs:120,translate:[0,0,0],rotate:[0,0,0]}]});
+ assert.ok(result.payload.parts.every(p=>p.trackRef===track.group&&!p.motion));
+ const parts=result.compiled.body.children.find(n=>n.type==='assemble').parts;
+ assert.ok(parts.every(p=>JSON.stringify(p.trajectory)===JSON.stringify(track)));
+ assert.equal(plan.caption.text,source.text);
+ assert.deepEqual([...Object.values(result.nodeParts),...Object.values(result.edgeParts)].flat(),parts.map(p=>p.id));
+});
