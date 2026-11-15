@@ -83,3 +83,20 @@ it('bounds forwarded prefix at 4096 without treating removed qualifications as s
  const retained=JSON.stringify({mode:'retain',reason:'missing_context'});f.start();f.finish(retained);await running;
  expect(f.emitted[0]).toEqual({mode:'retain',payload:null,reason:'missing_context'});f.provider.close();
 });
+
+it.each([
+ ['Only if the queue is full may this happen.','The system drops frames.'],
+ ['The following claim is false.','The cache guarantees fresh data.'],
+ ['This is a hypothetical outcome, not a guarantee.','The worker completes all tasks.'],
+])('keeps prior restriction %s available and communicates immutable caption risk',async(prefix,target)=>{
+ const f=fixture(),inputExchange={...exchange,target,publicContext:prefix+'\n\n'+target};
+ const running=f.provider.generate(inputExchange,f.controller.signal,{},f.stream);await f.ready;
+ const policy=f.calls.find(c=>c.method==='thread/start').params.baseInstructions;
+ expect(policy).toContain('including for zero-edge diagrams');
+ expect(policy).toContain('removing edges is not enough');
+ expect(policy).toContain('You cannot edit the caption');
+ const input=JSON.parse(f.calls.find(c=>c.method==='turn/start').params.input[0].text);
+ expect(input.context.publicPrefix).toBe(inputExchange.publicContext);expect(input.units[0].text).toBe(target);
+ const retained=JSON.stringify({mode:'retain',reason:'qualifier_risk'});f.start();f.delta(retained);f.finish(retained);await running;
+ expect(f.emitted).toEqual([{mode:'retain',payload:null,reason:'qualifier_risk'}]);f.provider.close();
+});
