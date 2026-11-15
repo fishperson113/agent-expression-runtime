@@ -36,7 +36,8 @@ export function compileDiagramGeometry(plan) {
     ||new Set(edgeIds).size!==edgeIds.length||plan.edges.some(e=>!ids.includes(e.from)||!ids.includes(e.to)||e.from===e.to))fail();
   const nodeGroups=plan.nodes.map(rectangle),edgeGroups=plan.edges.map(edgeParts);
   const parts=[...nodeGroups.flat(),...edgeGroups.flat()];
-  const payload={base:'none',parts,durationMs:120};
+  const track={group:'diagram_plane',pivot:[0,0,0],keyframes:[0,120].map(atMs=>({atMs,translate:[0,0,0],rotate:[0,0,0]}))};
+  const payload={base:'none',parts:parts.map(part=>({...part,trackRef:track.group})),tracks:[track],durationMs:120};
   const compiled=composeExpression(payload);
   return {payload,compiled,nodeParts:Object.fromEntries(ids.map((id,i)=>[id,nodeGroups[i].map(p=>p.id)])),
     edgeParts:Object.fromEntries(edgeIds.map((id,i)=>[id,edgeGroups[i].map(p=>p.id)]))};
