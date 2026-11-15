@@ -61,3 +61,9 @@ it('does not count repeated inspection of one submitted frame as settled renderi
  const f=setup();f.frame(11);f.tick();f.time(200);f.tick();expect(f.lab.status().visible).toBe(false);
  expect(mocks.draw).not.toHaveBeenCalled();f.frame(12);f.tick();expect(f.lab.status().visible).toBe(true);
 });
+it('dwell resets after a hidden interval while original source deadline is unchanged',()=>{
+ const f=setup();f.frame(11);f.settle();f.time(1000);expect(f.lab.status().visibleElapsedMs).toBe(840);
+ f.lost();f.tick();expect(f.lab.status().visibleElapsedMs).toBe(0);
+ f.time(2000);f.frame(12);f.tick();expect(f.lab.status()).toMatchObject({visible:true,visibleElapsedMs:0,remainingMs:8000,firstVisibleAt:160});
+ f.time(2200);expect(f.lab.status().visibleElapsedMs).toBe(200);f.lab.clear();
+});

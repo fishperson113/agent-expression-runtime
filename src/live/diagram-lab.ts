@@ -23,11 +23,12 @@ export function validateLabDiagram(diagram: any, body: unknown, sourceQuote: str
 export class DiagramLab {
   private overlay:SemanticDiagramOverlay;
   private frame=0;
+  private visibleSince:number|null=null;
   private telemetry:any={visible:false,reason:'idle',firstVisibleAt:null,frameId:null};
-  status(){return {...this.telemetry,owned:this.telemetry.owned?{...this.telemetry.owned}:null};}
+  status(){const now=performance.now(),a=this.active;return {...this.telemetry,owned:this.telemetry.owned?{...this.telemetry.owned}:null,current:!!a&&now<a.until,remainingMs:a?Math.max(0,a.until-now):0,visibleElapsedMs:this.telemetry.visible&&this.visibleSince!==null?Math.max(0,now-this.visibleSince):0};}
   private active?:{diagram:ReturnType<typeof validateLabDiagram>;owned:{epoch:string;sceneRevision:number;seq:number};after:number;until:number;waitUntil:number;settle?:{at:number;frameId:number;points:number[]}};
   constructor(private canvas:HTMLCanvasElement, private current:()=>any, private projection:()=>any, private invalidate:()=>void){this.overlay=new SemanticDiagramOverlay(canvas.parentElement!);}
-  clear(){this.active=undefined;cancelAnimationFrame(this.frame);this.frame=0;this.overlay.clear();this.canvas.style.visibility='';this.telemetry={...this.telemetry,visible:false,reason:'cleared',at:performance.now()};}
+  clear(){this.visibleSince=null;this.active=undefined;cancelAnimationFrame(this.frame);this.frame=0;this.overlay.clear();this.canvas.style.visibility='';this.telemetry={...this.telemetry,visible:false,reason:'cleared',at:performance.now()};}
   dispose(){this.clear();this.overlay.dispose();}
   start(diagram:ReturnType<typeof validateLabDiagram>,owned:{epoch:string;sceneRevision:number;seq:number},after:number,deadline:number){
     this.clear();if(!Number.isFinite(deadline)||deadline<=performance.now())throw Error('diagram_expired');this.active={diagram,owned,after,until:deadline,waitUntil:Math.min(deadline,performance.now()+2000)};this.telemetry={visible:false,reason:'waiting_frame',firstVisibleAt:null,frameId:null,at:performance.now(),owned:{...owned}};this.canvas.style.visibility='hidden';
@@ -51,10 +52,10 @@ export class DiagramLab {
           }
         }
         const ok=this.overlay.draw(a.diagram.plan,a.diagram,frame,true);
-        if(!ok){this.canvas.style.visibility='hidden';this.telemetry.visible=false;this.telemetry.reason=this.overlay.lastFailure;this.telemetry.fit=this.overlay.lastFit;if(performance.now()>=a.waitUntil){const reason=this.overlay.lastFailure;this.invalidate();this.telemetry.reason=reason;return;}}
-        else {this.canvas.style.visibility='';this.telemetry={...this.telemetry,visible:true,reason:'visible',fit:this.overlay.lastFit,at:performance.now(),firstVisibleAt:this.telemetry.firstVisibleAt??performance.now(),frameId:frame.frameId};a.waitUntil=performance.now()+2000;}
+        if(!ok){this.visibleSince=null;this.canvas.style.visibility='hidden';this.telemetry.visible=false;this.telemetry.reason=this.overlay.lastFailure;this.telemetry.fit=this.overlay.lastFit;if(performance.now()>=a.waitUntil){const reason=this.overlay.lastFailure;this.invalidate();this.telemetry.reason=reason;return;}}
+        else {this.visibleSince??=performance.now();this.canvas.style.visibility='';this.telemetry={...this.telemetry,visible:true,reason:'visible',fit:this.overlay.lastFit,at:performance.now(),firstVisibleAt:this.telemetry.firstVisibleAt??performance.now(),frameId:frame.frameId};a.waitUntil=performance.now()+2000;}
       }
-      if(!frame||frame.contentFrame<=a.after||state.busy){this.canvas.style.visibility='hidden';this.overlay.clear();this.telemetry.visible=false;this.telemetry.reason='waiting_frame';}
+      if(!frame||frame.contentFrame<=a.after||state.busy){this.visibleSince=null;this.canvas.style.visibility='hidden';this.overlay.clear();this.telemetry.visible=false;this.telemetry.reason='waiting_frame';}
       if(performance.now()>=a.waitUntil&&!this.telemetry.visible){this.invalidate();this.telemetry.reason='frame_timeout';return;}
       this.frame=requestAnimationFrame(draw);
     }catch{this.canvas.style.visibility='hidden';try{this.invalidate();}catch{this.clear();}}};

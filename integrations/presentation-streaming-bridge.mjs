@@ -1,3 +1,4 @@
+import {prepareDiagram,applyPreparedDiagram,revokeDiagramReceipt} from './presentation-diagram-staging.mjs';
 import { createHash } from 'node:crypto';
 import { PublicTextExcerpts } from './presentation-excerpts.mjs';
 import { PublicTextCheckpoints } from './presentation-checkpoints.mjs';
@@ -12,7 +13,7 @@ export class LiveStreamingPresentationBridge {
   constructor({state,page,host,runtime,provider,now=Date.now,onEvent=()=>{},ttlMs=10000,checkpoints={},boundedSourceLease=false,exactExcerptLease=false,protocol='freeform'}) {
     if(!['freeform','diagram'].includes(protocol))throw Error('presentation_protocol_invalid');
     exactExcerptLease ||= protocol==='diagram';
-    Object.assign(this,{state,page,now,onEvent,ttlMs:boundedSourceLease||exactExcerptLease?Math.min(ttlMs,10000):ttlMs,boundedSourceLease:boundedSourceLease||exactExcerptLease,exactExcerptLease});
+    Object.assign(this,{state,page,now,onEvent,protocol,ttlMs:boundedSourceLease||exactExcerptLease?Math.min(ttlMs,10000):ttlMs,boundedSourceLease:boundedSourceLease||exactExcerptLease,exactExcerptLease});
     this.excerpts=new PublicTextExcerpts();
     this.provider=provider??new NativePresentationProvider({host,runtime,timeoutMs:30000,protocol});
     this.checkpoints=new PublicTextCheckpoints(checkpoints);
@@ -36,7 +37,7 @@ export class LiveStreamingPresentationBridge {
     }finally{abandoned=true;clearTimeout(timer);signal?.removeEventListener('abort',abort);}
   }
   invalidate() {
-    clearTimeout(this.holdTimer);this.selected?.controller?.abort();this.serial++;this.selected=null;this.pending=null;this.active?.controller.abort();this.finalIds.clear();this.checkpoints.revoke();this.excerpts.revoke();this.sectionKey=null;
+    this.displayed=null;clearTimeout(this.holdTimer);this.selected?.controller?.abort();this.serial++;this.selected=null;this.pending=null;this.active?.controller.abort();this.finalIds.clear();this.checkpoints.revoke();this.excerpts.revoke();this.sectionKey=null;
     for(const timer of this.flushes.values())clearTimeout(timer);this.flushes.clear();
     if(!this.browserFault)void this.evaluate(()=>window.fischLive?.revokePresentation?.()).catch(()=>{});
   }
@@ -82,14 +83,14 @@ export class LiveStreamingPresentationBridge {
     job.sourceQuote=cp.target??cp.textPrefix.slice(job.sourceStart,job.sourceEnd);
     if(cp.textPrefix.slice(job.sourceStart,job.sourceEnd)!==job.sourceQuote){this.emit('drop',{code:'source_binding_invalid'});return;}
     this.emit('checkpoint',{sourceAt,revision:cp.checkpointRevision,sourceStart:Math.max(job.section,cp.sourceStart),previousCheckpointEnd:cp.previousEnd,sourceEnd:cp.sourceEnd,publishedAt:cp.observedAt,sectionPublishedAt:job.sectionPublishedAt,sourceHash:job.sourceHash});
-    if(this.boundedSourceLease&&this.selected?.admitted&&this.valid(this.selected)&&this.now()<this.selected.holdUntil){this.pending=job;this.emit('coalesced',{revision:cp.checkpointRevision});this.scheduleDrain();return;}
+    if(this.protocol!=='diagram'&&this.boundedSourceLease&&this.selected?.admitted&&this.valid(this.selected)&&this.now()<this.selected.holdUntil){this.pending=job;this.emit('coalesced',{revision:cp.checkpointRevision});this.scheduleDrain();return;}
     if(!this.boundedSourceLease&&this.selected?.admitted&&this.selected.section===section&&this.valid(this.selected)){this.emit('covered',{revision:cp.checkpointRevision});return;}
     if(this.active&&(this.boundedSourceLease||this.selected?.section===section)&&this.valid(this.selected)){this.pending=job;this.emit('coalesced',{revision:cp.checkpointRevision});return;}
     this.dispatch(job);
   }
-  dispatch(job){this.invalidateSource();job.serial=this.serial;this.selected=job;this.pending=job;
+  dispatch(job){if(this.protocol==='diagram'){prepareDiagram(this,job);return;}this.invalidateSource();job.serial=this.serial;this.selected=job;this.pending=job;
     void this.selectBrowser(job).catch(error=>this.emit('error',{code:error.message}));}
-  invalidateSource(reason='source_selected'){clearTimeout(this.holdTimer);if(this.selected)this.emit('source_revoked',{revision:this.selected.checkpoint.checkpointRevision,reason});this.selected?.controller?.abort();this.serial++;this.selected=null;this.pending=null;this.active?.controller.abort();
+  invalidateSource(reason='source_selected'){this.displayed=null;clearTimeout(this.holdTimer);if(this.selected)this.emit('source_revoked',{revision:this.selected.checkpoint.checkpointRevision,reason});this.selected?.controller?.abort();this.serial++;this.selected=null;this.pending=null;this.active?.controller.abort();
     this.revocation=this.browserFault?Promise.resolve():this.evaluate(()=>window.fischLive?.revokePresentation?.()).catch(()=>{});}
   valid(job){const s=this.state.conversation.snapshot();return !this.closed&&!this.browserFault&&this.selected===job&&this.remaining(job)>0&&
     !this.state.channel.stale&&s.available&&!s.pending&&!s.stopping&&!s.error&&s.messages.filter(m=>m.role==='user').at(-1)?.turn===job.turnId&&s.generation===job.generation&&
@@ -111,9 +112,9 @@ export class LiveStreamingPresentationBridge {
   scheduleDrain(){clearTimeout(this.holdTimer);this.holdTimer=setTimeout(()=>this.drain(),Math.max(1,(this.selected?.holdUntil??this.now())-this.now()));}
   drain(){
     if(this.active||!this.pending)return;
-    if(this.boundedSourceLease&&this.selected?.admitted&&this.valid(this.selected)&&this.now()<this.selected.holdUntil){this.scheduleDrain();return;}
+    if(this.protocol!=='diagram'&&this.boundedSourceLease&&this.selected?.admitted&&this.valid(this.selected)&&this.now()<this.selected.holdUntil){this.scheduleDrain();return;}
     if(this.pending!==this.selected){const next=this.pending;if(this.now()>=next.expiresAt){this.pending=null;return;}this.dispatch(next);return;}
-    if(!this.pending.scene?.scope)return;
+    if(this.protocol!=='diagram'&&!this.pending.scene?.scope)return;
     const job=this.pending;this.pending=null;if(!this.valid(job))return;
     const controller=job.controller;this.active={job,controller};this.emit('author_start',{revision:job.checkpoint.checkpointRevision});
     const timer=setTimeout(()=>{this.emit('source_expired',{revision:job.checkpoint.checkpointRevision});controller.abort();},Math.max(1,this.remaining(job)));
@@ -122,13 +123,13 @@ export class LiveStreamingPresentationBridge {
       target:job.sourceQuote,
       ...(this.exactExcerptLease?{publicContext:job.checkpoint.textPrefix.slice(-4096)}:{})},controller.signal,{partIds:job.scene.partIds},{
       isCurrent:()=>this.valid(job),onConfiguration:config=>this.emit('configuration',{revision:job.checkpoint.checkpointRevision,config}),onRejectedRecord:value=>this.emit('rejected_record',{revision:job.checkpoint.checkpointRevision,...value}),onPhase:phase=>this.emit('phase',{revision:job.checkpoint.checkpointRevision,phase}),onUsage:usage=>this.emit('usage',{revision:job.checkpoint.checkpointRevision,usage}),onRecord:record=>{admission=this.apply(job,record);admission.catch(()=>{});}
-    })).then(()=>admission).catch(error=>{this.emit('drop',{code:error.message,revision:job.checkpoint.checkpointRevision});
-      if(this.selected===job){const next=this.pending;this.invalidateSource();if(next!==job)this.pending=next;} // Revoke lease, not a previously rendered atomic record.
+    })).then(()=>admission).catch(async error=>{controller.abort();await admission.catch(()=>{});if(this.protocol==='diagram')await revokeDiagramReceipt(this,job.displayedOwned);this.emit('drop',{code:error.message,revision:job.checkpoint.checkpointRevision});
+      if(this.selected===job&&this.protocol!=='diagram'){const next=this.pending;this.invalidateSource();if(next!==job)this.pending=next;} // Revoke lease, not a previously rendered atomic record.
     }).finally(()=>{
       if(!this.boundedSourceLease&&job.admitted&&this.pending?.section===job.section)this.pending=null;
       clearTimeout(timer);this.emit('author_end',{revision:job.checkpoint.checkpointRevision});this.active=null;this.drain();});
   }
-  async apply(job,record){
+  async apply(job,record){if(this.protocol==='diagram')return applyPreparedDiagram(this,job,record);
     if(!this.valid(job))return;
     const body=presentationBody(record,job.scene.scope);if(!body){this.emit('retain',{revision:job.checkpoint.checkpointRevision});return;}
     let receipt;
