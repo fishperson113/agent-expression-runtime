@@ -58,7 +58,10 @@ const presentation = new PresentationAdmission(() => ({ documentId: (window as a
     return result;
   }, () => performance.now(), () => {
     const owned = presentationGeometry; presentationGeometry = undefined;
-    try { diagramLab?.clear(); annotations.clear(); } finally { if (owned) body.revokePresentationGeometry(owned); }
+    let retired=false;
+    try { diagramLab?.clear(); annotations.clear(); } finally { if (owned) retired=body.revokePresentationGeometry(owned); }
+    const fallback=body.chatSceneContext();
+    return retired && owned && fallback ? {retired:owned,fallback} : undefined;
   }, diagramEnabled);
 if (diagramEnabled) diagramLab = new DiagramLab(element<HTMLCanvasElement>('body'),
   () => { const scene=body.presentationAnnotationContext();return scene ? {...scene,seq:body.scheduler.nextSequence-1,busy:body.scheduler.busy} : null; },

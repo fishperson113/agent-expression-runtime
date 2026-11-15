@@ -141,7 +141,7 @@ export class LiveStreamingPresentationBridge {
     const body=presentationBody(record,job.scene.scope);if(!body){this.emit('retain',{revision:job.checkpoint.checkpointRevision});return;}
     let receipt;
     while(this.valid(job)){
-      receipt=await this.evaluate(value=>window.fischLive?.applyPreparedPresentation?.(value),{scope:job.scene.scope,body,...(record.annotations?{annotations:record.annotations}:{}),...(record.diagram?{diagram:record.diagram}:{})},job,late=>{if(late?.status==='accepted'){this.emit('admitted_stale',{revision:job.checkpoint.checkpointRevision,sourceHash:job.sourceHash});void revokeFreeformReceipt(this,late);}}).catch(error=>{this.emit('admission_unknown',{code:error.message,revision:job.checkpoint.checkpointRevision,sourceHash:job.sourceHash});throw error;});
+      receipt=await this.evaluate(value=>window.fischLive?.applyPreparedPresentation?.(value),{scope:job.scene.scope,body,replacement:record.mode==='compose'&&record.payload?.base==='none',...(record.annotations?{annotations:record.annotations}:{}),...(record.diagram?{diagram:record.diagram}:{})},job,late=>{if(late?.status==='accepted'){this.emit('admitted_stale',{revision:job.checkpoint.checkpointRevision,sourceHash:job.sourceHash});void revokeFreeformReceipt(this,late);}}).catch(error=>{this.emit('admission_unknown',{code:error.message,revision:job.checkpoint.checkpointRevision,sourceHash:job.sourceHash});throw error;});
       if(receipt?.code!=='presentation_busy')break;await sleep(50);
     }
     const accepted=receipt?.status==='accepted',current=this.valid(job);

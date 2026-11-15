@@ -89,9 +89,17 @@ a normal rejection leaves the previous scene on its original source lease.
 Neither generation nor replacement renews that original deadline.
 
 Prepared candidates bind the exact scene epoch/revision used for their inventory.
-Retirement of the previous lease, a user mutation, source correction or turn change
-invalidates the candidate rather than rebasing it onto fallback geometry. This
-conservative rule can reject a later valid source when its inventory has expired.
-An ambiguous commit exception remains fail-closed. Late receipt cleanup is scoped
-to its accepted geometry identity and cannot revoke a newer scene. These are
-continuity and ownership guarantees, not a reduction in model generation latency.
+Browser-issued intent/order tickets fence delayed preparation; ticket acquisition
+is the current-state authoring boundary, not host dispatch time. No cross-process
+clock is used as mutation authority.
+
+Relative edits and animations cannot survive retirement of that inventory. An
+explicit complete replacement may survive only the old display's own expiry when
+its exact owned cleanup returns the exact fallback scene identity. Admission
+compares that fallback again and validates a complete assembly, with optional
+style/flow, before rebasing the candidate scope. Its original source deadline stays
+unchanged. Corrections, user mutations, unknown cleanup and intervening scene
+changes invalidate rather than rebase. An ambiguous commit exception remains
+fail-closed. Late receipt cleanup is scoped to its accepted geometry identity and
+cannot revoke a newer scene. These are continuity and ownership guarantees, not a
+reduction in model generation latency or proof of semantic/visual quality.

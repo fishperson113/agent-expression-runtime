@@ -76,3 +76,27 @@ it('keeps old geometry and labels during freeform authoring and atomically repla
   expect(await page.locator('.fisch-conversation').textContent()).toContain('A first scene. A second scene.');expect(errors).toEqual([]);
  }finally{await browser?.close();await server.close();}
 },30000);
+
+it('rebases an absolute scene only onto the verified fallback from its old lease retirement',async()=>{
+ const server=await createServer({server:{host:'127.0.0.1',port:0}});await server.listen();let browser;
+ try {
+  browser=await chromium.launch({headless:true,...(process.platform==='win32'?{channel:'msedge'}:{}),args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+  const page=await browser.newPage();await page.goto(server.resolvedUrls.local[0]+'live.html');await page.waitForFunction(()=>window.fischLive?.chatSceneContext());
+  await page.evaluate(()=>{
+   const a=window.fischLive;a.conversationDocument='doc';
+   a.conversationStatus({threadId:'thread',generation:1,revision:1,ownerTurn:'turn',available:true,canSend:true,canCancel:true,pending:false,stopping:false,waiting:false,error:'',messages:[
+    {id:'u',turn:'turn',role:'user',text:'Explain',status:'completed',truncated:false},{id:'a',turn:'turn',role:'assistant',text:'Old context. New context.',status:'streaming',truncated:false}]});
+   window.id={documentId:'doc',threadId:'thread',turnId:'turn',generation:1,messageId:'a',textPrefix:'Old context.',publicRevision:1,section:0,remainingTtlMs:1200};
+   window.shape=id=>({type:'parallel',children:[{type:'assemble',durationMs:50,parts:[{id,kind:'ellipsoid',center:[0,0,0],scale:[.2,.2,.2]}]}]});
+   const old=a.presentationSnapshot(window.id);window.old=a.applyPresentation({scope:old.scope,body:window.shape('old')});
+  });
+  await page.waitForFunction(()=>window.fischLive.chatSceneContext()?.partIds.includes('old'));
+  expect(await page.evaluate(()=>{const a=window.fischLive;window.pending=a.preparePresentation({...window.id,textPrefix:'Old context. New context.',remainingTtlMs:5000},a.presentationPreparationTicket());return !!window.pending;})).toBe(true);
+  await page.waitForFunction(()=>{const s=window.fischLive.chatSceneContext();return s&&!s.partIds.includes('old');});
+  const result=await page.evaluate(()=>window.fischLive.applyPreparedPresentation({scope:window.pending.scope,body:window.shape('new'),replacement:true}));
+  expect(result.status).toBe('accepted');expect(result.sceneRevision).toBeGreaterThan(await page.evaluate(()=>window.old.sceneRevision));
+  await page.waitForFunction(()=>window.fischLive.chatSceneContext()?.partIds.includes('new'));
+  await page.waitForFunction(()=>{const s=window.fischLive.chatSceneContext();return s&&!s.partIds.includes('new');});
+  expect(await page.evaluate(()=>window.fischLive.applyPreparedPresentation({scope:window.pending.scope,body:window.shape('new'),replacement:true}).status)).toBe('rejected');
+ }finally{await browser?.close();await server.close();}
+},30000);

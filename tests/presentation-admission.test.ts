@@ -251,3 +251,40 @@ it('browser intent fences an unseen delayed ticket independently of host clock s
  expect(f.gate.prepare(f.source,{...ticket,preparationVersion:performance.timeOrigin+1500})).toBeNull();
  expect(f.gate.prepare(f.source,f.gate.preparationTicket())).not.toBeNull();
 });
+
+const absoluteBody={type:'parallel',children:[{type:'assemble',parts:[{id:'new',kind:'ellipsoid',center:[0,0,0],scale:[.2,.2,.2]}]}]};
+function retiredFixture(){
+ const f=stagedFixture();f.at(9000);const shot=f.gate.prepare({...f.source,remainingTtlMs:10000})!;
+ f.clear.mockImplementation(()=>{const retired={epoch:f.state.scene.epoch,sceneRevision:f.state.scene.revision,seq:1};
+  f.state.scene={epoch:'fallback',revision:f.state.scene.revision+1,partIds:['rest']};return {retired,fallback:{...f.state.scene}};});
+ f.at(10000);return {...f,shot};
+}
+it('recovers absolute replacement only across verified own retirement without extending candidate deadline',()=>{
+ const f=retiredFixture();expect(f.gate.reconcile()).toBe(true);expect(f.gate.reconcile()).toBe(false);
+ expect(f.clear).toHaveBeenCalledOnce();expect(f.gate.leaseDeadline(f.old.scope)).toBeNull();
+ f.at(15000);const receipt=f.gate.applyPrepared({scope:f.shot.scope,body:absoluteBody,replacement:true});
+ expect(receipt.status).toBe('accepted');expect(receipt.epoch).toBe('fallback');expect(f.gate.leaseDeadline(receipt.scope)).toBe(19000);
+ expect(f.gate.leaseDeadline(f.old.scope)).toBeNull();f.at(18999);expect(f.gate.reconcile()).toBe(false);
+ f.at(19000);expect(f.gate.reconcile()).toBe(true);expect(f.clear).toHaveBeenCalledTimes(2);
+});
+it.each(['relative','animate','missing_intent','extra_assemble','perform'])('retirement cannot rebase %s candidate',kind=>{
+ const f=retiredFixture();f.gate.reconcile();
+ const body=kind==='relative'?{type:'live',program:absoluteBody,configuration:{sceneAppend:true}}:
+  kind==='animate'?{type:'wait',durationMs:100}:kind==='extra_assemble'?{...absoluteBody,children:[...absoluteBody.children,...absoluteBody.children]}:
+  kind==='perform'?{...absoluteBody,children:[...absoluteBody.children,{type:'perform'}]}:absoluteBody;
+ expect(f.gate.applyPrepared({scope:f.shot.scope,body,replacement:kind!=='missing_intent'}).status).toBe('rejected');expect(f.admit).toHaveBeenCalledOnce();
+});
+it.each(['epoch','revision','cancel','correction','turn','expiry'])('retired candidate rejects intervening %s',reason=>{
+ const f=retiredFixture();f.gate.reconcile();
+ if(reason==='epoch')f.state.scene.epoch='user';if(reason==='revision')f.state.scene.revision++;
+ if(reason==='cancel')f.gate.invalidate();if(reason==='correction')f.state.snapshot.messages[1].text='Changed';
+ if(reason==='turn')f.state.snapshot.messages.push({role:'user',turn:'new'});if(reason==='expiry')f.at(19000);
+ expect(f.gate.applyPrepared({scope:f.shot.scope,body:absoluteBody,replacement:true}).status).toBe('rejected');expect(f.admit).toHaveBeenCalledOnce();
+});
+it.each(['noop','throw','wrong_owner','wrong_fallback'])('unknown cleanup %s cannot authorize rebasing',reason=>{
+ const f=retiredFixture();f.clear.mockImplementation(()=>{
+  if(reason==='throw')throw Error('unknown');if(reason==='noop')return;
+  return {retired:{epoch:reason==='wrong_owner'?'other':f.state.scene.epoch,sceneRevision:f.state.scene.revision,seq:1},fallback:{...f.state.scene,revision:reason==='wrong_fallback'?999:f.state.scene.revision}};
+ });f.gate.reconcile();
+ expect(f.gate.applyPrepared({scope:f.shot.scope,body:absoluteBody,replacement:true}).status).toBe('rejected');expect(f.admit).toHaveBeenCalledOnce();
+});
