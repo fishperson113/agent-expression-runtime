@@ -11,6 +11,9 @@ function inline(text: string, parent: Node) {
   }
   parent.appendChild(document.createTextNode(text.slice(start)));
 }
+export function formatInlineText(node: HTMLElement, text: string) {
+  node.replaceChildren();inline(text, node);
+}
 function formatted(text: string) {
   const output = document.createDocumentFragment();
   const pattern = /^```[a-zA-Z0-9_-]*\r?\n([\s\S]*?)\r?\n```[ \t]*(?=\r?\n|$)/gm;

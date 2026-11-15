@@ -66,3 +66,25 @@ it('fits tall wrapped node names beside vertical relation labels at actual compa
  const visible=layer.draw(plan,{nodeParts:{a:['a'],b:['b']},edgeParts:{e:['e']}},frame,true);return {visible,fit:layer.lastFit};
  })()`);expect(result.visible).toBe(true);expect(result.fit.collisions).toEqual([]);await page.close();
 },30000);
+
+it('formats caption emphasis safely without changing evidence or literal node labels',async()=>{
+ const page=await browser.newPage();await page.goto(server.resolvedUrls.local[0]);
+ const result=await page.evaluate(`(async()=>{
+  const {SemanticDiagramOverlay}=await import('/src/live/semantic-diagram-overlay.ts');
+  document.body.replaceChildren();const host=document.createElement('div');
+  host.style='position:relative;width:900px;height:600px';document.body.append(host);
+  const layer=new SemanticDiagramOverlay(host),quote='**Send** then \`Codex\` <img src=x onerror=alert(1)>.';
+  const plan={nodes:[{id:'a',term:'**literal**'}],edges:[],caption:{text:quote}};
+  const frame={contentFrame:1,capturedAt:Date.now(),parts:[{id:'a',bounds:{min:{x:.2,y:.2},max:{x:.4,y:.4}}}]};
+  const visible=layer.draw(plan,{nodeParts:{a:['a']},edgeParts:{}},frame,true);
+  const caption=host.querySelector('[data-semantic-diagram]').lastElementChild;
+  const result={visible,quote:plan.caption.text,text:caption.textContent,bold:caption.querySelector('strong')?.textContent,
+   code:caption.querySelector('code')?.textContent,images:host.querySelectorAll('img').length,
+   node:host.querySelector('[data-semantic-diagram]').firstElementChild.textContent,collisions:layer.lastFit.collisions};
+  layer.dispose();return result;
+ })()`);
+ expect(result.visible).toBe(true);expect(result.bold).toBe('Send');expect(result.code).toBe('Codex');
+ expect(result.text).toBe('Send then Codex <img src=x onerror=alert(1)>.');
+ expect(result.quote).toContain('**Send**');expect(result.node).toBe('**literal**');
+ expect(result.images).toBe(0);expect(result.collisions).toEqual([]);await page.close();
+},30000);
