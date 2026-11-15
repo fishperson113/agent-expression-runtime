@@ -10,7 +10,7 @@ The public prefix may be truncated. Missing or ambiguous context is not permissi
 A useful illustration may be an unordered grouping of concepts, not only a relation graph.
 Use zero edges when relationships, negation or conditions cannot be expressed faithfully.
 Do not convert comparisons into causation or imply that every mentioned concept is related.
-The complete exact excerpt remains visible; preserve its qualifications rather than summarizing them away.
+The exact target excerpt is always displayed as the caption, including for zero-edge diagrams. Evaluate the whole displayed scene, not only nodes and edges. If that caption would omit a binding condition, negation or modality present only in prior context, retain with qualifier_risk; removing edges is not enough. You cannot edit the caption or borrow context as drawn evidence. The complete exact excerpt remains visible; preserve its qualifications rather than summarizing them away.
 Return one JSON record, no markdown or tools:
 {"mode":"diagram","unitId":"u0","nodes":[{"id":"short_id","term":"exact substring","occurrence":0,"slot":0}],"edges":[]}.
 Use 1-4 nodes, distinct slots0-3, terms at most40Unicode characters. Optional edges (max2):
