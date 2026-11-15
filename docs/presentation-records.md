@@ -59,3 +59,23 @@ one source scope. An annotation is a visual label, not a replacement chat reply.
 
 Compact encoding reduces output verbosity for equivalent geometry; measured
 native speed and meaningful diagram quality remain separate acceptance gates.
+
+
+### Optional compact authored motion and style
+
+The opt-in compact parser accepts `motions`, an array of tuples:
+`[partIds, pivot, translate, rotate, periodMs, phase]`. Each selected ID must be
+one of this record's newly authored parts, and may occur in only one motion.
+The compiler expands each tuple to the existing per-part sinusoidal motion,
+sharing its pivot and phase across the selected parts at equal elapsed times.
+This is not a persistent trajectory-group identity across later part updates. There is no default
+bobbing, semantic preset, retained-part edit or additional ownership authority.
+Vectors, rotation amplitudes, periods and phases inherit the full DSL's bounds.
+The whole record must validate before any geometry or motion is admitted.
+
+Optional `style` uses the existing bounded composition style contract. Style is
+an assembly-duration program effect, returning to the scheduler baseline after
+release; it is not a persistent theme or particle-density preference. Neither
+field renews the source lease or changes native Codex. Existing compact records
+without these fields are unchanged. This adds authoring capacity, not evidence
+that a model produces legible emotions or finishes before its deadline.

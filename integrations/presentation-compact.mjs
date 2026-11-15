@@ -10,6 +10,7 @@ const id = source.$defs.id;
 const color = source.$defs.color;
 const scale = ellipsoid.scale.items;
 const radius = curve.radius;
+const motion = source.$defs.motion.anyOf.find(value => value.type === 'object').properties;
 const tuple = (items, minItems = items.length) => ({ type: 'array', items, additionalItems: false, minItems, maxItems: items.length });
 const xyz = tuple([num, num, num]);
 const unit = { type: 'number', minimum: 0, maximum: 1 };
@@ -22,11 +23,17 @@ export const compactPresentationSchema = object({
     tuple([{ const: 'c' }, id, { type: 'array', minItems: curve.points.minItems, maxItems: curve.points.maxItems, items: xyz }, radius, color], 4),
   ] } },
   durationMs: source.properties.durationMs,
+  motions: { description: 'Optional [partIds,pivot,translateAmplitude,rotateAmplitude,periodMs,phase]. IDs only from this record, once each; same-clock sinusoid; rotation/phase radians, period not lease. No default motion.', type: 'array', minItems: 1, maxItems: source.properties.parts.maxItems, items: tuple([
+    { type: 'array', minItems: 1, maxItems: source.properties.parts.maxItems, uniqueItems: true, items: id },
+    source.$defs.position, motion.translate, motion.rotate, motion.periodMs, motion.phase,
+  ]) },
+  style: { ...source.properties.style, description: 'Optional transient assembly-duration style; returns to baseline after release.' },
   annotations: object({
     labels: { type: 'array', maxItems: 8, items: object({ text: { type: 'string', minLength: 1, maxLength: 48, pattern: '^[^\\u0000-\\u001f\\u007f]+$' }, x: unit, y: unit }) },
     arrows: { type: 'array', maxItems: 8, items: object({ from: xy, to: xy }) },
   }, []),
 }, ['base']);
+compactPresentationSchema.$defs = { color, unit: source.$defs.unit };
 const validate = new Ajv({ strict: false, strictNumbers: true }).compile(compactPresentationSchema);
 
 function expandPart(part) {
@@ -37,6 +44,18 @@ function expandPart(part) {
   }
   const [, , points, radius, color] = part;
   return { id, kind: 'curve', points, radius, ...(color ? { color } : {}) };
+}
+
+function applyMotions(parts, motions = []) {
+  const byId = new Map(parts.map(part => [part.id, part])), assigned = new Set();
+  for (const [ids, pivot, translate, rotate, periodMs, phase] of motions) {
+    for (const id of ids) {
+      if (!byId.has(id)) throw Error('compact_motion_unknown_part');
+      if (assigned.has(id)) throw Error('compact_motion_conflict');
+      assigned.add(id);
+      byId.get(id).motion = structuredClone({ pivot, translate, rotate, periodMs, phase });
+    }
+  }
 }
 
 export function parseCompactPresentationRecord(text) {
@@ -50,7 +69,9 @@ export function parseCompactPresentationRecord(text) {
   if (!value.parts?.length) throw Error('compact_parts_required');
   if (new Set(value.parts.map(part => part[1])).size !== value.parts.length) throw Error('compact_duplicate_id');
   const payload = { base: value.base === 'keep' ? 'current_scene' : 'none', parts: value.parts.map(expandPart),
-    ...(value.durationMs === undefined ? {} : { durationMs: value.durationMs }) };
+    ...(value.durationMs === undefined ? {} : { durationMs: value.durationMs }),
+    ...(value.style === undefined ? {} : { style: value.style }) };
+  applyMotions(payload.parts, value.motions);
   const decision = parsePresentationRecord(JSON.stringify({ mode: 'compose', payload }));
   const annotations = value.annotations;
   const labels = annotations?.labels ?? [];
