@@ -493,3 +493,22 @@ separation does not establish a latency target, scene/text synchronization quali
 or real-model acceptance. Mocked relay/provider regressions demonstrate continued
 partial and completed text delivery during visual hangs or failures. No new voice
 pipeline is introduced; native dictation interoperability remains separately unverified.
+
+
+### Optional visual detail
+
+In **Thiết lập**, **Độ chi tiết Fisch** offers the default 2,000 particles or an
+optional 8,000-particle tier. The normal launcher stores this bounded local preference in Fisch application
+data and restores it even when the next launch uses a new browser port. Standalone
+web-development mode stores it only for the same browser origin. It applies
+on the next launch/open; changing it does not reload or interrupt the current
+page. The note shows the still-active count. Choose the standard tier again if
+higher detail makes your device sluggish. Unavailable storage or invalid values
+fall back to 2,000; no CLI flag or model change is involved.
+
+The higher tier improves particle coverage, not the meaning or creativity of a
+model-authored scene. A bounded offline laptop GPU comparison used two static
+saved scenes, ten seconds of warm-up and twenty seconds of rolling frame samples.
+Both tiers remained around 60 FPS there; this does not establish camera-on,
+long-session, GPU-memory or thermal performance on other devices. Native Codex
+continuity across a manual page reload was not established by this quality test.

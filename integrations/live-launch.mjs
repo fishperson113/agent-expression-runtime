@@ -1,3 +1,4 @@
+import {bindVisualPreferences} from './visual-preferences.mjs';
 import { existsSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -38,6 +39,7 @@ export async function openLive({ hands, assets, headless = false, signal, inspec
     if (signal?.aborted) throw Error('live_start_cancelled');
     browser = await launchLiveBrowser(headless);
     const page = await browser.newPage(livePageOptions(headless));
+    await bindVisualPreferences(page,origin);
     await inspect(page);
     const query = livePageQuery(process.env,synthetic);
     await page.goto(origin + '/live.html?' + query, { waitUntil: 'domcontentloaded', timeout: 30000 });

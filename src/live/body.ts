@@ -74,12 +74,13 @@ export class LiveBody {
   }
   output = 0;
   feedback?: (event: { epoch: string; seq: number; status: string }) => void;
-  constructor(private canvas: HTMLCanvasElement, private status: (text: string) => void) {
-    this.renderer = new ThreeRenderer(canvas, status); this.renderer.quality(2000);
+  constructor(private canvas: HTMLCanvasElement, private status: (text: string) => void, particleCount: 2000 | 8000 = 2000) {
+    const count = particleCount === 8000 ? 8000 : 2000;
+    this.renderer = new ThreeRenderer(canvas, status); this.renderer.quality(count);
     this.scheduler = new Scheduler({ now: () => performance.now() }, { apply: (state, now) => this.apply(state, now),
       dispose: () => this.renderer.dispose() }, { count: status }, (status, ir) => {
         this.lifecycle.feedback(status, ir);
-      }, 2000, { brightness: 0.95, pointSize: 2.2, dispersion: 0 });
+      }, count, { brightness: 0.95, pointSize: 2.2, dispersion: 0 });
     this.defaults.install(validateConfiguration(defaults), performance.now());
     this.restFace(0);
     this.resize = new ResizeObserver(() => this.size()); this.resize.observe(canvas); this.size();
