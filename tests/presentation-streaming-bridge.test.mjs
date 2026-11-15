@@ -1,5 +1,5 @@
 import {runInNewContext} from 'node:vm';
-import {it,expect} from 'vitest';
+import {it,expect,vi} from 'vitest';
 import {LiveStreamingPresentationBridge,presentationSection} from '../integrations/presentation-streaming-bridge.mjs';
 const tick=()=>new Promise(r=>setTimeout(r,5));
 function fixture(options={}){
@@ -266,4 +266,34 @@ it('obtains replacement browser intent only after delayed source revocation reso
  f.advance();f.append('Another complete explanation follows the corrected source. ');await tick();f.releases.shift()();await tick();
  expect(f.calls.filter(c=>c.arg?.identity).at(-1).arg.preparationTicket.preparationVersion).toBeGreaterThan(prepared.arg.preparationTicket.preparationVersion);
  f.bridge.close();f.releases.forEach(r=>r());await tick();
+});
+
+it('classifies source-limited browser waits as expiry without disabling subsequent observations',async()=>{
+ vi.useFakeTimers({toFake:['setTimeout','clearTimeout','performance']});const f=fixture({ttlMs:25});
+ try {
+  f.bridge.browserTimeoutMs=1000;const old=f.bridge.page.evaluate;
+  f.bridge.page.evaluate=(fn,arg)=>arg?.body?new Promise(()=>{}):old(fn,arg);
+  f.bridge.provider.generate=vi.fn(async(_ex,_signal,_scene,stream)=>stream.onRecord(composed));
+  f.append('A complete source explanation. ');await vi.advanceTimersByTimeAsync(1);
+  expect(f.bridge.provider.generate).toHaveBeenCalledOnce();await vi.advanceTimersByTimeAsync(30);
+  expect(f.events.filter(e=>e.type==='source_expired')).toHaveLength(1);
+  expect(f.events.some(e=>e.type==='browser_unavailable')).toBe(false);expect(f.bridge.browserFault).not.toBe(true);expect(f.bridge.active).toBeNull();
+  f.advance(31);f.append('\n**Next section**\nAnother complete source explanation. ');await vi.advanceTimersByTimeAsync(1);
+  expect(f.bridge.provider.generate).toHaveBeenCalledTimes(2);
+ }finally{f.bridge.close();await vi.advanceTimersByTimeAsync(1);vi.useRealTimers();}
+});
+
+it.each([{ttl:25,limit:1000,source:true},{ttl:25.5,limit:1000,source:true},{ttl:1000,limit:25,source:false}])('keeps source/browser deadline ownership distinct: $source',async({ttl,limit,source})=>{
+ vi.useFakeTimers({toFake:['setTimeout','clearTimeout','performance']});const f=fixture();let complete;
+ try {
+  f.bridge.browserTimeoutMs=limit;f.bridge.page.evaluate=()=>new Promise(r=>complete=r);
+  const job={controller:new AbortController(),checkpoint:{checkpointRevision:1},lastNow:1000,expiresAt:1000+ttl,monotonicDeadline:performance.now()+ttl};
+  const late=vi.fn(),pending=f.bridge.evaluate(()=>{},undefined,job,late).catch(e=>e.message);
+  if(ttl===25.5){await vi.advanceTimersByTimeAsync(25);expect(job.controller.signal.aborted).toBe(false);await vi.advanceTimersByTimeAsync(1);}
+  else await vi.advanceTimersByTimeAsync(26);await pending;
+  expect(f.events.filter(e=>e.type==='source_expired')).toHaveLength(source?1:0);
+  expect(f.bridge.browserFault===true).toBe(!source);expect(job.controller.signal.aborted).toBe(source);
+  complete({status:'accepted',epoch:'e',sceneRevision:2,seq:3});await vi.advanceTimersByTimeAsync(0);
+  expect(late).toHaveBeenCalledWith({status:'accepted',epoch:'e',sceneRevision:2,seq:3});
+ }finally{f.bridge.close();await vi.advanceTimersByTimeAsync(1);vi.useRealTimers();}
 });

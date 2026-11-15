@@ -26,6 +26,7 @@ export class LiveStreamingPresentationBridge {
     if(!Number.isFinite(now)||now<job.lastNow){this.browserFault=true;job.controller.abort();this.emit('drop',{code:'clock_regressed'});return 0;}
     job.lastNow=now;return Math.max(0,Math.min(job.expiresAt-now,job.monotonicDeadline-performance.now()));
   }
+  expire(job){if(!job.expiryReported){job.expiryReported=true;this.emit('source_expired',{revision:job.checkpoint.checkpointRevision});}job.controller.abort();}
   async evaluate(fn,value,job,onLate){
     const signal=job?.controller.signal;let timer,abort,abandoned=false;
     try{return await Promise.race([
@@ -33,7 +34,14 @@ export class LiveStreamingPresentationBridge {
       new Promise((_,reject)=>{
         abort=()=>reject(Error('presentation_browser_cancelled'));
         if(signal?.aborted)return abort();signal?.addEventListener('abort',abort,{once:true});
-        timer=setTimeout(()=>{this.browserFault=true;this.emit('browser_unavailable',{code:'presentation_browser_timeout'});reject(Error('presentation_browser_timeout'));},Math.max(1,Math.min(this.browserTimeoutMs??3000,job?this.remaining(job):3000)));
+        const limit=this.browserTimeoutMs??3000,left=job?this.remaining(job):Infinity,sourceLimited=left<=limit;
+        const timeout=()=>{
+          const remaining=job?this.remaining(job):Infinity;
+          if(job&&remaining<=0){this.expire(job);reject(Error('presentation_source_expired'));return;}
+          if(sourceLimited){timer=setTimeout(timeout,Math.max(1,Math.ceil(remaining)));return;}
+          this.browserFault=true;this.emit('browser_unavailable',{code:'presentation_browser_timeout'});reject(Error('presentation_browser_timeout'));
+        };
+        timer=setTimeout(timeout,Math.max(1,Math.ceil(Math.min(limit,left))));
       })]);
     }finally{abandoned=true;clearTimeout(timer);signal?.removeEventListener('abort',abort);}
   }
@@ -124,7 +132,7 @@ export class LiveStreamingPresentationBridge {
     if(this.protocol!=='diagram'&&!this.pending.scene?.scope)return;
     const job=this.pending;this.pending=null;if(!this.valid(job))return;
     const controller=job.controller;this.active={job,controller};this.emit('author_start',{revision:job.checkpoint.checkpointRevision});
-    const timer=setTimeout(()=>{this.emit('source_expired',{revision:job.checkpoint.checkpointRevision});controller.abort();},Math.max(1,this.remaining(job)));
+    const timer=setTimeout(()=>this.expire(job),Math.max(1,Math.ceil(this.remaining(job))));
     let admission=Promise.resolve();
     void Promise.resolve().then(()=>this.provider.generate({userText:job.userText,assistantText:job.checkpoint.sourceText,
       target:job.sourceQuote,
