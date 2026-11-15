@@ -1,3 +1,4 @@
+import { PresentationTransport } from './presentation-transport.mjs';
 import { diagramAuthorPolicy, diagramAuthorInput, parseDiagramAuthorRecord } from './diagram-author.mjs';
 import {compactPresentationSchema, parseCompactPresentationRecord} from './presentation-compact.mjs';
 import { createPresentationRecordStream, presentationRecordSchema } from './presentation-records.mjs';
@@ -104,9 +105,21 @@ function presentationNotifications({job,streaming,records,publish,resolve,reject
 }
 
 export class NativePresentationProvider {
-  constructor({ host, runtime = fischCodexRuntime(), Rpc = PlannerRpc, timeoutMs = 60000, visualModel, visualEffort, compact = false, miniScene = false, protocol = 'freeform' }) {
+  constructor({ host, runtime = fischCodexRuntime(), Rpc = PlannerRpc, timeoutMs = 60000, visualModel, visualEffort, compact = false, miniScene = false, protocol = 'freeform', warmTransport = false }) {
     if(!['freeform','diagram'].includes(protocol))throw Error('presentation_protocol_invalid');
     Object.assign(this, { host, runtime, Rpc, timeoutMs, visualModel, visualEffort, compact, miniScene, protocol });
+    if (warmTransport) this.transport = new PresentationTransport(Rpc, warmTransport === true ? {} : warmTransport);
+  }
+  async prepareTransport(request, rpc, streaming, phase) {
+      if (!this.transport?.initialized) { await request('initialize', { clientInfo: { name: 'fisch_presentation', version: '1' }, capabilities: { experimentalApi: true } }); phase('initialized');rpc.send({ method: 'initialized' });
+        if (this.transport) this.transport.initialized = true; }
+      const { config } = await request('config/read', { includeLayers: false });
+      if (!config || disabled.some(key => config.features?.[key] !== false) || Object.keys(config.mcp_servers ?? {}).length) throw Error('presentation_isolation');
+      if (streaming && (this.visualModel || this.visualEffort)) {
+        const catalog = await request('model/list', { includeHidden: false });
+        const model = catalog.data?.find(row => row.model === this.visualModel);
+        if (!model || !model.supportedReasoningEfforts?.some(row => row.reasoningEffort === this.visualEffort)) throw Error('presentation_model_unsupported');
+      }
   }
   async generate(exchange, signal, scene, streaming) {
     if (this.active || this.closed || signal.aborted) throw Error('presentation_unavailable');
@@ -121,8 +134,10 @@ export class NativePresentationProvider {
     const done = new Promise((yes, no) => { resolve = yes; reject = error => { job.failed = true; cancelRequest(error); no(error); }; }); done.catch(() => {});
     const notify = presentationNotifications({job,streaming,records,publish,resolve,reject});
     const args = [...this.host.args, 'app-server', '--stdio', ...fischCodexArguments(), '-c', 'web_search="disabled"', ...disabled.flatMap(key => ['--disable', key])];
-    let rpc; this.active=job;
-    try { rpc = new this.Rpc(this.host.command, args, this.runtime.cwd, notify, code => reject(Error(code)), this.runtime.env); }
+    let rpc, healthy = false; this.active=job;
+    try { rpc = this.transport
+      ? await this.transport.acquire(this.host.command, args, this.runtime.cwd, notify, code => reject(Error(code)), this.runtime.env)
+      : new this.Rpc(this.host.command, args, this.runtime.cwd, notify, code => reject(Error(code)), this.runtime.env); }
     catch(error){if(this.active===job)this.active=undefined;throw error;}
     this.rpc = rpc;
     const request=(...values)=>Promise.race([rpc.request(...values),cancelled]);
@@ -131,14 +146,7 @@ export class NativePresentationProvider {
     signal.addEventListener('abort', abort, { once: true }); timer = setTimeout(abort, this.timeoutMs);
     try {
       if (signal.aborted) abort();
-      await request('initialize', { clientInfo: { name: 'fisch_presentation', version: '1' }, capabilities: { experimentalApi: true } }); phase('initialized');rpc.send({ method: 'initialized' });
-      const { config } = await request('config/read', { includeLayers: false });
-      if (!config || disabled.some(key => config.features?.[key] !== false) || Object.keys(config.mcp_servers ?? {}).length) throw Error('presentation_isolation');
-      if (streaming && (this.visualModel || this.visualEffort)) {
-        const catalog = await request('model/list', { includeHidden: false });
-        const model = catalog.data?.find(row => row.model === this.visualModel);
-        if (!model || !model.supportedReasoningEfforts?.some(row => row.reasoningEffort === this.visualEffort)) throw Error('presentation_model_unsupported');
-      }
+      await this.prepareTransport(request, rpc, streaming, phase);
       const started = await request('thread/start', { cwd: this.runtime.cwd, ephemeral: true, ...(streaming && this.visualModel ? { model: this.visualModel } : {}), serviceTier: fischCodexServiceTier(this.runtime.env), sandbox: 'read-only', approvalPolicy: 'never', baseInstructions: diagramInput ? diagramAuthorPolicy : streaming ? streamingPolicy(this.compact,this.miniScene) : policy, developerInstructions: '' });
       job.threadId = started.thread.id;phase('thread_started');
       try {streaming?.onConfiguration?.({model:started.model,reasoningEffort:started.reasoningEffort,serviceTier:started.serviceTier});} catch {}
@@ -150,12 +158,14 @@ export class NativePresentationProvider {
       if (job.turnId && job.turnId !== ack.turn?.id) throw Error('presentation_turn_mismatch');
       job.turnId = ack.turn?.id; if (!job.turnId) throw Error('presentation_turn_missing'); await done;
       if (signal.aborted || this.closed) throw Error('presentation_aborted');
-      return streaming ? undefined : parsePresentation(job.text);
+      const result = streaming ? undefined : parsePresentation(job.text);
+      healthy = !job.failed; return result;
     } finally {
-      clearTimeout(timer); signal.removeEventListener('abort', abort); try{rpc.close();}catch{}
-      // Do not allow another generation until this process has actually settled.
-      try{await rpc.settled;}finally{if(this.active===job)this.active=undefined;if(this.rpc===rpc)this.rpc=undefined;}
+      clearTimeout(timer); signal.removeEventListener('abort', abort);
+      if (this.transport) await this.transport.release(healthy); else { try{rpc.close();}catch{} }
+      // Failed/retired warm transports settle before another generation; healthy ones remain idle.
+      try{if (!this.transport) await rpc.settled;}finally{if(this.active===job)this.active=undefined;if(this.rpc===rpc)this.rpc=undefined;}
     }
   }
-  close() { this.closed = true; this.active?.cancel?.(); try{this.rpc?.close();}catch{} }
+  close() { this.closed = true; this.transport?.close(); this.active?.cancel?.(); try{this.rpc?.close();}catch{} }
 }
