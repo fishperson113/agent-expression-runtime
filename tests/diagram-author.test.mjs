@@ -38,3 +38,28 @@ it('rejects unknown or malformed nested records rather than discarding fields',(
  }
  for(const bad of [null,[],0])expect(()=>parseDiagramAuthorRecord(JSON.stringify({...graph,nodes:[bad]}),exchange)).toThrow('diagram_record');
 });
+
+it.each([
+ ['Cats catch cats','cat',1,[11,14]],
+ ['aaa','aa',1,[1,3]],
+ ['🙂éé','é',1,[3,4]],
+ ['Queues buffer work until a worker is ready.','work',0,[14,18]],
+])('resolves exact substring occurrences in %s without guessing word boundaries',(target,term,occurrence,span)=>{
+ const value={mode:'diagram',unitId:'u0',nodes:[{id:'term',slot:0,term,occurrence}],edges:[]};
+ const result=parseDiagramAuthorRecord(JSON.stringify(value),{target});
+ expect(result.diagram.plan.nodes[0].span).toEqual(span);
+ expect(result.diagram.plan.nodes[0].term).toBe(target.slice(...span));
+ delete value.nodes[0].occurrence;
+ expect(()=>parseDiagramAuthorRecord(JSON.stringify(value),{target})).toThrow('diagram_quote');
+});
+it('applies the same occurrence contract to edge predicates and never repairs invalid selectors',()=>{
+ const target='A links B. A links C.',value={mode:'diagram',unitId:'u0',nodes:[{id:'a',slot:0,term:'A',occurrence:1},{id:'c',slot:1,term:'C',occurrence:0}],edges:[{id:'link',from:'a',to:'c',predicate:'links',occurrence:1,direction:'forward'}]};
+ expect(parseDiagramAuthorRecord(JSON.stringify(value),{target}).diagram.plan.edges[0].predicate).toBe('links');
+ for(const occurrence of [undefined,-1,2,0.5,'1']){
+  value.edges[0].occurrence=occurrence;
+  expect(()=>parseDiagramAuthorRecord(JSON.stringify(value),{target})).toThrow('diagram_quote');
+ }
+ expect(diagramAuthorPolicy).toContain('including matches inside longer words and overlapping matches');
+ expect(diagramAuthorPolicy).toContain('"term":"exact substring","occurrence":0');
+ expect(diagramAuthorPolicy).toContain('"predicate":"exact substring","occurrence":0');
+});
