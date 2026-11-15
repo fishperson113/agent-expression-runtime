@@ -187,3 +187,67 @@ it('invalid candidate input cannot clear valid displayed source, but rewritten s
  expect(gate.replace({identity:f.request,body:{}}).status).toBe('rejected');expect(gate.reconcile()).toBe(true);
  expect(clear).toHaveBeenCalledOnce();
 });
+
+function stagedFixture(){
+ const {state}=fixture();let now=0;const clear=vi.fn();
+ Object.assign(state.snapshot,{ownerTurn:'turn',revision:1});Object.assign(state.snapshot.messages[1],{id:'a',text:'First scene. More context.',status:'streaming'});
+ const admit=vi.fn((_body,scope,valid)=>valid()?{status:'accepted',epoch:scope.epoch,seq:1,sceneRevision:++state.scene.revision}:{status:'rejected'});
+ const gate=new PresentationAdmission(()=>state,admit,()=>now,clear,true);
+ const source={...identity,messageId:'a',textPrefix:'First scene.',publicRevision:1,remainingTtlMs:10000,section:0};
+ const shot=gate.snapshot(source)!;const old=gate.apply({scope:shot.scope,body:{}});
+ return {state,admit,clear,gate,source,old,at:(value:number)=>now=value};
+}
+it('stages independently without renewing the old lease and swaps atomically',()=>{
+ const f=stagedFixture();f.at(2000);
+ const next=f.gate.prepare({...f.source,textPrefix:'First scene. More context.',remainingTtlMs:5000})!;
+ expect(f.gate.leaseDeadline(f.old.scope)).toBe(10000);expect(f.clear).not.toHaveBeenCalled();
+ f.at(6000);const accepted=f.gate.applyPrepared({scope:next.scope,body:{}});
+ expect(accepted.status).toBe('accepted');expect(f.gate.leaseDeadline(accepted.scope)).toBe(7000);
+ expect(f.gate.leaseDeadline(f.old.scope)).toBeNull();f.at(7000);expect(f.gate.reconcile()).toBe(true);
+});
+it('rejected candidate keeps old authority; unknown commit fails closed',()=>{
+ const f=stagedFixture();const next=f.gate.prepare(f.source)!;
+ f.admit.mockImplementationOnce(()=>({status:'rejected',code:'invalid'} as any));
+ expect(f.gate.applyPrepared({scope:next.scope,body:{}}).status).toBe('rejected');
+ expect(f.gate.leaseDeadline(f.old.scope)).toBe(10000);expect(f.clear).not.toHaveBeenCalled();
+ const again=f.gate.prepare(f.source)!;f.admit.mockImplementationOnce(()=>{throw Error('unknown mutation');});
+ expect(f.gate.applyPrepared({scope:again.scope,body:{}}).status).toBe('rejected');
+ expect(f.gate.leaseDeadline(f.old.scope)).toBeNull();expect(f.clear).toHaveBeenCalledOnce();
+});
+it.each(['expiry','correction','turn','epoch','revision','cancel'])('prepared candidate cannot survive %s',reason=>{
+ const f=stagedFixture();const next=f.gate.prepare(f.source)!;
+ if(reason==='expiry')f.at(10000);if(reason==='correction')f.state.snapshot.messages[1].text='Rewritten';
+ if(reason==='turn')f.state.snapshot.messages.push({role:'user',turn:'new'});
+ if(reason==='epoch')f.state.scene.epoch='new';if(reason==='revision')f.state.scene.revision++;
+ if(reason==='cancel')f.gate.invalidate();f.gate.reconcile();
+ expect(f.gate.applyPrepared({scope:next.scope,body:{}}).code).toBe('presentation_stale');expect(f.admit).toHaveBeenCalledOnce();
+});
+it('stale prepared cleanup cannot cancel its replacement; nonstreaming preparation is refused',()=>{
+ const f=stagedFixture(),first=f.gate.prepare(f.source)!,second=f.gate.prepare(f.source)!;
+ f.gate.cancelPrepared(first.scope);expect(f.gate.applyPrepared({scope:first.scope,body:{}}).code).toBe('presentation_stale');
+ expect(f.gate.applyPrepared({scope:second.scope,body:{}}).status).toBe('accepted');expect(f.gate.prepare(identity)).toBeNull();
+});
+it('old lease retirement never rebases a still pending candidate onto fallback geometry',()=>{
+ const f=stagedFixture();f.at(9000);const next=f.gate.prepare({...f.source,remainingTtlMs:10000})!;
+ f.at(10000);expect(f.gate.reconcile()).toBe(true);f.state.scene.revision++;
+ expect(f.gate.applyPrepared({scope:next.scope,body:{}}).code).toBe('presentation_stale');
+});
+
+it('preserves exact prepared deadline when every synchronous clock read advances',()=>{
+ const f=stagedFixture();f.at(1000);const shot=f.gate.prepare({...f.source,remainingTtlMs:4000})!;
+ let clock=2000;(f.gate as any).now=()=>++clock;
+ const receipt=f.gate.applyPrepared({scope:shot.scope,body:{}});expect(receipt.status).toBe('accepted');
+ expect(f.gate.leaseDeadline(receipt.scope)).toBe(5000);
+});
+it('obsolete delayed preparation cannot overwrite or cancel newer permit',()=>{
+ const f=stagedFixture(),first=f.gate.prepare(f.source,100)!,newer=f.gate.prepare(f.source,200)!;
+ expect(f.gate.prepare(f.source,100)).toBeNull();expect(f.gate.prepare(f.source,200)).toBeNull();
+ f.gate.cancelPrepared(first.scope);expect(f.gate.applyPrepared({scope:newer.scope,body:{}}).status).toBe('accepted');
+ expect(f.gate.prepare(f.source,150)).toBeNull();
+});
+
+it('invalidation fences even a first preparation that was sent before cancellation',()=>{
+ const f=stagedFixture();f.at(1000);f.gate.invalidate();
+ expect(f.gate.prepare(f.source,performance.timeOrigin+500)).toBeNull();
+ f.at(1500);expect(f.gate.prepare(f.source,performance.timeOrigin+1500)).not.toBeNull();
+});

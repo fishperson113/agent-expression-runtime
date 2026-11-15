@@ -98,7 +98,7 @@ it('routes optional lab diagrams separately without altering native text',async(
  const f=fixture();f.append('Day la cau giai thich thu nhat. ');await tick();const native=f.snapshot.messages[1].text;
  const diagram={plan:{caption:{text:'thu nhat'}},nodeParts:{},edgeParts:{}};
  f.calls.find(c=>c.ex).stream.onRecord({mode:'compose',payload:{base:'none',parts:[{id:'role',kind:'ellipsoid',center:[0,0,0],scale:[.2,.2,.2]}]},diagram});await tick();
- const applied=f.calls.find(c=>c.arg?.body);expect(applied.arg.diagram).toEqual(diagram);expect(applied.fn).toContain('applyDiagramPresentation');expect(f.snapshot.messages[1].text).toBe(native);
+ const applied=f.calls.find(c=>c.arg?.body);expect(applied.arg.diagram).toEqual(diagram);expect(applied.fn).toContain('applyPreparedPresentation');expect(f.snapshot.messages[1].text).toBe(native);
  f.bridge.close();f.releases.forEach(r=>r());await tick();
 });
 
@@ -149,6 +149,7 @@ it('bounds a hanging admission, never replays it, and records late acceptance on
 it.each(['revoke','snapshot'])('bounds a hanging browser %s before any model request',async mode=>{
  const f=fixture();f.bridge.browserTimeoutMs=15;const old=f.bridge.page.evaluate;
  f.bridge.page.evaluate=(fn,arg)=>mode==='revoke'&&!arg||mode==='snapshot'&&arg?.identity?new Promise(()=>{}):old(fn,arg);
+ if(mode==='revoke')f.bridge.invalidateSource('explicit_source_reset');
  f.append('Day la cau giai thich thu nhat. ');await new Promise(r=>setTimeout(r,50));
  expect(f.bridge.browserFault).toBe(true);expect(f.calls.some(c=>c.ex)).toBe(false);const count=f.calls.length;f.append(' More completed public prose. ');await tick();expect(f.calls).toHaveLength(count);f.bridge.close();
 });
@@ -179,7 +180,7 @@ it.each(['close','invalidate','expiry'])('releases a hanging admission on %s wit
 
 it('browser snapshot rejects delayed expiry and clock rollback, never enlarges remaining lifetime',async()=>{
  const f=fixture();f.append('Day la cau giai thich thu nhat. ');await tick();const call=f.calls.find(c=>c.arg?.identity);
- const invoke=(wall,mono)=>runInNewContext('('+call.fn+')(value)',{value:{...call.arg,sentWall:1000,expiresAt:2000,monotonicDeadline:2000,remainingMs:1000},Date:{now:()=>wall},performance:{timeOrigin:0,now:()=>mono},window:{fischLive:{presentationSnapshot:value=>value}}});
+ const invoke=(wall,mono)=>runInNewContext('('+call.fn+')(value)',{value:{...call.arg,sentWall:1000,expiresAt:2000,monotonicDeadline:2000,remainingMs:1000},Date:{now:()=>wall},performance:{timeOrigin:0,now:()=>mono},window:{fischLive:{preparePresentation:value=>value}}});
  expect(invoke(900,1100)).toBeNull();expect(invoke(1500,2100)).toBeNull();expect(invoke(1500,1700).remainingTtlMs).toBe(300);
  f.bridge.close();f.releases.forEach(r=>r());await tick();
 });
@@ -217,4 +218,35 @@ it('author failure while candidate waits for dwell prevents any later commit',as
  f.bridge.provider.generate=async(ex,signal,scene,stream)=>{stream.onRecord({...composed,diagram:{}});await new Promise((_,no)=>reject=no);};
  f.append('A data pipeline can load one source with a small script when its volume and recovery needs remain simple.\n\n');await tick();reject(Error('presentation_stream_corrected'));await new Promise(r=>setTimeout(r,65));
  expect(f.calls.some(c=>c.arg?.body)).toBe(false);expect(f.bridge.active).toBeNull();expect(f.bridge.displayed.owned.epoch).toBe('old');f.bridge.close();
+});
+
+it('freeform stages without revoking displayed scene while a candidate is pending',async()=>{
+ const f=fixture({boundedSourceLease:true});f.append('A complete initial explanation. ');await tick();
+ const first=f.calls.find(c=>c.ex);first.stream.onRecord(composed);await tick();f.releases.shift()();await tick();
+ const before=f.calls.filter(c=>c.fn?.includes('revokePresentation')).length;
+ f.advance(2600);f.append('A second complete explanation with more details. ');await tick();
+ expect(f.calls.filter(c=>c.ex)).toHaveLength(2);
+ expect(f.calls.filter(c=>c.fn?.includes('revokePresentation'))).toHaveLength(before);
+ expect(f.calls.filter(c=>c.arg?.identity).at(-1).fn).toContain('preparePresentation');
+ f.bridge.close();f.releases.forEach(r=>r());await tick();
+});
+
+it('a failed freeform author before admission cancels only its candidate permit',async()=>{
+ const f=fixture({boundedSourceLease:true});f.append('A complete initial explanation. ');await tick();
+ f.calls.find(c=>c.ex).stream.onRecord(composed);await tick();f.releases.shift()();await tick();
+ const revokes=f.calls.filter(c=>c.fn?.includes('revokePresentation')).length;
+ f.bridge.provider.generate=async()=>{throw Error('candidate_failed');};
+ f.advance(2600);f.append('A second complete explanation with more details. ');await tick();await tick();
+ expect(f.events.some(e=>e.type==='drop'&&e.code==='candidate_failed')).toBe(true);
+ expect(f.calls.some(c=>c.fn?.includes('cancelPreparedPresentation'))).toBe(true);
+ expect(f.calls.some(c=>c.fn?.includes('revokeOwnedPresentation'))).toBe(false);
+ expect(f.calls.filter(c=>c.fn?.includes('revokePresentation'))).toHaveLength(revokes);f.bridge.close();
+});
+it('a failure after a freeform acceptance revokes only that received identity',async()=>{
+ const f=fixture();f.bridge.provider.generate=async(_ex,_signal,_scene,stream)=>{stream.onRecord(composed);await tick();throw Error('trailing_failure');};
+ f.append('A complete initial explanation. ');await tick();await tick();await tick();
+ expect(f.events.some(e=>e.type==='admitted')).toBe(true);
+ const cleanup=f.calls.find(c=>c.fn?.includes('revokeOwnedPresentation'));
+ expect(cleanup.arg).toEqual({epoch:'e',sceneRevision:2,seq:3});
+ expect(f.calls.some(c=>c.fn?.includes('revokePresentation'))).toBe(false);f.bridge.close();
 });

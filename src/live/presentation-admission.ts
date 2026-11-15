@@ -12,10 +12,12 @@ export class PresentationAdmission {
   private serial = 0;
   private issued?: { scope: Scope; at: number; leaseMs: number; textPrefix?: string };
   private candidate?: NonNullable<PresentationAdmission['issued']>;
+  private prepared?: NonNullable<PresentationAdmission['issued']>;
+  private preparationVersion = -Infinity;
   constructor(private read: () => State,
     private admit: (body: unknown, scope: Scope, valid: () => boolean, annotations: Annotations) => any,
     private now = () => performance.now(), private clearAnnotations = () => {}, private boundedSourceLease = false) {}
-  invalidate() { this.intent++; this.issued = undefined; this.candidate = undefined; try { this.clearAnnotations(); } catch { /* Visual cleanup must never block native chat publication. */ } }
+  invalidate() { this.preparationVersion=Math.max(this.preparationVersion,performance.timeOrigin+this.now()); this.intent++; this.issued = undefined; this.candidate = undefined; this.prepared = undefined; try { this.clearAnnotations(); } catch { /* Visual cleanup must never block native chat publication. */ } }
   leaseDeadline(scope: Scope) {
     const issued=this.candidate && scope && sameScope(this.candidate.scope,scope) ? this.candidate : this.issued;
     try { const state=this.read(); if(!issued || !scope || !sameScope(issued.scope,scope) ||
@@ -28,10 +30,44 @@ export class PresentationAdmission {
     return state.scene ? state.scene.epoch === scope.epoch && state.scene.revision === scope.sceneRevision : state.busy === true;
   }
   reconcile() {
-    if (!this.issued) return false;
-    try { const issued=this.issued, state=this.read(), age=this.now()-issued.at;
-      if (age>=0 && age<issued.leaseMs && this.sceneMatches(issued.scope,state) && this.available(issued.scope,state,issued.textPrefix)) return false; } catch { /* Fail closed on unavailable public state. */ }
-    this.invalidate(); return true;
+    try {
+      const state = this.read(), prepared = this.prepared;
+      if (prepared && (this.now() < prepared.at || this.now() >= prepared.at + prepared.leaseMs ||
+        !this.available(prepared.scope,state,prepared.textPrefix) || !this.sceneMatches(prepared.scope,state))) this.prepared=undefined;
+      const issued=this.issued;
+      if (!issued) return false;
+      const age=this.now()-issued.at;
+      if (age>=0 && age<issued.leaseMs && this.sceneMatches(issued.scope,state) && this.available(issued.scope,state,issued.textPrefix)) return false;
+      this.invalidate();return true;
+    } catch {this.invalidate();return true;}
+  }
+  prepare(identity: Identity, version?: number) {
+    if (this.candidate || typeof identity?.textPrefix !== 'string' || version !== undefined && (!Number.isFinite(version) || version <= this.preparationVersion)) return null;
+    const displayed = this.issued; this.prepared = undefined;
+    try {
+      const shot = this.snapshot(identity);
+      if (shot && this.issued) {this.prepared = {...this.issued};if(version!==undefined)this.preparationVersion=version;}
+      return shot;
+    } finally { this.issued = displayed; }
+  }
+  cancelPrepared(scope: Scope) {
+    if (this.prepared && sameScope(this.prepared.scope,scope)) this.prepared = undefined;
+  }
+  applyPrepared(value: { scope: Scope; body: any; annotations?: unknown }) {
+    const prepared = this.prepared;
+    const stale = {status:'rejected',code:'presentation_stale'};
+    if (!prepared || !value?.scope || !sameScope(prepared.scope,value.scope)) return stale;
+    try {
+      const state=this.read(), remaining=prepared.at+prepared.leaseMs-this.now();
+      if (remaining <= 0 || this.now() < prepared.at || !this.available(prepared.scope,state,prepared.textPrefix)) {this.prepared=undefined;return stale;}
+      if (!state.scene && state.busy) return {status:'rejected',code:'presentation_busy'};
+      if (!state.scene || state.scene.epoch!==prepared.scope.epoch || state.scene.revision!==prepared.scope.sceneRevision) {this.prepared=undefined;return stale;}
+      this.prepared=undefined;
+      if(this.candidate)return {status:'rejected',code:'presentation_busy'};
+      this.candidate=prepared;
+      try {return this.applyIssued(value,prepared,true);}
+      finally {if(this.candidate===prepared)this.candidate=undefined;}
+    } catch {this.prepared=undefined;return stale;}
   }
   private available(identity: Identity, state: State, textPrefix?: string) {
     const chat = state.snapshot, lastUser = chat?.messages?.filter((m: any) => m.role === 'user').at(-1);

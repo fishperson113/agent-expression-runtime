@@ -63,7 +63,7 @@ const presentation = new PresentationAdmission(() => ({ documentId: (window as a
 if (diagramEnabled) diagramLab = new DiagramLab(element<HTMLCanvasElement>('body'),
   () => { const scene=body.presentationAnnotationContext();return scene ? {...scene,seq:body.scheduler.nextSequence-1,busy:body.scheduler.busy} : null; },
   () => body.renderer.projectDisplayedParts(), () => presentation.invalidate());
-function applyDiagramPresentation(value:any) {
+function applyDiagramPresentation(value:any, prepared=false) {
   if (!diagramLab) return {status:'rejected',code:'diagram_lab_disabled'};
   let admitted=false;
   try {
@@ -71,7 +71,7 @@ function applyDiagramPresentation(value:any) {
     if(typeof scope?.sourceQuote!=='string' || !Number.isSafeInteger(scope.sourceStart) || !Number.isSafeInteger(scope.sourceEnd)) throw Error('diagram_source');
     const diagram=validateLabDiagram(value.diagram,value.body,scope.sourceQuote);
     const before=body.renderer.projectDisplayedParts()?.contentFrame??0;
-    const receipt=presentation.apply({scope,body:value.body});
+    const receipt=prepared ? presentation.applyPrepared({scope,body:value.body}) : presentation.apply({scope,body:value.body});
     if(receipt.status==='accepted') {
       admitted=true;const deadline=presentation.leaseDeadline(receipt.scope);if(deadline===null)throw Error('diagram_expired');
       diagramLab.start(diagram,{epoch:receipt.epoch,sceneRevision:receipt.sceneRevision,seq:receipt.seq},before,deadline);
@@ -152,6 +152,13 @@ Object.assign(window, { fischLive: { chatObservation: () => chatObservation(obse
   chatObservationScope: () => ({ sessionId: observations.snapshot.sessionId, revision: observations.sourceRevision }), pair: (base: string, token: string) => bridge.connect(base, token),
   revokePresentation: () => presentation.invalidate(),
   presentationSnapshot: (scope: any) => presentation.snapshot(scope),
+  preparePresentation: (scope: any, version?: number) => presentation.prepare(scope,version),
+  cancelPreparedPresentation: (scope: any) => presentation.cancelPrepared(scope),
+  applyPreparedPresentation: (value: any) => value?.diagram ? applyDiagramPresentation(value,true) : presentation.applyPrepared(value),
+  revokeOwnedPresentation: (owned: any) => {
+    if (owned && presentationGeometry && ['epoch','sceneRevision','seq'].every(key =>
+      owned[key] === presentationGeometry![key as keyof typeof presentationGeometry])) presentation.invalidate();
+  },
   applyPresentation: (value: any) => presentation.apply(value),
   applyDiagramPresentation,
   applyPreparedDiagram,

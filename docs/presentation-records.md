@@ -79,3 +79,19 @@ release; it is not a persistent theme or particle-density preference. Neither
 field renews the source lease or changes native Codex. Existing compact records
 without these fields are unchanged. This adds authoring capacity, not evidence
 that a model produces legible emotions or finishes before its deadline.
+
+### Freeform candidate staging
+
+A streaming freeform candidate is prepared separately from displayed ownership.
+Starting a later author request does not revoke a still-valid displayed scene.
+A complete, validated candidate replaces geometry and annotations atomically;
+a normal rejection leaves the previous scene on its original source lease.
+Neither generation nor replacement renews that original deadline.
+
+Prepared candidates bind the exact scene epoch/revision used for their inventory.
+Retirement of the previous lease, a user mutation, source correction or turn change
+invalidates the candidate rather than rebasing it onto fallback geometry. This
+conservative rule can reject a later valid source when its inventory has expired.
+An ambiguous commit exception remains fail-closed. Late receipt cleanup is scoped
+to its accepted geometry identity and cannot revoke a newer scene. These are
+continuity and ownership guarantees, not a reduction in model generation latency.

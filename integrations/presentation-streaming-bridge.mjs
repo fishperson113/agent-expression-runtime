@@ -1,3 +1,4 @@
+import {revokeFreeformReceipt,cancelFreeformCandidate} from './presentation-freeform-staging.mjs';
 import {prepareDiagram,applyPreparedDiagram,revokeDiagramReceipt} from './presentation-diagram-staging.mjs';
 import { createHash } from 'node:crypto';
 import { PublicTextExcerpts } from './presentation-excerpts.mjs';
@@ -88,7 +89,7 @@ export class LiveStreamingPresentationBridge {
     if(this.active&&(this.boundedSourceLease||this.selected?.section===section)&&this.valid(this.selected)){this.pending=job;this.emit('coalesced',{revision:cp.checkpointRevision});return;}
     this.dispatch(job);
   }
-  dispatch(job){if(this.protocol==='diagram'){prepareDiagram(this,job);return;}this.invalidateSource();job.serial=this.serial;this.selected=job;this.pending=job;
+  dispatch(job){if(this.protocol==='diagram'){prepareDiagram(this,job);return;}clearTimeout(this.holdTimer);this.selected?.controller.abort();this.serial++;job.serial=this.serial;job.preparationVersion=performance.timeOrigin+performance.now();this.selected=job;this.pending=job;
     void this.selectBrowser(job).catch(error=>this.emit('error',{code:error.message}));}
   invalidateSource(reason='source_selected'){this.displayed=null;clearTimeout(this.holdTimer);if(this.selected)this.emit('source_revoked',{revision:this.selected.checkpoint.checkpointRevision,reason});this.selected?.controller?.abort();this.serial++;this.selected=null;this.pending=null;this.active?.controller.abort();
     this.revocation=this.browserFault?Promise.resolve():this.evaluate(()=>window.fischLive?.revokePresentation?.()).catch(()=>{});}
@@ -101,8 +102,8 @@ export class LiveStreamingPresentationBridge {
     for(let n=0;n<20&&this.valid(job);n++){
       // Recheck both wall and monotonic elapsed time inside the browser; delayed
       // execution and wall-clock rollback must not renew the original source lease.
-      job.scene=await this.evaluate(({identity,expiresAt,sentWall,monotonicDeadline,remainingMs})=>{const wall=Date.now(),left=Math.min(remainingMs,expiresAt-wall,monotonicDeadline-(performance.timeOrigin+performance.now()));if(wall<sentWall||left<=0)return null;return window.fischLive?.presentationSnapshot?.({...identity,remainingTtlMs:Math.min(30000,left)});},
-        {identity:{documentId:job.documentId,threadId:job.threadId,turnId:job.turnId,generation:job.generation,messageId:job.messageId,
+      job.scene=await this.evaluate(({identity,expiresAt,sentWall,monotonicDeadline,remainingMs,preparationVersion})=>{const wall=Date.now(),left=Math.min(remainingMs,expiresAt-wall,monotonicDeadline-(performance.timeOrigin+performance.now()));if(wall<sentWall||left<=0)return null;return window.fischLive?.preparePresentation?.({...identity,remainingTtlMs:Math.min(30000,left)},preparationVersion);},
+        {preparationVersion:job.preparationVersion,identity:{documentId:job.documentId,threadId:job.threadId,turnId:job.turnId,generation:job.generation,messageId:job.messageId,
           textPrefix:job.checkpoint.textPrefix,publicRevision:job.publicRevision,section:job.section,sourceStart:job.sourceStart,sourceEnd:job.sourceEnd,sourceQuote:job.sourceQuote},expiresAt:job.expiresAt,sentWall:Date.now(),monotonicDeadline:performance.timeOrigin+job.monotonicDeadline,remainingMs:this.remaining(job)},job);
       if(job.scene?.scope)break;await sleep(50);
     }
@@ -124,7 +125,7 @@ export class LiveStreamingPresentationBridge {
       ...(this.exactExcerptLease?{publicContext:job.checkpoint.textPrefix.slice(-4096)}:{})},controller.signal,{partIds:job.scene.partIds},{
       isCurrent:()=>this.valid(job),onConfiguration:config=>this.emit('configuration',{revision:job.checkpoint.checkpointRevision,config}),onRejectedRecord:value=>this.emit('rejected_record',{revision:job.checkpoint.checkpointRevision,...value}),onPhase:phase=>this.emit('phase',{revision:job.checkpoint.checkpointRevision,phase}),onUsage:usage=>this.emit('usage',{revision:job.checkpoint.checkpointRevision,usage}),onRecord:record=>{admission=this.apply(job,record);admission.catch(()=>{});}
     })).then(()=>admission).catch(async error=>{controller.abort();await admission.catch(()=>{});if(this.protocol==='diagram')await revokeDiagramReceipt(this,job.displayedOwned);this.emit('drop',{code:error.message,revision:job.checkpoint.checkpointRevision});
-      if(this.selected===job&&this.protocol!=='diagram'){const next=this.pending;this.invalidateSource();if(next!==job)this.pending=next;} // Revoke lease, not a previously rendered atomic record.
+      if(this.protocol!=='diagram'){await cancelFreeformCandidate(this,job);await revokeFreeformReceipt(this,job.displayedOwned);}
     }).finally(()=>{
       if(!this.boundedSourceLease&&job.admitted&&this.pending?.section===job.section)this.pending=null;
       clearTimeout(timer);this.emit('author_end',{revision:job.checkpoint.checkpointRevision});this.active=null;this.drain();});
@@ -134,11 +135,11 @@ export class LiveStreamingPresentationBridge {
     const body=presentationBody(record,job.scene.scope);if(!body){this.emit('retain',{revision:job.checkpoint.checkpointRevision});return;}
     let receipt;
     while(this.valid(job)){
-      receipt=await this.evaluate(value=>value.diagram?window.fischLive?.applyDiagramPresentation?.(value):window.fischLive?.applyPresentation?.(value),{scope:job.scene.scope,body,...(record.annotations?{annotations:record.annotations}:{}),...(record.diagram?{diagram:record.diagram}:{})},job,late=>{if(late?.status==='accepted')this.emit('admitted_stale',{revision:job.checkpoint.checkpointRevision,sourceHash:job.sourceHash});}).catch(error=>{this.emit('admission_unknown',{code:error.message,revision:job.checkpoint.checkpointRevision,sourceHash:job.sourceHash});throw error;});
+      receipt=await this.evaluate(value=>window.fischLive?.applyPreparedPresentation?.(value),{scope:job.scene.scope,body,...(record.annotations?{annotations:record.annotations}:{}),...(record.diagram?{diagram:record.diagram}:{})},job,late=>{if(late?.status==='accepted'){this.emit('admitted_stale',{revision:job.checkpoint.checkpointRevision,sourceHash:job.sourceHash});void revokeFreeformReceipt(this,late);}}).catch(error=>{this.emit('admission_unknown',{code:error.message,revision:job.checkpoint.checkpointRevision,sourceHash:job.sourceHash});throw error;});
       if(receipt?.code!=='presentation_busy')break;await sleep(50);
     }
     const accepted=receipt?.status==='accepted',current=this.valid(job);
-    if(accepted&&current){job.admitted=true;job.holdUntil=Math.min(job.expiresAt,this.now()+2500);}
+    if(accepted&&current){job.admitted=true;job.displayedOwned={epoch:receipt.epoch,sceneRevision:receipt.sceneRevision,seq:receipt.seq};job.holdUntil=Math.min(job.expiresAt,this.now()+2500);}else if(accepted)await revokeFreeformReceipt(this,receipt);
     // A received acceptance is physical history, not proof its source is still current.
     // The source invalidator owns revocation; a late receipt must not revoke a newer lease.
     this.emit(accepted?(current?'admitted':'admitted_stale'):'drop',{code:receipt?.code,revision:job.checkpoint.checkpointRevision,
