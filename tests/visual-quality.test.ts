@@ -14,3 +14,4 @@ test('saving quality accepts only bounded choices and handles quota errors', () 
   expect(writes).toEqual(['8000', '2000']);
   expect(saveVisualQuality('8000', () => { throw Error('quota'); })).toBe(false);
 });
+

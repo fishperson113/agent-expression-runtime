@@ -498,8 +498,10 @@ pipeline is introduced; native dictation interoperability remains separately unv
 ### Optional visual detail
 
 In **Thiết lập**, **Độ chi tiết Fisch** offers the default 2,000 particles or an
-optional 8,000-particle tier. The browser stores this local preference and applies
-it when the page next opens; changing it does not reload or interrupt the current
+optional 8,000-particle tier. The normal launcher stores this bounded local preference in Fisch application
+data and restores it even when the next launch uses a new browser port. Standalone
+web-development mode stores it only for the same browser origin. It applies
+on the next launch/open; changing it does not reload or interrupt the current
 page. The note shows the still-active count. Choose the standard tier again if
 higher detail makes your device sluggish. Unavailable storage or invalid values
 fall back to 2,000; no CLI flag or model change is involved.
