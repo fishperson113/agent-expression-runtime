@@ -37,6 +37,7 @@ export class LiveStreamingPresentationBridge {
     }finally{abandoned=true;clearTimeout(timer);signal?.removeEventListener('abort',abort);}
   }
   invalidate() {
+    this.provider.invalidate?.();
     this.displayed=null;clearTimeout(this.holdTimer);this.selected?.controller?.abort();this.serial++;this.selected=null;this.pending=null;this.active?.controller.abort();this.finalIds.clear();this.checkpoints.revoke();this.excerpts.revoke();this.sectionKey=null;
     for(const timer of this.flushes.values())clearTimeout(timer);this.flushes.clear();
     if(!this.browserFault)void this.evaluate(()=>window.fischLive?.revokePresentation?.()).catch(()=>{});
@@ -85,14 +86,24 @@ export class LiveStreamingPresentationBridge {
     this.emit('checkpoint',{sourceAt,revision:cp.checkpointRevision,sourceStart:Math.max(job.section,cp.sourceStart),previousCheckpointEnd:cp.previousEnd,sourceEnd:cp.sourceEnd,publishedAt:cp.observedAt,sectionPublishedAt:job.sectionPublishedAt,sourceHash:job.sourceHash});
     if(this.protocol!=='diagram'&&this.boundedSourceLease&&this.selected?.admitted&&this.valid(this.selected)&&this.now()<this.selected.holdUntil){this.pending=job;this.emit('coalesced',{revision:cp.checkpointRevision});this.scheduleDrain();return;}
     if(!this.boundedSourceLease&&this.selected?.admitted&&this.selected.section===section&&this.valid(this.selected)){this.emit('covered',{revision:cp.checkpointRevision});return;}
-    if(this.active&&(this.boundedSourceLease||this.selected?.section===section)&&this.valid(this.selected)){this.pending=job;this.emit('coalesced',{revision:cp.checkpointRevision});return;}
+    if(this.active&&(this.boundedSourceLease||this.selected?.section===section)&&this.valid(this.selected)){this.pending=job;this.prefetch(job);this.emit('coalesced',{revision:cp.checkpointRevision});return;}
     this.dispatch(job);
   }
+  exchange(job){return {userText:job.userText,assistantText:job.checkpoint.sourceText,target:job.sourceQuote,
+    ...(this.exactExcerptLease?{publicContext:job.checkpoint.textPrefix.slice(-4096)}:{})};}
+  sourceIdentity(job){return {documentId:job.documentId,threadId:job.threadId,turnId:job.turnId,generation:job.generation,
+    messageId:job.messageId,publicRevision:job.publicRevision,revision:job.checkpoint.checkpointRevision,
+    sourceStart:job.sourceStart,sourceEnd:job.sourceEnd,sourceHash:job.sourceHash,sourceAt:job.sourceAt,
+    expiresAt:job.expiresAt,monotonicDeadline:job.monotonicDeadline};}
+  prefetch(job){if(this.protocol==='diagram')this.provider.prefetch?.(this.exchange(job),this.sourceIdentity(job),{
+    signal:job.controller.signal,isCurrent:()=>this.sourceCurrent(job),remainingMs:()=>this.remaining(job),
+    onEvent:(type,detail)=>this.emit(type,detail)});}
   dispatch(job){if(this.protocol==='diagram'){prepareDiagram(this,job);return;}this.invalidateSource();job.serial=this.serial;this.selected=job;this.pending=job;
     void this.selectBrowser(job).catch(error=>this.emit('error',{code:error.message}));}
-  invalidateSource(reason='source_selected'){this.displayed=null;clearTimeout(this.holdTimer);if(this.selected)this.emit('source_revoked',{revision:this.selected.checkpoint.checkpointRevision,reason});this.selected?.controller?.abort();this.serial++;this.selected=null;this.pending=null;this.active?.controller.abort();
+  invalidateSource(reason='source_selected'){this.provider.invalidate?.();this.displayed=null;clearTimeout(this.holdTimer);if(this.selected)this.emit('source_revoked',{revision:this.selected.checkpoint.checkpointRevision,reason});this.selected?.controller?.abort();this.serial++;this.selected=null;this.pending=null;this.active?.controller.abort();
     this.revocation=this.browserFault?Promise.resolve():this.evaluate(()=>window.fischLive?.revokePresentation?.()).catch(()=>{});}
-  valid(job){const s=this.state.conversation.snapshot();return !this.closed&&!this.browserFault&&this.selected===job&&this.remaining(job)>0&&
+  valid(job){return this.selected===job&&this.sourceCurrent(job);}
+  sourceCurrent(job){const s=this.state.conversation.snapshot();return !this.closed&&!this.browserFault&&this.remaining(job)>0&&
     !this.state.channel.stale&&s.available&&!s.pending&&!s.stopping&&!s.error&&s.messages.filter(m=>m.role==='user').at(-1)?.turn===job.turnId&&s.generation===job.generation&&
     (!s.ownerTurn||s.ownerTurn===job.turnId)&&this.state.channel.token===job.documentId&&this.state.output.thread===job.threadId&&
     s.messages.some(m=>m.id===job.messageId&&m.turn===job.turnId&&!m.truncated&&['streaming','completed'].includes(m.status)&&m.text.startsWith(job.checkpoint.textPrefix)&&(this.boundedSourceLease||presentationSection(m.text)===job.section));}
@@ -119,10 +130,8 @@ export class LiveStreamingPresentationBridge {
     const controller=job.controller;this.active={job,controller};this.emit('author_start',{revision:job.checkpoint.checkpointRevision});
     const timer=setTimeout(()=>{this.emit('source_expired',{revision:job.checkpoint.checkpointRevision});controller.abort();},Math.max(1,this.remaining(job)));
     let admission=Promise.resolve();
-    void Promise.resolve().then(()=>this.provider.generate({userText:job.userText,assistantText:job.checkpoint.sourceText,
-      target:job.sourceQuote,
-      ...(this.exactExcerptLease?{publicContext:job.checkpoint.textPrefix.slice(-4096)}:{})},controller.signal,{partIds:job.scene.partIds},{
-      isCurrent:()=>this.valid(job),onConfiguration:config=>this.emit('configuration',{revision:job.checkpoint.checkpointRevision,config}),onRejectedRecord:value=>this.emit('rejected_record',{revision:job.checkpoint.checkpointRevision,...value}),onPhase:phase=>this.emit('phase',{revision:job.checkpoint.checkpointRevision,phase}),onUsage:usage=>this.emit('usage',{revision:job.checkpoint.checkpointRevision,usage}),onRecord:record=>{admission=this.apply(job,record);admission.catch(()=>{});}
+    void Promise.resolve().then(()=>this.provider.generate(this.exchange(job),controller.signal,{partIds:job.scene.partIds},{
+      sourceIdentity:this.sourceIdentity(job),isCurrent:()=>this.valid(job),onConfiguration:config=>this.emit('configuration',{revision:job.checkpoint.checkpointRevision,config}),onRejectedRecord:value=>this.emit('rejected_record',{revision:job.checkpoint.checkpointRevision,...value}),onPhase:phase=>this.emit('phase',{revision:job.checkpoint.checkpointRevision,phase}),onUsage:usage=>this.emit('usage',{revision:job.checkpoint.checkpointRevision,usage}),onRecord:record=>{admission=this.apply(job,record);admission.catch(()=>{});}
     })).then(()=>admission).catch(async error=>{controller.abort();await admission.catch(()=>{});if(this.protocol==='diagram')await revokeDiagramReceipt(this,job.displayedOwned);this.emit('drop',{code:error.message,revision:job.checkpoint.checkpointRevision});
       if(this.selected===job&&this.protocol!=='diagram'){const next=this.pending;this.invalidateSource();if(next!==job)this.pending=next;} // Revoke lease, not a previously rendered atomic record.
     }).finally(()=>{

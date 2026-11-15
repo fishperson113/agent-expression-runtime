@@ -1,5 +1,5 @@
 import {runInNewContext} from 'node:vm';
-import {it,expect} from 'vitest';
+import {it,expect,vi} from 'vitest';
 import {LiveStreamingPresentationBridge,presentationSection} from '../integrations/presentation-streaming-bridge.mjs';
 const tick=()=>new Promise(r=>setTimeout(r,5));
 function fixture(options={}){
@@ -168,13 +168,32 @@ it('telemetry anchors an exact excerpt before a newer heading to its real source
 });
 
 it.each(['close','invalidate','expiry'])('releases a hanging admission on %s without extending source lifetime',async action=>{
- const f=fixture();f.bridge.browserTimeoutMs=1000;if(action==='expiry')f.bridge.ttlMs=25;const old=f.bridge.page.evaluate;
- f.bridge.page.evaluate=(fn,arg)=>arg?.body?new Promise(()=>{}):old(fn,arg);
- f.bridge.provider.generate=async(ex,signal,scene,stream)=>stream.onRecord(composed);
- f.append('Day la cau giai thich thu nhat. ');await tick();
- if(action==='close')f.bridge.close();if(action==='invalidate')f.bridge.invalidate();
- await new Promise(r=>setTimeout(r,60));expect(f.bridge.active).toBeNull();expect(f.events.some(e=>e.type==='admission_unknown')).toBe(true);
- expect(f.events.some(e=>e.type==='admitted')).toBe(false);if(action==='expiry')expect(f.events.some(e=>e.type==='source_expired')).toBe(true);f.bridge.close();
+ vi.useFakeTimers({toFake:['setTimeout','clearTimeout','performance']});const f=fixture();
+ try{
+  f.bridge.browserTimeoutMs=1000;if(action==='expiry')f.bridge.ttlMs=25;const old=f.bridge.page.evaluate;
+  f.bridge.page.evaluate=(fn,arg)=>arg?.body?new Promise(()=>{}):old(fn,arg);
+  f.bridge.provider.generate=async(ex,signal,scene,stream)=>stream.onRecord(composed);
+  f.append('Day la cau giai thich thu nhat. ');await vi.advanceTimersByTimeAsync(0);
+  const deadline=f.bridge.selected.expiresAt;expect(deadline).toBe(1000+f.bridge.ttlMs);
+  f.advance(5);await vi.advanceTimersByTimeAsync(5);
+  if(action==='close')f.bridge.close();if(action==='invalidate')f.bridge.invalidate();
+  f.advance(60);await vi.advanceTimersByTimeAsync(60);
+  expect(f.bridge.active).toBeNull();expect(f.events.some(e=>e.type==='admission_unknown')).toBe(true);
+  expect(f.events.some(e=>e.type==='admitted')).toBe(false);if(action==='expiry')expect(f.events.some(e=>e.type==='source_expired')).toBe(true);
+ }finally{f.bridge.close();f.releases.forEach(r=>r());await vi.advanceTimersByTimeAsync(0);vi.useRealTimers();}
+});
+it('browser deadline winning before source expiry still releases admission without repaint',async()=>{
+ vi.useFakeTimers({toFake:['setTimeout','clearTimeout','performance']});const f=fixture();
+ try{
+  f.bridge.ttlMs=25;f.bridge.browserTimeoutMs=5;const old=f.bridge.page.evaluate;
+  f.bridge.page.evaluate=(fn,arg)=>arg?.body?new Promise(()=>{}):old(fn,arg);
+  f.bridge.provider.generate=async(ex,signal,scene,stream)=>stream.onRecord(composed);
+  f.append('Day la cau giai thich thu nhat. ');await vi.advanceTimersByTimeAsync(0);
+  expect(f.bridge.selected.expiresAt).toBe(1025);f.advance(5);await vi.advanceTimersByTimeAsync(5);
+  expect(f.bridge.active).toBeNull();expect(f.events.some(e=>e.type==='browser_unavailable')).toBe(true);
+  expect(f.events.some(e=>e.type==='admission_unknown')).toBe(true);expect(f.events.some(e=>e.type==='admitted')).toBe(false);
+  expect(f.events.some(e=>e.type==='source_expired')).toBe(false);
+ }finally{f.bridge.close();f.releases.forEach(r=>r());await vi.advanceTimersByTimeAsync(0);vi.useRealTimers();}
 });
 
 it('browser snapshot rejects delayed expiry and clock rollback, never enlarges remaining lifetime',async()=>{
@@ -217,4 +236,16 @@ it('author failure while candidate waits for dwell prevents any later commit',as
  f.bridge.provider.generate=async(ex,signal,scene,stream)=>{stream.onRecord({...composed,diagram:{}});await new Promise((_,no)=>reject=no);};
  f.append('A data pipeline can load one source with a small script when its volume and recovery needs remain simple.\n\n');await tick();reject(Error('presentation_stream_corrected'));await new Promise(r=>setTimeout(r,65));
  expect(f.calls.some(c=>c.arg?.body)).toBe(false);expect(f.bridge.active).toBeNull();expect(f.bridge.displayed.owned.epoch).toBe('old');f.bridge.close();
+});
+it('diagram prefetch binds the exact queued source and cancels on native correction',async()=>{
+ const f=fixture({protocol:'diagram'}),prefetches=[];let invalidations=0;
+ f.bridge.provider.prefetch=(exchange,identity,options)=>prefetches.push({exchange,identity,options});f.bridge.provider.invalidate=()=>invalidations++;
+ f.append('Queues buffer work until a worker is ready, helping the system absorb a short burst of requests.\n\n');await tick();
+ f.advance(500);f.append('Backpressure asks the producer to slow down when a bounded queue cannot accept more work safely.\n\n');await tick();
+ expect(prefetches).toHaveLength(1);const r=prefetches[0];expect(r.identity.turnId).toBe('t');expect(r.identity.revision).toBe(2);
+ expect(r.exchange.publicContext).toContain('Queues buffer');expect(r.options.isCurrent()).toBe(true);expect(r.identity.expiresAt-r.identity.sourceAt).toBe(10000);expect(r.options.remainingMs()).toBeLessThanOrEqual(10000);
+ f.advance(600);expect(r.options.remainingMs()).toBeLessThanOrEqual(9400);const expiry=r.identity.expiresAt;
+ f.releases.shift()();await tick();const promoted=f.calls.filter(c=>c.ex).at(-1);expect(promoted.stream.sourceIdentity).toEqual(r.identity);expect(promoted.stream.sourceIdentity.expiresAt).toBe(expiry);
+ f.snapshot.messages[1].text='Correction.';f.send('item/agentMessage/delta');expect(invalidations).toBeGreaterThan(0);expect(r.options.isCurrent()).toBe(false);
+ f.bridge.close();f.releases.forEach(r=>r());await tick();
 });
