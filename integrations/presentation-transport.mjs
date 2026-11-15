@@ -12,9 +12,10 @@ export class PresentationTransport {
       clearTimeout(this.timer);
       if (!this.rpc) {
         this.jobs = 0; this.initialized = false;
+        const identity = this.identity = {};
         this.rpc = new this.Rpc(command, args, cwd,
-          (...values) => this.active?.notify(...values),
-          code => { const listener = this.active?.failed; this.retire(); listener?.(code); }, env);
+          (...values) => { if (this.identity === identity) this.active?.notify(...values); },
+          code => { if (this.identity !== identity) return; const listener = this.active?.failed; this.retire(); listener?.(code); }, env);
       }
       return this.rpc;
     } catch (error) { this.active = undefined; throw error; }
@@ -30,7 +31,7 @@ export class PresentationTransport {
   retire() {
     clearTimeout(this.timer);
     const rpc = this.rpc;
-    this.rpc = undefined; this.initialized = false;
+    this.rpc = undefined; this.identity = undefined; this.initialized = false;
     if (rpc) {
       this.retiring = Promise.resolve(rpc.settled);
       try { rpc.close(); } catch {}

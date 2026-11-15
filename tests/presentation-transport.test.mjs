@@ -104,3 +104,9 @@ it('late old streaming delta cannot publish into the next thread',async()=>{
   rpc.notify('item/agentMessage/delta',{threadId:old,itemId:'old-v',delta:'{"mode":"retain","payload":null}'});
   expect(records).toEqual([]);c.abort();await expect(pending).rejects.toThrow();p.close();
 });
+it('idle retirement late failure cannot poison a waiting new job',async()=>{
+  Rpc.instances=[];const p=make({maxJobs:16,idleMs:5});await run(p);const first=Rpc.instances[0];
+  first.close=()=>{first.closed=true;};await new Promise(r=>setTimeout(r,15));expect(first.closed).toBe(true);
+  const pending=run(p);await Promise.resolve();expect(Rpc.instances).toHaveLength(1);
+  first.failed('old_process_closed');first.finish();await pending;expect(Rpc.instances).toHaveLength(2);p.close();
+});
