@@ -20,9 +20,9 @@ async function fixture(frameDelay = 0) {
       else callback(at);
     });
   });
-  await page.goto(server.resolvedUrls.local[0] + 'live.html?fixture=synthetic');
-  await page.waitForFunction(() => !!window.fischLive);
   await page.clock.pauseAt(new Date('2026-11-09T12:00:30Z'));
+  await page.goto(server.resolvedUrls.local[0] + 'live.html?fixture=synthetic');
+  await page.waitForFunction(() => !!window.fischLive, null, { polling: 100 });
   await page.locator('.debug>summary').click();
   return page;
 }
@@ -56,9 +56,10 @@ async function recordedApplication(page, request) {
         cancelled: linked.some(r => r.kind === 'execution' && r.payload.phase === 'cancelled'),
         metrics: window.fischLive.metrics(), reactive: window.fischLive.reactiveStatus() };
     }, request.requestId);
+    const reason = state.bundle.manifest.incomplete ? 'incomplete' : state.cancelled ? 'cancelled' :
+      state.now + 16 >= request.deadline ? 'deadline' : null;
+    if (reason) throw Error('recorded_application_missing:' + JSON.stringify({ reason, ...state }));
     if (state.applied && state.frame) return state;
-    if (state.cancelled || state.now + 16 >= request.deadline || state.bundle.manifest.incomplete)
-      throw Error('recorded_application_missing:' + JSON.stringify(state));
     await page.clock.runFor(16);
   }
 }
@@ -101,17 +102,21 @@ it.each([0, 240])('records linked observer/render evidence after application wit
     expect(await page.locator('video').evaluate(video => video.srcObject)).toBeNull();
   } finally { await page.close(); }
 }, 45000);
-it('does not replace an expired action with a later applied receipt', async () => {
+it('rejects an action whose first frame arrives after its original lease', async () => {
   const page = await fixture(6000);
   try {
     await page.locator('#trace-start').click(); const request = await candidate(page);
-    await page.evaluate(() => { window.__recordingFrameUntil = performance.now() + 6000; });
+    const releaseAt = await page.evaluate(() => window.__recordingFrameUntil = performance.now() + 6000);
     expect((await page.evaluate(({ id, data }) => window.fischLive.deliverReactiveDecision(id, data),
       { id: request.requestId, data: expression(request) })).reason).toBe('accepted');
-    await expect(recordedApplication(page, request)).rejects.toThrow('recorded_application_missing:');
-    await page.clock.runFor(1200);
+    const failure = await recordedApplication(page, request).then(() => null, error =>
+      JSON.parse(error.message.slice('recorded_application_missing:'.length)));
+    expect(failure?.reason).toBe('deadline');
+    expect(failure.now).toBeLessThan(request.deadline);
+    await page.clock.runFor(Math.max(0, releaseAt + 32 - await page.evaluate(() => performance.now())));
     const bundle = await page.evaluate(() => window.fischLive.recordingSnapshot());
-    const linked = bundle.records.filter(r => r.payload.requestId === request.requestId && r.payload.actionId === 'recorded_action');
+    const linked = bundle.records.filter(r => r.payload.origin === 'reactive' && r.payload.requestId === request.requestId &&
+      r.payload.decisionId === 'recorded_decision' && r.payload.actionId === 'recorded_action');
     expect(linked.some(r => r.kind === 'execution' && r.payload.phase === 'applied')).toBe(false);
     expect(linked.some(r => r.kind === 'execution' && r.payload.phase === 'cancelled')).toBe(true);
   } finally { await page.close(); }
