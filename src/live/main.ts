@@ -1,3 +1,4 @@
+import {preparedDiagramIdentity,matchingDiagramStatus} from './prepared-diagram';
 import { DiagramLab, validateLabDiagram } from './diagram-lab';
 import { PresentationAnnotations } from './presentation-annotations';
 import { PresentationAdmission } from './presentation-admission';
@@ -75,6 +76,23 @@ function applyDiagramPresentation(value:any) {
     return receipt;
   } catch { if(admitted)presentation.invalidate();return {status:'rejected',code:'diagram_invalid'}; }
 }
+function applyPreparedDiagram(value:any) {
+  if(!diagramLab)return {status:'rejected',code:'diagram_lab_disabled'};
+  let accepted=false;
+  try {
+    const identity=preparedDiagramIdentity(value);
+    if(!identity)return {status:'rejected',code:'presentation_stale'};
+    const diagram=validateLabDiagram(value.diagram,value.body,identity.sourceQuote);
+    const before=body.renderer.projectDisplayedParts()?.contentFrame??0;
+    const receipt=presentation.replace({identity,body:value.body});
+    if(receipt.status==='accepted') {
+      accepted=true;const deadline=presentation.leaseDeadline(receipt.scope);
+      if(deadline===null)throw Error('diagram_expired');
+      diagramLab.start(diagram,{epoch:receipt.epoch,sceneRevision:receipt.sceneRevision,seq:receipt.seq},before,deadline);
+    }
+    return receipt;
+  }catch{if(accepted)presentation.invalidate();return {status:'rejected',code:'diagram_invalid'};}
+}
 let presentationFrame = 0;
 const reconcilePresentation = () => {
   if (stopped) return;
@@ -133,6 +151,8 @@ Object.assign(window, { fischLive: { chatObservation: () => chatObservation(obse
   presentationSnapshot: (scope: any) => presentation.snapshot(scope),
   applyPresentation: (value: any) => presentation.apply(value),
   applyDiagramPresentation,
+  applyPreparedDiagram,
+  diagramPresentationStatus: (owned:any) => matchingDiagramStatus(owned,diagramLab?.status()),
   diagramLabStatus: () => diagramLab?.status() ?? {visible:false,reason:'disabled'},
   selectThread: () => { presentation.invalidate(); hands.reset(); resetReactive(); logActivity('Đã chọn phiên Codex.'); return bridge.cancel(); },
   panelControlStatus: (value: any) => { if (stopped) return; panelControls ??= mountPanelControls(element('conversation-tools'), value => (window as any).fischPanelRespond(value)); if (['mode', 'ready'].includes(value?.type)) { conversation.panelOwner(); liveSetup.panelOwner(); } else panelControls.project(value); },

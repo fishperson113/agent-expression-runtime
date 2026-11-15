@@ -2,13 +2,13 @@ import {runInNewContext} from 'node:vm';
 import {it,expect} from 'vitest';
 import {LiveStreamingPresentationBridge,presentationSection} from '../integrations/presentation-streaming-bridge.mjs';
 const tick=()=>new Promise(r=>setTimeout(r,5));
-function fixture(){
+function fixture(options={}){
  let now=1000, releases=[],calls=[],events=[];
  const snapshot={available:true,generation:1,revision:1,ownerTurn:'t',messages:[{id:'u',turn:'t',role:'user',status:'completed',text:'giai thich di'}, {id:'a',turn:'t',role:'assistant',status:'streaming',text:'',truncated:false}]};
  const state={channel:{token:'d'},output:{thread:'h'},conversation:{snapshot:()=>snapshot}};
- const page={evaluate:async(fn,arg)=>{calls.push({fn:String(fn),arg});if(arg?.identity)return {scope:{epoch:'e',sceneRevision:1},partIds:[]};if(arg?.body)return {status:'accepted'};}};
+ const page={evaluate:async(fn,arg)=>{calls.push({fn:String(fn),arg});if(arg?.body)return {status:'accepted',epoch:'e',sceneRevision:2,seq:3};if(arg?.identity)return {scope:{epoch:'e',sceneRevision:1},partIds:[]};}};
  const provider={generate:async(ex,signal,scene,stream)=>{calls.push({ex,signal,stream});await new Promise(r=>releases.push(r));},close(){}};
- const bridge=new LiveStreamingPresentationBridge({state,page,provider,now:()=>now,onEvent:e=>events.push(e),checkpoints:{minChars:10,cooldownMs:0}});
+ const bridge=new LiveStreamingPresentationBridge({state,page,provider,now:()=>now,onEvent:e=>events.push(e),checkpoints:{minChars:10,cooldownMs:0},...options});
  const send=(method,extra={})=>bridge.observe({method,params:{threadId:'h',turnId:'t',...extra}});
  send('item/started',{item:{id:'a',type:'agentMessage',phase:'final_answer'}});
  return {bridge,calls,events,snapshot,send,releases,advance:(ms=100)=>now+=ms,append:text=>{snapshot.messages[1].text+=text;snapshot.revision++;send('item/agentMessage/delta',{itemId:'a',delta:text});}};
@@ -182,4 +182,39 @@ it('browser snapshot rejects delayed expiry and clock rollback, never enlarges r
  const invoke=(wall,mono)=>runInNewContext('('+call.fn+')(value)',{value:{...call.arg,sentWall:1000,expiresAt:2000,monotonicDeadline:2000,remainingMs:1000},Date:{now:()=>wall},performance:{timeOrigin:0,now:()=>mono},window:{fischLive:{presentationSnapshot:value=>value}}});
  expect(invoke(900,1100)).toBeNull();expect(invoke(1500,2100)).toBeNull();expect(invoke(1500,1700).remainingTtlMs).toBe(300);
  f.bridge.close();f.releases.forEach(r=>r());await tick();
+});
+
+it('production diagram bridge prepares without authority and commits through transaction',async()=>{
+ const f=fixture({protocol:'diagram'}),quote='A data pipeline can load one source with a small script when its volume and recovery needs remain simple.';
+ f.append(quote+'\n\n');await tick();const call=f.calls.find(c=>c.ex);expect(call).toBeDefined();
+ expect(f.calls.some(c=>c.arg?.identity)).toBe(false);expect(call.ex.target).toBe(quote);
+ call.stream.onRecord({...composed,diagram:{plan:{caption:{text:quote}}}});await tick();
+ const commit=f.calls.find(c=>c.arg?.body);expect(commit.fn).toContain('applyPreparedDiagram');expect(commit.arg.identity.sourceQuote).toBe(quote);
+ expect(f.events.some(e=>e.type==='admitted')).toBe(true);const revokes=f.calls.filter(c=>c.fn?.includes('revokePresentation')).length;
+ f.advance();f.append('Another source can need recovery if retries and volume become more demanding than a small isolated script.\n\n');
+ f.releases.shift()();await tick();expect(f.calls.filter(c=>c.ex)).toHaveLength(2);
+ expect(f.calls.filter(c=>c.fn?.includes('revokePresentation'))).toHaveLength(revokes);
+ f.snapshot.messages[1].text='The source was replaced.';f.send('item/agentMessage/delta');await tick();
+ expect(f.calls.filter(c=>c.ex).at(-1).signal.aborted).toBe(true);expect(f.calls.some(c=>c.fn?.includes('revokePresentation'))).toBe(true);
+ f.bridge.close();f.releases.forEach(r=>r());await tick();
+});
+it.each(['before','after'])('diagram author failure %s admission fences candidate and preserves unrelated scene',async when=>{
+ const f=fixture({protocol:'diagram'});let reject;f.bridge.provider.generate=async(ex,signal,scene,stream)=>{
+  if(when==='after'){stream.onRecord({...composed,diagram:{}});await tick();}
+  await new Promise((_,no)=>reject=no);
+ };
+ f.append('A data pipeline can load one source with a small script when its volume and recovery needs remain simple.\n\n');await tick();await tick();
+ const selected=f.bridge.selected;reject(Error('presentation_stream_corrected'));await tick();await tick();
+ expect(selected.controller.signal.aborted).toBe(true);expect(f.bridge.active).toBeNull();
+ const ownedRevoke=f.calls.find(c=>c.fn?.includes('diagramLabStatus')&&c.fn.includes('revokePresentation'));
+ expect(!!ownedRevoke).toBe(when==='after');if(ownedRevoke)expect(ownedRevoke.arg).toEqual({epoch:'e',sceneRevision:2,seq:3});
+ f.bridge.close();
+});
+it('author failure while candidate waits for dwell prevents any later commit',async()=>{
+ const f=fixture({protocol:'diagram'});let reject;
+ f.bridge.displayed={expiresAt:11000,owned:{epoch:'old',sceneRevision:1,seq:1}};
+ const old=f.bridge.page.evaluate;f.bridge.page.evaluate=async(fn,arg)=>String(fn).includes('diagramPresentationStatus')?{current:true,visible:false,remainingMs:10000}:old(fn,arg);
+ f.bridge.provider.generate=async(ex,signal,scene,stream)=>{stream.onRecord({...composed,diagram:{}});await new Promise((_,no)=>reject=no);};
+ f.append('A data pipeline can load one source with a small script when its volume and recovery needs remain simple.\n\n');await tick();reject(Error('presentation_stream_corrected'));await new Promise(r=>setTimeout(r,65));
+ expect(f.calls.some(c=>c.arg?.body)).toBe(false);expect(f.bridge.active).toBeNull();expect(f.bridge.displayed.owned.epoch).toBe('old');f.bridge.close();
 });

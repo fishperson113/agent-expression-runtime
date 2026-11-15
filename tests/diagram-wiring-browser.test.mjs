@@ -21,7 +21,7 @@ it('shows an exact-source diagram on actual frames and revokes without changing 
    window.shot=api.presentationSnapshot(window.identity);
    const wrong=structuredClone(diagram);wrong.plan.caption.text='Earlier sentence.';
    const bad=api.applyDiagramPresentation({scope:window.shot.scope,body,diagram:wrong});
-   window.receipt=api.applyDiagramPresentation({scope:window.shot.scope,body,diagram});return {missing,bad,receipt:window.receipt};
+   const wall=Date.now(),mono=performance.timeOrigin+performance.now();window.receipt=api.applyPreparedDiagram({identity:window.identity,body,diagram,sentWall:wall,expiresAt:wall+6000,monotonicDeadline:mono+6000,remainingMs:6000});return {missing,bad,receipt:window.receipt};
   },{quote,body,diagram:record.diagram});
   expect(result.missing.status).toBe('rejected');expect(result.bad.status).toBe('rejected');expect(result.receipt.status).toBe('accepted');
   await page.waitForFunction(()=>window.fischLive.diagramLabStatus().visible,{},{timeout:5000});
@@ -32,6 +32,14 @@ it('shows an exact-source diagram on actual frames and revokes without changing 
   await page.waitForTimeout(200);const second=await page.evaluate(()=>{const rect=document.querySelector('[data-semantic-diagram] div')?.getBoundingClientRect();return rect?{x:rect.x,y:rect.y}:null;});
   expect(second,JSON.stringify(await page.evaluate(()=>window.fischLive.diagramLabStatus()))).not.toBeNull();
   expect(Math.abs(first.x-second.x)).toBeLessThan(15);expect(Math.abs(first.y-second.y)).toBeLessThan(15);
+  const preserved=await page.evaluate(()=>{
+   const api=window.fischLive,old=api.diagramLabStatus(),wall=Date.now(),mono=performance.timeOrigin+performance.now();
+   const bad=api.applyPreparedDiagram({identity:{...window.identity,sourceQuote:'invented'},body:window.diagramBody,diagram:window.diagram,sentWall:wall,expiresAt:wall+9000,monotonicDeadline:mono+9000,remainingMs:9000});
+   const status=api.diagramLabStatus(),receipt=api.diagramPresentationStatus(window.receipt);
+   return {bad,same:status.firstVisibleAt===old.firstVisibleAt,visible:status.visible,receipt};
+  });
+  expect(preserved.bad.status).toBe('rejected');expect(preserved.same).toBe(true);expect(preserved.visible).toBe(true);
+  expect(preserved.receipt.current).toBe(true);expect(preserved.receipt.visibleElapsedMs).toBeGreaterThan(100);
   // Canvas offset must never silently detach labels from the submitted particles.
   await page.locator('#body').evaluate(el=>el.style.left='12px');
   await page.waitForFunction(()=>window.fischLive.diagramLabStatus().reason==='diagram_viewport_mismatch');
