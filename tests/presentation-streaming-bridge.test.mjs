@@ -218,3 +218,15 @@ it('author failure while candidate waits for dwell prevents any later commit',as
  f.append('A data pipeline can load one source with a small script when its volume and recovery needs remain simple.\n\n');await tick();reject(Error('presentation_stream_corrected'));await new Promise(r=>setTimeout(r,65));
  expect(f.calls.some(c=>c.arg?.body)).toBe(false);expect(f.bridge.active).toBeNull();expect(f.bridge.displayed.owned.epoch).toBe('old');f.bridge.close();
 });
+it('diagram prefetch binds the exact queued source and cancels on native correction',async()=>{
+ const f=fixture({protocol:'diagram'}),prefetches=[];let invalidations=0;
+ f.bridge.provider.prefetch=(exchange,identity,options)=>prefetches.push({exchange,identity,options});f.bridge.provider.invalidate=()=>invalidations++;
+ f.append('Queues buffer work until a worker is ready, helping the system absorb a short burst of requests.\n\n');await tick();
+ f.advance(500);f.append('Backpressure asks the producer to slow down when a bounded queue cannot accept more work safely.\n\n');await tick();
+ expect(prefetches).toHaveLength(1);const r=prefetches[0];expect(r.identity.turnId).toBe('t');expect(r.identity.revision).toBe(2);
+ expect(r.exchange.publicContext).toContain('Queues buffer');expect(r.options.isCurrent()).toBe(true);expect(r.identity.expiresAt-r.identity.sourceAt).toBe(10000);expect(r.options.remainingMs()).toBeLessThanOrEqual(10000);
+ f.advance(600);expect(r.options.remainingMs()).toBeLessThanOrEqual(9400);const expiry=r.identity.expiresAt;
+ f.releases.shift()();await tick();const promoted=f.calls.filter(c=>c.ex).at(-1);expect(promoted.stream.sourceIdentity).toEqual(r.identity);expect(promoted.stream.sourceIdentity.expiresAt).toBe(expiry);
+ f.snapshot.messages[1].text='Correction.';f.send('item/agentMessage/delta');expect(invalidations).toBeGreaterThan(0);expect(r.options.isCurrent()).toBe(false);
+ f.bridge.close();f.releases.forEach(r=>r());await tick();
+});
