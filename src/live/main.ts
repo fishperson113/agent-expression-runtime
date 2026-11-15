@@ -1,3 +1,4 @@
+import { readVisualQuality, mountVisualQuality } from './visual-quality';
 import {preparedDiagramIdentity,matchingDiagramStatus} from './prepared-diagram';
 import { DiagramLab, validateLabDiagram } from './diagram-lab';
 import { PresentationAnnotations } from './presentation-annotations';
@@ -32,7 +33,9 @@ const conversation = mountConversation(element('conversation-tools'), value => {
 let panelControls: ReturnType<typeof mountPanelControls> | undefined;
 mountDisclosures(element('app'));
 const synthetic = new URLSearchParams(location.search).get('fixture') === 'synthetic';
-const body = new LiveBody(element<HTMLCanvasElement>('body'), text => { element('body-status').textContent = text; });
+const visualQuality = readVisualQuality();
+const body = new LiveBody(element<HTMLCanvasElement>('body'), text => { element('body-status').textContent = text; }, visualQuality);
+mountVisualQuality(visualQuality);
 const recording = new LiveRecording(() => body.scheduler.epoch, synthetic ? 'synthetic' : 'live-structured');
 body.trace.setSink(recording.record);
 const diagramEnabled = new URLSearchParams(location.search).get('diagramLab') === '1';
