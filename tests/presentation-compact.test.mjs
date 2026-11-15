@@ -82,3 +82,50 @@ test('optional annotation arrays expand to canonical browser shape', () => {
   assert.deepEqual(read({...sample,annotations:{}}).annotations,{labels:[],arrows:[]});
   assert.equal(read(sample).annotations,undefined);
 });
+
+const motionTuple = [['a','b'], [0,0,0], [0,0.1,0], [0,0,0.1], 2400, 0];
+test('optional shared authored motion expands atomically without changing static geometry', () => {
+  const staticResult = read(sample), result = read({...sample,motions:[motionTuple],style:{pointSize:3,brightness:0.85}});
+  for (const [index,part] of result.payload.parts.entries()) {
+    const {motion,...geometry}=part;
+    assert.deepEqual(geometry,staticResult.payload.parts[index]);
+    assert.deepEqual(motion,{pivot:[0,0,0],translate:[0,0.1,0],rotate:[0,0,0.1],periodMs:2400,phase:0});
+  }
+  assert.notEqual(result.payload.parts[0].motion,result.payload.parts[1].motion);
+  assert.deepEqual(result.payload.style,{pointSize:3,brightness:0.85});
+  const stream=createPresentationRecordStream({isCurrent:()=>true,parseRecord:parse});
+  const text=JSON.stringify({...sample,motions:[motionTuple]});
+  assert.deepEqual(stream.push(text.slice(0,-1)),[]);
+  assert.equal(stream.push('}')[0].payload.parts[1].motion.periodMs,2400);
+});
+test('motion cannot target retained, duplicate or missing parts or extend ownership', () => {
+  for (const motions of [[], [[['missing'],...motionTuple.slice(1)]],
+    [[['a','a'],...motionTuple.slice(1)]], [motionTuple,motionTuple],
+    [[...motionTuple,'extra']], [{parts:['a'],script:'unsafe'}]]) {
+    assert.throws(()=>read({...sample,base:'keep',motions}));
+  }
+  assert.throws(()=>read({base:'retain',motions:[motionTuple]}));
+  assert.throws(()=>read({...sample,motions:[motionTuple],lifetimeMs:99999}));
+});
+test('compact motion inherits exact canonical bounds and rejects malformed numbers', () => {
+  for (const [index,value] of [[1,[2.1,0,0]],[2,[0.401,0,0]],[3,[0.601,0,0]],
+    [4,999],[4,10001],[5,-0.1],[5,7],[2,[0,0]],[4,null]]) {
+    const motion=structuredClone(motionTuple);motion[index]=value;
+    assert.throws(()=>read({...sample,motions:[motion]}));
+  }
+  for(const style of [{pointSize:9},{brightness:1.1},{color:'red'},{persist:true},{}])
+    assert.throws(()=>read({...sample,style}));
+  const result=read({...sample,motions:[[['a'],[-2,2,0],[-0.4,0.4,0],[-0.6,0.6,0],10000,2*Math.PI]]});
+  assert.equal(result.payload.parts[0].motion.periodMs,10000);
+  assert.equal(result.payload.parts[1].motion,undefined);
+});
+
+test('expanded shared motion follows canonical rigid transforms over time', async () => {
+  const {sculptureCloud,motionTransforms}=await import('../src/core/geometry/sampling.ts');
+  const result=read({...sample,motions:[motionTuple]});
+  const cloud=sculptureCloud({parts:result.payload.parts},100);
+  const start=motionTransforms(cloud,0), quarter=motionTransforms(cloud,600);
+  assert.deepEqual(quarter[0],quarter[1]);
+  assert.notDeepEqual(start[0],quarter[0]);
+  assert.ok([...quarter[0]].every(Number.isFinite));
+});
