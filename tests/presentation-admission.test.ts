@@ -142,3 +142,48 @@ it('rejects UTF-16 boundaries inside an emoji',()=>{
  expect(f.gate.snapshot({...request,sourceStart:1,sourceEnd:2,sourceQuote:'\ud83d'})).toBeNull();
  expect(f.gate.snapshot({...request,sourceStart:1,sourceEnd:3,sourceQuote:'\u{1f600}'})).not.toBeNull();
 });
+it('transactional replacement preserves displayed lease through candidate rejection and expiry',()=>{
+ const f=sourcedFixture();let now=0;const clear=vi.fn();let reject=false;
+ const gate=new PresentationAdmission(()=>f.state,(_body,scope,valid)=>{
+  expect(gate.leaseDeadline(scope)).not.toBeNull();
+  return reject?{status:'rejected',code:'bad_geometry'}:f.admit(_body,scope,valid);
+ },()=>now,clear,true);
+ const first=gate.replace({identity:f.request,body:{}});expect(first.status).toBe('accepted');
+ now=200;reject=true;const next={...f.request,sourceStart:0,sourceEnd:7,remainingTtlMs:2000};
+ expect(gate.replace({identity:next,body:{}}).code).toBe('bad_geometry');
+ expect(gate.leaseDeadline(first.scope)).toBe(1000);expect(clear).not.toHaveBeenCalled();
+ now=1000;expect(gate.reconcile()).toBe(true);expect(clear).toHaveBeenCalledOnce();
+});
+it('candidate callback can inspect both leases; success alone transfers authority with original remaining TTL',()=>{
+ const f=sourcedFixture();let now=0;let old:any;let candidateScope:any;
+ const gate=new PresentationAdmission(()=>f.state,(body,scope,valid)=>{
+  candidateScope=scope;expect(gate.leaseDeadline(scope)).toBe(now===0?1000:1200);
+  if(old)expect(gate.leaseDeadline(old.scope)).toBe(1000);
+  return f.admit(body,scope,valid);
+ },()=>now,()=>{},true);
+ old=gate.replace({identity:f.request,body:{}});now=300;
+ const next=gate.replace({identity:{...f.request,remainingTtlMs:900},body:{}});
+ expect(next.status).toBe('accepted');expect(gate.leaseDeadline(old.scope)).toBeNull();
+ expect(gate.leaseDeadline(next.scope)).toBe(1200);expect(gate.apply({scope:candidateScope,body:{}}).status).toBe('rejected');
+ now=1200;expect(gate.reconcile()).toBe(true);
+});
+it.each(['cancel','throw'])('candidate %s never resurrects displayed ownership',kind=>{
+ const f=sourcedFixture(),clear=vi.fn();let destructive=false;
+ const gate=new PresentationAdmission(()=>f.state,(body,scope,valid)=>{
+  if(destructive){if(kind==='cancel'){gate.invalidate();return {status:'rejected'};}throw Error('unknown_mutation');}
+  return f.admit(body,scope,valid);
+ },()=>0,clear,true);
+ const old=gate.replace({identity:f.request,body:{}});destructive=true;
+ expect(gate.replace({identity:f.request,body:{}}).status).toBe('rejected');
+ expect(gate.leaseDeadline(old.scope)).toBeNull();expect(clear).toHaveBeenCalledOnce();
+});
+it('invalid candidate input cannot clear valid displayed source, but rewritten source revokes it',()=>{
+ const f=sourcedFixture(),clear=vi.fn(),gate=new PresentationAdmission(()=>f.state,f.admit,()=>0,clear,true);
+ const old=gate.replace({identity:f.request,body:{}});
+ expect(gate.replace({identity:{...f.request,sourceQuote:'invented'},body:{}}).status).toBe('rejected');
+ expect(gate.replace({identity:f.request,body:{},annotations:{invalid:true}}).status).toBe('rejected');
+ expect(gate.leaseDeadline(old.scope)).toBe(1000);expect(clear).not.toHaveBeenCalled();
+ f.state.snapshot.messages[1].text='Edited. Repeat.';
+ expect(gate.replace({identity:f.request,body:{}}).status).toBe('rejected');expect(gate.reconcile()).toBe(true);
+ expect(clear).toHaveBeenCalledOnce();
+});

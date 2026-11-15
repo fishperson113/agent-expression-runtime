@@ -11,12 +11,13 @@ export class PresentationAdmission {
   private intent = 0;
   private serial = 0;
   private issued?: { scope: Scope; at: number; leaseMs: number; textPrefix?: string };
+  private candidate?: NonNullable<PresentationAdmission['issued']>;
   constructor(private read: () => State,
     private admit: (body: unknown, scope: Scope, valid: () => boolean, annotations: Annotations) => any,
     private now = () => performance.now(), private clearAnnotations = () => {}, private boundedSourceLease = false) {}
-  invalidate() { this.intent++; this.issued = undefined; try { this.clearAnnotations(); } catch { /* Visual cleanup must never block native chat publication. */ } }
+  invalidate() { this.intent++; this.issued = undefined; this.candidate = undefined; try { this.clearAnnotations(); } catch { /* Visual cleanup must never block native chat publication. */ } }
   leaseDeadline(scope: Scope) {
-    const issued=this.issued;
+    const issued=this.candidate && scope && sameScope(this.candidate.scope,scope) ? this.candidate : this.issued;
     try { const state=this.read(); if(!issued || !scope || !sameScope(issued.scope,scope) ||
       this.now()<issued.at || this.now()>=issued.at+issued.leaseMs || !this.available(issued.scope,state,issued.textPrefix) || !this.sceneMatches(issued.scope,state)) return null;
       return issued.at+issued.leaseMs;
@@ -71,11 +72,23 @@ export class PresentationAdmission {
       return { scope: { ...scope }, partIds: [...state.scene.partIds] };
     } catch { return null; }
   }
+  replace(value: { identity: Identity; body: unknown; annotations?: unknown }) {
+    if (!value?.identity) return { status: 'rejected', code: 'presentation_stale' };
+    if (this.candidate) return { status: 'rejected', code: 'presentation_busy' };
+    const displayed=this.issued, shot=this.snapshot(value.identity);
+    if (!shot) return { status: 'rejected', code: 'presentation_stale' };
+    const candidate=this.issued!; this.issued=displayed; this.candidate=candidate;
+    try { return this.applyIssued({scope:shot.scope,body:value.body,annotations:value.annotations},candidate,true); }
+    finally { if(this.candidate===candidate)this.candidate=undefined; }
+  }
   apply(value: { scope: Scope; body: unknown; annotations?: unknown }) {
-    const issued = this.issued;
+    return this.applyIssued(value,this.issued,false);
+  }
+  private applyIssued(value: { scope: Scope; body: unknown; annotations?: unknown }, issued: PresentationAdmission['issued'], candidate: boolean) {
+    const owns=()=>issued && (candidate ? this.candidate===issued : this.issued===issued);
     const valid = () => {
       try {
-        if (!issued || this.issued !== issued || !value?.scope ||
+        if (!owns() || !issued || !value?.scope ||
             !sameScope(issued.scope,value.scope)) return false;
         const state = this.read(), age = this.now() - issued.at;
         return age >= 0 && age < issued.leaseMs && this.available(issued.scope, state, issued.textPrefix) &&
@@ -88,15 +101,18 @@ export class PresentationAdmission {
       const same = issued && value?.scope && sameScope(issued.scope,value.scope);
       return { status: 'rejected', code: same && age >= 0 && age < issued!.leaseMs && state.busy && this.available(issued!.scope, state, issued!.textPrefix) ? 'presentation_busy' : 'presentation_stale' };
     }
+    let annotations: Annotations;
+    try { annotations=validateAnnotations(value.annotations); }
+    catch { if(!candidate && owns())this.invalidate();return {status:'rejected',code:'presentation_invalid'}; }
     try {
-      const annotations = validateAnnotations(value.annotations);
       const result = this.admit(value.body, issued!.scope, valid, annotations);
-      if (result?.status === 'accepted' && Number.isSafeInteger(result.sceneRevision) && this.issued === issued) {
+      if (result?.status === 'accepted' && Number.isSafeInteger(result.sceneRevision) && owns()) {
         const scope = { ...issued!.scope, sceneRevision: result.sceneRevision, admissionVersion: ++this.serial };
         this.issued = { scope, at: issued!.at, leaseMs: issued!.leaseMs, textPrefix: issued!.textPrefix };
         return { ...result, scope: { ...scope } };
       }
-      if (this.issued === issued) this.invalidate(); return result;
-    } catch { if (this.issued === issued) this.invalidate(); return { status: 'rejected', code: 'presentation_invalid' }; }
+      if (result?.status === 'accepted' && owns()) { this.invalidate(); return {status:'rejected',code:'presentation_invalid'}; }
+      if (!candidate && owns()) this.invalidate(); return result;
+    } catch { if (owns()) this.invalidate(); return { status: 'rejected', code: 'presentation_invalid' }; }
   }
 }
