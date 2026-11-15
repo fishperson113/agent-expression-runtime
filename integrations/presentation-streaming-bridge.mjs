@@ -94,9 +94,7 @@ export class LiveStreamingPresentationBridge {
   invalidateSource(reason='source_selected'){this.displayed=null;clearTimeout(this.holdTimer);if(this.selected)this.emit('source_revoked',{revision:this.selected.checkpoint.checkpointRevision,reason});this.selected?.controller?.abort();this.serial++;this.selected=null;this.pending=null;this.active?.controller.abort();
     this.revokeBrowser();}
   revokeBrowser(){
-    this.revocation=this.browserFault?Promise.resolve():this.evaluate(()=>window.fischLive?.revokePresentation?.()).then(floor=>{
-      if(Number.isFinite(floor))this.preparationFloor=Math.max(this.preparationFloor??-Infinity,floor);
-    }).catch(()=>{});
+    this.revocation=this.browserFault?Promise.resolve():this.evaluate(()=>window.fischLive?.revokePresentation?.()).catch(()=>{});
   }
   valid(job){const s=this.state.conversation.snapshot();return !this.closed&&!this.browserFault&&this.selected===job&&this.remaining(job)>0&&
     !this.state.channel.stale&&s.available&&!s.pending&&!s.stopping&&!s.error&&s.messages.filter(m=>m.role==='user').at(-1)?.turn===job.turnId&&s.generation===job.generation&&
@@ -105,13 +103,13 @@ export class LiveStreamingPresentationBridge {
   async selectBrowser(job){
     await this.revocation;
     if(!this.valid(job))return;
-    job.preparationVersion=Math.max(performance.timeOrigin+performance.now(),(this.preparationFloor??-Infinity)+1);
-    this.preparationFloor=job.preparationVersion;
+    job.preparationTicket=await this.evaluate(()=>window.fischLive?.presentationPreparationTicket?.(),undefined,job);
+    if(!this.valid(job)||!job.preparationTicket)return;
     for(let n=0;n<20&&this.valid(job);n++){
       // Recheck both wall and monotonic elapsed time inside the browser; delayed
       // execution and wall-clock rollback must not renew the original source lease.
-      job.scene=await this.evaluate(({identity,expiresAt,sentWall,monotonicDeadline,remainingMs,preparationVersion})=>{const wall=Date.now(),left=Math.min(remainingMs,expiresAt-wall,monotonicDeadline-(performance.timeOrigin+performance.now()));if(wall<sentWall||left<=0)return null;return window.fischLive?.preparePresentation?.({...identity,remainingTtlMs:Math.min(30000,left)},preparationVersion);},
-        {preparationVersion:job.preparationVersion,identity:{documentId:job.documentId,threadId:job.threadId,turnId:job.turnId,generation:job.generation,messageId:job.messageId,
+      job.scene=await this.evaluate(({identity,expiresAt,sentWall,monotonicDeadline,remainingMs,preparationTicket})=>{const wall=Date.now(),left=Math.min(remainingMs,expiresAt-wall,monotonicDeadline-(performance.timeOrigin+performance.now()));if(wall<sentWall||left<=0)return null;return window.fischLive?.preparePresentation?.({...identity,remainingTtlMs:Math.min(30000,left)},preparationTicket);},
+        {preparationTicket:job.preparationTicket,identity:{documentId:job.documentId,threadId:job.threadId,turnId:job.turnId,generation:job.generation,messageId:job.messageId,
           textPrefix:job.checkpoint.textPrefix,publicRevision:job.publicRevision,section:job.section,sourceStart:job.sourceStart,sourceEnd:job.sourceEnd,sourceQuote:job.sourceQuote},expiresAt:job.expiresAt,sentWall:Date.now(),monotonicDeadline:performance.timeOrigin+job.monotonicDeadline,remainingMs:this.remaining(job)},job);
       if(job.scene?.scope)break;await sleep(50);
     }

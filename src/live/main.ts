@@ -152,7 +152,8 @@ Object.assign(window, { fischLive: { chatObservation: () => chatObservation(obse
   chatObservationScope: () => ({ sessionId: observations.snapshot.sessionId, revision: observations.sourceRevision }), pair: (base: string, token: string) => bridge.connect(base, token),
   revokePresentation: () => presentation.invalidate(),
   presentationSnapshot: (scope: any) => presentation.snapshot(scope),
-  preparePresentation: (scope: any, version?: number) => presentation.prepare(scope,version),
+  presentationPreparationTicket: () => presentation.preparationTicket(),
+  preparePresentation: (scope: any, ticket?: any) => ticket ? presentation.prepare(scope,ticket) : null,
   cancelPreparedPresentation: (scope: any) => presentation.cancelPrepared(scope),
   applyPreparedPresentation: (value: any) => value?.diagram ? applyDiagramPresentation(value,true) : presentation.applyPrepared(value),
   revokeOwnedPresentation: (owned: any) => {

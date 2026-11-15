@@ -63,11 +63,11 @@ it('keeps old geometry and labels during freeform authoring and atomically repla
    window.oldReceipt=api.applyPresentation({scope:shot.scope,body:window.visual('old'),annotations:{labels:[{text:'Old label',x:.5,y:.2}],arrows:[]}});
   });
   await page.waitForFunction(()=>window.fischLive.chatSceneContext()?.partIds.includes('old'));
-  const pending=await page.evaluate(()=>{const api=window.fischLive;window.prepared=api.preparePresentation({...window.identity,textPrefix:'A first scene. A second scene.'});return {scope:window.prepared?.scope,parts:api.chatSceneContext().partIds};});
+  const pending=await page.evaluate(()=>{const api=window.fischLive;window.prepared=api.preparePresentation({...window.identity,textPrefix:'A first scene. A second scene.'},api.presentationPreparationTicket());return {scope:window.prepared?.scope,parts:api.chatSceneContext().partIds};});
   expect(pending.scope).toBeTruthy();expect(pending.parts).toContain('old');expect(await page.locator('svg[aria-label="Scene annotations"]').textContent()).toContain('Old label');
   const rejected=await page.evaluate(()=>window.fischLive.applyPreparedPresentation({scope:window.prepared.scope,body:{type:'invalid'}}));
   expect(rejected.status).toBe('rejected');expect(await page.evaluate(()=>window.fischLive.chatSceneContext().partIds)).toContain('old');
-  const result=await page.evaluate(()=>{const api=window.fischLive,shot=api.preparePresentation({...window.identity,textPrefix:'A first scene. A second scene.'});return api.applyPreparedPresentation({scope:shot.scope,body:window.visual('new'),annotations:{labels:[{text:'New label',x:.5,y:.2}],arrows:[]}});});
+  const result=await page.evaluate(()=>{const api=window.fischLive,shot=api.preparePresentation({...window.identity,textPrefix:'A first scene. A second scene.'},api.presentationPreparationTicket());return api.applyPreparedPresentation({scope:shot.scope,body:window.visual('new'),annotations:{labels:[{text:'New label',x:.5,y:.2}],arrows:[]}});});
   expect(result.status).toBe('accepted');await page.waitForFunction(()=>window.fischLive.chatSceneContext()?.partIds.includes('new'));
   expect(await page.locator('svg[aria-label="Scene annotations"]').textContent()).toContain('New label');
   expect(await page.locator('svg[aria-label="Scene annotations"]').textContent()).not.toContain('Old label');

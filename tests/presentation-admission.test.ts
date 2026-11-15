@@ -239,15 +239,15 @@ it('preserves exact prepared deadline when every synchronous clock read advances
  const receipt=f.gate.applyPrepared({scope:shot.scope,body:{}});expect(receipt.status).toBe('accepted');
  expect(f.gate.leaseDeadline(receipt.scope)).toBe(5000);
 });
-it('obsolete delayed preparation cannot overwrite or cancel newer permit',()=>{
- const f=stagedFixture(),first=f.gate.prepare(f.source,100)!,newer=f.gate.prepare(f.source,200)!;
- expect(f.gate.prepare(f.source,100)).toBeNull();expect(f.gate.prepare(f.source,200)).toBeNull();
+it('obsolete browser tickets cannot overwrite or cancel newer permits',()=>{
+ const f=stagedFixture(),a=f.gate.preparationTicket(),first=f.gate.prepare(f.source,a)!,b=f.gate.preparationTicket(),newer=f.gate.prepare(f.source,b)!;
+ expect(f.gate.prepare(f.source,a)).toBeNull();expect(f.gate.prepare(f.source,b)).toBeNull();
  f.gate.cancelPrepared(first.scope);expect(f.gate.applyPrepared({scope:newer.scope,body:{}}).status).toBe('accepted');
- expect(f.gate.prepare(f.source,150)).toBeNull();
 });
-
-it('invalidation fences even a first preparation that was sent before cancellation',()=>{
- const f=stagedFixture();f.at(1000);f.gate.invalidate();
- expect(f.gate.prepare(f.source,performance.timeOrigin+500)).toBeNull();
- f.at(1500);expect(f.gate.prepare(f.source,performance.timeOrigin+1500)).not.toBeNull();
+it('browser intent fences an unseen delayed ticket independently of host clock skew',()=>{
+ const f=stagedFixture();f.at(1000);const ticket=f.gate.preparationTicket();
+ f.at(1100);f.gate.invalidate();f.at(1200);
+ expect(f.gate.prepare(f.source,ticket)).toBeNull();
+ expect(f.gate.prepare(f.source,{...ticket,preparationVersion:performance.timeOrigin+1500})).toBeNull();
+ expect(f.gate.prepare(f.source,f.gate.preparationTicket())).not.toBeNull();
 });

@@ -3,10 +3,10 @@ import {it,expect} from 'vitest';
 import {LiveStreamingPresentationBridge,presentationSection} from '../integrations/presentation-streaming-bridge.mjs';
 const tick=()=>new Promise(r=>setTimeout(r,5));
 function fixture(options={}){
- let now=1000, releases=[],calls=[],events=[];
+ let now=1000, releases=[],calls=[],events=[],ticket=0;
  const snapshot={available:true,generation:1,revision:1,ownerTurn:'t',messages:[{id:'u',turn:'t',role:'user',status:'completed',text:'giai thich di'}, {id:'a',turn:'t',role:'assistant',status:'streaming',text:'',truncated:false}]};
  const state={channel:{token:'d'},output:{thread:'h'},conversation:{snapshot:()=>snapshot}};
- const page={evaluate:async(fn,arg)=>{calls.push({fn:String(fn),arg});if(arg?.body)return {status:'accepted',epoch:'e',sceneRevision:2,seq:3};if(arg?.identity)return {scope:{epoch:'e',sceneRevision:1},partIds:[]};}};
+ const page={evaluate:async(fn,arg)=>{calls.push({fn:String(fn),arg});if(String(fn).includes('presentationPreparationTicket'))return {intentVersion:0,preparationVersion:++ticket};if(arg?.body)return {status:'accepted',epoch:'e',sceneRevision:2,seq:3};if(arg?.identity)return {scope:{epoch:'e',sceneRevision:1},partIds:[]};}};
  const provider={generate:async(ex,signal,scene,stream)=>{calls.push({ex,signal,stream});await new Promise(r=>releases.push(r));},close(){}};
  const bridge=new LiveStreamingPresentationBridge({state,page,provider,now:()=>now,onEvent:e=>events.push(e),checkpoints:{minChars:10,cooldownMs:0},...options});
  const send=(method,extra={})=>bridge.observe({method,params:{threadId:'h',turnId:'t',...extra}});
@@ -251,18 +251,19 @@ it('a failure after a freeform acceptance revokes only that received identity',a
  expect(f.calls.some(c=>c.fn?.includes('revokePresentation'))).toBe(false);f.bridge.close();
 });
 
-it('stamps a replacement prepare after a delayed explicit source revocation resolves',async()=>{
- const f=fixture();let release,cutoff=-Infinity,delayed=true;const old=f.bridge.page.evaluate;
+it('obtains replacement browser intent only after delayed source revocation resolves',async()=>{
+ const f=fixture();let release,intent=0,delayed=true;const old=f.bridge.page.evaluate;
  f.bridge.page.evaluate=async(fn,arg)=>{
-  if(!arg&&String(fn).includes('revokePresentation')&&delayed){delayed=false;await new Promise(r=>release=r);cutoff=performance.timeOrigin+performance.now()+60000;return cutoff;}
-  if(arg?.identity&&arg.preparationVersion<=cutoff)return null;
+  if(!arg&&String(fn).includes('revokePresentation')&&delayed){delayed=false;await new Promise(r=>release=r);intent++;return;}
+  if(String(fn).includes('presentationPreparationTicket')){const ticket=await old(fn,arg);return {...ticket,intentVersion:intent};}
+  if(arg?.identity&&arg.preparationTicket.intentVersion!==intent)return null;
   return old(fn,arg);
  };
  f.bridge.invalidateSource('source_rewritten');f.append('A new complete explanation after correction. ');await tick();
  expect(f.calls.some(c=>c.ex)).toBe(false);release();await tick();await tick();
- const prepared=f.calls.find(c=>c.arg?.identity);expect(prepared.arg.preparationVersion).toBeGreaterThan(cutoff);
+ const prepared=f.calls.find(c=>c.arg?.identity);expect(prepared.arg.preparationTicket.intentVersion).toBe(1);
  expect(f.calls.filter(c=>c.ex)).toHaveLength(1);
  f.advance();f.append('Another complete explanation follows the corrected source. ');await tick();f.releases.shift()();await tick();
- expect(f.calls.filter(c=>c.arg?.identity).at(-1).arg.preparationVersion).toBeGreaterThan(prepared.arg.preparationVersion);
+ expect(f.calls.filter(c=>c.arg?.identity).at(-1).arg.preparationTicket.preparationVersion).toBeGreaterThan(prepared.arg.preparationTicket.preparationVersion);
  f.bridge.close();f.releases.forEach(r=>r());await tick();
 });

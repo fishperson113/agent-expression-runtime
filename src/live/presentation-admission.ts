@@ -13,11 +13,12 @@ export class PresentationAdmission {
   private issued?: { scope: Scope; at: number; leaseMs: number; textPrefix?: string };
   private candidate?: NonNullable<PresentationAdmission['issued']>;
   private prepared?: NonNullable<PresentationAdmission['issued']>;
-  private preparationVersion = -Infinity;
+  private preparationVersion = 0;
+  private preparationSerial = 0;
   constructor(private read: () => State,
     private admit: (body: unknown, scope: Scope, valid: () => boolean, annotations: Annotations) => any,
     private now = () => performance.now(), private clearAnnotations = () => {}, private boundedSourceLease = false) {}
-  invalidate() { this.preparationVersion=Math.max(this.preparationVersion,performance.timeOrigin+this.now()); this.intent++; this.issued = undefined; this.candidate = undefined; this.prepared = undefined; try { this.clearAnnotations(); } catch { /* Visual cleanup must never block native chat publication. */ } return this.preparationVersion; }
+  invalidate() { this.intent++; this.issued = undefined; this.candidate = undefined; this.prepared = undefined; try { this.clearAnnotations(); } catch { /* Visual cleanup must never block native chat publication. */ } }
   leaseDeadline(scope: Scope) {
     const issued=this.candidate && scope && sameScope(this.candidate.scope,scope) ? this.candidate : this.issued;
     try { const state=this.read(); if(!issued || !scope || !sameScope(issued.scope,scope) ||
@@ -41,12 +42,13 @@ export class PresentationAdmission {
       this.invalidate();return true;
     } catch {this.invalidate();return true;}
   }
-  prepare(identity: Identity, version?: number) {
-    if (this.candidate || typeof identity?.textPrefix !== 'string' || version !== undefined && (!Number.isFinite(version) || version <= this.preparationVersion)) return null;
+  preparationTicket() {return {intentVersion:this.intent,preparationVersion:++this.preparationSerial};}
+  prepare(identity: Identity, ticket?: {intentVersion:number;preparationVersion:number}) {
+    if (this.candidate || typeof identity?.textPrefix !== 'string' || ticket !== undefined && (ticket.intentVersion!==this.intent || !Number.isSafeInteger(ticket.preparationVersion) || ticket.preparationVersion<=this.preparationVersion || ticket.preparationVersion>this.preparationSerial)) return null;
     const displayed = this.issued; this.prepared = undefined;
     try {
       const shot = this.snapshot(identity);
-      if (shot && this.issued) {this.prepared = {...this.issued};if(version!==undefined)this.preparationVersion=version;}
+      if (shot && this.issued) {this.prepared = {...this.issued};if(ticket)this.preparationVersion=ticket.preparationVersion;}
       return shot;
     } finally { this.issued = displayed; }
   }
