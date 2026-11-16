@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
-import { createServer, preview } from 'vite';
+import { startLiveServer } from './live-server.mjs';
 import { chromium } from '@playwright/test';
 import { startGateway, stopChild } from '../scripts/start-session.mjs';
 import { prepareLiveRuntime } from '../scripts/prepare-live.mjs';
@@ -28,9 +28,7 @@ export async function openLive({ hands, assets, headless = false, signal, inspec
   if (signal?.aborted) throw Error('live_start_cancelled');
   await prepareLiveRuntime({ hands, assets, production, signal });
   if (signal?.aborted) throw Error('live_start_cancelled');
-  const vite = production ? await preview({ root: liveRoot, preview: { host: '127.0.0.1', port: 0 } }) :
-    await createServer({ root: liveRoot, server: { host: '127.0.0.1', port: 0 } });
-  if (!production) await vite.listen();
+  const vite = await startLiveServer({root:liveRoot,production,signal});
   const closeServer = () => vite.close();
   const origin = vite.resolvedUrls.local[0].replace(/\/$/, ''), token = randomBytes(32).toString('hex');
   let gateway, browser;
