@@ -143,3 +143,31 @@ This aligns the advertised JSON shape with existing strict parser behavior.
 Observed missing-parts outputs such as `{ "base": "keep" }` remain rejected,
 not silently converted to retain or filled with generated geometry. Numeric
 limits, source authority, deadlines and native Codex behavior are unchanged.
+
+## Optional reviewed geometry assets
+
+`createPresentationAssetLibrary(entries)` builds an immutable, bounded catalog for
+an explicitly opted-in `NativePresentationProvider({compact:true, assetLibrary})`.
+It is a developer integration option, **not enabled by `fisch live` or a new default**.
+Only compact streaming/freeform accepts this option; mini, diagram and batch modes
+reject it. Native Codex conversation instructions are unchanged.
+
+Entries contain an ID, an objective appearance description and a canonical full-DSL
+`compose` record with `base:none`. At most eight assets and 128 KiB combined geometry
+are accepted. Validation rejects invalid geometry, inherited parts and authority
+fields; each content hash binds one immutable payload. Descriptions are trusted
+application configuration and should describe what was actually reviewed, not
+assign emotion labels or make observations about the user.
+
+The visual author can choose `{base:"reuse",assetId,sha256}`, retain, or a fresh
+compact composition. Reuse does not accept timing, motion, source or ownership
+overrides. It expands through the existing canonical validator and ordinary
+source-bound admission path. No expired source is revived, no timeout triggers an
+automatic picture, and no keyword/gesture-to-asset mapping is introduced.
+
+`integrations/assets/ribbon-swim.json` is an optional offline-generated example,
+not loaded automatically. Its twenty-part fish and finite swim/tail tracks were
+visually inspected; body/belly particle weights were manually refined. The tracks
+finish and hold, not loop indefinitely. It was reviewed at the existing optional
+8,000-particle setting and is sparser at the default 2,000. Asset selection is not
+proof of emotional fidelity, sustained engagement or a faster native experience.

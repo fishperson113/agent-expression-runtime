@@ -113,9 +113,10 @@ function presentationNotifications({job,streaming,records,publish,resolve,reject
 }
 
 export class NativePresentationProvider {
-  constructor({ host, runtime = fischCodexRuntime(), Rpc = PlannerRpc, timeoutMs = 60000, visualModel, visualEffort, compact = false, miniScene = false, protocol = 'freeform', warmTransport = false }) {
+  constructor({ host, runtime = fischCodexRuntime(), Rpc = PlannerRpc, timeoutMs = 60000, visualModel, visualEffort, compact = false, miniScene = false, protocol = 'freeform', warmTransport = false, assetLibrary = null }) {
     if(!['freeform','diagram'].includes(protocol))throw Error('presentation_protocol_invalid');
-    Object.assign(this, { host, runtime, Rpc, timeoutMs, visualModel, visualEffort, compact, miniScene, protocol });
+    if(assetLibrary&&(!compact||miniScene||protocol!=='freeform'||typeof assetLibrary.parseRecord!=='function'||typeof assetLibrary.policy!=='string'))throw Error('presentation_asset_options');
+    Object.assign(this, { host, runtime, Rpc, timeoutMs, visualModel, visualEffort, compact, miniScene, protocol, assetLibrary });
     if (warmTransport) this.transport = new PresentationTransport(Rpc, warmTransport === true ? {} : warmTransport);
   }
   async prepareTransport(request, rpc, streaming, phase) {
@@ -136,7 +137,8 @@ export class NativePresentationProvider {
     const job = { id: randomUUID(), text: undefined };
     let timer, resolve, reject, cancelRequest;
     const cancelled=new Promise((_,no)=>{cancelRequest=no;});cancelled.catch(()=>{});
-    const records = streaming ? createPresentationRecordStream({ ...(diagramInput ? {parseRecord:text=>parseDiagramAuthorRecord(text,exchange)} : this.compact ? {parseRecord:this.miniScene?parseMiniPresentation:parseCompactPresentationRecord} : {}), isCurrent: () => !signal.aborted && streaming.isCurrent() }) : null;
+    if(this.assetLibrary&&!streaming)throw Error('presentation_assets_streaming_only');
+    const records = streaming ? createPresentationRecordStream({ ...(diagramInput ? {parseRecord:text=>parseDiagramAuthorRecord(text,exchange)} : this.assetLibrary ? {parseRecord:this.assetLibrary.parseRecord} : this.compact ? {parseRecord:this.miniScene?parseMiniPresentation:parseCompactPresentationRecord} : {}), isCurrent: () => !signal.aborted && streaming.isCurrent() }) : null;
     const publish = text => { for (const record of records.push(text)) {streaming.onPhase?.('record');streaming.onRecord(record);} };
     const phase=name=>{try{streaming?.onPhase?.(name);}catch{}};
     const done = new Promise((yes, no) => { resolve = yes; reject = error => { job.failed = true; cancelRequest(error); no(error); }; }); done.catch(() => {});
@@ -155,7 +157,7 @@ export class NativePresentationProvider {
     try {
       if (signal.aborted) abort();
       await this.prepareTransport(request, rpc, streaming, phase);
-      const started = await request('thread/start', { cwd: this.runtime.cwd, ephemeral: true, ...(streaming && this.visualModel ? { model: this.visualModel } : {}), serviceTier: fischCodexServiceTier(this.runtime.env), sandbox: 'read-only', approvalPolicy: 'never', baseInstructions: diagramInput ? diagramAuthorPolicy : streaming ? streamingPolicy(this.compact,this.miniScene) : policy, developerInstructions: '' });
+      const started = await request('thread/start', { cwd: this.runtime.cwd, ephemeral: true, ...(streaming && this.visualModel ? { model: this.visualModel } : {}), serviceTier: fischCodexServiceTier(this.runtime.env), sandbox: 'read-only', approvalPolicy: 'never', baseInstructions: diagramInput ? diagramAuthorPolicy : streaming ? streamingPolicy(this.compact,this.miniScene)+(this.assetLibrary?'\n'+this.assetLibrary.policy:'') : policy, developerInstructions: '' });
       job.threadId = started.thread.id;phase('thread_started');
       try {streaming?.onConfiguration?.({model:started.model,reasoningEffort:started.reasoningEffort,serviceTier:started.serviceTier});} catch {}
       const catalog = await request('mcpServerStatus/list', { threadId: job.threadId });
