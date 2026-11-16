@@ -60,3 +60,28 @@ it('cleans real preview collision listeners and retains the successful bound ser
  }finally{await server?.close();await occupied?.close();await rm(root,{recursive:true,force:true});}
  expect(process.listenerCount('SIGTERM')).toBe(before);
 });
+
+
+it('retries exact loopback listen EACCES without changing permissions',async()=>{
+ let calls=0;const failed=bound(56561);
+ const server=await startLiveServer({root:'.',first:56561-49152,previewServer:async options=>{
+  if(calls++===0){options.plugins[0].configurePreviewServer(failed);throw Object.assign(Error('reserved'),{code:'EACCES',syscall:'listen',address:'127.0.0.1',port:56561});}
+  return bound(options.preview.port);
+ }});
+ expect(failed.close).toHaveBeenCalledOnce();expect(calls).toBe(2);expect(server.httpServer.address().port).not.toBe(56561);
+});
+it.each([{syscall:'open',address:'127.0.0.1',port:49152},{syscall:'listen',address:'0.0.0.0',port:49152},{syscall:'listen',address:'127.0.0.1',port:49153},{}])('does not mask unrelated EACCES %j',async fields=>{
+ const previewServer=vi.fn(async()=>{throw Object.assign(Error('denied'),{code:'EACCES',...fields});});
+ await expect(startLiveServer({root:'.',first:0,previewServer})).rejects.toThrow('denied');expect(previewServer).toHaveBeenCalledOnce();
+});
+it('bounds repeated exact reserved-port failures to32 attempts',async()=>{
+ const ports=[];await expect(startLiveServer({root:'.',first:0,previewServer:async options=>{const port=options.preview.port;ports.push(port);throw Object.assign(Error('reserved'),{code:'EACCES',syscall:'listen',address:'127.0.0.1',port});}})).rejects.toThrow('live_port_exhausted');
+ expect(ports).toHaveLength(32);expect(new Set(ports).size).toBe(32);
+});
+
+it('closes a dev server denied by the exact reserved listen before retry',async()=>{
+ const servers=[];const server=await startLiveServer({root:'.',production:false,first:0,createDevServer:async options=>{
+  const s=bound(options.server.port);if(!servers.length)s.listen=async()=>{throw Object.assign(Error('reserved'),{code:'EACCES',syscall:'listen',address:'127.0.0.1',port:options.server.port});};servers.push(s);return s;
+ }});
+ expect(servers[0].close).toHaveBeenCalledOnce();expect(server).toBe(servers[1]);expect(server.close).not.toHaveBeenCalled();
+});
