@@ -18,19 +18,22 @@ export function presentationSourceOptions(env) {
 // Independent, best-effort public-text observer. Never awaited by the native relay.
 export class LiveStreamingPresentationBridge {
   constructor({state,page,host,runtime,provider,now=Date.now,onEvent=()=>{},ttlMs=10000,checkpoints={},boundedSourceLease=false,exactExcerptLease=false,paragraphSources=false,listItemSources=false,visualModel,visualEffort,protocol='freeform'}) {
-    if(!['freeform','diagram'].includes(protocol))throw Error('presentation_protocol_invalid');
+    if(!['freeform','diagram','compact'].includes(protocol))throw Error('presentation_protocol_invalid');
+    const wireProtocol=protocol,compact=protocol==='compact';
+    if(compact&&provider)throw Error('presentation_compact_provider_conflict');
+    if(compact)protocol='freeform';
     if(typeof paragraphSources!=='boolean'||paragraphSources&&protocol!=='freeform')throw Error('presentation_paragraph_protocol');
     if(typeof listItemSources!=='boolean'||listItemSources&&(!paragraphSources||protocol!=='freeform'))throw Error('presentation_list_sources_invalid');
     const modelOptions=visualModelOptions(visualModel,visualEffort);
     if(provider&&Object.keys(modelOptions).length)throw Error('presentation_model_provider_conflict');
     exactExcerptLease ||= protocol==='diagram'||paragraphSources;
-    Object.assign(this,{state,page,now,onEvent,protocol,ttlMs:boundedSourceLease||exactExcerptLease?Math.min(ttlMs,10000):ttlMs,boundedSourceLease:boundedSourceLease||exactExcerptLease,exactExcerptLease});
+    Object.assign(this,{state,page,now,onEvent,protocol,wireProtocol,ttlMs:boundedSourceLease||exactExcerptLease?Math.min(ttlMs,10000):ttlMs,boundedSourceLease:boundedSourceLease||exactExcerptLease,exactExcerptLease});
     this.excerpts=new PublicTextExcerpts();this.paragraphs=paragraphSources?new PublicParagraphSources({allowListItems:listItemSources}):null;
-    this.provider=provider??new NativePresentationProvider({host,runtime,timeoutMs:30000,protocol,...modelOptions});
+    this.provider=provider??new NativePresentationProvider({host,runtime,timeoutMs:30000,protocol,...modelOptions,...(compact?{compact:true}:{})});
     this.checkpoints=new PublicTextCheckpoints(checkpoints);
     this.flushes=new Map();this.serial=0;this.finalIds=new Map();this.closed=false;this.selected=null;this.active=null;this.pending=null;
   }
-  emit(type,detail={}) { try {this.onEvent({type,at:this.now(),...detail});} catch {/* Telemetry cannot break chat. */} }
+  emit(type,detail={}) { try {this.onEvent({type,at:this.now(),...(this.wireProtocol==='compact'?{wireProtocol:'compact'}:{}),...detail});} catch {/* Telemetry cannot break chat. */} }
   remaining(job){
     const now=this.now();
     if(!Number.isFinite(now)||now<job.lastNow){this.browserFault=true;job.controller.abort();this.emit('drop',{code:'clock_regressed'});return 0;}

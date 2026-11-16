@@ -590,3 +590,27 @@ node bin/fisch.mjs live
 ```
 
 Both values are required, exact and case-sensitive; no effort is chosen automatically. The native model catalog must support the pair. Invalid configuration disables only the visual lane; a catalog rejection disables it for the session without retrying each new reply. Native chat remains available. Remove both variables before starting a new session to restore the unchanged default. This selects only the ordinary freeform author, not research assets, hybrid policies or priority scheduling; a visible scene before source expiry is not guaranteed. Paragraph/list options remain separate and off by default.
+
+### Optional compact visual wire format
+
+Use the existing protocol selector in either panel or `--terminal` mode:
+
+```powershell
+$env:FISCH_PRESENTATION_PROTOCOL='compact'
+node bin/fisch.mjs live
+```
+
+`compact` selects the existing tuple-based author inside the same freeform visual
+lane. `freeform` remains the default; `diagram` is unchanged. Exact spelling is
+required. Paragraph/list source options work with both freeform formats and keep
+their original context limits, timestamps and leases. Native Codex configuration,
+text and tools do not change. Invalid configuration disables only the visual lane.
+
+Compact records offer ellipsoids, curves, optional sinusoidal part motion and
+screen-space annotations, then expand through canonical validation. They do not
+expose the full format's patches, trajectories or arbitrary geometry operations.
+Retain is allowed; no asset library, mini-scene quota, sentence sampler or research
+scheduler is enabled. This selects the existing compact policy plus wire grammar,
+not an encoding-only controlled experiment. Smaller records do not guarantee
+lower time-to-first-token, correct visual meaning or a scene before the answer ends.
+Remove the variable or set `freeform` to restore the unchanged default format.
