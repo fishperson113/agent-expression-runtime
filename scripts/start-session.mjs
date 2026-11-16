@@ -159,23 +159,39 @@ async function pairRenderer(page, base, token) {
   await page.waitForFunction(() => /worker|fallback/.test(document.querySelector('#mode')?.textContent ?? ''));
 }
 
-export async function stopChild(child) {
-  if (!child?.pid || child.exitCode !== null || child.signalCode !== null) return;
-  const exited = new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(Error('Child shutdown timed out.')), 10000);
-    child.once('exit', () => { clearTimeout(timer); resolve(); });
+async function terminateOwnedChild(child, {platform, spawnProcess, killGroup}) {
+  if (platform !== 'win32') {
+    if (child.aerProcessGroup) killGroup(-child.pid, 'SIGTERM');
+    else child.kill('SIGTERM');
+    return;
+  }
+  await new Promise(resolve => {
+    const killer = spawnProcess('taskkill', ['/PID', String(child.pid), '/T', '/F'],
+      { windowsHide: true, stdio: 'ignore' });
+    const clean = () => { killer.removeListener('error', failed); killer.removeListener('exit', finished); };
+    const failed = () => { clean(); resolve(); };
+    const finished = () => { clean(); resolve(); };
+    killer.once('error', failed);
+    killer.once('exit', finished);
   });
-  if (process.platform === 'win32') {
-    await new Promise(resolve => {
-      const killer = spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
-      killer.once('error', resolve);
-      killer.once('exit', resolve);
-    });
-  } else if (child.aerProcessGroup) process.kill(-child.pid, 'SIGTERM');
-  else child.kill('SIGTERM');
-  await exited;
 }
 
+export async function stopChild(child, {platform = process.platform, spawnProcess = spawn,
+  killGroup = (pid, signal) => process.kill(pid, signal)} = {}) {
+  if (!child?.pid || child.exitCode !== null || child.signalCode !== null) return;
+  let exited, timer;
+  const target = new Promise(resolve => { exited = resolve; child.once('exit', exited); });
+  const deadline = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(Error('Child shutdown timed out.')), 10000);
+  });
+  try {
+    const terminated = terminateOwnedChild(child, {platform, spawnProcess, killGroup});
+    await Promise.race([Promise.all([target, terminated]), deadline]);
+  } finally {
+    clearTimeout(timer);
+    child.removeListener('exit', exited);
+  }
+}
 async function codexHost({ base, token, signal }) {
   const host = await codexCommand();
   return new Promise((accept, reject) => {
