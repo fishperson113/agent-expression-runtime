@@ -324,3 +324,9 @@ The browser smoke result in [evidence/browser-smoke.json](evidence/browser-smoke
 - M3: Tauri Channels, bounds, Worker/fallback and basic recovery implemented. Native executable build is checked separately. Native visual/recovery matrix, actual overload responsiveness and 20-minute soak remain unverified.
 
 Fisch does not persist raw planner messages; bounded redacted interaction text is sent to the selected inference provider. Reference replay capture is explicit opt-in. Default counters exclude prompt and credential payloads. Screenshots show only generic scripted prompts. The source SRS attachment, local credentials, caches and build outputs are excluded from the public Git repository.
+
+## Awaited visual shutdown (focused patch)
+
+Terminal and panel shutdown now join the visual provider's cached close promise, including startup-failure paths. Cancellation still starts synchronously; native event observation remains nonblocking. Cleanup attempts all owners and preserves an existing primary failure. This is provider/process settlement, not a guarantee that browser annotations have finished retiring, a latency improvement, or an explanation of historical test interruptions. No prewarm or new configuration is enabled.
+
+Validation history retains an initial pre-test missing-Vitest failure and a synthetic drain-fixture timeout. After repairing the worktree's own lockfile dependencies and correcting only the fixture's selected-source/scope setup, the 16 focused checks passed. The drain case uses mocked validity, clock budget and provider; entrypoint startup-failure cases inject binding failure, not every possible createBridge failure. Full-suite and live validation are separate gates.

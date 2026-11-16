@@ -14,7 +14,7 @@ import { LiveConversation, bindLiveConversation } from './live-conversation.mjs'
 import { PlaygroundProjection } from './playground-projection.mjs';
 import { liveSetupStatus } from './live-setup-status.mjs';
 import { liveRoot } from './live-launch.mjs';
-import { liveShutdownCode, closeLiveOwned } from './live-shutdown.mjs';
+import { liveShutdownCode, closeLiveOwned, closePresentation } from './live-shutdown.mjs';
 
 export function presentationCall(state, method, ...args) {
   try {
@@ -82,7 +82,7 @@ export async function createBridge({ live, host, cwd, env, configured, instructi
       ? { ...state.conversation.snapshot(), available: false, canSend: false, canCancel: false, error: 'conversation_restart_required' }
       : state.conversation.snapshot() });
     return state;
-  } catch (error) { await closeLiveOwned([() => state.broker?.close(), () => state.transport?.close()], true); throw error; }
+  } catch (error) { await closeLiveOwned([() => closePresentation(state), () => state.broker?.close(), () => state.transport?.close()], true); throw error; }
 }
 
 export async function runTerminalCodex({ live, cwd, signal, spawnClient = spawn, host: suppliedHost, reactiveProvider }) {
@@ -94,8 +94,8 @@ export async function runTerminalCodex({ live, cwd, signal, spawnClient = spawn,
   const state = await createBridge({ live, host, cwd, env, configured });
   let child, stopping = false, stoppedCode = 1, closing, failed = false;
   const cleanupFailure = Promise.withResolvers(); void cleanupFailure.promise.catch(() => {});
-  const cleanup = () => closing ??= closeLiveOwned([() => state.unbind?.(), () => stopChild(child), () => state.transport.close()]);
-  const closeConversation = () => { presentationCall(state, 'close'); state.channel.stale = true; state.channel.token = undefined; state.conversation.close(); };
+  const cleanup = () => closing ??= closeLiveOwned([() => closePresentation(state), () => state.unbind?.(), () => stopChild(child), () => state.transport.close()]);
+  const closeConversation = () => { closePresentation(state); state.channel.stale = true; state.channel.token = undefined; state.conversation.close(); };
   const stop = code => { if (stopping) return; stopping = true; stoppedCode = state.broker.browserUnavailable ? 1 : code;
     closeConversation(); state.broker.close(); void cleanup().catch(cleanupFailure.reject); };
   state.fail = stop;

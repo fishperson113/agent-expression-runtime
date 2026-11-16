@@ -63,7 +63,17 @@ export class LiveStreamingPresentationBridge {
     for(const timer of this.flushes.values())clearTimeout(timer);this.flushes.clear();
     this.revokeBrowser();
   }
-  close(){this.closed=true;this.invalidate();this.provider.close?.();}
+  close() {
+    if (this.closePromise) return this.closePromise;
+    const done = Promise.withResolvers(); this.closePromise = done.promise;
+    this.closePromise.catch(() => {}); this.closed = true;
+    let failed = false, failure, pending;
+    try { this.invalidate(); } catch (error) { failed = true; failure = error; }
+    try { pending = this.provider.close?.(); } catch (error) { if (!failed) { failed = true; failure = error; } }
+    Promise.resolve(pending).then(() => failed ? done.reject(failure) : done.resolve(),
+      error => done.reject(failed ? failure : error));
+    return this.closePromise;
+  }
   observe(message) { try {this.observePublic(message);} catch(error){this.emit('error',{code:error.message});this.invalidate();} }
   observePublic(message) {
     if(this.closed||this.visualUnavailable||this.browserFault||message.params?.threadId!==this.state.output.thread)return;
