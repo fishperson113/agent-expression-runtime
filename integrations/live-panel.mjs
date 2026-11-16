@@ -1,9 +1,9 @@
 import { fischCodexRuntime } from './fisch-codex-runtime.mjs';
 import { codexCommand } from '../scripts/start-session.mjs';
-import { createBridge, startLivePolling, presentationCall } from './live-terminal.mjs';
+import { createBridge, startLivePolling } from './live-terminal.mjs';
 import { createLiveReactiveProvider, nativeLiveEnvironment } from './live-reactive-provider.mjs';
 import { bindLiveConversation } from './live-conversation.mjs';
-import { liveShutdownCode, closeLiveOwned } from './live-shutdown.mjs';
+import { liveShutdownCode, closeLiveOwned, closePresentation } from './live-shutdown.mjs';
 import { openPanelClient } from './panel-client.mjs';
 
 export function startupFeedback(error) {
@@ -39,8 +39,8 @@ function panelPublication(state, value) {
 async function keepDisconnectedPanel(state, client, signal, page) {
   state.conversation.transportLost();
   const token = state.channel.token, snapshot = state.conversation.snapshot();
-  state.channel.stale = true; presentationCall(state, 'close'); state.broker.close();
-  await closeLiveOwned([() => client?.close(), () => state.transport.close()], true);
+  state.channel.stale = true; closePresentation(state); state.broker.close();
+  await closeLiveOwned([() => closePresentation(state), () => client?.close(), () => state.transport.close()], true);
   if (signal.aborted) return 1;
   let timer;
   try {
@@ -68,7 +68,7 @@ export async function runPanelCodex({ live, cwd, signal, host: suppliedHost, rea
   const done = Promise.withResolvers(); let client, timer, unbind, failed = false;
   state.fail = code => done.resolve(code);
   const onAbort = () => {
-    state.channel.stale = true; state.conversation.close(); presentationCall(state, 'close'); state.broker.close();
+    state.channel.stale = true; state.conversation.close(); closePresentation(state); state.broker.close();
     done.resolve(liveShutdownCode(signal.reason) ?? 130); void state.transport.close().catch(() => {});
   };
   signal.addEventListener('abort', onAbort, { once: true });
@@ -107,8 +107,8 @@ export async function runPanelCodex({ live, cwd, signal, host: suppliedHost, rea
       }, { token, feedback, snapshot });
       if (!published) throw Error('panel_startup_publication_failed');
     } finally {
-      state.channel.stale = true; presentationCall(state, 'close'); state.broker.close();
-      await closeLiveOwned([() => client?.close(), () => state.transport.close()], true);
+      state.channel.stale = true; closePresentation(state); state.broker.close();
+      await closeLiveOwned([() => closePresentation(state), () => client?.close(), () => state.transport.close()], true);
     }
     // Connection closure can settle `done`; only an explicit Stop ends this offline screen.
     await new Promise(resolve => { if (signal.aborted) resolve(); else signal.addEventListener('abort', resolve, { once: true }); });
@@ -116,7 +116,7 @@ export async function runPanelCodex({ live, cwd, signal, host: suppliedHost, rea
   }
   finally {
     clearInterval(timer); signal.removeEventListener('abort', onAbort); state.channel.stale = true;
-    state.conversation.close(); presentationCall(state, 'close'); state.broker.close();
-    await closeLiveOwned([() => unbind?.(), () => client?.close(), () => state.transport.close()], failed);
+    state.conversation.close(); closePresentation(state); state.broker.close();
+    await closeLiveOwned([() => closePresentation(state), () => unbind?.(), () => client?.close(), () => state.transport.close()], failed);
   }
 }
