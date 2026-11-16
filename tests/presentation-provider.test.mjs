@@ -220,3 +220,18 @@ it('signals terminal stream rejection before a delayed process settles, once onl
  }finally{settle?.();provider.close();await running.catch(()=>{});}
 });
 
+
+
+it.each([false,{maxJobs:1},{idleMs:1}])('does not report successful transport cleanup as failure (%j)',async(warmTransport)=>{
+ const failures=[],published=[];
+ class ClosingRpc extends Rpc {
+  constructor(command,args,cwd,notify,failed){super(command,args,cwd,notify);this.failed=failed;}
+  close(){this.failed('planner_closed');}
+  async request(method,params){if(method!=='turn/start')return super.request(method,params);queueMicrotask(()=>{this.notify('item/completed',{threadId:'visual-thread',item:{type:'agentMessage',phase:'final_answer',text:'{\"mode\":\"retain\",\"payload\":null}'}});this.notify('turn/completed',{threadId:'visual-thread',turn:{id:'visual-turn',status:'completed'}});});return {turn:{id:'visual-turn'}};}
+ }
+ const provider=new NativePresentationProvider({host:{command:'fixture',args:[]},runtime:{cwd:'fixture',env:{}},Rpc:ClosingRpc,warmTransport});
+ try{await provider.generate({userText:'a',assistantText:'b'},new AbortController().signal,{},
+  {isCurrent:()=>true,onRecord:r=>published.push(r),onFailure:e=>failures.push(e)});
+ await new Promise(r=>setTimeout(r,10));expect(published).toHaveLength(1);expect(failures).toEqual([]);
+ }finally{provider.close();}
+});
