@@ -1,3 +1,4 @@
+import { visualModelOptions } from './presentation-model-options.mjs';
 import { PublicParagraphSources } from './presentation-paragraphs.mjs';
 import {revokeFreeformReceipt,cancelFreeformCandidate} from './presentation-freeform-staging.mjs';
 import {prepareDiagram,applyPreparedDiagram,revokeDiagramReceipt} from './presentation-diagram-staging.mjs';
@@ -16,14 +17,16 @@ export function presentationSourceOptions(env) {
 
 // Independent, best-effort public-text observer. Never awaited by the native relay.
 export class LiveStreamingPresentationBridge {
-  constructor({state,page,host,runtime,provider,now=Date.now,onEvent=()=>{},ttlMs=10000,checkpoints={},boundedSourceLease=false,exactExcerptLease=false,paragraphSources=false,listItemSources=false,protocol='freeform'}) {
+  constructor({state,page,host,runtime,provider,now=Date.now,onEvent=()=>{},ttlMs=10000,checkpoints={},boundedSourceLease=false,exactExcerptLease=false,paragraphSources=false,listItemSources=false,visualModel,visualEffort,protocol='freeform'}) {
     if(!['freeform','diagram'].includes(protocol))throw Error('presentation_protocol_invalid');
     if(typeof paragraphSources!=='boolean'||paragraphSources&&protocol!=='freeform')throw Error('presentation_paragraph_protocol');
     if(typeof listItemSources!=='boolean'||listItemSources&&(!paragraphSources||protocol!=='freeform'))throw Error('presentation_list_sources_invalid');
+    const modelOptions=visualModelOptions(visualModel,visualEffort);
+    if(provider&&Object.keys(modelOptions).length)throw Error('presentation_model_provider_conflict');
     exactExcerptLease ||= protocol==='diagram'||paragraphSources;
     Object.assign(this,{state,page,now,onEvent,protocol,ttlMs:boundedSourceLease||exactExcerptLease?Math.min(ttlMs,10000):ttlMs,boundedSourceLease:boundedSourceLease||exactExcerptLease,exactExcerptLease});
     this.excerpts=new PublicTextExcerpts();this.paragraphs=paragraphSources?new PublicParagraphSources({allowListItems:listItemSources}):null;
-    this.provider=provider??new NativePresentationProvider({host,runtime,timeoutMs:30000,protocol});
+    this.provider=provider??new NativePresentationProvider({host,runtime,timeoutMs:30000,protocol,...modelOptions});
     this.checkpoints=new PublicTextCheckpoints(checkpoints);
     this.flushes=new Map();this.serial=0;this.finalIds=new Map();this.closed=false;this.selected=null;this.active=null;this.pending=null;
   }
@@ -60,7 +63,7 @@ export class LiveStreamingPresentationBridge {
   close(){this.closed=true;this.invalidate();this.provider.close?.();}
   observe(message) { try {this.observePublic(message);} catch(error){this.emit('error',{code:error.message});this.invalidate();} }
   observePublic(message) {
-    if(this.closed||this.browserFault||message.params?.threadId!==this.state.output.thread)return;
+    if(this.closed||this.visualUnavailable||this.browserFault||message.params?.threadId!==this.state.output.thread)return;
     const p=message.params;
     if(['item/started','item/completed'].includes(message.method)&&p.item?.type==='agentMessage'&&p.item.phase==='final_answer') {
       this.finalIds.set(p.turnId,p.item.id);if(this.finalIds.size>64)this.finalIds.delete(this.finalIds.keys().next().value);
@@ -119,7 +122,7 @@ export class LiveStreamingPresentationBridge {
   revokeBrowser(){
     this.revocation=this.browserFault?Promise.resolve():this.evaluate(()=>window.fischLive?.revokePresentation?.()).catch(()=>{});
   }
-  valid(job){const s=this.state.conversation.snapshot();return !this.closed&&!this.browserFault&&!job.controller.signal.aborted&&this.selected===job&&this.remaining(job)>0&&
+  valid(job){const s=this.state.conversation.snapshot();return !this.closed&&!this.visualUnavailable&&!this.browserFault&&!job.controller.signal.aborted&&this.selected===job&&this.remaining(job)>0&&
     !this.state.channel.stale&&s.available&&!s.pending&&!s.stopping&&!s.error&&s.messages.filter(m=>m.role==='user').at(-1)?.turn===job.turnId&&s.generation===job.generation&&
     (!s.ownerTurn||s.ownerTurn===job.turnId)&&this.state.channel.token===job.documentId&&this.state.output.thread===job.threadId&&
     s.messages.some(m=>m.id===job.messageId&&m.turn===job.turnId&&!m.truncated&&['streaming','completed'].includes(m.status)&&m.text.startsWith(job.checkpoint.textPrefix)&&(this.boundedSourceLease||presentationSection(m.text)===job.section));}
@@ -151,11 +154,16 @@ export class LiveStreamingPresentationBridge {
       target:job.sourceQuote,
       ...(this.exactExcerptLease?{publicContext:job.checkpoint.publicContext??job.checkpoint.textPrefix.slice(-4096)}:{})},controller.signal,{partIds:job.scene.partIds},{
       isCurrent:()=>this.valid(job),onFailure:()=>this.failAuthor(job),onConfiguration:config=>this.emit('configuration',{revision:job.checkpoint.checkpointRevision,config}),onRejectedRecord:value=>this.emit('rejected_record',{revision:job.checkpoint.checkpointRevision,...value}),onPhase:phase=>this.emit('phase',{revision:job.checkpoint.checkpointRevision,phase}),onUsage:usage=>this.emit('usage',{revision:job.checkpoint.checkpointRevision,usage}),onRecord:record=>{admission=this.apply(job,record);admission.catch(()=>{});}
-    })).then(()=>admission).catch(async error=>{controller.abort();await admission.catch(()=>{});if(this.protocol==='diagram')await revokeDiagramReceipt(this,job.displayedOwned);this.emit('drop',{code:error.message,revision:job.checkpoint.checkpointRevision});
+    })).then(()=>admission).catch(async error=>{if(error?.message==='presentation_model_unsupported')this.disableUnsupportedModel();controller.abort();await admission.catch(()=>{});if(this.protocol==='diagram')await revokeDiagramReceipt(this,job.displayedOwned);this.emit('drop',{code:error.message,revision:job.checkpoint.checkpointRevision});
       if(this.protocol!=='diagram'){await cancelFreeformCandidate(this,job);await revokeFreeformReceipt(this,job.displayedOwned);}
     }).finally(()=>{
       if(!this.boundedSourceLease&&job.admitted&&this.pending?.section===job.section)this.pending=null;
       clearTimeout(timer);this.emit('author_end',{revision:job.checkpoint.checkpointRevision});this.active=null;this.drain();});
+  }
+  disableUnsupportedModel(){
+    if(this.visualUnavailable)return;
+    this.visualUnavailable=true;this.invalidate();
+    this.emit('unavailable',{code:'presentation_model_unsupported'});
   }
   failAuthor(job){
     job.controller.abort();

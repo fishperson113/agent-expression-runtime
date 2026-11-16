@@ -578,3 +578,15 @@ preserved or rejected above 4096 characters; exact source timestamps and the ori
 10-second lease are not renewed by repeated items. Structural closure does not
 prove semantic completeness: a later qualifier may change the earlier meaning.
 This option improves eligible source coverage, not a guarantee of timely visuals.
+
+### Optional visual-only model and effort
+
+The independent public-text visual author can use an explicit model/effort pair in either panel or `--terminal` mode. This does not change the conversational Codex model, instructions or tools. From this checkout in PowerShell:
+
+```powershell
+$env:FISCH_VISUAL_MODEL='gpt-6-luna'
+$env:FISCH_VISUAL_EFFORT='low'
+node bin/fisch.mjs live
+```
+
+Both values are required, exact and case-sensitive; no effort is chosen automatically. The native model catalog must support the pair. Invalid configuration disables only the visual lane; a catalog rejection disables it for the session without retrying each new reply. Native chat remains available. Remove both variables before starting a new session to restore the unchanged default. This selects only the ordinary freeform author, not research assets, hybrid policies or priority scheduling; a visible scene before source expiry is not guaranteed. Paragraph/list options remain separate and off by default.
