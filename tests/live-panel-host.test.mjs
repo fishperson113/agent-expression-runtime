@@ -24,8 +24,9 @@ function panelPage() {
       try { return await fn(arg); } finally { globalThis.window = old; } } };
   return { bindings, controls, snapshots, page, frame, api };
 }
-it.each([false,true])('boots panel chat with invalid visual config=%s without changing native relay', async invalid => {
-  vi.stubEnv('FISCH_VISUAL_MODEL',invalid?'model':undefined);vi.stubEnv('FISCH_VISUAL_EFFORT',undefined);
+it.each([false,true,'protocol','compact'])('boots panel chat with visual config=%s without changing native relay', async invalid => {
+  vi.stubEnv('FISCH_VISUAL_MODEL',invalid===true?'model':undefined);vi.stubEnv('FISCH_VISUAL_EFFORT',undefined);
+  vi.stubEnv('FISCH_PRESENTATION_PROTOCOL',invalid==='protocol'?'Compact':invalid==='compact'?'compact':undefined);
   const diagnostic=vi.spyOn(console,'error').mockImplementation(()=>{});
   const script = `let buffer='';process.stdin.on('data',chunk=>{buffer+=chunk;let n;while((n=buffer.indexOf('\\n'))>=0){const m=JSON.parse(buffer.slice(0,n));buffer=buffer.slice(n+1);const send=v=>process.stdout.write(JSON.stringify(v)+'\\n');if(m.method==='initialize')send({id:m.id,result:{}});if(m.method==='thread/start')send({id:m.id,result:{thread:{id:'panel-thread'}}});if(m.method==='mcpServer/tool/call')send({id:m.id,error:{code:-32601,message:'fixture unsupported'}});if(m.method==='turn/start'){send({id:m.id,result:{turn:{id:'panel-turn',status:'inProgress'}}});send({method:'turn/started',params:{threadId:'panel-thread',turn:{id:'panel-turn'}}});for(let i=0;i<8;i++)send({method:'item/started',params:{threadId:'panel-thread',turnId:'panel-turn',item:{id:'tool-'+i,type:'mcpToolCall',server:'fisch_live',tool:'observe',status:'inProgress'}}});send({method:'item/agentMessage/delta',params:{threadId:'panel-thread',turnId:'panel-turn',itemId:'answer',delta:'Canonical fixture reply'}});send({method:'turn/completed',params:{threadId:'panel-thread',turn:{id:'panel-turn',status:'completed'}}});}}});`;
   const { bindings, controls, snapshots, page, frame } = panelPage(), abort = new AbortController();
@@ -40,7 +41,7 @@ it.each([false,true])('boots panel chat with invalid visual config=%s without ch
     expect(snapshots.at(-1).canSend).toBe(true);
     await vi.waitFor(() => expect(controls.filter(value => value.type === 'tool')).toHaveLength(8));
     expect(() => bindings.get('fischPanelRespond')({ page, frame: {} }, {})).toThrow('panel_control_source_rejected');
-    if(invalid)expect(diagnostic).toHaveBeenCalledWith(expect.stringContaining('native chat remains available'));
+    if(invalid===true||invalid==='protocol')expect(diagnostic).toHaveBeenCalledWith(expect.stringContaining('native chat remains available'));
   } finally { try { abort.abort(); expect(await run).toBe(130); } finally { diagnostic.mockRestore();vi.unstubAllEnvs(); } }
 });
 
