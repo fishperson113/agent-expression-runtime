@@ -137,3 +137,14 @@ it.each(['absent', 'observe'])('keeps conversation and its input barrier usable 
     else expect(f.api.available).toBe(false);
   } finally { await f.close(); }
 });
+
+it('keeps native terminal requests and replies usable with invalid visual-only configuration',async()=>{
+ vi.stubEnv('FISCH_VISUAL_MODEL','model');vi.stubEnv('FISCH_VISUAL_EFFORT',undefined);
+ const error=vi.spyOn(console,'error').mockImplementation(()=>{});let f;
+ try{
+  f=await start(null);await f.call('turn/start',{threadId:'native',input:[{type:'text',text:'Hello',text_elements:[]}]});
+  await vi.waitFor(()=>expect(f.notifications.some(m=>m.params?.delta==='A synthetic conversational reply.')).toBe(true));
+  const {result}=await f.call('test/snapshot');const thread=result.seen.find(m=>m.method==='thread/start'),turn=result.seen.find(m=>m.method==='turn/start');
+  expect(thread.params.model).toBeUndefined();expect(turn.params.effort).toBeUndefined();expect(error).toHaveBeenCalledWith(expect.stringContaining('native chat remains available'));
+ }finally{await f?.close();error.mockRestore();vi.unstubAllEnvs();}
+});

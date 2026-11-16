@@ -238,3 +238,23 @@ it.each([false,{maxJobs:1},{idleMs:1}])('does not report successful transport cl
  expect(usage).toEqual([]);expect(published).toHaveLength(1);expect(failures).toEqual([]);
  }finally{provider.close();}
 });
+
+it('validates the exact configured visual pair before independent thread/turn and leaves defaults absent',async()=>{
+ class ConfigRpc extends Rpc {
+  async request(method,params){
+   if(method==='model/list'){Rpc.calls.push({method,params});return {data:[{model:'gpt-6-luna',supportedReasoningEfforts:[{reasoningEffort:'low'}]}]};}
+   if(method!=='turn/start')return super.request(method,params);
+   Rpc.calls.push({method,params});queueMicrotask(()=>{this.notify('item/completed',{threadId:'visual-thread',item:{id:'r',type:'agentMessage',phase:'final_answer',text:'{"mode":"retain","payload":null}'}});this.notify('turn/completed',{threadId:'visual-thread',turn:{id:'visual-turn',status:'completed'}});});return {turn:{id:'visual-turn'}};
+  }
+ }
+ const requests=[];
+ for(const options of [{},{visualModel:'gpt-6-luna',visualEffort:'low'}]){
+  const p=new NativePresentationProvider({host:{command:'fixture',args:[]},runtime:{cwd:'fixture',env:{}},Rpc:ConfigRpc,...options});
+  try{await p.generate({userText:'a',assistantText:'b'},new AbortController().signal,{}, {isCurrent:()=>true,onRecord(){}});requests.push(structuredClone(Rpc.calls));}finally{p.close();}
+ }
+ const thread=requests.map(c=>c.find(x=>x.method==='thread/start').params),turn=requests.map(c=>c.find(x=>x.method==='turn/start').params);
+ expect(thread[0]).not.toHaveProperty('model');expect(turn[0]).not.toHaveProperty('effort');
+ expect(thread[1]).toEqual({...thread[0],model:'gpt-6-luna'});expect(turn[1]).toEqual({...turn[0],effort:'low'});
+ expect(requests[0].some(c=>c.method==='model/list')).toBe(false);
+ expect(requests[1].findIndex(c=>c.method==='model/list')).toBeLessThan(requests[1].findIndex(c=>c.method==='thread/start'));
+});
