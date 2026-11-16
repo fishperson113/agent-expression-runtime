@@ -31,12 +31,12 @@ it('forbids textual replies and bounds scene plans',()=>{
  expect(()=>parsePresentation(JSON.stringify({...result,scenes:[{...result.scenes[0],holdMs:999999}]}))).toThrow();
 });
 it('uses an independent read-only no-tools thread with public data only',async()=>{
- const provider=make(); const exchange={userText:'flink la gi',assistantText:'Published answer',privateReasoning:'secret'};
+ const provider=make(); const exchange={userText:'flink la gi',assistantText:'Published answer',publicContext:'streaming-only context',privateReasoning:'secret'};
  const scenes=await provider.generate(exchange,new AbortController().signal,{partIds:['face']}); expect(scenes).toHaveLength(1);
  const thread=Rpc.calls.find(c=>c.method==='thread/start').params;
  expect(thread).toMatchObject({ephemeral:true,serviceTier:'priority',sandbox:'read-only',approvalPolicy:'never',developerInstructions:''});
  const turn=Rpc.calls.find(c=>c.method==='turn/start').params;
- expect(turn.input[0].text).not.toContain('secret');expect(turn.threadId).toBe('visual-thread');provider.close();
+ expect(turn.input[0].text).not.toContain('secret');expect(JSON.parse(turn.input[0].text)).not.toHaveProperty('publicContext');expect(turn.threadId).toBe('visual-thread');provider.close();
 });
 it('rejects nonempty tool catalogs before model generation',async()=>{
  Rpc.badCatalog=true;const provider=make();try{await expect(provider.generate({userText:'a',assistantText:'b'},new AbortController().signal,{})).rejects.toThrow('presentation_catalog');
@@ -150,4 +150,25 @@ it('closing after an emitted record never replays or retracts that receipt',asyn
  const records=[];const provider=new NativePresentationProvider({host:{command:'fake',args:[]},runtime:{cwd:'fake',env:{}},Rpc:RecordRpc});
  await expect(provider.generate({userText:'x',assistantText:'y'},new AbortController().signal,{}, {isCurrent:()=>true,onRecord:record=>{records.push(record);provider.close();}})).rejects.toThrow('presentation_aborted');
  expect(records).toEqual([{mode:'retain',payload:null}]);expect(provider.active).toBeUndefined();
+});
+
+
+it.each([false,true])('preserves bounded public context only for independent streaming freeform compact=%s',async compact=>{
+ class ContextRpc extends Rpc {
+  async request(method,params){if(method!=='turn/start')return super.request(method,params);Rpc.calls.push({method,params});queueMicrotask(()=>{
+   this.notify('item/completed',{threadId:'visual-thread',item:{id:'context',type:'agentMessage',phase:'final_answer',text:compact?' {"base":"retain"}':'{"mode":"retain","payload":null}'}});
+   this.notify('turn/completed',{threadId:'visual-thread',turn:{id:'visual-turn',status:'completed'}});
+  });return {turn:{id:'visual-turn'}};}
+ }
+ const provider=new NativePresentationProvider({host:{command:'fake',args:[]},runtime:{cwd:'fake',env:{}},Rpc:ContextRpc,compact});
+ const target='The service restarts.',context='Only if the operator approves. '+target;
+ try{
+  await provider.generate({userText:'Explain.',assistantText:target,target,publicContext:context,privateReasoning:'SECRET'},new AbortController().signal,{}, {isCurrent:()=>true,onRecord:()=>{}});
+  const data=JSON.parse(Rpc.calls.find(c=>c.method==='turn/start').params.input[0].text);
+  expect(data).toMatchObject({assistantText:target,target,publicContext:context});expect(data.privateReasoning).toBeUndefined();
+  expect(Rpc.calls.find(c=>c.method==='thread/start').params.baseInstructions).toContain('Missing context is not evidence');
+  await provider.generate({userText:'Explain.',assistantText:target,target,publicContext:'x'.repeat(4096)+'😀'+'z'.repeat(4095)},new AbortController().signal,{}, {isCurrent:()=>true,onRecord:()=>{}});
+  const bounded=JSON.parse(Rpc.calls.find(c=>c.method==='turn/start').params.input[0].text).publicContext;
+  expect(bounded).toBe('z'.repeat(4095));
+ }finally{provider.close();}
 });
