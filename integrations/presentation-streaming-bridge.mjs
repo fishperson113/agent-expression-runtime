@@ -92,12 +92,13 @@ export class LiveStreamingPresentationBridge {
     job.sourceQuote=cp.target??cp.textPrefix.slice(job.sourceStart,job.sourceEnd);
     if(cp.textPrefix.slice(job.sourceStart,job.sourceEnd)!==job.sourceQuote){this.emit('drop',{code:'source_binding_invalid'});return;}
     this.emit('checkpoint',{sourceAt,revision:cp.checkpointRevision,sourceStart:Math.max(job.section,cp.sourceStart),previousCheckpointEnd:cp.previousEnd,sourceEnd:cp.sourceEnd,publishedAt:cp.observedAt,sectionPublishedAt:job.sectionPublishedAt,sourceHash:job.sourceHash});
-    if(this.protocol!=='diagram'&&this.boundedSourceLease&&this.selected?.admitted&&this.valid(this.selected)&&this.now()<this.selected.holdUntil){this.pending=job;this.emit('coalesced',{revision:cp.checkpointRevision});this.scheduleDrain();return;}
     if(!this.boundedSourceLease&&this.selected?.admitted&&this.selected.section===section&&this.valid(this.selected)){this.emit('covered',{revision:cp.checkpointRevision});return;}
     if(this.active&&(this.boundedSourceLease||this.selected?.section===section)&&this.valid(this.selected)){this.pending=job;this.emit('coalesced',{revision:cp.checkpointRevision});return;}
     this.dispatch(job);
   }
-  dispatch(job){if(this.protocol==='diagram'){prepareDiagram(this,job);return;}clearTimeout(this.holdTimer);this.selected?.controller.abort();this.serial++;job.serial=this.serial;this.selected=job;this.pending=job;
+  dispatch(job){if(this.protocol==='diagram'){prepareDiagram(this,job);return;}
+    job.promotionNotBefore=this.boundedSourceLease?Math.min(this.selected?.expiresAt??0,this.selected?.holdUntil??this.selected?.promotionNotBefore??0):0;
+    clearTimeout(this.holdTimer);this.selected?.controller.abort();this.serial++;job.serial=this.serial;this.selected=job;this.pending=job;
     void this.selectBrowser(job).catch(error=>this.emit('error',{code:error.message}));}
   invalidateSource(reason='source_selected'){this.displayed=null;clearTimeout(this.holdTimer);if(this.selected)this.emit('source_revoked',{revision:this.selected.checkpoint.checkpointRevision,reason});this.selected?.controller?.abort();this.serial++;this.selected=null;this.pending=null;this.active?.controller.abort();
     this.revokeBrowser();}
@@ -124,10 +125,8 @@ export class LiveStreamingPresentationBridge {
     if(!this.valid(job)||!job.scene?.scope){this.emit('drop',{code:'source_unavailable',revision:job.checkpoint.checkpointRevision});return;}
     this.drain();
   }
-  scheduleDrain(){clearTimeout(this.holdTimer);this.holdTimer=setTimeout(()=>this.drain(),Math.max(1,(this.selected?.holdUntil??this.now())-this.now()));}
   drain(){
     if(this.active||!this.pending)return;
-    if(this.protocol!=='diagram'&&this.boundedSourceLease&&this.selected?.admitted&&this.valid(this.selected)&&this.now()<this.selected.holdUntil){this.scheduleDrain();return;}
     if(this.pending!==this.selected){const next=this.pending;if(this.now()>=next.expiresAt){this.pending=null;return;}this.dispatch(next);return;}
     if(this.protocol!=='diagram'&&!this.pending.scene?.scope)return;
     const job=this.pending;this.pending=null;if(!this.valid(job))return;
@@ -147,6 +146,10 @@ export class LiveStreamingPresentationBridge {
   async apply(job,record){if(this.protocol==='diagram')return applyPreparedDiagram(this,job,record);
     if(!this.valid(job))return;
     const body=presentationBody(record,job.scene.scope);if(!body){this.emit('retain',{revision:job.checkpoint.checkpointRevision});return;}
+    // Authoring overlaps the old scene's dwell, but admission does not. This
+    // gate never extends either source lease and is rechecked after every wait.
+    while(!job.controller.signal.aborted&&this.valid(job)&&this.now()<job.promotionNotBefore)await sleep(Math.min(50,job.promotionNotBefore-this.now(),this.remaining(job)));
+    if(job.controller.signal.aborted||!this.valid(job))return;
     let receipt;
     while(this.valid(job)){
       receipt=await this.evaluate(value=>window.fischLive?.applyPreparedPresentation?.(value),{scope:job.scene.scope,body,replacement:record.mode==='compose'&&record.payload?.base==='none',...(record.annotations?{annotations:record.annotations}:{}),...(record.diagram?{diagram:record.diagram}:{})},job,late=>{if(late?.status==='accepted'){this.emit('admitted_stale',{revision:job.checkpoint.checkpointRevision,sourceHash:job.sourceHash});void revokeFreeformReceipt(this,late);}}).catch(error=>{this.emit('admission_unknown',{code:error.message,revision:job.checkpoint.checkpointRevision,sourceHash:job.sourceHash});throw error;});

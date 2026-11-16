@@ -116,8 +116,9 @@ it('opt-in bounded lease coalesces latest pending and retains original TTL after
  f.append('Day la cau giai thich thu nhat. ');await tick();const first=f.calls.find(c=>c.ex);
  f.advance();f.append('\n**Chu de moi**\nDay la chu de thu hai. ');await tick();
  first.stream.onRecord({mode:'compose',payload:{base:'none',parts:[{id:'role',kind:'ellipsoid',center:[0,0,0],scale:[.2,.2,.2]}]}});await tick();
- const expiry=f.bridge.selected.expiresAt;f.releases.shift()();await tick();expect(f.calls.filter(c=>c.ex)).toHaveLength(1);
- f.advance(2501);f.bridge.drain();await tick();expect(f.calls.filter(c=>c.ex)).toHaveLength(2);expect(expiry).toBe(11000);
+ const expiry=f.bridge.selected.expiresAt;f.releases.shift()();await tick();expect(f.calls.filter(c=>c.ex)).toHaveLength(2);
+ const second=f.calls.filter(c=>c.ex).at(-1);second.stream.onRecord(composed);await tick();expect(f.calls.filter(c=>c.arg?.body)).toHaveLength(1);
+ expect(f.bridge.selected.expiresAt).toBe(11100);f.advance(2501);await new Promise(r=>setTimeout(r,60));expect(f.calls.filter(c=>c.arg?.body)).toHaveLength(2);expect(expiry).toBe(11000);
  f.snapshot.messages[1].text='replacement';f.send('item/agentMessage/delta');await tick();expect(f.calls.filter(c=>c.ex).at(-1).signal.aborted).toBe(true);
  f.bridge.close();f.releases.forEach(r=>r());await tick();
 });
@@ -296,4 +297,46 @@ it.each([{ttl:25,limit:1000,source:true},{ttl:25.5,limit:1000,source:true},{ttl:
   complete({status:'accepted',epoch:'e',sceneRevision:2,seq:3});await vi.advanceTimersByTimeAsync(0);
   expect(late).toHaveBeenCalledWith({status:'accepted',epoch:'e',sceneRevision:2,seq:3});
  }finally{f.bridge.close();await vi.advanceTimersByTimeAsync(1);vi.useRealTimers();}
+});
+
+for(const ending of ['correction','expiry','close'])it(`does not promote staged output during display hold after ${ending}`,async()=>{
+ const f=fixture({boundedSourceLease:true});f.append('Initial public explanation. ');await tick();
+ f.calls.find(c=>c.ex).stream.onRecord(composed);await tick();f.releases.shift()();await tick();
+ f.advance(100);f.append('Another complete public explanation. ');await tick();
+ const second=f.calls.filter(c=>c.ex).at(-1);expect(f.calls.filter(c=>c.ex)).toHaveLength(2);
+ second.stream.onRecord(composed);await tick();expect(f.calls.filter(c=>c.arg?.body)).toHaveLength(1);
+ const deadline=f.bridge.selected.expiresAt;
+ if(ending==='correction'){f.snapshot.messages[1].text='Corrected source.';f.send('item/agentMessage/delta');}
+ else if(ending==='expiry')f.advance(10001);
+ else f.bridge.close();
+ await new Promise(r=>setTimeout(r,65));expect(f.calls.filter(c=>c.arg?.body)).toHaveLength(1);
+ expect(second.stream.isCurrent()).toBe(false);if(ending==='expiry')expect(f.bridge.selected.expiresAt).toBe(deadline);
+ f.bridge.close();f.releases.forEach(r=>r());await tick();
+});
+
+it('author failure during dwell cancels promptly and drains newest without applying failed record',async()=>{
+ const f=fixture({boundedSourceLease:true});f.append('Initial public explanation. ');await tick();
+ f.calls.find(c=>c.ex).stream.onRecord(composed);await tick();f.releases.shift()();await tick();
+ let reject;f.bridge.provider.generate=async(ex,signal,scene,stream)=>{f.calls.push({ex,signal,stream});stream.onRecord(composed);await new Promise((_,r)=>reject=r);};
+ f.advance(100);f.append('Second public explanation. ');await tick();
+ f.advance(100);f.append('Third newest public explanation. ');await tick();expect(f.calls.filter(c=>c.ex)).toHaveLength(2);
+ f.bridge.provider.generate=async(ex,signal,scene,stream)=>{f.calls.push({ex,signal,stream});await new Promise(r=>f.releases.push(r));};
+ reject(Error('corrected_after_record'));await new Promise(r=>setTimeout(r,90));
+ expect(f.calls.filter(c=>c.ex)).toHaveLength(3);expect(f.calls.filter(c=>c.ex).at(-1).ex.target).toContain('Third newest');
+ expect(f.calls.filter(c=>c.arg?.body)).toHaveLength(1);expect(f.events.some(e=>e.code==='corrected_after_record')).toBe(true);
+ f.bridge.close();f.releases.forEach(r=>r());await tick();
+});
+it('retain and latest pending preserve old display hold without renewing candidate deadline',async()=>{
+ const f=fixture({boundedSourceLease:true});f.append('Initial public explanation. ');await tick();
+ f.calls.find(c=>c.ex).stream.onRecord(composed);await tick();f.releases.shift()();await tick();
+ const hold=f.bridge.selected.holdUntil,oldExpiry=f.bridge.selected.expiresAt;
+ f.advance(100);f.append('Second public explanation. ');await tick();
+ const second=f.calls.filter(c=>c.ex).at(-1);second.stream.onRecord({mode:'retain'});await tick();
+ f.advance(100);f.append('Third public explanation. ');f.advance(100);f.append('Fourth newest public explanation. ');await tick();
+ expect(f.calls.filter(c=>c.ex)).toHaveLength(2);f.releases.shift()();await tick();
+ expect(f.calls.filter(c=>c.ex)).toHaveLength(3);const third=f.calls.filter(c=>c.ex).at(-1);expect(third.ex.target).toContain('Fourth newest');
+ expect(f.bridge.selected.promotionNotBefore).toBe(hold);expect(f.bridge.selected.expiresAt).toBe(oldExpiry);
+ third.stream.onRecord(composed);await tick();expect(f.calls.filter(c=>c.arg?.body)).toHaveLength(1);
+ f.advance(2500);await new Promise(r=>setTimeout(r,65));expect(f.calls.filter(c=>c.arg?.body)).toHaveLength(2);expect(f.bridge.selected.expiresAt).toBe(oldExpiry);
+ f.bridge.close();f.releases.forEach(r=>r());await tick();
 });
