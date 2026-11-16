@@ -1,3 +1,4 @@
+import { types } from 'node:util';
 const fields = ['userText', 'target', 'publicContext', 'assistantText'];
 const own = (value, key) => Object.getOwnPropertyDescriptor(value, key);
 const invalid = () => { throw Error('presentation_asset_job_invalid'); };
@@ -38,6 +39,7 @@ export function bindAssetJob(library, exchange) {
     snapshot[key] = descriptor.value;
   }
   const job = library.createJob(Object.freeze(snapshot));
+  if (types.isPromise(job)) { Promise.prototype.then.call(job, undefined, () => {}); invalid(); }
   if (!job || typeof job !== 'object' || ![Object.prototype, null].includes(Object.getPrototypeOf(job)) || 'then' in job) invalid();
   const parser = own(job, 'parseRecord'), data = own(job, 'input');
   if (!parser || typeof parser.value !== 'function' || !data || !Object.hasOwn(data, 'value') || !data.value || Array.isArray(data.value) || typeof data.value !== 'object') invalid();

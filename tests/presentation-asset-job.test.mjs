@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import {expect,it} from 'vitest';
 import {bindAssetJob} from '../integrations/presentation-asset-job.mjs';
 import {NativePresentationProvider} from '../integrations/presentation-provider.mjs';
@@ -67,4 +68,16 @@ it('enforces exact JSON UTF8 byte boundary and bounded depth/value count',()=>{
  expect(()=>bind({v:'x'.repeat(65529)})).toThrow();expect(()=>bind({v:'\u{1f600}'.repeat(16383)})).toThrow();
  let depth={};for(let i=0;i<32;i++)depth={v:depth};expect(()=>bind(depth)).not.toThrow();depth={v:depth};expect(()=>bind(depth)).toThrow();
  expect(()=>bind({v:Array(16382).fill(0)})).not.toThrow();expect(()=>bind({v:Array(16383).fill(0)})).toThrow();
+});
+
+it('observes rejected native factory promises without unhandled rejection or RPC',()=>{
+ const providerUrl=new URL('../integrations/presentation-provider.mjs',import.meta.url).href;
+ const code=`import {NativePresentationProvider} from ${JSON.stringify(providerUrl)};
+ let allocated=0;class Rpc{constructor(){allocated++;}}
+ for(const createJob of [()=>Promise.reject(Error('rejected')),async()=>{throw Error('async_rejected');}]){
+ const p=new NativePresentationProvider({host:{command:'fixture',args:[]},runtime:{cwd:'fixture',env:{}},Rpc,compact:true,assetLibrary:{policy:'fixed',parseRecord:()=>{},createJob}});
+ let rejected=false;try{await p.generate({userText:'u',target:'t',publicContext:'c'},new AbortController().signal,{}, {isCurrent:()=>true,onRecord(){}});}catch(e){if(e.message!=='presentation_asset_job_invalid')throw e;rejected=true;}
+ if(!rejected||allocated)throw Error('invalid_factory_lifecycle');await p.close();}
+ await new Promise(r=>setImmediate(r));`;
+ expect(()=>execFileSync(process.execPath,['--unhandled-rejections=strict','--input-type=module','-e',code],{stdio:'pipe',timeout:10000})).not.toThrow();
 });
