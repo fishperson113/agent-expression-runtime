@@ -137,3 +137,35 @@ it('distinguishes Markdown blockquotes from ordinary quoted dialogue', () => {
   const dialogue = '"' + a + '"';
   expect(new PublicParagraphSources().update(input(dialogue + '\n\n')).checkpoint.target).toBe(dialogue);
 });
+it('accepts bounded complete emoji graphemes without changing the source quote', () => {
+  for (const suffix of ['\u{1f600}', '\u2764\ufe0f', '\u{1f44d}\u{1f3fd}', '\u{1f469}\u200d\u{1f4bb}', '\u{1f1fb}\u{1f1f3}', '1\ufe0f\u20e3', '\u{1f645}', '\u{1f600}'.repeat(8)]) {
+    const quote = a + ' ' + suffix;
+    const cp = new PublicParagraphSources().update(input(quote, { completed: true })).checkpoint;
+    expect(cp.target).toBe(quote); expect(cp.sourceText).toBe(quote); expect(cp.publicContext).toBe(quote);
+  }
+});
+it('does not treat words, malformed emoji, excessive emoji or unpunctuated text as closure', () => {
+  for (const quote of [a + ' \u{1f600} ordinary', a + ' \u{1f600}\u200d', a + ' \ufe0f', a + ' \u{1f3fd}',
+    a + ' \u{1f600}'.repeat(9), a.slice(0, -1) + ' \u{1f600}', '- ' + a + ' \u{1f600}'])
+    expect(new PublicParagraphSources().update(input(quote, { completed: true })).checkpoint).toBeNull();
+});
+it('keeps emoji UTF16 spans, CRLF and first closure age without repeat renewal', () => {
+  const quote = a + ' \u{1f469}\u200d\u{1f4bb} \u{1f645}';
+  const text = 'Heading\r\n\r\n  ' + quote + '  \r\n\r\n';
+  const s = new PublicParagraphSources(); const cp = s.update(input(text)).checkpoint;
+  expect(cp.sourceStart).toBe(text.indexOf(quote)); expect(cp.sourceEnd).toBe(text.indexOf(quote) + quote.length);
+  expect(text.slice(cp.sourceStart, cp.sourceEnd)).toBe(quote); expect(cp.sourceAt).toBe(1000);
+  expect(s.update(input(text + quote + '\r\n\r\n', { at: 2000 })).checkpoint).toBeNull();
+  expect(s.firstSeen.get(quote)).toBe(1000);
+});
+it('does not backdate emoji closure and retires its source on immediate turn2 or correction', () => {
+  const quote = a + ' \u{1f469}\u200d\u{1f4bb}'; const s = new PublicParagraphSources();
+  expect(s.update(input(a + ' \u{1f469}\u200d')).checkpoint).toBeNull();
+  const cp = s.update(input(quote, { completed: true, at: 2000 })).checkpoint;
+  expect(cp.sourceAt).toBe(2000); expect(cp.target).toBe(quote);
+  const next = s.update(input('', { turnId: 't2', messageId: 'm2', at: 2001 }));
+  expect(next).toEqual({ revoked: true, reason: 'identity_changed', checkpoint: null });
+  expect(s.update(input(quote, { completed: true, at: 2002 })).reason).toBe('source_retired');
+  const corrected = new PublicParagraphSources(); corrected.update(input(quote + '\n\n'));
+  expect(corrected.update(input(a + ' \u{1f600}\n\n', { at: 2000 })).reason).toBe('text_corrected');
+});
