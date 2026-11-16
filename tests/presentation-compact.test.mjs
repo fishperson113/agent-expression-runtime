@@ -132,12 +132,12 @@ test('expanded shared motion follows canonical rigid transforms over time', asyn
 
 test('advertised base alternatives reject observed missing-parts outputs before semantic parsing',async()=>{
  const {default:Ajv}=await import('ajv');const {compactPresentationSchema}=await import('../integrations/presentation-compact.mjs');
- const {miniPresentationSchema}=await import('../integrations/presentation-provider.mjs');
- for(const schema of [compactPresentationSchema,miniPresentationSchema]){
+ const {miniPresentationSchema,parseMiniPresentation}=await import('../integrations/presentation-provider.mjs');
+ for(const [schema,decode] of [[compactPresentationSchema,read],[miniPresentationSchema,value=>parseMiniPresentation(JSON.stringify(value))]]){
   const validate=new Ajv({strict:false,strictNumbers:true}).compile(schema);
   for(const value of [{base:'keep'},{base:'replace'},{base:'keep',durationMs:600},{base:'keep',durationMs:500,style:{brightness:.55}},{base:'retain',parts:sample.parts},{base:'retain',durationMs:500},{base:'replace',parts:[]},{base:'keep',parts:null},{base:'replace',parts:null},...Object.entries({style:{brightness:.55},motions:[motionTuple],annotations:{labels:[]}}).map(([key,value])=>({base:'retain',[key]:value}))]){
-   assert.equal(validate(value),false,JSON.stringify(value));assert.throws(()=>read(value));
+   assert.equal(validate(value),false,JSON.stringify(value));assert.throws(()=>decode(value));
   }
-  for(const value of [{base:'retain'},sample,{...sample,base:'keep'},{...sample,style:{brightness:.55}},{...sample,motions:[motionTuple]}]){assert.equal(validate(value),true,JSON.stringify(validate.errors));assert.doesNotThrow(()=>read(value));}
+  for(const value of [{base:'retain'},sample,{...sample,base:'keep'},{...sample,style:{brightness:.55}},{...sample,motions:[motionTuple]}]){assert.equal(validate(value),true,JSON.stringify(validate.errors));assert.doesNotThrow(()=>decode(value));}
  }
 });
