@@ -14,8 +14,9 @@ afterAll(async () => { await browser?.close(); await server?.close(); });
 async function fixture(version) {
   const page = await browser.newPage();
   await page.clock.install({ time: new Date('2026-11-09T12:00:00Z') });
-  await page.goto(server.resolvedUrls.local[0] + 'live.html?fixture=synthetic'); await page.waitForFunction(() => !!window.fischLive);
   await page.clock.pauseAt(new Date('2026-11-09T12:00:30Z'));
+  await page.goto(server.resolvedUrls.local[0] + 'live.html?fixture=synthetic');
+  await page.waitForFunction(() => !!window.fischLive, null, { polling: 100 });
   await page.evaluate(version => {
     window.fischLive.configureReactive(true, version);
     const checkbox = document.querySelector('#enable-reactivity'); checkbox.checked = true; checkbox.dispatchEvent(new Event('change'));

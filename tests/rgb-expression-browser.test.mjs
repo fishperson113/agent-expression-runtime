@@ -42,9 +42,9 @@ it('renders provider-chosen RGB on the actual Live avatar through V2 causal admi
   const page = await browser.newPage(), color = '#a237c9';
   try {
     await page.clock.install({ time: new Date('2026-11-10T01:00:00Z') });
-    await page.goto(server.resolvedUrls.local[0] + 'live.html?fixture=synthetic');
-    await page.waitForFunction(() => !!window.fischLive);
     await page.clock.pauseAt(new Date('2026-11-10T01:00:30Z'));
+    await page.goto(server.resolvedUrls.local[0] + 'live.html?fixture=synthetic');
+    await page.waitForFunction(() => !!window.fischLive, null, { polling: 100 });
     await installRasterProbe(page);
     await page.clock.runFor(1100); await page.evaluate(() => window.fischLive.fixture('present'));
     await page.clock.runFor(800);
@@ -64,9 +64,10 @@ it('renders provider-chosen RGB on the actual Live avatar through V2 causal admi
     });
     const decision = await provider.decide(candidate.observationWindow);
     expect((await page.evaluate(value => window.fischLive.deliverReactiveDecision(value.requestId, value), decision)).reason).toBe('accepted');
+    const before = await page.evaluate(() => ({ now: performance.now(), frame: window.fischLive.metrics().render.frame }));
     await page.clock.runFor(550);
-    const observed = await page.evaluate(() => ({ baseline: window.rgbBaseline, probe: window.rgbProbe, metrics: window.fischLive.metrics() }));
-    expect(observed.probe.state).toBe(color); expect(observed.probe.shader).toBe(color.slice(1)); expect(observed.probe.frame).toBeGreaterThan(0);
+    const observed = await page.evaluate(() => ({ now: performance.now(), baseline: window.rgbBaseline, probe: window.rgbProbe, metrics: window.fischLive.metrics(), reactive: window.fischLive.reactiveStatus() }));
+    expect(observed.probe.state, JSON.stringify({ before, observed })).toBe(color); expect(observed.probe.shader).toBe(color.slice(1)); expect(observed.probe.frame).toBeGreaterThan(0);
     for (const raster of [observed.baseline, observed.probe.raster]) {
       expect(raster.contextLost).toBe(false); expect(raster.errorBefore).toBe(0); expect(raster.errorAfter).toBe(0);
       expect(raster.foreground).toBeGreaterThan(10);

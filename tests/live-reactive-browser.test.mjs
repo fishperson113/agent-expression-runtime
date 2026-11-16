@@ -10,9 +10,9 @@ afterAll(async () => { await browser?.close(); await server?.close(); });
 async function pageFixture() {
   const page = await browser.newPage();
   await page.clock.install({ time: new Date('2026-11-09T12:00:00Z') });
-  await page.goto(server.resolvedUrls.local[0] + 'live.html?fixture=synthetic');
-  await page.waitForFunction(() => !!window.fischLive);
   await page.clock.pauseAt(new Date('2026-11-09T12:00:30Z'));
+  await page.goto(server.resolvedUrls.local[0] + 'live.html?fixture=synthetic');
+  await page.waitForFunction(() => !!window.fischLive, null, { polling: 100 });
   await page.evaluate(() => { window.fischLive.configureReactive(true); const checkbox = document.querySelector('#enable-reactivity'); checkbox.checked = true; checkbox.dispatchEvent(new Event('change')); });
   return page;
 }
@@ -47,9 +47,12 @@ it('accepts compatible current hand frames and releases the owner at expiry', as
     const until = await page.evaluate(() => performance.now() + 100);
     expect((await deliver(page, req, express(req, until))).reason).toBe('accepted');
     expect((await page.evaluate(() => window.fischLive.metrics())).reactiveOwner).toBe('test_action');
+    const before = await page.evaluate(() => ({ now: performance.now(), frame: window.fischLive.metrics().render.frame }));
     await page.clock.runFor(120);
-    expect((await page.evaluate(() => window.fischLive.metrics())).reactiveOwner).toBeNull();
-    expect((await page.evaluate(() => window.fischLive.reactiveStatus())).owner).toBeNull();
+    const after = await page.evaluate(() => ({ now: performance.now(), body: window.fischLive.metrics(), reactive: window.fischLive.reactiveStatus() }));
+    const evidence = JSON.stringify({ until, before, after });
+    expect(after.body.reactiveOwner, evidence).toBeNull();
+    expect(after.reactive.owner, evidence).toBeNull();
   } finally { await page.close(); }
 }, 30000);
 it('revokes before delivery on camera unavailability, cancel, selected thread, user intent and stop', async () => {
