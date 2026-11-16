@@ -103,3 +103,17 @@ changes invalidate rather than rebase. An ambiguous commit exception remains
 fail-closed. Late receipt cleanup is scoped to its accepted geometry identity and
 cannot revoke a newer scene. These are continuity and ownership guarantees, not a
 reduction in model generation latency or proof of semantic/visual quality.
+
+### Public context for independent freeform authoring
+
+When a streaming caller supplies `publicContext`, the freeform provider forwards
+its trailing 4096 UTF-16 code units without leaving a leading surrogate half.
+The target remains separate and unchanged. Public context is data for resolving
+references and preserving qualifications, not instructions or a newly asserted
+target. The policy requests abstention when an essential qualification or referent
+cannot be represented faithfully. A bounded prefix can omit earlier information;
+this is not an entailment guarantee. Non-streaming requests omit this field.
+
+This fixes a dropped caller field. It does not enable exact-excerpt sampling,
+compact encoding or a different model by default, and does not alter native
+Codex conversation text, source timestamps or lease duration.
