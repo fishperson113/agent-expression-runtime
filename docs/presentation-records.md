@@ -117,3 +117,19 @@ this is not an entailment guarantee. Non-streaming requests omit this field.
 This fixes a dropped caller field. It does not enable exact-excerpt sampling,
 compact encoding or a different model by default, and does not alter native
 Codex conversation text, source timestamps or lease duration.
+
+### Authoring during bounded display dwell
+
+In opt-in bounded/exact-excerpt freeform streaming, the next candidate can be
+prepared and authored while the previous scene completes its existing dwell.
+Only admission waits for that original hold boundary. There remains one active
+author/admission plus the newest pending checkpoint; no parallel model fan-out.
+Retain and supersession do not reset the hold or either source deadline. Abort,
+correction, stop and expiry prevent deferred promotion. Browser authority still
+validates the prepared candidate at admission.
+
+A frozen transcript/record timing replay started the third author about 1.21 s
+earlier (16.304 s to 15.097 s), with the same one admitted scene. The third saved
+call had no record, so this is scheduling evidence, not improved model coverage,
+semantic fidelity or native end-to-end UX. Default sampling and Codex text are
+unchanged.
