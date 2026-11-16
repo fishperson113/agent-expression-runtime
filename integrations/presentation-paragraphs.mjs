@@ -7,11 +7,26 @@ function identityOf(input) {
   if (keys.some(key => typeof input[key] !== 'string' || !input[key] || input[key].length > 256)) return null;
   return JSON.stringify([...keys.map(key => input[key]), input.generation, input.role]);
 }
+const emojiSegments = new Intl.Segmenter('und', { granularity: 'grapheme' });
+const emojiCluster = /^(?:\p{RGI_Emoji})$/v;
+function hasClosedSuffix(quote) {
+  const punctuation = /[.!?。！？]["'”’)]*$/u;
+  if (punctuation.test(quote)) return true;
+  const clusters = [...emojiSegments.segment(quote)];
+  let count = 0;
+  for (let i = clusters.length - 1; i >= 0; i--) {
+    const { segment, index } = clusters[i];
+    if (/^[\t ]+$/u.test(segment)) continue;
+    if (!emojiCluster.test(segment) || ++count > 8) break;
+    if (punctuation.test(quote.slice(0, index).replace(/[\t ]+$/u, ''))) return true;
+  }
+  return false;
+}
 function eligible(raw) {
   const quote = raw.trim();
   return quote.length >= 80 && quote.length <= 1024 && !/[\r\n]/u.test(quote)
     && !/^\s*(?:#{1,6}\s|[-*+>]\s|\d+[.)]\s|\| |\*\*.*\*\*$|__.*__$)/u.test(quote)
-    && /[.!?。！？]["'”’)]*$/u.test(quote);
+    && hasClosedSuffix(quote);
 }
 function closedParagraphs(text, completed) {
   const result = []; let begin = 0, lines = [], fence = null;
