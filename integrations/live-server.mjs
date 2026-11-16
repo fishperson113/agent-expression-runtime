@@ -20,7 +20,8 @@ export async function startLiveServer({root,production=true,signal,first=randomI
       if(server)await server.close();
       if(signal?.aborted)throw Error('live_start_cancelled');
       // Vite wraps EADDRINUSE with this exact message, without retaining code.
-      if(error.code!=='EADDRINUSE'&&error.message!==`Port ${port} is already in use`)throw error;
+      const reserved=error.code==='EACCES'&&error.syscall==='listen'&&error.address==='127.0.0.1'&&error.port===port;
+      if(!reserved&&error.code!=='EADDRINUSE'&&error.message!==`Port ${port} is already in use`)throw error;
     }
   }
   throw Error('live_port_exhausted');
