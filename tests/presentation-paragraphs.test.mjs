@@ -169,3 +169,105 @@ it('does not backdate emoji closure and retires its source on immediate turn2 or
   const corrected = new PublicParagraphSources(); corrected.update(input(quote + '\n\n'));
   expect(corrected.update(input(a + ' \u{1f600}\n\n', { at: 2000 })).reason).toBe('text_corrected');
 });
+
+const listSource = () => new PublicParagraphSources({ allowListItems: true });
+const itemA = '- **Useful feedback:** ' + a;
+const itemB = '2. **Qualified example:** ' + b;
+it('keeps list items opt-in and exact markup until a positive sibling boundary', () => {
+  const s = listSource();
+  expect(s.update(input(itemA + '\n\n')).checkpoint).toBeNull();
+  expect(s.update(input(itemA + '\n\n- ', { at: 1100 })).checkpoint).toBeNull();
+  const cp = s.update(input(itemA + '\n\n- next', { at: 1200 })).checkpoint;
+  expect(cp.target).toBe(itemA); expect(cp.sourceAt).toBe(1200);
+  expect(cp.textPrefix).toBe(itemA); expect(cp.publicContext).toBe(itemA + '\n\n- next');
+  expect(new PublicParagraphSources().update(input(itemA, { completed: true })).checkpoint).toBeNull();
+});
+it('accepts unordered and ordered single-line items at terminal or heading closure', () => {
+  for (const marker of ['- ', '* ', '+ ', '1. ', '23) ']) {
+    const quote = marker + '**Example:** ' + a;
+    expect(listSource().update(input(quote, { completed: true })).checkpoint.target).toBe(quote);
+    expect(listSource().update(input(quote + '\n\n# Next section')).checkpoint.target).toBe(quote);
+  }
+});
+it('rejects all wrapped, lazy, nested, fenced and blockquoted continuations without prose leakage', () => {
+  for (const suffix of ['\n' + b, '\n  ' + b, '\n\n\t' + b,
+    '\n  - ' + b, '\n\n```text\n' + b + '\n```', '\n> ' + b]) {
+    expect(listSource().update(input(itemA + suffix, { completed: true })).checkpoint).toBeNull();
+  }
+  for (const prefix of ['  - ', '\t- ', '- ', '1. ']) {
+    expect(listSource().update(input(prefix + '\n' + b, { completed: true })).checkpoint).toBeNull();
+  }
+});
+it('preserves CRLF UTF16 offsets, inline quotes and punctuation plus emoji without slicing', () => {
+  const quote = '+ **Example:** ' + a + ' 😀';
+  const text = 'Heading 😀\r\n\r\n' + quote + '\r\n\r\n2) Next';
+  const cp = listSource().update(input(text)).checkpoint;
+  expect(cp.target).toBe(quote); expect(cp.sourceStart).toBe(text.indexOf(quote));
+  expect(cp.sourceEnd).toBe(text.indexOf(quote) + quote.length);
+  expect(text.slice(cp.sourceStart, cp.sourceEnd)).toBe(quote);
+});
+it('does not relax minimum length, colon endings, malformed emoji or maximum source size', () => {
+  for (const quote of ['- Small.', '- ' + a.slice(0, -1) + ':', '- ' + a + ' note', '- ' + 'x'.repeat(1024) + '.'])
+    expect(listSource().update(input(quote, { completed: true })).checkpoint).toBeNull();
+});
+it('keeps first observed true closure for repeats and skipped items without reminting', () => {
+  const s = listSource(), text = itemA + '\n' + itemB + '\n- next';
+  expect(s.update(input(text)).checkpoint.target).toBe(itemB);
+  const cp = s.update(input(text + '\n' + itemA + '\n+ next', { at: 5000 })).checkpoint;
+  expect(cp.target).toBe(itemA); expect(cp.sourceAt).toBe(1000);
+  expect(s.update(input(text + '\n' + itemA + '\n+ next\n' + itemB + '\n- next', { at: 6000 })).checkpoint).toBeNull();
+});
+it('retains all context and revokes rewritten or terminal-reopened items', () => {
+  const prior = 'This is conditional, not an observed successful result.';
+  const s = listSource(); const cp = s.update(input(itemA + '\n- next', { publicContext: prior })).checkpoint;
+  expect(cp.publicContext).toBe(prior + '\n\n' + itemA + '\n- next');
+  expect(s.update(input(itemA + '\n  continuation', { publicContext: prior, at: 2000 })).revoked).toBe(true);
+  expect(s.update(input(itemA + '\n- next', { publicContext: prior, at: 3000 })).checkpoint).toBeNull();
+  const terminal = listSource(); terminal.update(input(itemA, { completed: true }));
+  expect(terminal.update(input(itemA + '\n  continuation', { completed: true, at: 2000 })).reason).toBe('terminal_regressed');
+  expect(listSource().update(input(itemA, { completed: true, publicContext: 'x'.repeat(4096) })).reason).toBe('context_limit');
+});
+it('does not harvest list-looking text within a fence or trailing continuation of indented items', () => {
+  expect(listSource().update(input('```\n' + itemA + '\n' + itemB + '\n```', { completed: true })).checkpoint).toBeNull();
+  expect(listSource().update(input('  ' + itemA + '\n' + b, { completed: true })).checkpoint).toBeNull();
+});
+it('closes on observed zero-indent prose after a blank, never the blank alone', () => {
+  const s = listSource();
+  expect(s.update(input(itemA + '\n\n')).checkpoint).toBeNull();
+  const cp = s.update(input(itemA + '\n\nNext', { at: 2000 })).checkpoint;
+  expect(cp.target).toBe(itemA); expect(cp.sourceAt).toBe(2000);
+  expect(s.update(input(itemA + '\n\nNext conclusion continues.', { at: 3000 })).checkpoint).toBeNull();
+  const completed = listSource().update(input(itemA + '\n\n' + b, { completed: true }));
+  expect(completed.checkpoint.target).toBe(b);
+  expect(listSource().update(input(itemA + '\n\n  ' + b, { completed: true })).checkpoint).toBeNull();
+});
+it('observes partial headings only when nonempty and keeps first closure through append', () => {
+  const s = listSource();
+  expect(s.update(input(itemA + '\n# ')).checkpoint).toBeNull();
+  expect(s.update(input(itemA + '\n# Next', { at: 2000 })).checkpoint.sourceAt).toBe(2000);
+  expect(s.update(input(itemA + '\n# Next heading', { at: 3000 })).checkpoint).toBeNull();
+  expect(listSource().update(input(itemA + '\n```\n# Next\n```', { completed: true })).checkpoint).toBeNull();
+});
+it('rejects tab and code-indented marker padding while preserving one through four spaces', () => {
+  for (const padding of ['\t', '     ', ' \t', '\t ']) {
+    const quote = '-' + padding + a;
+    expect(listSource().update(input(quote, { completed: true })).checkpoint).toBeNull();
+    expect(listSource().update(input(quote + '\n' + b, { completed: true })).checkpoint).toBeNull();
+  }
+  for (let width = 1; width <= 4; width++) {
+    const quote = '-' + ' '.repeat(width) + a;
+    expect(listSource().update(input(quote, { completed: true })).checkpoint.target).toBe(quote);
+  }
+});
+it('explicit false preserves all legacy output bytes across streamed prose and unsupported lists', () => {
+  const aDefault = new PublicParagraphSources(), explicit = new PublicParagraphSources({ allowListItems: false });
+  for (const [i, text] of [a, a + '\n\n', a + '\n\n' + itemA, a + '\n\n' + itemA + '\n\n' + b].entries()) {
+    const value = input(text, { at: 1000 + i, completed: i === 3 });
+    expect(JSON.stringify(explicit.update(value))).toBe(JSON.stringify(aDefault.update(value)));
+  }
+});
+it('does not treat nested block structures on the marker line as ordinary list prose', () => {
+  for (const prefix of ['- > ', '- # ', '- - ', '- 1. ', '- ```', '- ~~~']) {
+    expect(listSource().update(input(prefix + a, { completed: true })).checkpoint).toBeNull();
+  }
+});
