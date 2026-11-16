@@ -105,7 +105,7 @@ export class LiveStreamingPresentationBridge {
   revokeBrowser(){
     this.revocation=this.browserFault?Promise.resolve():this.evaluate(()=>window.fischLive?.revokePresentation?.()).catch(()=>{});
   }
-  valid(job){const s=this.state.conversation.snapshot();return !this.closed&&!this.browserFault&&this.selected===job&&this.remaining(job)>0&&
+  valid(job){const s=this.state.conversation.snapshot();return !this.closed&&!this.browserFault&&!job.controller.signal.aborted&&this.selected===job&&this.remaining(job)>0&&
     !this.state.channel.stale&&s.available&&!s.pending&&!s.stopping&&!s.error&&s.messages.filter(m=>m.role==='user').at(-1)?.turn===job.turnId&&s.generation===job.generation&&
     (!s.ownerTurn||s.ownerTurn===job.turnId)&&this.state.channel.token===job.documentId&&this.state.output.thread===job.threadId&&
     s.messages.some(m=>m.id===job.messageId&&m.turn===job.turnId&&!m.truncated&&['streaming','completed'].includes(m.status)&&m.text.startsWith(job.checkpoint.textPrefix)&&(this.boundedSourceLease||presentationSection(m.text)===job.section));}
@@ -136,12 +136,17 @@ export class LiveStreamingPresentationBridge {
     void Promise.resolve().then(()=>this.provider.generate({userText:job.userText,assistantText:job.checkpoint.sourceText,
       target:job.sourceQuote,
       ...(this.exactExcerptLease?{publicContext:job.checkpoint.textPrefix.slice(-4096)}:{})},controller.signal,{partIds:job.scene.partIds},{
-      isCurrent:()=>this.valid(job),onConfiguration:config=>this.emit('configuration',{revision:job.checkpoint.checkpointRevision,config}),onRejectedRecord:value=>this.emit('rejected_record',{revision:job.checkpoint.checkpointRevision,...value}),onPhase:phase=>this.emit('phase',{revision:job.checkpoint.checkpointRevision,phase}),onUsage:usage=>this.emit('usage',{revision:job.checkpoint.checkpointRevision,usage}),onRecord:record=>{admission=this.apply(job,record);admission.catch(()=>{});}
+      isCurrent:()=>this.valid(job),onFailure:()=>this.failAuthor(job),onConfiguration:config=>this.emit('configuration',{revision:job.checkpoint.checkpointRevision,config}),onRejectedRecord:value=>this.emit('rejected_record',{revision:job.checkpoint.checkpointRevision,...value}),onPhase:phase=>this.emit('phase',{revision:job.checkpoint.checkpointRevision,phase}),onUsage:usage=>this.emit('usage',{revision:job.checkpoint.checkpointRevision,usage}),onRecord:record=>{admission=this.apply(job,record);admission.catch(()=>{});}
     })).then(()=>admission).catch(async error=>{controller.abort();await admission.catch(()=>{});if(this.protocol==='diagram')await revokeDiagramReceipt(this,job.displayedOwned);this.emit('drop',{code:error.message,revision:job.checkpoint.checkpointRevision});
       if(this.protocol!=='diagram'){await cancelFreeformCandidate(this,job);await revokeFreeformReceipt(this,job.displayedOwned);}
     }).finally(()=>{
       if(!this.boundedSourceLease&&job.admitted&&this.pending?.section===job.section)this.pending=null;
       clearTimeout(timer);this.emit('author_end',{revision:job.checkpoint.checkpointRevision});this.active=null;this.drain();});
+  }
+  failAuthor(job){
+    job.controller.abort();
+    if(this.protocol==='diagram')void revokeDiagramReceipt(this,job.displayedOwned);
+    else {void cancelFreeformCandidate(this,job);void revokeFreeformReceipt(this,job.displayedOwned);}
   }
   async apply(job,record){if(this.protocol==='diagram')return applyPreparedDiagram(this,job,record);
     if(!this.valid(job))return;
