@@ -172,3 +172,24 @@ it.each([false,true])('preserves bounded public context only for independent str
   expect(bounded).toBe('z'.repeat(4095));
  }finally{provider.close();}
 });
+
+it('opts into immutable asset references only for compact streaming without forcing selection',async()=>{
+ const {createPresentationAssetLibrary}=await import('../integrations/presentation-assets.mjs');
+ const assetLibrary=createPresentationAssetLibrary([{id:'oval',description:'A reusable oval, no assigned feeling.',record:{mode:'compose',payload:{base:'none',parts:[{id:'oval',kind:'ellipsoid',center:[0,0,0],scale:[0.2,0.2,0.2]}]}}}]);
+ for(const choose of ['reuse','retain']){
+  const text=choose==='reuse'?JSON.stringify({base:'reuse',assetId:'oval',sha256:assetLibrary.catalog[0].sha256}):'{"base":"retain"}';
+  class AssetRpc extends Rpc {async request(method,params){if(method!=='turn/start')return super.request(method,params);Rpc.calls.push({method,params});queueMicrotask(()=>{
+   this.notify('item/completed',{threadId:'visual-thread',item:{id:'asset',type:'agentMessage',phase:'final_answer',text}});
+   this.notify('turn/completed',{threadId:'visual-thread',turn:{id:'visual-turn',status:'completed'}});
+  });return {turn:{id:'visual-turn'}};}}
+  const provider=new NativePresentationProvider({host:{command:'fake',args:[]},runtime:{cwd:'fake',env:{}},Rpc:AssetRpc,compact:true,assetLibrary}),records=[];
+  await provider.generate({userText:'public',assistantText:'public',target:'public'},new AbortController().signal,{}, {isCurrent:()=>true,onRecord:r=>records.push(r)});
+  expect(records[0].mode).toBe(choose==='reuse'?'compose':'retain');
+  const thread=Rpc.calls.find(c=>c.method==='thread/start').params;expect(thread.baseInstructions).toContain('Optional local reusable geometry assets');
+  expect(thread.baseInstructions).toContain('necessary conditions');expect(thread.model).toBeUndefined();
+  expect(Rpc.calls.find(c=>c.method==='turn/start').params.outputSchema).toBeUndefined();provider.close();
+ }
+ for(const options of [{},{compact:true,miniScene:true},{compact:true,protocol:'diagram'}])expect(()=>new NativePresentationProvider({host:{command:'fake',args:[]},runtime:{cwd:'fake',env:{}},assetLibrary,...options})).toThrow('presentation_asset_options');
+ const provider=new NativePresentationProvider({host:{command:'fake',args:[]},runtime:{cwd:'fake',env:{}},compact:true,assetLibrary});
+ await expect(provider.generate({},new AbortController().signal,{})).rejects.toThrow('presentation_assets_streaming_only');provider.close();
+});
