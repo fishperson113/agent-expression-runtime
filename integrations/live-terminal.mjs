@@ -1,6 +1,7 @@
 import { fischCodexRuntime } from './fisch-codex-runtime.mjs';
 import { spawn } from 'node:child_process';
 import { captureChatObservation } from './chat-observation.mjs';
+import { optionalSelectorPresentation } from './selector-presentation.mjs';
 import { LiveStreamingPresentationBridge } from './presentation-streaming-bridge.mjs';
 import { randomUUID } from 'node:crypto';
 import { liveCodexArguments } from '../scripts/live-codex.mjs';
@@ -41,7 +42,7 @@ async function observeMessage(state, message) {
   const value = state.projection.accept(message) ?? started;
   if (value) await state.broker.evaluate(value => window.fischLive.playgroundStatus?.(value), value).catch(() => {});
 }
-export async function createBridge({ live, host, cwd, env, configured, instructions }) {
+export async function createBridge({ live, host, cwd, env, configured, instructions, signal }) {
   const state = { logs: [], projection: new PlaygroundProjection(), channel: { token: randomUUID(), stale: false } };
   state.output = new LiveOutput((thread, previous) => selectThread(state, thread, previous));
   const original = liveCodexArguments(liveRoot, cwd, env), config = original.slice(original.indexOf('-c'));
@@ -59,8 +60,16 @@ export async function createBridge({ live, host, cwd, env, configured, instructi
         const rejected = { id: message.id, error }; state.output.accept(rejected); state.conversation?.accept(rejected); state.transport.reject(message, error);
       }, log: text => { state.logs.push(text); state.logs.splice(0, Math.max(0, state.logs.length - 20)); } });
     state.conversation = new LiveConversation({ output: state.output, transport: state.transport, broker: state.broker, captureObservation: scope => captureChatObservation(state.broker, state.channel, scope) });
-    try { state.presentation = new LiveStreamingPresentationBridge({ state, page: live.page, host, runtime: fischCodexRuntime(), protocol: process.env.FISCH_PRESENTATION_PROTOCOL ?? 'freeform' }); }
-    catch (error) { const code=error?.message==='presentation_protocol_invalid'?'presentation_protocol_invalid':'presentation_unavailable';state.logs.push(code);if(code==='presentation_protocol_invalid')console.error('FISCH_PRESENTATION_PROTOCOL must be freeform or diagram. Visual lane disabled; native chat remains available.'); }
+    try {
+      const presentationRuntime = fischCodexRuntime();
+      const selector = await optionalSelectorPresentation({ state, host, runtime: presentationRuntime, signal });
+      if (signal?.aborted) { selector?.provider.close(); throw Error('live_start_cancelled'); }
+      state.presentation = new LiveStreamingPresentationBridge({ state, page: live.page, host,
+        runtime: presentationRuntime, protocol: process.env.FISCH_PRESENTATION_PROTOCOL ?? 'freeform',
+        ...(selector ? { provider: selector.provider, boundedSourceLease: true, ttlMs: 10000 } : {}) });
+      if (selector) state.presentation.checkpoints = selector.sampler;
+    }
+    catch (error) { if (signal?.aborted) throw error; const code=error?.message==='presentation_protocol_invalid'?'presentation_protocol_invalid':'presentation_unavailable';state.logs.push(code);if(code==='presentation_protocol_invalid')console.error('FISCH_PRESENTATION_PROTOCOL must be freeform or diagram. Visual lane disabled; native chat remains available.'); }
     state.publishSetup = (native, token) => state.broker.evaluate(({ value, token }) => {
       const api = window.fischLive; if (api.conversationOffline === true) return;
       if (token) api.conversationDocument = token; api.setupStatus?.(value);
@@ -78,7 +87,7 @@ export async function runTerminalCodex({ live, cwd, signal, spawnClient = spawn,
   const env = { ...nativeLiveEnvironment(runtime.env), AER_BASE_URL: live.base, AER_PAIRING_TOKEN: live.token, FISCH_LIVE: '1', FISCH_PLANNER_BACKEND: 'off' };
   const configured = reactiveProvider === undefined ? createLiveReactiveProvider(runtime.env, { defaultNative: true }) : { provider: reactiveProvider, reason: reactiveProvider ? 'ready' : 'disabled_by_config' };
 
-  const state = await createBridge({ live, host, cwd, env, configured });
+  const state = await createBridge({ live, host, cwd, env, configured, signal });
   let child, stopping = false, stoppedCode = 1, closing, failed = false;
   const cleanupFailure = Promise.withResolvers(); void cleanupFailure.promise.catch(() => {});
   const cleanup = () => closing ??= closeLiveOwned([() => state.unbind?.(), () => stopChild(child), () => state.transport.close()]);

@@ -512,3 +512,69 @@ saved scenes, ten seconds of warm-up and twenty seconds of rolling frame samples
 Both tiers remained around 60 FPS there; this does not establish camera-on,
 long-session, GPU-memory or thermal performance on other devices. Native Codex
 continuity across a manual page reload was not established by this quality test.
+
+### Experimental local asset selector (off by default)
+
+This optional path tries a small, locally trained selector before the independent
+visual author. It does **not** change Codex's prompt, tools, model, or conversation.
+It is not a general emotion detector and is not enabled by `fisch live` alone.
+The current reviewed bundle has three assets and a known false positive: it chose
+an encouraging plant for a factual acknowledgement that only an introduction
+would change. Synthetic holdout results were 8 compatible selections and 1 wrong
+selection, with 8 of 12 compatible opportunities selected. Human acceptance is
+still unknown. Do not treat these figures as natural-dialogue accuracy.
+
+The selector uses the whole completed public assistant message plus all preceding
+public assistant messages. More than 128 tokens is rejected without truncation.
+It does not read private reasoning, tools, camera data or the user's message as
+classifier input. Its source lease begins at the first observed public text, not
+when the worker becomes ready or returns a result. A long answer may therefore
+expire before a visual can be admitted. This mode does not promise word-by-word
+illustration of a streaming answer.
+
+Setup is deliberately separate from ordinary Live. A trusted, reviewed local
+bundle is required; it is not downloaded or bundled with Fisch. Install the
+optional pinned runtime only if you intend to test this experiment:
+
+```sh
+npm ci --prefix integrations/selector
+```
+
+Set `FISCH_EXPERIMENTAL_SELECTOR_MANIFEST` to the absolute path of the bundle's
+manifest, then launch the usual `fisch live`. To use an already prepared isolated
+runtime, set `FISCH_SELECTOR_RUNTIME_DIRECTORY` to that runtime's package directory.
+Unset the manifest variable to disable the experiment. These are session settings,
+not changes to global Codex configuration. Live never installs this runtime or
+fetches model weights automatically.
+
+The data-only manifest identifies profile `fisch-setfit-v1` and local basename
+entries under `files`: `model`, `head`, `tokenizer`, `tokenizerConfig`, and `assets`,
+each with `file` and `sha256`. Files must be alongside the manifest and match the
+reviewed profile's exact hashes. The worker code is Fisch's own fixed code; the
+manifest cannot supply executable code, a package name, or a worker entry point.
+Hashes protect bundle consistency, not the authenticity of an arbitrary download.
+Only use a bundle from a trusted source. No model files are needed for ordinary Live.
+
+Bootstrap is bounded and completed before this session's visual mode is chosen.
+Missing dependencies, missing files, mismatched hashes, or a worker load failure
+leave the ordinary visual lane enabled for the whole session. A late worker-ready
+message cannot switch an already running turn into this mode. The log reports
+whether the experiment is enabled or unavailable, without exposing source text.
+
+When enabled, the same presentation coordinator remains the only scene writer.
+Exactly one local asset selection goes through canonical validation and the
+existing browser intent, revision and lease checks. Abstention, ambiguity,
+oversized input or worker failure can fall back to the slow visual author only
+while the original source is still valid. Cancellation or stale source never
+starts a fallback. Context too large for the slow author's explicit context field
+is rejected rather than silently dropping qualifications. Neither branch renews
+the lease, and a late result cannot overwrite a newer owner.
+
+The current FP32 model is about 470 MB. On the tested laptop, cold worker load was
+about 3 seconds and process RSS about 900 MB. A single opt-in native trial admitted
+a reviewed playful fish 246 ms after the observed completed-text marker; an actual
+canvas capture at 1.308 seconds remained inside the original lease. These are
+separate admission and capture times, not a measured first-visible latency or a
+general speed guarantee. The image was judged compatible as a generic playful
+accompaniment, not a literal illustration or proof of understanding. The default
+renderer and ordinary visual lane remain unchanged when this feature is off.
