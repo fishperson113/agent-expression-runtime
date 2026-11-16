@@ -10,7 +10,7 @@ export async function startLiveServer({root,production=true,signal,first=randomI
     const port=49152+(first+attempt*7919)%16384;
     const options={host:'127.0.0.1',port,strictPort:true};let server;
     try {
-      server=production?await previewServer({root,preview:options}):await createDevServer({root,server:options});
+      server=production?await previewServer({root,preview:options,plugins:[{name:'fisch-preview-lifetime',configurePreviewServer(value){server=value;}}]}):await createDevServer({root,server:options});
       if(!production)await server.listen();
       if(signal?.aborted)throw Error('live_start_cancelled');
       const address=server.httpServer?.address();

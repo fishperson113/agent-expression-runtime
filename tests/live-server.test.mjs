@@ -36,3 +36,27 @@ it('retains actual dev sockets and retries an occupied safe initial port',async(
   const response=await fetch(`http://127.0.0.1:${address.port}/live.html`);expect(response.ok).toBe(true);
  }finally{await server?.close();await occupied?.close();}
 });
+
+
+it('closes a preview instance captured before its bind rejects',async()=>{
+ const failed=bound(49152);let attempts=0;
+ const server=await startLiveServer({root:'.',first:0,previewServer:async options=>{
+  if(attempts++===0){options.plugins[0].configurePreviewServer(failed);throw Error('Port 49152 is already in use');}
+  return bound(options.preview.port);
+ }});
+ expect(failed.close).toHaveBeenCalledOnce();expect(server.close).not.toHaveBeenCalled();
+});
+it('cleans real preview collision listeners and retains the successful bound server',async()=>{
+ const {mkdtemp,mkdir,writeFile,rm}=await import('node:fs/promises');const {tmpdir}=await import('node:os');const {join}=await import('node:path');
+ const root=await mkdtemp(join(tmpdir(),'fisch-preview-'));await mkdir(join(root,'dist'));await writeFile(join(root,'dist','live.html'),'<!doctype html><title>Fixture</title>');
+ const before=process.listenerCount('SIGTERM');let occupied,server;
+ try{
+  occupied=await startLiveServer({root,first:0});const withPreview=process.listenerCount('SIGTERM');
+  const port=occupied.httpServer.address().port;
+  server=await startLiveServer({root,first:port-49152});
+  expect(server.httpServer.address().port).not.toBe(port);
+  expect(process.listenerCount('SIGTERM')).toBe(withPreview);
+  const response=await fetch(`http://127.0.0.1:${server.httpServer.address().port}/live.html`);expect(response.ok).toBe(true);
+ }finally{await server?.close();await occupied?.close();await rm(root,{recursive:true,force:true});}
+ expect(process.listenerCount('SIGTERM')).toBe(before);
+});
