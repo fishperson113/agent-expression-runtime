@@ -340,3 +340,22 @@ it('retain and latest pending preserve old display hold without renewing candida
  f.advance(2500);await new Promise(r=>setTimeout(r,65));expect(f.calls.filter(c=>c.arg?.body)).toHaveLength(2);expect(f.bridge.selected.expiresAt).toBe(oldExpiry);
  f.bridge.close();f.releases.forEach(r=>r());await tick();
 });
+
+it('fences a terminal visual failure before provider settlement and revokes only its late receipt',async()=>{
+ const f=fixture();let completeApply;
+ const original=f.bridge.page.evaluate;
+ f.bridge.page.evaluate=async(fn,arg)=>arg?.body?new Promise(r=>{completeApply=r;}):original(fn,arg);
+ f.append('Day la cau giai thich thu nhat. ');await tick();
+ const call=f.calls.find(c=>c.ex);
+ const record={mode:'compose',payload:{base:'none',parts:[{id:'role',kind:'ellipsoid',center:[0,0,0],scale:[.2,.2,.2]}]}};
+ call.stream.onRecord(record);await tick();expect(completeApply).toBeTypeOf('function');
+ call.stream.onFailure({code:'presentation_record_extra'});await tick();
+ expect(call.signal.aborted).toBe(true);expect(call.stream.isCurrent()).toBe(false);
+ expect(f.bridge.active).not.toBeNull(); // Transport settlement still outstanding.
+ completeApply({status:'accepted',epoch:'old',sceneRevision:7,seq:9});await tick();
+ expect(f.events.some(e=>e.type==='admitted')).toBe(false);
+ const revoked=f.calls.filter(c=>c.fn?.includes('revokeOwnedPresentation')).map(c=>c.arg);
+ expect(revoked).toEqual([{epoch:'old',sceneRevision:7,seq:9}]);
+ const before=f.calls.length;call.stream.onRecord(record);await tick();expect(f.calls).toHaveLength(before);
+ f.bridge.close();f.releases.forEach(r=>r());await tick();
+});

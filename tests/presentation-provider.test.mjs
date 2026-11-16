@@ -193,3 +193,30 @@ it('opts into immutable asset references only for compact streaming without forc
  const provider=new NativePresentationProvider({host:{command:'fake',args:[]},runtime:{cwd:'fake',env:{}},compact:true,assetLibrary});
  await expect(provider.generate({},new AbortController().signal,{})).rejects.toThrow('presentation_assets_streaming_only');provider.close();
 });
+
+it('signals terminal stream rejection before a delayed process settles, once only',async()=>{
+ let instance,settle;const failures=[],records=[];let finished=false;
+ class DelayedRpc extends Rpc {
+  constructor(...args){super(...args);instance=this;this.settled=new Promise(r=>{settle=r;});}
+  async request(method,params){
+   if(method!=='turn/start')return super.request(method,params);
+   queueMicrotask(()=>{
+    const threadId='visual-thread',itemId='answer';
+    this.notify('item/started',{threadId,item:{id:itemId,type:'agentMessage',phase:'final_answer'}});
+    this.notify('item/agentMessage/delta',{threadId,itemId,delta:'{"mode":"retain","payload":null}\n'});
+    this.notify('item/agentMessage/delta',{threadId,itemId,delta:'extra'});
+   });return {turn:{id:'visual-turn'}};
+  }
+ }
+ const provider=new NativePresentationProvider({host:{command:'fixture',args:[]},runtime:{cwd:'fixture',env:{}},Rpc:DelayedRpc});
+ const running=provider.generate({userText:'a',assistantText:'b'},new AbortController().signal,{},
+  {isCurrent:()=>true,onRecord:r=>records.push(r),onFailure:e=>failures.push(e)}).finally(()=>{finished=true;});
+ running.catch(()=>{});
+ try{
+  for(let i=0;i<30&&!failures.length;i++)await new Promise(r=>setTimeout(r,5));
+  expect(failures).toEqual([{code:'presentation_record_extra'}]);expect(finished).toBe(false);expect(records).toHaveLength(1);
+  instance.notify('item/agentMessage/delta',{threadId:'visual-thread',itemId:'answer',delta:'more'});
+  expect(failures).toHaveLength(1);settle();await expect(running).rejects.toThrow('presentation_record_extra');
+ }finally{settle?.();provider.close();await running.catch(()=>{});}
+});
+

@@ -141,7 +141,7 @@ export class NativePresentationProvider {
     const records = streaming ? createPresentationRecordStream({ ...(diagramInput ? {parseRecord:text=>parseDiagramAuthorRecord(text,exchange)} : this.assetLibrary ? {parseRecord:this.assetLibrary.parseRecord} : this.compact ? {parseRecord:this.miniScene?parseMiniPresentation:parseCompactPresentationRecord} : {}), isCurrent: () => !signal.aborted && streaming.isCurrent() }) : null;
     const publish = text => { for (const record of records.push(text)) {streaming.onPhase?.('record');streaming.onRecord(record);} };
     const phase=name=>{try{streaming?.onPhase?.(name);}catch{}};
-    const done = new Promise((yes, no) => { resolve = yes; reject = error => { job.failed = true; cancelRequest(error); no(error); }; }); done.catch(() => {});
+    const done = new Promise((yes, no) => { resolve = yes; reject = error => { if(job.failed)return;job.failed = true;cancelRequest(error);no(error);try{streaming?.onFailure?.({code:error.message});}catch{} }; }); done.catch(() => {});
     const notify = presentationNotifications({job,streaming,records,publish,resolve,reject});
     const args = [...this.host.args, 'app-server', '--stdio', ...fischCodexArguments(), '-c', 'web_search="disabled"', ...disabled.flatMap(key => ['--disable', key])];
     let rpc, healthy = false; this.active=job;
@@ -170,7 +170,7 @@ export class NativePresentationProvider {
       if (signal.aborted || this.closed) throw Error('presentation_aborted');
       const result = streaming ? undefined : parsePresentation(job.text);
       healthy = !job.failed; return result;
-    } finally {
+    } catch(error) { reject(error);throw error; } finally {
       clearTimeout(timer); signal.removeEventListener('abort', abort);
       if (this.transport) await this.transport.release(healthy); else { try{rpc.close();}catch{} }
       // Failed/retired warm transports settle before another generation; healthy ones remain idle.
