@@ -223,15 +223,18 @@ it('signals terminal stream rejection before a delayed process settles, once onl
 
 
 it.each([false,{maxJobs:1},{idleMs:1}])('does not report successful transport cleanup as failure (%j)',async(warmTransport)=>{
- const failures=[],published=[];
+ const failures=[],published=[],usage=[];let completedRpc;
  class ClosingRpc extends Rpc {
-  constructor(command,args,cwd,notify,failed){super(command,args,cwd,notify);this.failed=failed;}
+  constructor(command,args,cwd,notify,failed){super(command,args,cwd,notify);this.failed=failed;completedRpc=this;}
   close(){this.failed('planner_closed');}
   async request(method,params){if(method!=='turn/start')return super.request(method,params);queueMicrotask(()=>{this.notify('item/completed',{threadId:'visual-thread',item:{type:'agentMessage',phase:'final_answer',text:'{\"mode\":\"retain\",\"payload\":null}'}});this.notify('turn/completed',{threadId:'visual-thread',turn:{id:'visual-turn',status:'completed'}});});return {turn:{id:'visual-turn'}};}
  }
  const provider=new NativePresentationProvider({host:{command:'fixture',args:[]},runtime:{cwd:'fixture',env:{}},Rpc:ClosingRpc,warmTransport});
  try{await provider.generate({userText:'a',assistantText:'b'},new AbortController().signal,{},
-  {isCurrent:()=>true,onRecord:r=>published.push(r),onFailure:e=>failures.push(e)});
- await new Promise(r=>setTimeout(r,10));expect(published).toHaveLength(1);expect(failures).toEqual([]);
+  {isCurrent:()=>true,onRecord:r=>published.push(r),onUsage:u=>usage.push(u),onFailure:e=>failures.push(e)});
+ await new Promise(r=>setTimeout(r,10));
+ completedRpc.notify('thread/tokenUsage/updated',{threadId:'visual-thread',tokenUsage:{late:true}});
+ completedRpc.notify('item/completed',{threadId:'visual-thread',item:{type:'agentMessage',phase:'final_answer',text:'late'}});
+ expect(usage).toEqual([]);expect(published).toHaveLength(1);expect(failures).toEqual([]);
  }finally{provider.close();}
 });

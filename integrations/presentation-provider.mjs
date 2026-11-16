@@ -88,7 +88,7 @@ function streamingPolicy(compact, miniScene) {
 
 function presentationNotifications({job,streaming,records,publish,resolve,reject}) {
   return (method,params) => {
-      if (job.failed || params.threadId !== job.threadId) return;
+      if (job.failed || job.completed || params.threadId !== job.threadId) return;
       const eventTurn = params.turnId ?? params.turn?.id;
       if (job.turnId && eventTurn && eventTurn !== job.turnId) return reject(Error('presentation_turn_mismatch'));
       if (streaming && method === 'thread/tokenUsage/updated') { try { streaming.onUsage?.(params.tokenUsage); } catch {} }
