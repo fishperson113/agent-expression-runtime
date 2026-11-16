@@ -165,12 +165,12 @@ async function terminateOwnedChild(child, {platform, spawnProcess, killGroup}) {
     else child.kill('SIGTERM');
     return;
   }
-  await new Promise((resolve, reject) => {
+  await new Promise(resolve => {
     const killer = spawnProcess('taskkill', ['/PID', String(child.pid), '/T', '/F'],
       { windowsHide: true, stdio: 'ignore' });
     const clean = () => { killer.removeListener('error', failed); killer.removeListener('exit', finished); };
-    const failed = () => { clean(); reject(Error('Child process-tree shutdown failed.')); };
-    const finished = code => { clean(); code === 0 ? resolve() : reject(Error('Child process-tree shutdown failed.')); };
+    const failed = () => { clean(); resolve(); };
+    const finished = () => { clean(); resolve(); };
     killer.once('error', failed);
     killer.once('exit', finished);
   });

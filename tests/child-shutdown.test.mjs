@@ -1,5 +1,6 @@
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
-import {EventEmitter} from 'node:events';
+import {EventEmitter,once} from 'node:events';
+import {spawn} from 'node:child_process';
 import {stopChild} from '../scripts/start-session.mjs';
 
 const child = () => Object.assign(new EventEmitter(),{
@@ -50,10 +51,10 @@ describe('owned child complete shutdown deadline',()=>{
   await vi.advanceTimersByTimeAsync(20);expect(result.get().state).toBe('pending');
   route.target.emit('exit',0);await result.done;expect(result.get().state).toBe('resolved');
  });
- it('surfaces helper failure rather than masking it after target exit',async()=>{
+ it('accepts nonzero helper completion after independently observed target exit',async()=>{
   const route=windows(),result=outcome(route.running);route.target.emit('exit',0);
   route.killer.emit('exit',1);await result.done;
-  expect(result.get().message).toBe('Child process-tree shutdown failed.');
+  expect(result.get().state).toBe('resolved');
   expect(vi.getTimerCount()).toBe(0);expect(route.target.listenerCount('exit')).toBe(0);
  });
  it('observes a helper error delivered after the aggregate timeout',async()=>{
@@ -70,11 +71,26 @@ describe('owned child complete shutdown deadline',()=>{
   await expect(stopChild(target,{platform:'win32',spawnProcess})).rejects.toThrow('spawn failed');
   expect(target.listenerCount('exit')).toBe(0);expect(vi.getTimerCount()).toBe(0);
  });
- it('propagates an emitted helper error without waiting the remaining deadline',async()=>{
+ it('does not turn a helper error into success while the target remains alive',async()=>{
   const route=windows(),result=outcome(route.running);
-  await vi.advanceTimersByTimeAsync(12);route.killer.emit('error',Error('helper unavailable'));await result.done;
-  expect(result.get().message).toBe('Child process-tree shutdown failed.');
-  expect(vi.getTimerCount()).toBe(0);
+  await vi.advanceTimersByTimeAsync(12);route.killer.emit('error',Error('helper unavailable'));
+  await vi.advanceTimersByTimeAsync(9987);expect(result.get().state).toBe('pending');
+  await vi.advanceTimersByTimeAsync(1);await result.done;
+  expect(result.get().message).toBe('Child shutdown timed out.');expect(vi.getTimerCount()).toBe(0);
+ });
+ it('accepts target exit after a nonzero helper result, but not before the exit',async()=>{
+  const route=windows(),result=outcome(route.running);route.killer.emit('exit',128);
+  await vi.advanceTimersByTimeAsync(10);expect(result.get().state).toBe('pending');
+  route.target.emit('exit',0);await result.done;expect(result.get().state).toBe('resolved');
+ });
+ it('still times out a live target after nonzero helper completion',async()=>{
+  const route=windows(),result=outcome(route.running);route.killer.emit('exit',128);
+  await vi.advanceTimersByTimeAsync(10000);await result.done;
+  expect(result.get().message).toBe('Child shutdown timed out.');
+ });
+ it('preserves original helper-error behavior when target exit is independently observed',async()=>{
+  const route=windows(),result=outcome(route.running);route.killer.emit('error',Error('helper unavailable'));
+  route.target.emit('exit',0);await result.done;expect(result.get().state).toBe('resolved');
  });
  it('preserves Unix process-group SIGTERM and waits for exit',async()=>{
   const target=child();target.aerProcessGroup=true;const killGroup=vi.fn();
@@ -104,3 +120,31 @@ describe('owned child complete shutdown deadline',()=>{
   expect(spawnProcess).not.toHaveBeenCalled();expect(vi.getTimerCount()).toBe(0);
  });
 });
+
+async function realChild() {
+ const target=spawn(process.execPath,['-e',"process.stdin.resume();process.stdin.on('end',()=>process.exit(0));process.stdout.write('ready');"],
+  {windowsHide:true,stdio:['pipe','pipe','ignore']});
+ try {await once(target.stdout,'data',{signal:AbortSignal.timeout(3000)});return target;}
+ catch(error){target.kill('SIGKILL');throw error;}
+}
+function tracedKiller(trace) {
+ return (command,args,options)=>{
+  const at=performance.now(),helper=spawn(command,args,options);
+  helper.once('exit',(code,signal)=>trace.push({helperCode:code,helperSignal:signal,elapsedMs:performance.now()-at}));
+  return helper;
+ };
+}
+for(const concurrent of [false,true]) {
+ it.skipIf(process.platform!=='win32')(`handles actual Windows ${concurrent?'overlapping owned stops':'stdin-end natural exit'}`,async()=>{
+  vi.useRealTimers();const target=await realChild(),trace=[],spawnProcess=tracedKiller(trace);
+  try {
+   const started=performance.now();
+   if(concurrent)await Promise.all([stopChild(target,{spawnProcess}),stopChild(target,{spawnProcess})]);
+   else {target.stdin.end();await stopChild(target,{spawnProcess});}
+   expect(target.exitCode!==null||target.signalCode!==null).toBe(true);
+   expect(trace.length).toBe(concurrent?2:1);
+   console.info('child-shutdown-real',JSON.stringify({case:concurrent?'overlap':'stdin-end',
+    elapsedMs:performance.now()-started,trace,targetExitCode:target.exitCode,targetSignalCode:target.signalCode}));
+  } finally {if(target.exitCode===null&&target.signalCode===null)target.kill('SIGKILL');}
+ },15000);
+}
