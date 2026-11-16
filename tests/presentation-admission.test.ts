@@ -187,3 +187,104 @@ it('invalid candidate input cannot clear valid displayed source, but rewritten s
  expect(gate.replace({identity:f.request,body:{}}).status).toBe('rejected');expect(gate.reconcile()).toBe(true);
  expect(clear).toHaveBeenCalledOnce();
 });
+
+function stagedFixture(){
+ const {state}=fixture();let now=0;const clear=vi.fn();
+ Object.assign(state.snapshot,{ownerTurn:'turn',revision:1});Object.assign(state.snapshot.messages[1],{id:'a',text:'First scene. More context.',status:'streaming'});
+ const admit=vi.fn((_body,scope,valid)=>valid()?{status:'accepted',epoch:scope.epoch,seq:1,sceneRevision:++state.scene.revision}:{status:'rejected'});
+ const gate=new PresentationAdmission(()=>state,admit,()=>now,clear,true);
+ const source={...identity,messageId:'a',textPrefix:'First scene.',publicRevision:1,remainingTtlMs:10000,section:0};
+ const shot=gate.snapshot(source)!;const old=gate.apply({scope:shot.scope,body:{}});
+ return {state,admit,clear,gate,source,old,at:(value:number)=>now=value};
+}
+it('stages independently without renewing the old lease and swaps atomically',()=>{
+ const f=stagedFixture();f.at(2000);
+ const next=f.gate.prepare({...f.source,textPrefix:'First scene. More context.',remainingTtlMs:5000})!;
+ expect(f.gate.leaseDeadline(f.old.scope)).toBe(10000);expect(f.clear).not.toHaveBeenCalled();
+ f.at(6000);const accepted=f.gate.applyPrepared({scope:next.scope,body:{}});
+ expect(accepted.status).toBe('accepted');expect(f.gate.leaseDeadline(accepted.scope)).toBe(7000);
+ expect(f.gate.leaseDeadline(f.old.scope)).toBeNull();f.at(7000);expect(f.gate.reconcile()).toBe(true);
+});
+it('rejected candidate keeps old authority; unknown commit fails closed',()=>{
+ const f=stagedFixture();const next=f.gate.prepare(f.source)!;
+ f.admit.mockImplementationOnce(()=>({status:'rejected',code:'invalid'} as any));
+ expect(f.gate.applyPrepared({scope:next.scope,body:{}}).status).toBe('rejected');
+ expect(f.gate.leaseDeadline(f.old.scope)).toBe(10000);expect(f.clear).not.toHaveBeenCalled();
+ const again=f.gate.prepare(f.source)!;f.admit.mockImplementationOnce(()=>{throw Error('unknown mutation');});
+ expect(f.gate.applyPrepared({scope:again.scope,body:{}}).status).toBe('rejected');
+ expect(f.gate.leaseDeadline(f.old.scope)).toBeNull();expect(f.clear).toHaveBeenCalledOnce();
+});
+it.each(['expiry','correction','turn','epoch','revision','cancel'])('prepared candidate cannot survive %s',reason=>{
+ const f=stagedFixture();const next=f.gate.prepare(f.source)!;
+ if(reason==='expiry')f.at(10000);if(reason==='correction')f.state.snapshot.messages[1].text='Rewritten';
+ if(reason==='turn')f.state.snapshot.messages.push({role:'user',turn:'new'});
+ if(reason==='epoch')f.state.scene.epoch='new';if(reason==='revision')f.state.scene.revision++;
+ if(reason==='cancel')f.gate.invalidate();f.gate.reconcile();
+ expect(f.gate.applyPrepared({scope:next.scope,body:{}}).code).toBe('presentation_stale');expect(f.admit).toHaveBeenCalledOnce();
+});
+it('stale prepared cleanup cannot cancel its replacement; nonstreaming preparation is refused',()=>{
+ const f=stagedFixture(),first=f.gate.prepare(f.source)!,second=f.gate.prepare(f.source)!;
+ f.gate.cancelPrepared(first.scope);expect(f.gate.applyPrepared({scope:first.scope,body:{}}).code).toBe('presentation_stale');
+ expect(f.gate.applyPrepared({scope:second.scope,body:{}}).status).toBe('accepted');expect(f.gate.prepare(identity)).toBeNull();
+});
+it('old lease retirement never rebases a still pending candidate onto fallback geometry',()=>{
+ const f=stagedFixture();f.at(9000);const next=f.gate.prepare({...f.source,remainingTtlMs:10000})!;
+ f.at(10000);expect(f.gate.reconcile()).toBe(true);f.state.scene.revision++;
+ expect(f.gate.applyPrepared({scope:next.scope,body:{}}).code).toBe('presentation_stale');
+});
+
+it('preserves exact prepared deadline when every synchronous clock read advances',()=>{
+ const f=stagedFixture();f.at(1000);const shot=f.gate.prepare({...f.source,remainingTtlMs:4000})!;
+ let clock=2000;(f.gate as any).now=()=>++clock;
+ const receipt=f.gate.applyPrepared({scope:shot.scope,body:{}});expect(receipt.status).toBe('accepted');
+ expect(f.gate.leaseDeadline(receipt.scope)).toBe(5000);
+});
+it('obsolete browser tickets cannot overwrite or cancel newer permits',()=>{
+ const f=stagedFixture(),a=f.gate.preparationTicket(),first=f.gate.prepare(f.source,a)!,b=f.gate.preparationTicket(),newer=f.gate.prepare(f.source,b)!;
+ expect(f.gate.prepare(f.source,a)).toBeNull();expect(f.gate.prepare(f.source,b)).toBeNull();
+ f.gate.cancelPrepared(first.scope);expect(f.gate.applyPrepared({scope:newer.scope,body:{}}).status).toBe('accepted');
+});
+it('browser intent fences an unseen delayed ticket independently of host clock skew',()=>{
+ const f=stagedFixture();f.at(1000);const ticket=f.gate.preparationTicket();
+ f.at(1100);f.gate.invalidate();f.at(1200);
+ expect(f.gate.prepare(f.source,ticket)).toBeNull();
+ expect(f.gate.prepare(f.source,{...ticket,preparationVersion:performance.timeOrigin+1500})).toBeNull();
+ expect(f.gate.prepare(f.source,f.gate.preparationTicket())).not.toBeNull();
+});
+
+const absoluteBody={type:'parallel',children:[{type:'assemble',parts:[{id:'new',kind:'ellipsoid',center:[0,0,0],scale:[.2,.2,.2]}]}]};
+function retiredFixture(){
+ const f=stagedFixture();f.at(9000);const shot=f.gate.prepare({...f.source,remainingTtlMs:10000})!;
+ f.clear.mockImplementation(()=>{const retired={epoch:f.state.scene.epoch,sceneRevision:f.state.scene.revision,seq:1};
+  f.state.scene={epoch:'fallback',revision:f.state.scene.revision+1,partIds:['rest']};return {retired,fallback:{...f.state.scene}};});
+ f.at(10000);return {...f,shot};
+}
+it('recovers absolute replacement only across verified own retirement without extending candidate deadline',()=>{
+ const f=retiredFixture();expect(f.gate.reconcile()).toBe(true);expect(f.gate.reconcile()).toBe(false);
+ expect(f.clear).toHaveBeenCalledOnce();expect(f.gate.leaseDeadline(f.old.scope)).toBeNull();
+ f.at(15000);const receipt=f.gate.applyPrepared({scope:f.shot.scope,body:absoluteBody,replacement:true});
+ expect(receipt.status).toBe('accepted');expect(receipt.epoch).toBe('fallback');expect(f.gate.leaseDeadline(receipt.scope)).toBe(19000);
+ expect(f.gate.leaseDeadline(f.old.scope)).toBeNull();f.at(18999);expect(f.gate.reconcile()).toBe(false);
+ f.at(19000);expect(f.gate.reconcile()).toBe(true);expect(f.clear).toHaveBeenCalledTimes(2);
+});
+it.each(['relative','animate','missing_intent','extra_assemble','perform'])('retirement cannot rebase %s candidate',kind=>{
+ const f=retiredFixture();f.gate.reconcile();
+ const body=kind==='relative'?{type:'live',program:absoluteBody,configuration:{sceneAppend:true}}:
+  kind==='animate'?{type:'wait',durationMs:100}:kind==='extra_assemble'?{...absoluteBody,children:[...absoluteBody.children,...absoluteBody.children]}:
+  kind==='perform'?{...absoluteBody,children:[...absoluteBody.children,{type:'perform'}]}:absoluteBody;
+ expect(f.gate.applyPrepared({scope:f.shot.scope,body,replacement:kind!=='missing_intent'}).status).toBe('rejected');expect(f.admit).toHaveBeenCalledOnce();
+});
+it.each(['epoch','revision','cancel','correction','turn','expiry'])('retired candidate rejects intervening %s',reason=>{
+ const f=retiredFixture();f.gate.reconcile();
+ if(reason==='epoch')f.state.scene.epoch='user';if(reason==='revision')f.state.scene.revision++;
+ if(reason==='cancel')f.gate.invalidate();if(reason==='correction')f.state.snapshot.messages[1].text='Changed';
+ if(reason==='turn')f.state.snapshot.messages.push({role:'user',turn:'new'});if(reason==='expiry')f.at(19000);
+ expect(f.gate.applyPrepared({scope:f.shot.scope,body:absoluteBody,replacement:true}).status).toBe('rejected');expect(f.admit).toHaveBeenCalledOnce();
+});
+it.each(['noop','throw','wrong_owner','wrong_fallback'])('unknown cleanup %s cannot authorize rebasing',reason=>{
+ const f=retiredFixture();f.clear.mockImplementation(()=>{
+  if(reason==='throw')throw Error('unknown');if(reason==='noop')return;
+  return {retired:{epoch:reason==='wrong_owner'?'other':f.state.scene.epoch,sceneRevision:f.state.scene.revision,seq:1},fallback:{...f.state.scene,revision:reason==='wrong_fallback'?999:f.state.scene.revision}};
+ });f.gate.reconcile();
+ expect(f.gate.applyPrepared({scope:f.shot.scope,body:absoluteBody,replacement:true}).status).toBe('rejected');expect(f.admit).toHaveBeenCalledOnce();
+});

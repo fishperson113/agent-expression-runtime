@@ -133,7 +133,9 @@ async function assertUnblockedStream(provider) {
   const first = 'A queue preserves arrival order and lets a consumer process messages independently. Producers can continue sending while the consumer works, until the bounded queue reaches capacity.';
   const last = ' Backpressure then limits new messages without changing earlier ones.';
   const { bindings, controls, snapshots, page, frame, api } = panelPage(), abort = new AbortController();
-  api.presentationSnapshot = () => ({ scope: { fixture: true }, partIds: [] });
+  let preparationVersion=0;
+  api.presentationPreparationTicket = vi.fn(() => ({intentVersion:0,preparationVersion:++preparationVersion}));
+  api.preparePresentation = vi.fn((_identity,ticket) => ticket?.preparationVersion===preparationVersion ? {scope:{fixture:true},partIds:[]} : null);
   api.revokePresentation = () => {};
   const run = runPanelCodex({ live: { page, base: 'http://127.0.0.1:1', token: 'fixture' }, cwd: process.cwd(),
     signal: abort.signal, reactiveProvider: null, host: { command: process.execPath, args: ['-e', streamedHostScript(first, last), '--'] } });
@@ -144,6 +146,8 @@ async function assertUnblockedStream(provider) {
     await vi.waitFor(() => expect(snapshots.some(s => s.messages.some(m => m.text === first && m.status === 'streaming'))).toBe(true));
     if (provider) {
       await vi.waitFor(() => expect(provider).toHaveBeenCalled());
+      expect(api.presentationPreparationTicket).toHaveBeenCalled();
+      expect(api.preparePresentation).toHaveBeenCalled();
       expect(provider.mock.calls[0][0].assistantText).toBe(first);
     }
     await vi.waitFor(() => expect(snapshots.at(-1)?.messages.some(m => m.text === first + last && m.status === 'completed')).toBe(true));

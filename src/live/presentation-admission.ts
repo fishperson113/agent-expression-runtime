@@ -1,7 +1,9 @@
+import { independentReplacement } from './presentation-replacement';
 import { presentationSection } from './presentation-section.mjs';
 import { validateAnnotations, type Annotations } from './presentation-annotations';
 type Identity = { documentId: string; threadId: string; turnId: string; generation: number; messageId?: string; textPrefix?: string; publicRevision?: number; remainingTtlMs?: number; section?: number; sourceStart?: number; sourceEnd?: number; sourceQuote?: string };
 type Scene = { epoch: string; revision: number; partIds: string[] };
+type Retirement = { retired: {epoch:string;sceneRevision:number;seq:number}; fallback:Scene };
 type Scope = Identity & { epoch: string; sceneRevision: number; intentVersion: number; admissionVersion: number; prefixLength?: number };
 type State = { documentId?: string; stopped: boolean; hidden: boolean; busy?: boolean; snapshot?: any; scene: Scene | null };
 const sourceKeys = ['sourceStart', 'sourceEnd', 'sourceQuote'] as const;
@@ -12,10 +14,13 @@ export class PresentationAdmission {
   private serial = 0;
   private issued?: { scope: Scope; at: number; leaseMs: number; textPrefix?: string };
   private candidate?: NonNullable<PresentationAdmission['issued']>;
+  private prepared?: NonNullable<PresentationAdmission['issued']> & {retirement?:Retirement};
+  private preparationVersion = 0;
+  private preparationSerial = 0;
   constructor(private read: () => State,
     private admit: (body: unknown, scope: Scope, valid: () => boolean, annotations: Annotations) => any,
-    private now = () => performance.now(), private clearAnnotations = () => {}, private boundedSourceLease = false) {}
-  invalidate() { this.intent++; this.issued = undefined; this.candidate = undefined; try { this.clearAnnotations(); } catch { /* Visual cleanup must never block native chat publication. */ } }
+    private now = () => performance.now(), private clearAnnotations: () => Retirement | void = () => {}, private boundedSourceLease = false) {}
+  invalidate() { this.intent++; this.issued = undefined; this.candidate = undefined; this.prepared = undefined; try { this.clearAnnotations(); } catch { /* Visual cleanup must never block native chat publication. */ } }
   leaseDeadline(scope: Scope) {
     const issued=this.candidate && scope && sameScope(this.candidate.scope,scope) ? this.candidate : this.issued;
     try { const state=this.read(); if(!issued || !scope || !sameScope(issued.scope,scope) ||
@@ -28,10 +33,63 @@ export class PresentationAdmission {
     return state.scene ? state.scene.epoch === scope.epoch && state.scene.revision === scope.sceneRevision : state.busy === true;
   }
   reconcile() {
-    if (!this.issued) return false;
-    try { const issued=this.issued, state=this.read(), age=this.now()-issued.at;
-      if (age>=0 && age<issued.leaseMs && this.sceneMatches(issued.scope,state) && this.available(issued.scope,state,issued.textPrefix)) return false; } catch { /* Fail closed on unavailable public state. */ }
-    this.invalidate(); return true;
+    try {
+      const state = this.read(), prepared = this.prepared;
+      if (prepared && (this.now() < prepared.at || this.now() >= prepared.at + prepared.leaseMs ||
+        !this.available(prepared.scope,state,prepared.textPrefix) || !this.preparedSceneMatches(prepared,state))) this.prepared=undefined;
+      const issued=this.issued;
+      if (!issued) return false;
+      const age=this.now()-issued.at;
+      if (age>=0 && age<issued.leaseMs && this.sceneMatches(issued.scope,state) && this.available(issued.scope,state,issued.textPrefix)) return false;
+      if(age>=issued.leaseMs && this.retireForCandidate(issued,state))return true;
+      this.invalidate();return true;
+    } catch {this.invalidate();return true;}
+  }
+  private preparedSceneMatches(prepared: NonNullable<PresentationAdmission['prepared']>, state: State) {
+    const fallback=prepared.retirement?.fallback;
+    return this.sceneMatches(fallback ? {...prepared.scope,epoch:fallback.epoch,sceneRevision:fallback.revision} : prepared.scope,state);
+  }
+  private retireForCandidate(issued: NonNullable<PresentationAdmission['issued']>, state: State) {
+    const prepared=this.prepared;
+    if(!prepared || prepared.retirement || !state.scene || !this.available(issued.scope,state,issued.textPrefix) ||
+      !this.sceneMatches(issued.scope,state) || prepared.scope.epoch!==issued.scope.epoch || prepared.scope.sceneRevision!==issued.scope.sceneRevision)return false;
+    const retirement=this.clearAnnotations(), after=this.read();this.issued=undefined;
+    if(this.prepared!==prepared || this.intent!==prepared.scope.intentVersion || !retirement || retirement.retired.epoch!==issued.scope.epoch || retirement.retired.sceneRevision!==issued.scope.sceneRevision ||
+      !Number.isSafeInteger(retirement.retired.seq) || !after.scene || after.scene.epoch!==retirement.fallback.epoch ||
+      after.scene.revision!==retirement.fallback.revision || !this.available(prepared.scope,after,prepared.textPrefix))return false;
+    prepared.retirement=retirement;return true;
+  }
+  preparationTicket() {return {intentVersion:this.intent,preparationVersion:++this.preparationSerial};}
+  prepare(identity: Identity, ticket?: {intentVersion:number;preparationVersion:number}) {
+    if (this.candidate || typeof identity?.textPrefix !== 'string' || ticket !== undefined && (ticket.intentVersion!==this.intent || !Number.isSafeInteger(ticket.preparationVersion) || ticket.preparationVersion<=this.preparationVersion || ticket.preparationVersion>this.preparationSerial)) return null;
+    const displayed = this.issued; this.prepared = undefined;
+    try {
+      const shot = this.snapshot(identity);
+      if (shot && this.issued) {this.prepared = {...this.issued};if(ticket)this.preparationVersion=ticket.preparationVersion;}
+      return shot;
+    } finally { this.issued = displayed; }
+  }
+  cancelPrepared(scope: Scope) {
+    if (this.prepared && sameScope(this.prepared.scope,scope)) this.prepared = undefined;
+  }
+  applyPrepared(value: { scope: Scope; body: any; annotations?: unknown; replacement?: boolean }) {
+    const prepared = this.prepared;
+    const stale = {status:'rejected',code:'presentation_stale'};
+    if (!prepared || !value?.scope || !sameScope(prepared.scope,value.scope)) return stale;
+    try {
+      const state=this.read(), remaining=prepared.at+prepared.leaseMs-this.now();
+      if (remaining <= 0 || this.now() < prepared.at || !this.available(prepared.scope,state,prepared.textPrefix)) {this.prepared=undefined;return stale;}
+      if (!state.scene && state.busy) return {status:'rejected',code:'presentation_busy'};
+      if (!state.scene || !this.preparedSceneMatches(prepared,state)) {this.prepared=undefined;return stale;}
+      const retired=prepared.retirement;
+      if(retired && (value.replacement!==true || !independentReplacement(value.body))) {this.prepared=undefined;return stale;}
+      const admitted=retired ? {...prepared,scope:{...prepared.scope,epoch:retired.fallback.epoch,sceneRevision:retired.fallback.revision}} : prepared;
+      this.prepared=undefined;
+      if(this.candidate)return {status:'rejected',code:'presentation_busy'};
+      this.candidate=admitted;
+      try {return this.applyIssued({...value,scope:admitted.scope},admitted,true);}
+      finally {if(this.candidate===admitted)this.candidate=undefined;}
+    } catch {this.prepared=undefined;return stale;}
   }
   private available(identity: Identity, state: State, textPrefix?: string) {
     const chat = state.snapshot, lastUser = chat?.messages?.filter((m: any) => m.role === 'user').at(-1);

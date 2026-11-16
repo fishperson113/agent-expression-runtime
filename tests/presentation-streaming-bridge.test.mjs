@@ -1,12 +1,12 @@
 import {runInNewContext} from 'node:vm';
-import {it,expect} from 'vitest';
+import {it,expect,vi} from 'vitest';
 import {LiveStreamingPresentationBridge,presentationSection} from '../integrations/presentation-streaming-bridge.mjs';
 const tick=()=>new Promise(r=>setTimeout(r,5));
 function fixture(options={}){
- let now=1000, releases=[],calls=[],events=[];
+ let now=1000, releases=[],calls=[],events=[],ticket=0;
  const snapshot={available:true,generation:1,revision:1,ownerTurn:'t',messages:[{id:'u',turn:'t',role:'user',status:'completed',text:'giai thich di'}, {id:'a',turn:'t',role:'assistant',status:'streaming',text:'',truncated:false}]};
  const state={channel:{token:'d'},output:{thread:'h'},conversation:{snapshot:()=>snapshot}};
- const page={evaluate:async(fn,arg)=>{calls.push({fn:String(fn),arg});if(arg?.body)return {status:'accepted',epoch:'e',sceneRevision:2,seq:3};if(arg?.identity)return {scope:{epoch:'e',sceneRevision:1},partIds:[]};}};
+ const page={evaluate:async(fn,arg)=>{calls.push({fn:String(fn),arg});if(String(fn).includes('presentationPreparationTicket'))return {intentVersion:0,preparationVersion:++ticket};if(arg?.body)return {status:'accepted',epoch:'e',sceneRevision:2,seq:3};if(arg?.identity)return {scope:{epoch:'e',sceneRevision:1},partIds:[]};}};
  const provider={generate:async(ex,signal,scene,stream)=>{calls.push({ex,signal,stream});await new Promise(r=>releases.push(r));},close(){}};
  const bridge=new LiveStreamingPresentationBridge({state,page,provider,now:()=>now,onEvent:e=>events.push(e),checkpoints:{minChars:10,cooldownMs:0},...options});
  const send=(method,extra={})=>bridge.observe({method,params:{threadId:'h',turnId:'t',...extra}});
@@ -98,7 +98,7 @@ it('routes optional lab diagrams separately without altering native text',async(
  const f=fixture();f.append('Day la cau giai thich thu nhat. ');await tick();const native=f.snapshot.messages[1].text;
  const diagram={plan:{caption:{text:'thu nhat'}},nodeParts:{},edgeParts:{}};
  f.calls.find(c=>c.ex).stream.onRecord({mode:'compose',payload:{base:'none',parts:[{id:'role',kind:'ellipsoid',center:[0,0,0],scale:[.2,.2,.2]}]},diagram});await tick();
- const applied=f.calls.find(c=>c.arg?.body);expect(applied.arg.diagram).toEqual(diagram);expect(applied.fn).toContain('applyDiagramPresentation');expect(f.snapshot.messages[1].text).toBe(native);
+ const applied=f.calls.find(c=>c.arg?.body);expect(applied.arg.diagram).toEqual(diagram);expect(applied.fn).toContain('applyPreparedPresentation');expect(f.snapshot.messages[1].text).toBe(native);
  f.bridge.close();f.releases.forEach(r=>r());await tick();
 });
 
@@ -149,6 +149,7 @@ it('bounds a hanging admission, never replays it, and records late acceptance on
 it.each(['revoke','snapshot'])('bounds a hanging browser %s before any model request',async mode=>{
  const f=fixture();f.bridge.browserTimeoutMs=15;const old=f.bridge.page.evaluate;
  f.bridge.page.evaluate=(fn,arg)=>mode==='revoke'&&!arg||mode==='snapshot'&&arg?.identity?new Promise(()=>{}):old(fn,arg);
+ if(mode==='revoke')f.bridge.invalidateSource('explicit_source_reset');
  f.append('Day la cau giai thich thu nhat. ');await new Promise(r=>setTimeout(r,50));
  expect(f.bridge.browserFault).toBe(true);expect(f.calls.some(c=>c.ex)).toBe(false);const count=f.calls.length;f.append(' More completed public prose. ');await tick();expect(f.calls).toHaveLength(count);f.bridge.close();
 });
@@ -179,7 +180,7 @@ it.each(['close','invalidate','expiry'])('releases a hanging admission on %s wit
 
 it('browser snapshot rejects delayed expiry and clock rollback, never enlarges remaining lifetime',async()=>{
  const f=fixture();f.append('Day la cau giai thich thu nhat. ');await tick();const call=f.calls.find(c=>c.arg?.identity);
- const invoke=(wall,mono)=>runInNewContext('('+call.fn+')(value)',{value:{...call.arg,sentWall:1000,expiresAt:2000,monotonicDeadline:2000,remainingMs:1000},Date:{now:()=>wall},performance:{timeOrigin:0,now:()=>mono},window:{fischLive:{presentationSnapshot:value=>value}}});
+ const invoke=(wall,mono)=>runInNewContext('('+call.fn+')(value)',{value:{...call.arg,sentWall:1000,expiresAt:2000,monotonicDeadline:2000,remainingMs:1000},Date:{now:()=>wall},performance:{timeOrigin:0,now:()=>mono},window:{fischLive:{preparePresentation:value=>value}}});
  expect(invoke(900,1100)).toBeNull();expect(invoke(1500,2100)).toBeNull();expect(invoke(1500,1700).remainingTtlMs).toBe(300);
  f.bridge.close();f.releases.forEach(r=>r());await tick();
 });
@@ -217,4 +218,82 @@ it('author failure while candidate waits for dwell prevents any later commit',as
  f.bridge.provider.generate=async(ex,signal,scene,stream)=>{stream.onRecord({...composed,diagram:{}});await new Promise((_,no)=>reject=no);};
  f.append('A data pipeline can load one source with a small script when its volume and recovery needs remain simple.\n\n');await tick();reject(Error('presentation_stream_corrected'));await new Promise(r=>setTimeout(r,65));
  expect(f.calls.some(c=>c.arg?.body)).toBe(false);expect(f.bridge.active).toBeNull();expect(f.bridge.displayed.owned.epoch).toBe('old');f.bridge.close();
+});
+
+it('freeform stages without revoking displayed scene while a candidate is pending',async()=>{
+ const f=fixture({boundedSourceLease:true});f.append('A complete initial explanation. ');await tick();
+ const first=f.calls.find(c=>c.ex);first.stream.onRecord(composed);await tick();f.releases.shift()();await tick();
+ const before=f.calls.filter(c=>c.fn?.includes('revokePresentation')).length;
+ f.advance(2600);f.append('A second complete explanation with more details. ');await tick();
+ expect(f.calls.filter(c=>c.ex)).toHaveLength(2);
+ expect(f.calls.filter(c=>c.fn?.includes('revokePresentation'))).toHaveLength(before);
+ expect(f.calls.filter(c=>c.arg?.identity).at(-1).fn).toContain('preparePresentation');
+ f.bridge.close();f.releases.forEach(r=>r());await tick();
+});
+
+it('a failed freeform author before admission cancels only its candidate permit',async()=>{
+ const f=fixture({boundedSourceLease:true});f.append('A complete initial explanation. ');await tick();
+ f.calls.find(c=>c.ex).stream.onRecord(composed);await tick();f.releases.shift()();await tick();
+ const revokes=f.calls.filter(c=>c.fn?.includes('revokePresentation')).length;
+ f.bridge.provider.generate=async()=>{throw Error('candidate_failed');};
+ f.advance(2600);f.append('A second complete explanation with more details. ');await tick();await tick();
+ expect(f.events.some(e=>e.type==='drop'&&e.code==='candidate_failed')).toBe(true);
+ expect(f.calls.some(c=>c.fn?.includes('cancelPreparedPresentation'))).toBe(true);
+ expect(f.calls.some(c=>c.fn?.includes('revokeOwnedPresentation'))).toBe(false);
+ expect(f.calls.filter(c=>c.fn?.includes('revokePresentation'))).toHaveLength(revokes);f.bridge.close();
+});
+it('a failure after a freeform acceptance revokes only that received identity',async()=>{
+ const f=fixture();f.bridge.provider.generate=async(_ex,_signal,_scene,stream)=>{stream.onRecord(composed);await tick();throw Error('trailing_failure');};
+ f.append('A complete initial explanation. ');await tick();await tick();await tick();
+ expect(f.events.some(e=>e.type==='admitted')).toBe(true);
+ const cleanup=f.calls.find(c=>c.fn?.includes('revokeOwnedPresentation'));
+ expect(cleanup.arg).toEqual({epoch:'e',sceneRevision:2,seq:3});
+ expect(f.calls.some(c=>c.fn?.includes('revokePresentation'))).toBe(false);f.bridge.close();
+});
+
+it('obtains replacement browser intent only after delayed source revocation resolves',async()=>{
+ const f=fixture();let release,intent=0,delayed=true;const old=f.bridge.page.evaluate;
+ f.bridge.page.evaluate=async(fn,arg)=>{
+  if(!arg&&String(fn).includes('revokePresentation')&&delayed){delayed=false;await new Promise(r=>release=r);intent++;return;}
+  if(String(fn).includes('presentationPreparationTicket')){const ticket=await old(fn,arg);return {...ticket,intentVersion:intent};}
+  if(arg?.identity&&arg.preparationTicket.intentVersion!==intent)return null;
+  return old(fn,arg);
+ };
+ f.bridge.invalidateSource('source_rewritten');f.append('A new complete explanation after correction. ');await tick();
+ expect(f.calls.some(c=>c.ex)).toBe(false);release();await tick();await tick();
+ const prepared=f.calls.find(c=>c.arg?.identity);expect(prepared.arg.preparationTicket.intentVersion).toBe(1);
+ expect(f.calls.filter(c=>c.ex)).toHaveLength(1);
+ f.advance();f.append('Another complete explanation follows the corrected source. ');await tick();f.releases.shift()();await tick();
+ expect(f.calls.filter(c=>c.arg?.identity).at(-1).arg.preparationTicket.preparationVersion).toBeGreaterThan(prepared.arg.preparationTicket.preparationVersion);
+ f.bridge.close();f.releases.forEach(r=>r());await tick();
+});
+
+it('classifies source-limited browser waits as expiry without disabling subsequent observations',async()=>{
+ vi.useFakeTimers({toFake:['setTimeout','clearTimeout','performance']});const f=fixture({ttlMs:25});
+ try {
+  f.bridge.browserTimeoutMs=1000;const old=f.bridge.page.evaluate;
+  f.bridge.page.evaluate=(fn,arg)=>arg?.body?new Promise(()=>{}):old(fn,arg);
+  f.bridge.provider.generate=vi.fn(async(_ex,_signal,_scene,stream)=>stream.onRecord(composed));
+  f.append('A complete source explanation. ');await vi.advanceTimersByTimeAsync(1);
+  expect(f.bridge.provider.generate).toHaveBeenCalledOnce();await vi.advanceTimersByTimeAsync(30);
+  expect(f.events.filter(e=>e.type==='source_expired')).toHaveLength(1);
+  expect(f.events.some(e=>e.type==='browser_unavailable')).toBe(false);expect(f.bridge.browserFault).not.toBe(true);expect(f.bridge.active).toBeNull();
+  f.advance(31);f.append('\n**Next section**\nAnother complete source explanation. ');await vi.advanceTimersByTimeAsync(1);
+  expect(f.bridge.provider.generate).toHaveBeenCalledTimes(2);
+ }finally{f.bridge.close();await vi.advanceTimersByTimeAsync(1);vi.useRealTimers();}
+});
+
+it.each([{ttl:25,limit:1000,source:true},{ttl:25.5,limit:1000,source:true},{ttl:1000,limit:25,source:false}])('keeps source/browser deadline ownership distinct: $source',async({ttl,limit,source})=>{
+ vi.useFakeTimers({toFake:['setTimeout','clearTimeout','performance']});const f=fixture();let complete;
+ try {
+  f.bridge.browserTimeoutMs=limit;f.bridge.page.evaluate=()=>new Promise(r=>complete=r);
+  const job={controller:new AbortController(),checkpoint:{checkpointRevision:1},lastNow:1000,expiresAt:1000+ttl,monotonicDeadline:performance.now()+ttl};
+  const late=vi.fn(),pending=f.bridge.evaluate(()=>{},undefined,job,late).catch(e=>e.message);
+  if(ttl===25.5){await vi.advanceTimersByTimeAsync(25);expect(job.controller.signal.aborted).toBe(false);await vi.advanceTimersByTimeAsync(1);}
+  else await vi.advanceTimersByTimeAsync(26);await pending;
+  expect(f.events.filter(e=>e.type==='source_expired')).toHaveLength(source?1:0);
+  expect(f.bridge.browserFault===true).toBe(!source);expect(job.controller.signal.aborted).toBe(source);
+  complete({status:'accepted',epoch:'e',sceneRevision:2,seq:3});await vi.advanceTimersByTimeAsync(0);
+  expect(late).toHaveBeenCalledWith({status:'accepted',epoch:'e',sceneRevision:2,seq:3});
+ }finally{f.bridge.close();await vi.advanceTimersByTimeAsync(1);vi.useRealTimers();}
 });

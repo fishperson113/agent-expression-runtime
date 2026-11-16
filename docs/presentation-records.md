@@ -79,3 +79,27 @@ release; it is not a persistent theme or particle-density preference. Neither
 field renews the source lease or changes native Codex. Existing compact records
 without these fields are unchanged. This adds authoring capacity, not evidence
 that a model produces legible emotions or finishes before its deadline.
+
+### Freeform candidate staging
+
+A streaming freeform candidate is prepared separately from displayed ownership.
+Starting a later author request does not revoke a still-valid displayed scene.
+A complete, validated candidate replaces geometry and annotations atomically;
+a normal rejection leaves the previous scene on its original source lease.
+Neither generation nor replacement renews that original deadline.
+
+Prepared candidates bind the exact scene epoch/revision used for their inventory.
+Browser-issued intent/order tickets fence delayed preparation; ticket acquisition
+is the current-state authoring boundary, not host dispatch time. No cross-process
+clock is used as mutation authority.
+
+Relative edits and animations cannot survive retirement of that inventory. An
+explicit complete replacement may survive only the old display's own expiry when
+its exact owned cleanup returns the exact fallback scene identity. Admission
+compares that fallback again and validates a complete assembly, with optional
+style/flow, before rebasing the candidate scope. Its original source deadline stays
+unchanged. Corrections, user mutations, unknown cleanup and intervening scene
+changes invalidate rather than rebase. An ambiguous commit exception remains
+fail-closed. Late receipt cleanup is scoped to its accepted geometry identity and
+cannot revoke a newer scene. These are continuity and ownership guarantees, not a
+reduction in model generation latency or proof of semantic/visual quality.
