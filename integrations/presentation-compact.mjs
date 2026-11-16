@@ -33,6 +33,11 @@ export const compactPresentationSchema = object({
     arrows: { type: 'array', maxItems: 8, items: object({ from: xy, to: xy }) },
   }, []),
 }, ['base']);
+// Advertise the same base-dependent shape that the parser enforces below.
+compactPresentationSchema.oneOf = [
+  {properties:{base:{const:'retain'}},maxProperties:1},
+  {properties:{base:{enum:['keep','replace']}},required:['parts']},
+];
 compactPresentationSchema.$defs = { color, unit: source.$defs.unit };
 const validate = new Ajv({ strict: false, strictNumbers: true }).compile(compactPresentationSchema);
 
