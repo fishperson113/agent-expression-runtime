@@ -133,3 +133,13 @@ earlier (16.304 s to 15.097 s), with the same one admitted scene. The third save
 call had no record, so this is scheduling evidence, not improved model coverage,
 semantic fidelity or native end-to-end UX. Default sampling and Codex text are
 unchanged.
+
+### Compact base alternatives
+
+The advertised compact and derived mini schemas require non-empty `parts` for
+`base: keep` and `base: replace`. To make no new change, return only
+`{ "base": "retain" }`; retain cannot carry duration, style, geometry or labels.
+This aligns the advertised JSON shape with existing strict parser behavior.
+Observed missing-parts outputs such as `{ "base": "keep" }` remain rejected,
+not silently converted to retain or filled with generated geometry. Numeric
+limits, source authority, deadlines and native Codex behavior are unchanged.
