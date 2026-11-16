@@ -512,3 +512,26 @@ saved scenes, ten seconds of warm-up and twenty seconds of rolling frame samples
 Both tiers remained around 60 FPS there; this does not establish camera-on,
 long-session, GPU-memory or thermal performance on other devices. Native Codex
 continuity across a manual page reload was not established by this quality test.
+
+## Experimental closed-paragraph visual sources
+
+`FISCH_PRESENTATION_PARAGRAPHS=1` enables a research-only source sampler for the
+ordinary freeform visual author. It is off by default and is not supported by
+the diagram protocol. Codex conversation is unchanged.
+
+Each eligible, newly closed prose paragraph has its exact source span and the
+first observed closure time. Repeated old text does not receive a fresh lease.
+Targets are single-line prose of 80–1024 characters closed by a blank line or
+completed message. Prior public assistant context and the entire available
+current message are forwarded together, without truncation; more than 4096
+characters revokes the current source. Lists, headings, Markdown blockquotes and fenced code
+are not eligible targets. This is not a general long-context solution.
+
+Ordinary appended text does not cancel each in-flight author request. Rewrites,
+recognized explicit corrections, changed context/intent and capacity overflow
+revoke it. A later qualifier can change the meaning of an earlier paragraph
+without matching the correction detector: a scene can therefore temporarily be
+misleading. Paragraph closure and correction patterns do not guarantee semantic
+validity. This tradeoff is restricted to the opt-in experiment, not a default
+safety or synchronization claim. Source leases remain 10 seconds and are never
+renewed to accommodate slow generation.

@@ -1,3 +1,4 @@
+import { PublicParagraphSources } from './presentation-paragraphs.mjs';
 import {revokeFreeformReceipt,cancelFreeformCandidate} from './presentation-freeform-staging.mjs';
 import {prepareDiagram,applyPreparedDiagram,revokeDiagramReceipt} from './presentation-diagram-staging.mjs';
 import { createHash } from 'node:crypto';
@@ -11,11 +12,12 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 // Independent, best-effort public-text observer. Never awaited by the native relay.
 export class LiveStreamingPresentationBridge {
-  constructor({state,page,host,runtime,provider,now=Date.now,onEvent=()=>{},ttlMs=10000,checkpoints={},boundedSourceLease=false,exactExcerptLease=false,protocol='freeform'}) {
+  constructor({state,page,host,runtime,provider,now=Date.now,onEvent=()=>{},ttlMs=10000,checkpoints={},boundedSourceLease=false,exactExcerptLease=false,paragraphSources=false,protocol='freeform'}) {
     if(!['freeform','diagram'].includes(protocol))throw Error('presentation_protocol_invalid');
-    exactExcerptLease ||= protocol==='diagram';
+    if(typeof paragraphSources!=='boolean'||paragraphSources&&protocol!=='freeform')throw Error('presentation_paragraph_protocol');
+    exactExcerptLease ||= protocol==='diagram'||paragraphSources;
     Object.assign(this,{state,page,now,onEvent,protocol,ttlMs:boundedSourceLease||exactExcerptLease?Math.min(ttlMs,10000):ttlMs,boundedSourceLease:boundedSourceLease||exactExcerptLease,exactExcerptLease});
-    this.excerpts=new PublicTextExcerpts();
+    this.excerpts=new PublicTextExcerpts();this.paragraphs=paragraphSources?new PublicParagraphSources():null;
     this.provider=provider??new NativePresentationProvider({host,runtime,timeoutMs:30000,protocol});
     this.checkpoints=new PublicTextCheckpoints(checkpoints);
     this.flushes=new Map();this.serial=0;this.finalIds=new Map();this.closed=false;this.selected=null;this.active=null;this.pending=null;
@@ -46,7 +48,7 @@ export class LiveStreamingPresentationBridge {
     }finally{abandoned=true;clearTimeout(timer);signal?.removeEventListener('abort',abort);}
   }
   invalidate() {
-    this.displayed=null;clearTimeout(this.holdTimer);this.selected?.controller?.abort();this.serial++;this.selected=null;this.pending=null;this.active?.controller.abort();this.finalIds.clear();this.checkpoints.revoke();this.excerpts.revoke();this.sectionKey=null;
+    this.displayed=null;clearTimeout(this.holdTimer);this.selected?.controller?.abort();this.serial++;this.selected=null;this.pending=null;this.active?.controller.abort();this.finalIds.clear();this.checkpoints.revoke();this.excerpts.revoke();this.paragraphs?.revoke();this.sectionKey=null;
     for(const timer of this.flushes.values())clearTimeout(timer);this.flushes.clear();
     this.revokeBrowser();
   }
@@ -71,7 +73,7 @@ export class LiveStreamingPresentationBridge {
     if(this.sectionKey!==sectionKey){this.sectionKey=sectionKey;this.sectionPublishedAt=this.now();}
     if(!this.boundedSourceLease&&this.selected&&this.selected.section!==section)this.invalidateSource('section_changed');
     const id={documentId:this.state.channel.token,threadId:this.state.output.thread,turnId,messageId};
-    const result=(this.exactExcerptLease?this.excerpts:this.checkpoints).update({...id,text:answer.text,at:this.now(),completed:answer.status==='completed'});
+    const result=this.samplePublic(answer,snapshot,id);
     if(result.revoked)this.invalidateSource(result.reason);
     if(!result.checkpoint){
       const key=JSON.stringify([turnId,messageId,answer.text.length]);
@@ -95,6 +97,13 @@ export class LiveStreamingPresentationBridge {
     if(!this.boundedSourceLease&&this.selected?.admitted&&this.selected.section===section&&this.valid(this.selected)){this.emit('covered',{revision:cp.checkpointRevision});return;}
     if(this.active&&(this.boundedSourceLease||this.selected?.section===section)&&this.valid(this.selected)){this.pending=job;this.emit('coalesced',{revision:cp.checkpointRevision});return;}
     this.dispatch(job);
+  }
+  samplePublic(answer,snapshot,id){
+    const input={...id,text:answer.text,at:this.now(),completed:answer.status==='completed'};
+    if(!this.paragraphs)return (this.exactExcerptLease?this.excerpts:this.checkpoints).update(input);
+    const prior=snapshot.messages.slice(0,snapshot.messages.indexOf(answer)).filter(message=>message.role==='assistant');
+    if(prior.some(message=>message.truncated)){this.paragraphs.revoke();return {revoked:true,reason:'public_context_truncated',checkpoint:null};}
+    return this.paragraphs.update({...input,generation:snapshot.generation,role:'assistant',publicContext:prior.map(message=>message.text).join('\n\n')});
   }
   dispatch(job){if(this.protocol==='diagram'){prepareDiagram(this,job);return;}
     job.promotionNotBefore=this.boundedSourceLease?Math.min(this.selected?.expiresAt??0,this.selected?.holdUntil??this.selected?.promotionNotBefore??0):0;
@@ -135,7 +144,7 @@ export class LiveStreamingPresentationBridge {
     let admission=Promise.resolve();
     void Promise.resolve().then(()=>this.provider.generate({userText:job.userText,assistantText:job.checkpoint.sourceText,
       target:job.sourceQuote,
-      ...(this.exactExcerptLease?{publicContext:job.checkpoint.textPrefix.slice(-4096)}:{})},controller.signal,{partIds:job.scene.partIds},{
+      ...(this.exactExcerptLease?{publicContext:job.checkpoint.publicContext??job.checkpoint.textPrefix.slice(-4096)}:{})},controller.signal,{partIds:job.scene.partIds},{
       isCurrent:()=>this.valid(job),onFailure:()=>this.failAuthor(job),onConfiguration:config=>this.emit('configuration',{revision:job.checkpoint.checkpointRevision,config}),onRejectedRecord:value=>this.emit('rejected_record',{revision:job.checkpoint.checkpointRevision,...value}),onPhase:phase=>this.emit('phase',{revision:job.checkpoint.checkpointRevision,phase}),onUsage:usage=>this.emit('usage',{revision:job.checkpoint.checkpointRevision,usage}),onRecord:record=>{admission=this.apply(job,record);admission.catch(()=>{});}
     })).then(()=>admission).catch(async error=>{controller.abort();await admission.catch(()=>{});if(this.protocol==='diagram')await revokeDiagramReceipt(this,job.displayedOwned);this.emit('drop',{code:error.message,revision:job.checkpoint.checkpointRevision});
       if(this.protocol!=='diagram'){await cancelFreeformCandidate(this,job);await revokeFreeformReceipt(this,job.displayedOwned);}
