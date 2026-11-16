@@ -550,3 +550,31 @@ continuations invalidate the whole item. Their prose-looking suffixes are not
 harvested separately. Unindented prose without a preceding blank line remains
 ambiguous lazy continuation and excludes the whole item. This is
 an exact-source syntax option, not Markdown completeness or semantic safety.
+
+### Explicit list-item source opt-in
+
+PowerShell example for the ordinary freeform visual provider:
+
+```powershell
+$env:FISCH_PRESENTATION_PROTOCOL = 'freeform'
+$env:FISCH_PRESENTATION_PARAGRAPHS = '1'
+$env:FISCH_PRESENTATION_LIST_ITEMS = '1'
+npm start
+```
+
+Only the exact string `1` enables either source option. List items require the
+paragraph option and freeform protocol. Contradictory configuration disables the
+visual lane with a configuration error; native chat remains available. Defaults
+remain unchanged. This does not activate a diagram provider, research priority
+scheduler, or asset library.
+
+The list sampler keeps complete column-zero, single-line items with their original
+marker and inline markup, at least 80 characters and the existing sentence-ending
+punctuation rules. A blank line alone does not close an item. It waits for a
+supported next sibling/heading, observed unindented prose after a blank line, or
+terminal completion. Indented, wrapped, nested, fenced and ambiguous continuations
+are excluded; marker padding must be 1–4 plain spaces. Full available context is
+preserved or rejected above 4096 characters; exact source timestamps and the original
+10-second lease are not renewed by repeated items. Structural closure does not
+prove semantic completeness: a later qualifier may change the earlier meaning.
+This option improves eligible source coverage, not a guarantee of timely visuals.

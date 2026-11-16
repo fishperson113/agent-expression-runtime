@@ -10,14 +10,19 @@ import { presentationSection } from '../src/live/presentation-section.mjs';
 export { presentationSection };
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+export function presentationSourceOptions(env) {
+  return { paragraphSources: env.FISCH_PRESENTATION_PARAGRAPHS === '1', listItemSources: env.FISCH_PRESENTATION_LIST_ITEMS === '1' };
+}
+
 // Independent, best-effort public-text observer. Never awaited by the native relay.
 export class LiveStreamingPresentationBridge {
-  constructor({state,page,host,runtime,provider,now=Date.now,onEvent=()=>{},ttlMs=10000,checkpoints={},boundedSourceLease=false,exactExcerptLease=false,paragraphSources=false,protocol='freeform'}) {
+  constructor({state,page,host,runtime,provider,now=Date.now,onEvent=()=>{},ttlMs=10000,checkpoints={},boundedSourceLease=false,exactExcerptLease=false,paragraphSources=false,listItemSources=false,protocol='freeform'}) {
     if(!['freeform','diagram'].includes(protocol))throw Error('presentation_protocol_invalid');
     if(typeof paragraphSources!=='boolean'||paragraphSources&&protocol!=='freeform')throw Error('presentation_paragraph_protocol');
+    if(typeof listItemSources!=='boolean'||listItemSources&&(!paragraphSources||protocol!=='freeform'))throw Error('presentation_list_sources_invalid');
     exactExcerptLease ||= protocol==='diagram'||paragraphSources;
     Object.assign(this,{state,page,now,onEvent,protocol,ttlMs:boundedSourceLease||exactExcerptLease?Math.min(ttlMs,10000):ttlMs,boundedSourceLease:boundedSourceLease||exactExcerptLease,exactExcerptLease});
-    this.excerpts=new PublicTextExcerpts();this.paragraphs=paragraphSources?new PublicParagraphSources():null;
+    this.excerpts=new PublicTextExcerpts();this.paragraphs=paragraphSources?new PublicParagraphSources({allowListItems:listItemSources}):null;
     this.provider=provider??new NativePresentationProvider({host,runtime,timeoutMs:30000,protocol});
     this.checkpoints=new PublicTextCheckpoints(checkpoints);
     this.flushes=new Map();this.serial=0;this.finalIds=new Map();this.closed=false;this.selected=null;this.active=null;this.pending=null;
