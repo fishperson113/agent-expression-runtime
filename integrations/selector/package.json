@@ -1,0 +1,1 @@
+{"name":"fisch-selector-shadow","version":"0.0.0","private":true,"type":"module","dependencies":{"@huggingface/tokenizers":"0.2.0","onnxruntime-node":"1.31.1"}}

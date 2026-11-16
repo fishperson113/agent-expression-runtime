@@ -64,7 +64,7 @@ export async function runPanelCodex({ live, cwd, signal, host: suppliedHost, rea
   const runtime = fischCodexRuntime(); cwd = runtime.cwd;
   const env = { ...nativeLiveEnvironment(runtime.env), AER_BASE_URL: live.base, AER_PAIRING_TOKEN: live.token, FISCH_LIVE: '1', FISCH_PLANNER_BACKEND: 'off' };
   const configured = reactiveProvider === undefined ? createLiveReactiveProvider(runtime.env, { defaultNative: true }) : { provider: reactiveProvider, reason: reactiveProvider ? 'ready' : 'disabled_by_config' };
-  const state = await createBridge({ live, host, cwd, env, configured });
+  const state = await createBridge({ live, host, cwd, env, configured, signal });
   const done = Promise.withResolvers(); let client, timer, unbind, failed = false;
   state.fail = code => done.resolve(code);
   const onAbort = () => {
