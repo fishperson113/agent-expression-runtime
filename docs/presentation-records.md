@@ -189,3 +189,25 @@ shutdown if the underlying process never settles.
 The normal launcher does not call prewarm, and warm transport remains off by
 default. This API does not install the experimental two-slot pool, change native
 Codex settings, or establish an end-to-end latency or scene-quality improvement.
+
+## Optional per-job asset input
+
+A trusted compact/freeform `assetLibrary` may additionally implement synchronous
+`createJob(exchange)`. Its existing `policy` and `parseRecord` remain required.
+The factory runs once before RPC allocation, receiving only frozen own string
+fields `userText`, `target`, `publicContext`, and optional `assistantText`.
+It returns own data properties `{input, parseRecord}`. Input must be a plain JSON
+object: no accessors, cycles, exotic objects, sparse arrays or nonfinite numbers;
+limits are 32 nesting levels, 16,384 values and 65,536 serialized UTF-8 bytes.
+The input is cloned and deeply frozen. The captured parser's receiver is a
+frozen `{input, parseRecord}` binding, not the mutable factory return object.
+This pairs validation with the exact input sent for that job. Factory errors and
+invalid results fail before starting the visual transport. Promise results are
+not supported. Without a factory, the existing input and parser path is unchanged.
+
+This opt-in API does not grant browser authority, alter visual policy, schedule
+jobs, change native Codex, or enable any experimental launcher by default.
+
+The factory is trusted host application code, not an untrusted plugin sandbox.
+Structural limits bound accepted JSON; they do not isolate proxy traps or hostile
+factory computation. Callers retain all source freshness and admission checks.
