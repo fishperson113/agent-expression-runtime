@@ -1,4 +1,4 @@
-// Opt-in exact public prose only. Closure is syntax, not semantic entailment.
+// Exact public source collection. Closure is syntax, not semantic entailment.
 const LIMIT = 256;
 const correction = /(?<![\p{L}\p{N}])(?:actually|correction|đính chính|nói đúng hơn)(?![\p{L}\p{N}])/giu;
 function identityOf(input) {
@@ -22,11 +22,13 @@ function hasClosedSuffix(quote) {
   }
   return false;
 }
+function closedText(quote) {
+  return quote.length >= 80 && quote.length <= 1024 && !/[\r\n]/u.test(quote) && hasClosedSuffix(quote);
+}
 function eligible(raw) {
   const quote = raw.trim();
-  return quote.length >= 80 && quote.length <= 1024 && !/[\r\n]/u.test(quote)
-    && !/^\s*(?:#{1,6}\s|[-*+>]\s|\d+[.)]\s|\| |\*\*.*\*\*$|__.*__$)/u.test(quote)
-    && hasClosedSuffix(quote);
+  return closedText(quote)
+    && !/^\s*(?:#{1,6}\s|[-*+>]\s|\d+[.)]\s|\| |\*\*.*\*\*$|__.*__$)/u.test(quote);
 }
 function closedParagraphs(text, completed) {
   const result = []; let begin = 0, lines = [], fence = null;
@@ -51,8 +53,55 @@ function closedParagraphs(text, completed) {
   if (completed && !fence) flush(text.length);
   return result;
 }
+function listStart(line) {
+  const match = line.match(/^(?:[-+*]|\d{1,9}[.)]) {1,4}(\S.*)$/u);
+  return !!match && !/^(?:>\s?|#{1,6}\s|`{3,}|~{3,}|(?:[-+*]|\d{1,9}[.)])(?:\s|$))/u.test(match[1]);
+}
+const ordinaryStart = line => !!line.trim() && !/^(?:[\s#>*+`~|\-]|\d+[.)](?:\s|$))/u.test(line);
+const headingStart = /^#{1,6}[\t ]+\S/u;
+function closedListItems(text, completed) {
+  const items = [], excluded = []; let active = null, fence = null;
+  const finish = end => {
+    if (!active) return;
+    excluded.push([active.start, end]);
+    if (!active.invalid && closedText(active.quote))
+      items.push({ quote: active.quote, start: active.start, end: active.start + active.quote.length });
+    active = null;
+  };
+  for (const match of text.matchAll(/([^\n]*)(\n|$)/gu)) {
+    if (!match[0]) continue;
+    const line = match[1].replace(/\r$/u, ''), offset = match.index;
+    const marker = line.match(/^\s{0,3}(`{3,}|~{3,})/u);
+    if (marker) {
+      if (active) active.invalid = true;
+      if (!fence) fence = marker[1];
+      else if (marker[1][0] === fence[0] && marker[1].length >= fence.length) fence = null;
+      continue;
+    }
+    if (fence) continue;
+    if (listStart(line)) {
+      finish(offset); active = { start: offset, quote: line.trimEnd(), invalid: false, blank: false };
+    } else if (!active && /^[\t ]*(?:[-+*]|\d{1,9}[.)])(?:[\t ]+|$)/u.test(line)) {
+      active = { start: offset, quote: line.trimEnd(), invalid: true, blank: false };
+    } else if (headingStart.test(line)) finish(offset);
+    else if (active?.blank && ordinaryStart(line)) finish(offset);
+    else if (line.trim() && active) active.invalid = true;
+    else if (active) active.blank = true;
+  }
+  if (completed) finish(text.length);
+  else if (active) excluded.push([active.start, text.length]);
+  return { items, excluded };
+}
+function sources(text, completed, allowListItems) {
+  const prose = closedParagraphs(text, completed);
+  if (!allowListItems) return prose;
+  const { items, excluded } = closedListItems(text, completed);
+  return [...prose.filter(p => !excluded.some(([start, end]) => p.start >= start && p.start < end)), ...items]
+    .sort((a, b) => a.start - b.start);
+}
 export class PublicParagraphSources {
-  constructor() {
+  constructor({ allowListItems = false } = {}) {
+    this.allowListItems = allowListItems === true;
     this.serial = 0; this.lastNow = -Infinity; this.identity = null; this.retired = new Set();
     this.text = ''; this.context = ''; this.completed = false; this.firstSeen = new Map(); this.emitted = new Set();
   }
@@ -84,7 +133,7 @@ export class PublicParagraphSources {
     const corrections = [...input.text.matchAll(correction)];
     if (corrections.some(match => match.index + match[0].length > oldLength)) return this.reject('explicit_correction');
     this.text = input.text; this.completed = input.completed;
-    const candidates = this.observe(closedParagraphs(input.text, input.completed), input.at);
+    const candidates = this.observe(sources(input.text, input.completed, this.allowListItems), input.at);
     const candidate = candidates.at(-1);
     const publicContext = input.publicContext ? input.publicContext + '\n\n' + input.text : input.text;
     if (publicContext.length > 4096) return this.reject('context_limit');

@@ -535,3 +535,18 @@ misleading. Paragraph closure and correction patterns do not guarantee semantic
 validity. This tradeoff is restricted to the opt-in experiment, not a default
 safety or synchronization claim. Source leases remain 10 seconds and are never
 renewed to accommodate slow generation.
+
+The internal `PublicParagraphSources({ allowListItems: true })` option additionally
+accepts complete single-line, column-zero unordered or ordered list items with
+one to four plain spaces after the marker (tabs and larger padding abstain). This
+option is off by default and is not enabled by the launcher environment setting
+above. The exact marker and inline markup remain in the source; no text is
+shortened. The 80-1024-character limits and sentence/emoji suffix checks remain.
+A nonempty next top-level item or column-zero ATX heading closes an item; terminal
+completion can close an item that has no continuation. A blank line followed by
+observed zero-indent ordinary prose also closes it; blank lines alone do not.
+Wrapped, indented, nested, fenced, blockquoted or ambiguous ordinary-text
+continuations invalidate the whole item. Their prose-looking suffixes are not
+harvested separately. Unindented prose without a preceding blank line remains
+ambiguous lazy continuation and excludes the whole item. This is
+an exact-source syntax option, not Markdown completeness or semantic safety.
