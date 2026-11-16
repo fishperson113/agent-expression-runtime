@@ -3,12 +3,12 @@ export class PresentationTransport {
     if (!Number.isSafeInteger(idleMs) || idleMs < 1 || !Number.isSafeInteger(maxJobs) || maxJobs < 1) throw Error('presentation_transport_limits');
     Object.assign(this, { Rpc, idleMs, maxJobs });
   }
-  async acquire(command, args, cwd, notify, failed, env) {
+  async acquire(command, args, cwd, notify, failed, env, isCurrent = () => true) {
     if (this.active || this.closed) throw Error('presentation_transport_unavailable');
     this.active = { notify, failed };
     try {
       await this.retiring;
-      if (this.closed) throw Error('presentation_transport_closed');
+      if (this.closed || !isCurrent()) throw Error('presentation_transport_closed');
       clearTimeout(this.timer);
       if (!this.rpc) {
         this.jobs = 0; this.initialized = false;
