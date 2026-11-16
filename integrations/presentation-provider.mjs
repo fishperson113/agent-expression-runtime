@@ -119,6 +119,29 @@ export class NativePresentationProvider {
     Object.assign(this, { host, runtime, Rpc, timeoutMs, visualModel, visualEffort, compact, miniScene, protocol, assetLibrary });
     if (warmTransport) this.transport = new PresentationTransport(Rpc, warmTransport === true ? {} : warmTransport);
   }
+  launchArguments() {
+    return [...this.host.args, 'app-server', '--stdio', ...fischCodexArguments(), '-c', 'web_search="disabled"', ...disabled.flatMap(key => ['--disable', key])];
+  }
+  async prewarm(signal) {
+    if (!this.transport || this.active || this.closed || signal.aborted) throw Error('presentation_unavailable');
+    let finish, timer, rpc, healthy=false, cancel;
+    const job={settled:new Promise(resolve=>{finish=resolve;})}; this.active=job;
+    const cancelled=new Promise((_,reject)=>{cancel=reject;});cancelled.catch(()=>{});
+    const current=()=>this.active===job&&!this.closed&&!signal.aborted&&!job.failed;
+    const guard=()=>{if(!current())throw Error('presentation_aborted');};
+    const abort=()=>{job.failed=true;cancel(Error('presentation_aborted'));try{rpc?.close();}catch{}};
+    job.cancel=abort;signal.addEventListener('abort',abort,{once:true});timer=setTimeout(abort,this.timeoutMs);
+    try {
+      rpc=await this.transport.acquire(this.host.command,this.launchArguments(),this.runtime.cwd,()=>{},abort,this.runtime.env,current);
+      guard();this.rpc=rpc;
+      const request=async(...args)=>{guard();const value=await Promise.race([rpc.request(...args),cancelled]);guard();return value;};
+      await this.prepareTransport(request,rpc,{},()=>{});guard();healthy=true;
+    } finally {
+      clearTimeout(timer);signal.removeEventListener('abort',abort);
+      try{await this.transport.release(healthy&&current());}
+      finally{if(this.active===job)this.active=undefined;if(this.rpc===rpc)this.rpc=undefined;finish();}
+    }
+  }
   async prepareTransport(request, rpc, streaming, phase) {
       if (!this.transport?.initialized) { await request('initialize', { clientInfo: { name: 'fisch_presentation', version: '1' }, capabilities: { experimentalApi: true } }); phase('initialized');rpc.send({ method: 'initialized' });
         if (this.transport) this.transport.initialized = true; }
@@ -134,26 +157,25 @@ export class NativePresentationProvider {
     if (this.active || this.closed || signal.aborted) throw Error('presentation_unavailable');
     if(this.protocol==='diagram'&&!streaming)throw Error('diagram_requires_streaming');
     const diagramInput=this.protocol==='diagram'?diagramAuthorInput(exchange):null;
-    const job = { id: randomUUID(), text: undefined };
+    let finish;const job = { id: randomUUID(), text: undefined, settled:new Promise(resolve=>{finish=resolve;}) };
     let timer, resolve, reject, cancelRequest;
     const cancelled=new Promise((_,no)=>{cancelRequest=no;});cancelled.catch(()=>{});
     if(this.assetLibrary&&!streaming)throw Error('presentation_assets_streaming_only');
     const records = streaming ? createPresentationRecordStream({ ...(diagramInput ? {parseRecord:text=>parseDiagramAuthorRecord(text,exchange)} : this.assetLibrary ? {parseRecord:this.assetLibrary.parseRecord} : this.compact ? {parseRecord:this.miniScene?parseMiniPresentation:parseCompactPresentationRecord} : {}), isCurrent: () => !signal.aborted && streaming.isCurrent() }) : null;
     const publish = text => { for (const record of records.push(text)) {streaming.onPhase?.('record');streaming.onRecord(record);} };
     const phase=name=>{try{streaming?.onPhase?.(name);}catch{}};
-    const done = new Promise((yes, no) => { resolve = yes; reject = error => { if(job.failed||job.completed)return;job.failed = true;cancelRequest(error);no(error);try{streaming?.onFailure?.({code:error.message});}catch{} }; }); done.catch(() => {});
+    const done = new Promise((yes, no) => { resolve = yes; reject = error => { if(job.failed||job.completed)return;job.failed = true;job.failure=error;cancelRequest(error);no(error);try{streaming?.onFailure?.({code:error.message});}catch{} }; }); done.catch(() => {});
     const notify = presentationNotifications({job,streaming,records,publish,resolve,reject});
-    const args = [...this.host.args, 'app-server', '--stdio', ...fischCodexArguments(), '-c', 'web_search="disabled"', ...disabled.flatMap(key => ['--disable', key])];
+    const args = this.launchArguments();
     let rpc, healthy = false; this.active=job;
+    const abort = () => { const error=Error('presentation_aborted');reject(error);cancelRequest(error);try{rpc?.close();}catch{} };
+    job.cancel=abort;signal.addEventListener('abort',abort,{once:true});timer=setTimeout(abort,this.timeoutMs);
     try { rpc = this.transport
-      ? await this.transport.acquire(this.host.command, args, this.runtime.cwd, notify, code => reject(Error(code)), this.runtime.env)
+      ? await this.transport.acquire(this.host.command, args, this.runtime.cwd, notify, code => reject(Error(code)), this.runtime.env,()=>!this.closed&&!signal.aborted&&!job.failed)
       : new this.Rpc(this.host.command, args, this.runtime.cwd, notify, code => reject(Error(code)), this.runtime.env); }
-    catch(error){if(this.active===job)this.active=undefined;throw error;}
+    catch(error){clearTimeout(timer);signal.removeEventListener('abort',abort);if(this.active===job)this.active=undefined;finish();throw error;}
     this.rpc = rpc;
-    const request=(...values)=>Promise.race([rpc.request(...values),cancelled]);
-    const abort = () => { const error=Error('presentation_aborted');reject(error);cancelRequest(error);try{rpc.close();}catch{} };
-    job.cancel=abort;
-    signal.addEventListener('abort', abort, { once: true }); timer = setTimeout(abort, this.timeoutMs);
+    const request=async(...values)=>{if(signal.aborted||this.closed||job.failed)throw job.failure??Error('presentation_aborted');const value=await Promise.race([rpc.request(...values),cancelled]);if(signal.aborted||this.closed||job.failed)throw job.failure??Error('presentation_aborted');return value;};
     try {
       if (signal.aborted) abort();
       await this.prepareTransport(request, rpc, streaming, phase);
@@ -172,10 +194,14 @@ export class NativePresentationProvider {
       healthy = !job.failed;job.completed=healthy;return result;
     } catch(error) { reject(error);throw error; } finally {
       clearTimeout(timer); signal.removeEventListener('abort', abort);
-      if (this.transport) await this.transport.release(healthy); else { try{rpc.close();}catch{} }
-      // Failed/retired warm transports settle before another generation; healthy ones remain idle.
-      try{if (!this.transport) await rpc.settled;}finally{if(this.active===job)this.active=undefined;if(this.rpc===rpc)this.rpc=undefined;}
+      try{
+        if (this.transport) await this.transport.release(healthy); else {try{rpc.close();}catch{}await rpc.settled;}
+      }finally{if(this.active===job)this.active=undefined;if(this.rpc===rpc)this.rpc=undefined;finish();}
     }
   }
-  close() { this.closed = true; this.transport?.close(); this.active?.cancel?.(); try{this.rpc?.close();}catch{} }
+  close() {
+    if(this.closePromise)return this.closePromise;this.closed=true;const job=this.active,rpc=this.rpc;
+    this.active?.cancel?.();const retired=this.transport?.close();try{rpc?.close();}catch{}
+    this.closePromise=Promise.all([retired,job?.settled,rpc?.settled]).then(()=>{});this.closePromise.catch(()=>{});return this.closePromise;
+  }
 }

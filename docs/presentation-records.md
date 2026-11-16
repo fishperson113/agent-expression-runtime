@@ -171,3 +171,21 @@ visually inspected; body/belly particle weights were manually refined. The track
 finish and hold, not loop indefinitely. It was reviewed at the existing optional
 8,000-particle setting and is sparser at the default 2,000. Asset selection is not
 proof of emotional fidelity, sustained engagement or a faster native experience.
+
+## Optional visual-provider prewarm API
+
+`NativePresentationProvider.prewarm(signal)` is an explicit API for providers
+constructed with `warmTransport`. It starts and validates the isolated visual
+transport without creating a thread, sending source text, or running inference.
+Foreground generation still rechecks configuration and tool availability and
+creates a fresh ephemeral thread for each source. Source deadlines and browser
+ownership remain the caller's responsibility; prewarm does not extend either.
+
+`close()` now returns an idempotent promise for process retirement and active
+operation settlement. Callers must await it before replacing a physical process
+slot. Cancellation requests retirement but cannot guarantee a hard wall-clock
+shutdown if the underlying process never settles.
+
+The normal launcher does not call prewarm, and warm transport remains off by
+default. This API does not install the experimental two-slot pool, change native
+Codex settings, or establish an end-to-end latency or scene-quality improvement.
