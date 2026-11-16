@@ -1,3 +1,4 @@
+import { UserRequestPresentationBridgeV2 } from './user-request-presentation-v2.mjs';
 import { presentationModelOptions } from './presentation-model-options.mjs';
 import { fischCodexRuntime } from './fisch-codex-runtime.mjs';
 import { spawn } from 'node:child_process';
@@ -47,6 +48,11 @@ function visualUnavailable(state,event){
   state.logs.push(event.code);
   console.error('Visual model/effort is not supported by the native catalog. Visual lane disabled for this session; native chat remains available.');
 }
+export async function configureUserRequestPresentationV2(state) {
+  if(!state.presentation?.previewReady)return;
+  try { if(!await state.presentation.previewReady)throw Error('presentation_user_setup'); }
+  catch(error) { const failed=state.presentation;state.presentation=null;try{await failed.close();}catch{}throw error; }
+}
 export async function createBridge({ live, host, cwd, env, configured, instructions }) {
   const state = { logs: [], projection: new PlaygroundProjection(), channel: { token: randomUUID(), stale: false } };
   state.output = new LiveOutput((thread, previous) => selectThread(state, thread, previous));
@@ -65,7 +71,9 @@ export async function createBridge({ live, host, cwd, env, configured, instructi
         const rejected = { id: message.id, error }; state.output.accept(rejected); state.conversation?.accept(rejected); state.transport.reject(message, error);
       }, log: text => { state.logs.push(text); state.logs.splice(0, Math.max(0, state.logs.length - 20)); } });
     state.conversation = new LiveConversation({ output: state.output, transport: state.transport, broker: state.broker, captureObservation: scope => captureChatObservation(state.broker, state.channel, scope) });
-    try { state.presentation = new LiveStreamingPresentationBridge({ state, page: live.page, host, runtime: fischCodexRuntime(), protocol: process.env.FISCH_PRESENTATION_PROTOCOL ?? 'freeform', ...presentationSourceOptions(process.env), ...presentationModelOptions(process.env), onEvent: event => visualUnavailable(state,event) }); }
+    try { const Presentation = process.env.FISCH_USER_REQUEST_VISUAL === '1' ? UserRequestPresentationBridgeV2 : LiveStreamingPresentationBridge;
+      state.presentation = new Presentation({ state, page: live.page, host, runtime: fischCodexRuntime(), protocol: process.env.FISCH_PRESENTATION_PROTOCOL ?? 'freeform', ...presentationSourceOptions(process.env), ...presentationModelOptions(process.env), onEvent: event => visualUnavailable(state,event) });
+      await configureUserRequestPresentationV2(state); }
     catch (error) {
       const known=['presentation_protocol_invalid','presentation_paragraph_protocol','presentation_list_sources_invalid','presentation_model_config_invalid'];
       const code=known.includes(error?.message)?error.message:'presentation_unavailable';state.logs.push(code);
@@ -78,9 +86,9 @@ export async function createBridge({ live, host, cwd, env, configured, instructi
       const api = window.fischLive; if (api.conversationOffline === true) return;
       if (token) api.conversationDocument = token; api.setupStatus?.(value);
     }, { value: liveSetupStatus(native, configured), token }).catch(() => {});
-    state.publication = () => ({ token: state.channel.token, snapshot: state.channel.stale
+    state.publication = () => { presentationCall(state, 'observeUserRequestV2'); return ({ token: state.channel.token, snapshot: state.channel.stale
       ? { ...state.conversation.snapshot(), available: false, canSend: false, canCancel: false, error: 'conversation_restart_required' }
-      : state.conversation.snapshot() });
+      : state.conversation.snapshot() }); };
     return state;
   } catch (error) { await closeLiveOwned([() => closePresentation(state), () => state.broker?.close(), () => state.transport?.close()], true); throw error; }
 }

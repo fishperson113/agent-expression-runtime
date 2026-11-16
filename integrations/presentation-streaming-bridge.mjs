@@ -165,6 +165,7 @@ export class LiveStreamingPresentationBridge {
     let admission=Promise.resolve();
     void Promise.resolve().then(()=>this.provider.generate({userText:job.userText,assistantText:job.checkpoint.sourceText,
       target:job.sourceQuote,
+      ...(job.sourceRole==='user_request'?{sourceRole:'user_request',publicContext:job.checkpoint.publicContext}:{}),
       ...(this.exactExcerptLease?{publicContext:job.checkpoint.publicContext??job.checkpoint.textPrefix.slice(-4096)}:{})},controller.signal,{partIds:job.scene.partIds},{
       isCurrent:()=>this.valid(job),onFailure:()=>this.failAuthor(job),onConfiguration:config=>this.emit('configuration',{revision:job.checkpoint.checkpointRevision,config}),onRejectedRecord:value=>this.emit('rejected_record',{revision:job.checkpoint.checkpointRevision,...value}),onPhase:phase=>this.emit('phase',{revision:job.checkpoint.checkpointRevision,phase}),onUsage:usage=>this.emit('usage',{revision:job.checkpoint.checkpointRevision,usage}),onRecord:record=>{admission=this.apply(job,record);admission.catch(()=>{});}
     })).then(()=>admission).catch(async error=>{if(error?.message==='presentation_model_unsupported')this.disableUnsupportedModel();controller.abort();await admission.catch(()=>{});if(this.protocol==='diagram')await revokeDiagramReceipt(this,job.displayedOwned);this.emit('drop',{code:error.message,revision:job.checkpoint.checkpointRevision});
