@@ -127,3 +127,38 @@ it('user-mode serializer preserves conditional Unicode source without assistant 
  expect(sent.userRequest).toBe(target);expect(sent.target).toBe(target);expect(sent.publicContext).toBe(input.publicContext);
  expect([...sent.target].slice(-2).map(c=>c.codePointAt(0))).toEqual([0x111,0x1f600]);expect(JSON.parse(JSON.stringify(sent))).toEqual(sent);
 });
+
+it.each(['active','selected_only','expired','newturn','same_turn'])('scheduler dispatch respects original source and prior assistant %s state',async(state)=>{
+ const started=[],streams=[],releases=[];
+ const author={generate:async(ex,_signal,_scene,stream)=>{started.push(ex);streams.push(stream);if(ex.sourceRole!=='user_request')await new Promise(resolve=>releases.push(resolve));},close(){for(const release of releases)release();}};
+ const f=fixture(author);await f.bridge.previewReady;
+ f.api.captureUserRequestV2=()=>null;
+ f.api.presentationPreparationTicket=()=>({intentVersion:0,preparationVersion:1});
+ f.api.preparePresentation=identity=>({scope:{...identity,epoch:'e',sceneRevision:0,intentVersion:0,admissionVersion:1},partIds:[]});
+ f.api.userRequestSourceV2=()=>({sourceVersion:1,remainingTtlMs:9000});
+ f.api.applyPreparedPresentation=()=>{f.calls.push(['applied']);return {status:'accepted',epoch:'e',sceneRevision:1,seq:1};};
+ try{
+  const text='An earlier complete public assistant explanation with enough characters for this synthetic scheduling fixture.';
+  f.snapshot.ownerTurn='old';f.snapshot.revision++;f.snapshot.messages.push({id:'oldU',turn:'old',role:'user',status:'completed',text:'Earlier request.'},{id:'oldA',turn:'old',role:'assistant',status:'streaming',text});
+  f.bridge.dispatch({...timing(),documentId:'d',threadId:'h',generation:1,turnId:'old',messageId:'oldA',userText:'Earlier request.',publicRevision:f.snapshot.revision,section:0,sourceStart:0,sourceEnd:text.length,sourceQuote:text,sourceAt:Date.now(),controller:new AbortController(),checkpoint:{checkpointRevision:1,textPrefix:text,sourceText:text}});
+  await until(()=>started.length===1);const oldController=f.bridge.selected.controller;
+  if(state==='selected_only'){releases[0]();await until(()=>!f.bridge.active);}
+  if(state!=='same_turn'){f.snapshot.ownerTurn='new';f.snapshot.revision++;f.snapshot.messages.push({id:'newU',turn:'new',role:'user',status:'completed',text:'Please show a new abstract shape.'});}
+  f.bridge.observeUserRequestV2();const source=f.bridge.userRequests.current;
+  expect(source).toBeTruthy();expect(started.filter(x=>x.sourceRole==='user_request')).toHaveLength(0);
+  if(state==='same_turn'){expect(f.bridge.userAttempt).toBeUndefined();expect(oldController.signal.aborted).toBe(false);return;}
+  expect(f.bridge.userAttempt).toBe(source.sourceVersion);expect(oldController.signal.aborted).toBe(true);
+  const userJob=f.bridge.selected;expect(userJob.monotonicDeadline).toBe(source.deadline);
+  if(state==='expired')f.bridge.userRequests.now=()=>source.deadline+1;
+  if(state==='newturn'){f.snapshot.ownerTurn='newest';f.snapshot.revision++;f.snapshot.messages.push({id:'newestU',turn:'newest',role:'user',status:'completed',text:'Please show the newest abstract shape.'});f.bridge.observeUserRequestV2();expect(userJob.controller.signal.aborted).toBe(true);}
+  // A record from the old still-active provider must not reach browser admission.
+  streams[0].onRecord(scene);await new Promise(resolve=>setTimeout(resolve,10));expect(f.calls.some(x=>x[0]==='applied')).toBe(false);
+  if(state!=='selected_only'){expect(started).toHaveLength(1);releases[0]();}
+  await until(()=>!f.bridge.active);await new Promise(resolve=>setTimeout(resolve,25));
+  if(state==='expired'){expect(f.bridge.userRequests.current).toBeNull();expect(started.filter(x=>x.sourceRole==='user_request')).toHaveLength(0);return;}
+  if(state==='newturn'){expect(started.filter(x=>x.sourceRole==='user_request').map(x=>x.target)).toEqual(['Please show the newest abstract shape.']);expect(f.bridge.userRequests.current.sourceVersion).not.toBe(source.sourceVersion);return;}
+  expect(f.bridge.userRequests.current).toBe(source);expect(performance.now()).toBeLessThan(source.deadline);
+  expect(started.filter(x=>x.sourceRole==='user_request')).toHaveLength(1);
+  expect(userJob.monotonicDeadline).toBe(source.deadline);expect(f.calls.some(x=>x[0]==='generic_revoke')).toBe(false);
+ }finally{for(const release of releases)release();await f.bridge.close();}
+});

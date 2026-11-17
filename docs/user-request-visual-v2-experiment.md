@@ -25,3 +25,13 @@ Known host/browser asymmetry: the host does not consume its expired deference li
 - The latest policy-v2.1 plus ownerless-fix live attempt was blocked by Computer Use browser-URL policy confidence before any prompt. Both trace installation markers appeared; zero native turns, visual-author calls, records or admissions occurred. The existing 180-second named-process watchdog ended it; no bypass or retry was attempted. It provides no model or UX outcome for this bundle.
 
 There is no full-suite pass for this final experimental tree, no current real-UX success, and no causal A/B result. The runtime uses the existing one-active/latest-pending mechanism; the authorized live attempt had a wall-clock bound, not an invented hard model-call cap. Promotion requires a fresh review, full regression/CI gates, and authorized real interaction evidence showing recognizable visuals with correct attribution and meaningful assistant follow-up.
+
+## Follow-up: obsolete-source scheduling proof and narrow fix
+
+After the original provenance commit, a read-only audit found that a new user version was marked attempted before checking prior assistant work. The deterministic proof reproduced two skipped-user cases (prior active and selected-only assistant); expiry and newest-turn controls passed. This was a host scheduling proof, not an explanation of a historical live result.
+
+The follow-up marks the attempt only at dispatch and permits the existing scheduler to supersede work with a provably different document/thread/generation/turn identity. It does not preempt same-turn assistant work. Existing dispatch aborts the old selected controller, keeps the single active slot until settlement, and drains the newest candidate without generic browser invalidation, an extra queue, or deadline renewal. The revised tests no longer manually clear old selection and check old late records, same-turn priority, newest-turn selection, and original expiry.
+
+The intended integration file passed 16/16. The scoped regression batch then passed 86/86 in exactly four files (three V2 suites plus existing streaming bridge tests); build and architecture gates passed. The expected-red proof and original provenance commit remain preserved. No browser/model rerun was performed for this scheduling change, and it remains experimental.
+
+The earlier 509-file archive and its strict trace loader pin describe the pre-scheduling-fix bundle, not this updated source. They are preserved unchanged and must not be reused as current-source verification. A future authorized trace would require new guards and a new frozen manifest. This follow-up still has no final full-suite pass, live UX proof, or promotion approval.

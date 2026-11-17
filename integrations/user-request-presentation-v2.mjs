@@ -27,12 +27,15 @@ export class UserRequestPresentationBridgeV2 extends LiveStreamingPresentationBr
   const previous=this.userRequests.current,u=this.userRequests.observe(this.state.channel.token,this.state.conversation.snapshot());
   if(previous&&!this.userRequests.current&&this.selected?.sourceRole==='user_request')this.invalidateSource('user_request_retired');
   if(!u||this.userAttempt===u.sourceVersion)return;
-  this.userAttempt=u.sourceVersion;
-  if(this.active||this.pending||this.selected?.sourceRole!=='user_request'&&this.selected)return;
+  const obsolete=job=>job&&['documentId','threadId','generation','turnId'].every(k=>job[k]!==undefined&&u[k]!==undefined)&&
+   ['documentId','threadId','generation','turnId'].some(k=>job[k]!==u[k]);
+  // Keep current-turn assistant priority; only supersede proven prior-source work.
+  if([this.active?.job,this.pending,this.selected].some(job=>job&&!obsolete(job)))return;
   const left=u.deadline-performance.now(),sourceAt=this.now()-(performance.now()-u.sourceAt);
   if(left<=0)return;
   const checkpoint={sourceText:u.text,textPrefix:u.text,target:u.text,publicContext:u.publicContext,sourceStart:0,sourceEnd:u.text.length,checkpointRevision:u.sourceVersion,observedAt:sourceAt};
   const job={...u,sourceRole:'user_request',userVersion:u.sourceVersion,userText:u.text,sourceAt,lastNow:this.now(),expiresAt:sourceAt+10000,monotonicDeadline:u.deadline,controller:new AbortController(),checkpoint,section:0,sourceStart:0,sourceEnd:u.text.length,sourceQuote:u.text,sourceHash:createHash('sha256').update(u.text).digest('hex')};
+  this.userAttempt=u.sourceVersion;
   this.emit('checkpoint',{sourceRole:'user_request',sourceAt,revision:u.sourceVersion,sourceHash:job.sourceHash});this.dispatch(job);
  }
  invalidateSource(reason){
