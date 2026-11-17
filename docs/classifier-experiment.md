@@ -1,8 +1,9 @@
 # Local classifier experiment
 
 Historical experiment: the classifier gate has been removed from Live's provider
-factory. The trial below describes the former integration. Standalone experiment
-runners, shadow/process adapters and evidence remain pending cleanup.
+factory. The trial below describes the former integration. Its shadow adapter,
+process bridge and worker have also been removed; offline runners and evidence
+remain pending cleanup.
 
 This optional offline experiment evaluates original Laya on structured synthetic
 hand, face and context features. It does not process images, infer emotions,
@@ -79,10 +80,10 @@ Synthetic confidence is measurement quality, never MediaPipe handedness score.
 Recent-response age and source health are experimental context extensions,
 not claims about currently transported production fields.
 
-Actual scores are replayed through the [shadow adapter](classifier-shadow.md).
-That boundary does not generate DSL or grant control ownership. Callback-based
-revocation tests are protocol tests, separate from the existing causal host
-regressions. This experiment does not certify rendering, camera accuracy,
+Actual scores were replayed through the former shadow adapter. That boundary
+did not generate DSL or grant control ownership. Its callback-based revocation
+tests covered the retired protocol, separately from causal host regressions.
+This experiment does not certify rendering, camera accuracy,
 naturalness, retention or a replacement for the current semantic agent.
 
 ## Measured result, 2026-11-10
