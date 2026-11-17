@@ -15,9 +15,9 @@ transport timeouts are `startupTimeoutMs` (default 120000) and
 Await `client.ready` before `client.classify(window, signal)`. Calls before
 readiness, concurrent calls and invalid or oversized projections reject without
 queuing. A successful classification returns the strict five-score JSON string
-accepted by the optional provider gate. Pass the gate a caller-owned request
-clock and authoritative `isCurrent` check separately; process transport timeouts
-are relative Node timers, not comparisons against browser request deadlines.
+for standalone experiments. Live's provider factory no longer accepts a
+classifier gate. Process transport timeouts are relative Node timers, not
+comparisons against browser request deadlines.
 
 The worker is spawned without a shell using these arguments:
 `-u workerPath --model-dir modelDir --prompt promptPath`. It must emit one line

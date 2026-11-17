@@ -1,5 +1,9 @@
 # Local classifier experiment
 
+Historical experiment: the classifier gate has been removed from Live's provider
+factory. The trial below describes the former integration. Standalone experiment
+runners, shadow/process adapters and evidence remain pending cleanup.
+
 This optional offline experiment evaluates original Laya on structured synthetic
 hand, face and context features. It does not process images, infer emotions,
 author effects, or enable a production observer. The abstract five-way result
@@ -130,7 +134,7 @@ The product trial used actual inference on projected typed V2 windows through
 gated to observe/action-null, making zero downstream semantic requests and
 zero fixture-ledger reservations. A ninth request was rejected after a user
 abort following actual inference. The local worker exited cleanly. Downstream
-positive dispatch is covered by controlled integration tests, not by a claimed
+positive dispatch was covered by controlled integration tests, not by a claimed
 successful expressive Laya example. There were no rendered actions.
 
 The projection explicitly left hand measurement quality unknown rather than
@@ -139,5 +143,6 @@ host context. Production context extraction and the optional CLI/UI selection
 are separate integration work; this experiment does not silently enable either.
 GLiNER2.5-Decide was researched as another Apache-2.0 local candidate but was
 not downloaded or executed. Jev was not executed. The immediate recommendation
-is to retain the opt-in gate and failed evidence, and improve/re-evaluate a
+was to retain the opt-in gate and failed evidence, and improve/re-evaluate a
 candidate on independent data before attempting a live expressive rollout.
+That recommendation is superseded by the removal of the Live classifier gate.
