@@ -3,6 +3,7 @@ import {preparedDiagramIdentity,matchingDiagramStatus} from './prepared-diagram'
 import { DiagramLab, validateLabDiagram } from './diagram-lab';
 import { PresentationAnnotations } from './presentation-annotations';
 import { PresentationAdmission } from './presentation-admission';
+import { UserRequestAdmissionV2 } from './user-request-admission-v2';
 import type { ReactiveRequest } from '../core/live/decision-types';
 import './style.css';
 import { chatObservation } from './chat-observation';
@@ -43,7 +44,22 @@ let diagramLab: DiagramLab | undefined;
 let presentationChat: any;
 let presentationGeometry: { epoch: string; sceneRevision: number; seq: number } | undefined;
 const annotations = new PresentationAnnotations(element('body').parentElement!, () => stopped ? null : body.presentationAnnotationContext());
-const presentation = new PresentationAdmission(() => ({ documentId: (window as any).fischLive?.conversationDocument,
+let userRequestAttribution: HTMLDivElement | undefined;
+function setUserAttribution(active: boolean) {
+  if (!userRequestAttribution && active) {
+    userRequestAttribution = document.createElement('div');
+    userRequestAttribution.style.cssText='position:absolute;bottom:12px;left:12px;pointer-events:none;padding:4px 8px;background:#10202be6;color:#d9f3ef;font:12px sans-serif;border-radius:6px';
+    element('body').parentElement!.append(userRequestAttribution);
+  }
+  if(userRequestAttribution) { userRequestAttribution.textContent=active?'User-request preview':'';userRequestAttribution.hidden=!active; }
+}
+function retireUserGeometry(owned: any) {
+  if (!owned || !presentationGeometry || !['epoch','sceneRevision','seq'].every(key=>owned[key]===presentationGeometry![key as keyof typeof presentationGeometry])) return;
+  presentationGeometry=undefined;
+  try { diagramLab?.clear();annotations.clear();setUserAttribution(false); } finally { body.revokePresentationGeometry(owned); }
+}
+function createPresentation(v2=false) {
+ const args: ConstructorParameters<typeof PresentationAdmission> = [() => ({ documentId: (window as any).fischLive?.conversationDocument,
   stopped, hidden: document.hidden, busy: body.scheduler.busy, snapshot: presentationChat, scene: body.chatSceneContext() }),
   (value, scope, valid, labels) => {
     const deadline = presentation.leaseDeadline(scope);
@@ -54,15 +70,19 @@ const presentation = new PresentationAdmission(() => ({ documentId: (window as a
       diagramLab?.clear();
       presentationGeometry = { epoch: result.epoch, sceneRevision: result.sceneRevision, seq: result.seq };
       annotations.set(labels, presentationGeometry, deadline);
+      setUserAttribution((scope as any).sourceRole==='user_request');
     }
     return result;
   }, () => performance.now(), () => {
     const owned = presentationGeometry; presentationGeometry = undefined;
     let retired=false;
-    try { diagramLab?.clear(); annotations.clear(); } finally { if (owned) retired=body.revokePresentationGeometry(owned); }
+    try { diagramLab?.clear(); annotations.clear(); setUserAttribution(false); } finally { if (owned) retired=body.revokePresentationGeometry(owned); }
     const fallback=body.chatSceneContext();
     return retired && owned && fallback ? {retired:owned,fallback} : undefined;
-  }, diagramEnabled);
+  }, diagramEnabled];
+ return v2 ? new UserRequestAdmissionV2(...args,retireUserGeometry) : new PresentationAdmission(...args);
+}
+let presentation: PresentationAdmission | UserRequestAdmissionV2 = createPresentation();
 if (diagramEnabled) diagramLab = new DiagramLab(element<HTMLCanvasElement>('body'),
   () => { const scene=body.presentationAnnotationContext();return scene ? {...scene,seq:body.scheduler.nextSequence-1,busy:body.scheduler.busy} : null; },
   () => body.renderer.projectDisplayedParts(), () => presentation.invalidate());
@@ -155,6 +175,14 @@ Object.assign(window, { fischLive: { chatObservation: () => chatObservation(obse
   chatObservationScope: () => ({ sessionId: observations.snapshot.sessionId, revision: observations.sourceRevision }), pair: (base: string, token: string) => bridge.connect(base, token),
   revokePresentation: () => presentation.invalidate(),
   presentationSnapshot: (scope: any) => presentation.snapshot(scope),
+  configureUserRequestPreviewV2: () => {
+    if (presentation instanceof UserRequestAdmissionV2 || presentationGeometry) return false;
+    presentation = createPresentation(true);
+    return (presentation as UserRequestAdmissionV2).configureUserRequestPreviewV2();
+  },
+  userRequestSourceV2: (identity:any) => presentation instanceof UserRequestAdmissionV2 ? presentation.userRequestSourceV2(identity) : null,
+  captureUserRequestV2: () => presentation instanceof UserRequestAdmissionV2 ? presentation.captureUserRequestV2() : null,
+  handoffUserRequestV2: (value:any) => presentation instanceof UserRequestAdmissionV2 ? presentation.handoffUserRequestV2(value) : {status:'rejected',code:'user_request_disabled'},
   presentationPreparationTicket: () => presentation.preparationTicket(),
   preparePresentation: (scope: any, ticket?: any) => ticket ? presentation.prepare(scope,ticket) : null,
   cancelPreparedPresentation: (scope: any) => presentation.cancelPrepared(scope),
