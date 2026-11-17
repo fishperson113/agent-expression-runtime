@@ -1,5 +1,9 @@
 # Local GLiNER decision trial
 
+Historical experiment: Live's optional classifier gate has been removed. The
+product trial below used the former integration; standalone runners, process
+transport and recorded evidence remain pending cleanup.
+
 This is a second actual local classifier experiment, not a proposed model or
 an enabled production default. It classifies structured synthetic hand, face
 and context state into five abstract categories with abstention. It does not
