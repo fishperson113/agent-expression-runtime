@@ -1,8 +1,9 @@
 # Local GLiNER decision trial
 
 Historical experiment: Live's optional classifier gate has been removed. The
-product trial below used the former integration; standalone runners, process
-transport and recorded evidence remain pending cleanup.
+product trial below used the former integration. Its shadow adapter, process
+bridge and worker have also been removed; offline runners and recorded evidence
+remain pending cleanup.
 
 This is a second actual local classifier experiment, not a proposed model or
 an enabled production default. It classifies structured synthetic hand, face
@@ -87,9 +88,9 @@ python experiments/classifier/gliner.py --model-dir /path/to/pinned-model \
 
 Use the shared evaluator with `--model-label gliner`; concatenate the original
 and paired datasets for its input. Its baseline fits only original train rows.
-`serve-gliner.py --model-dir ... --prompt ...` provides the bounded client's
-JSONL worker protocol. The caller supplies trustworthy preprocessing, current
+The former `serve-gliner.py` JSONL worker and bounded process client have been
+removed. Their historical trial required trustworthy preprocessing, current
 host authorization and the request's actual clock domain. Hand measurement
-quality must remain unknown when unavailable; handedness confidence is not a
-substitute. Production preprocessing/UI selection and human relevance remain
-separate gates. Full synthetic predictions and matrices accompany this record.
+quality remained unknown when unavailable; handedness confidence was not a
+substitute. The retained runner above only reproduces offline classifications.
+Full synthetic predictions and matrices accompany this record.
